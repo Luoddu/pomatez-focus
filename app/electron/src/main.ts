@@ -7,6 +7,7 @@ import {
   Tray,
   shell,
   powerMonitor,
+  screen,
 } from "electron";
 import path from "path";
 import fs from "fs";
@@ -52,15 +53,20 @@ else {
   app
     .whenReady()
     .then(async () => {
+      const area = screen.getPrimaryDisplay().workAreaSize;
+      let compactMode = false;
+      let expandedBounds: Electron.Rectangle | null = null;
+      let expandedMaximized = false;
       win = new BrowserWindow({
-        width: 560,
-        height: 760,
-        minWidth: 340,
-        minHeight: 180,
+        width: Math.min(1040, area.width),
+        height: Math.min(800, area.height),
+        minWidth: 760,
+        minHeight: 580,
         resizable: true,
-        maximizable: false,
+        maximizable: true,
+        minimizable: true,
         show: false,
-        frame: false,
+        frame: true,
         alwaysOnTop: true,
         backgroundColor: "#f8faff",
         icon: path.join(__dirname, "assets/logo-dark.ico"),
@@ -105,12 +111,24 @@ else {
         )
           throw new Error("Invalid window mode");
         win!.setAlwaysOnTop(value.pinned);
-        win!.setResizable(!value.compact);
-        win!.setMinimumSize(340, value.compact ? 180 : 500);
-        win!.setSize(
-          value.compact ? 340 : 560,
-          value.compact ? 180 : 760
-        );
+        if (value.compact !== compactMode) {
+          if (value.compact) {
+            expandedBounds = win!.getNormalBounds();
+            expandedMaximized = win!.isMaximized();
+            if (expandedMaximized) win!.unmaximize();
+            win!.setMinimumSize(360, 220);
+            win!.setSize(360, 220);
+            win!.setResizable(false);
+            win!.setMaximizable(false);
+          } else {
+            win!.setResizable(true);
+            win!.setMaximizable(true);
+            win!.setMinimumSize(760, 580);
+            if (expandedBounds) win!.setBounds(expandedBounds);
+            if (expandedMaximized) win!.maximize();
+          }
+          compactMode = value.compact;
+        }
         return { compact: value.compact, pinned: win!.isAlwaysOnTop() };
       });
       handler("minimize", () => {

@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { CounterContext } from "contexts/CounterContext";
-import { FocusTask, timeParts } from "./session";
+import { FocusSession, FocusTask, timeParts } from "./session";
 import "./focus.css";
 
 const demo: FocusTask[] = [
@@ -22,6 +22,19 @@ const clock = (seconds: number) => {
   ).padStart(2, "0")}`;
 };
 const api = () => (window as any).focusApi;
+const durationText = (seconds: number) => {
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return `${total} 秒`;
+  const minutes = Math.floor(total / 60);
+  return minutes < 60
+    ? `${minutes} 分钟`
+    : `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`;
+};
+const recordTime = (value: number) =>
+  new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 export default function FocusApp() {
   const timer = useContext(CounterContext);
   const [tasks, setTasks] = useState(demo),
@@ -53,6 +66,16 @@ export default function FocusApp() {
       new Date(r.startedAt).toDateString() === new Date().toDateString()
   );
   const pending = timer.records.filter((r) => r.sync === "pending");
+  const groups = timer.records
+    .slice()
+    .sort((a, b) => b.startedAt - a.startedAt)
+    .reduce((result, record) => {
+      const date = new Date(record.startedAt).toLocaleDateString();
+      const group = result.find((item) => item.date === date);
+      if (group) group.records.push(record);
+      else result.push({ date, records: [record] });
+      return result;
+    }, [] as { date: string; records: FocusSession[] }[]);
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -209,12 +232,6 @@ export default function FocusApp() {
           >
             {compact ? "↗" : "↙"}
           </button>
-          <button title="最小化" onClick={() => api()?.minimize()}>
-            −
-          </button>
-          <button title="收起到托盘" onClick={() => api()?.hide()}>
-            ×
-          </button>
         </div>
       </header>
       {compact ? (
@@ -246,7 +263,6 @@ export default function FocusApp() {
           <nav>
             {[
               ["timer", "番茄专注"],
-              ["records", "专注记录"],
               ["settings", "飞书连接"],
             ].map(([id, label]) => (
               <button
@@ -258,9 +274,16 @@ export default function FocusApp() {
               </button>
             ))}
           </nav>
-          <main className="content">
+          <main
+            className={`content ${tab === "timer" ? "split-view" : ""}`}
+          >
             {tab === "timer" && (
-              <section className="timer-page">
+              <section
+                className={`timer-page ${
+                  active?.status === "review" ? "reviewing" : ""
+                }`}
+                aria-label="当前番茄专注"
+              >
                 <div className="task-picker">
                   <select
                     aria-label="选择番茄"
@@ -417,6 +440,15 @@ export default function FocusApp() {
                     >
                       保存专注记录
                     </button>
+                    <button
+                      className="discard"
+                      onClick={() => {
+                        setMessage("");
+                        timer.discard();
+                      }}
+                    >
+                      放弃本次记录
+                    </button>
                     <small>
                       完成数由你确认；不会自动勾选飞书任务。
                     </small>
@@ -430,33 +462,59 @@ export default function FocusApp() {
                     休息 5 分钟
                   </button>
                 )}
+              </section>
+            )}
+            {tab === "timer" && (
+              <aside
+                className="history-panel"
+                aria-label="专注概览与记录"
+              >
+                <h1>概览</h1>
                 <div className="overview">
-                  <div>
-                    <strong>
-                      {today.reduce(
-                        (s, r) => s + (r.completedCount || 0),
-                        0
-                      )}
-                    </strong>
-                    <small>今日番茄</small>
-                  </div>
-                  <div>
-                    <strong>
-                      {Math.round(
+                  {[
+                    [
+                      "今日番茄",
+                      String(
+                        today.reduce(
+                          (s, r) => s + (r.completedCount || 0),
+                          0
+                        )
+                      ),
+                    ],
+                    [
+                      "今日专注时长",
+                      durationText(
                         today.reduce(
                           (s, r) => s + (r.acceptedSeconds || 0),
                           0
-                        ) / 60
-                      )}{" "}
-                      <em>m</em>
-                    </strong>
-                    <small>今日专注时长</small>
-                  </div>
+                        )
+                      ),
+                    ],
+                    [
+                      "总番茄",
+                      String(
+                        timer.records.reduce(
+                          (s, r) => s + (r.completedCount || 0),
+                          0
+                        )
+                      ),
+                    ],
+                    [
+                      "总专注时长",
+                      durationText(
+                        timer.records.reduce(
+                          (s, r) => s + (r.acceptedSeconds || 0),
+                          0
+                        )
+                      ),
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} data-stat={label}>
+                      <small>{label}</small>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
                 </div>
-              </section>
-            )}
-            {tab === "records" && (
-              <section>
                 <div className="section-title">
                   <h1>专注记录</h1>
                   <button onClick={exportRecords}>导出</button>
@@ -475,34 +533,37 @@ export default function FocusApp() {
                     从第一个番茄开始，留下你的专注记录。
                   </p>
                 )}
-                <ol className="records">
-                  {timer.records.map((r) => (
-                    <li key={r.id}>
-                      <span className="record-dot">◷</span>
-                      <div>
-                        <h3>{r.task.title}</h3>
-                        <p>
-                          {new Date(r.startedAt).toLocaleString()} —{" "}
-                          {r.endedAt &&
-                            new Date(r.endedAt).toLocaleTimeString()}
-                        </p>
-                        <small>
-                          完成 {r.completedCount} 个 ·{" "}
-                          {r.sync === "synced"
-                            ? "已同步飞书"
-                            : r.sync === "pending"
-                            ? "待同步"
-                            : "本地记录"}
-                        </small>
-                      </div>
-                      <strong>
-                        {((r.acceptedSeconds || 0) / 60).toFixed(1)}{" "}
-                        <em>m</em>
-                      </strong>
-                    </li>
-                  ))}
-                </ol>
-              </section>
+                {groups.map((group) => (
+                  <section className="record-day" key={group.date}>
+                    <h2>{group.date}</h2>
+                    <ol className="records">
+                      {group.records.map((r) => (
+                        <li key={r.id}>
+                          <span className="record-dot">◷</span>
+                          <div>
+                            <p className="record-time">
+                              {recordTime(r.startedAt)} —{" "}
+                              {r.endedAt ? recordTime(r.endedAt) : ""}
+                            </p>
+                            <h3>{r.task.title}</h3>
+                            <small>
+                              完成 {r.completedCount} 个 ·{" "}
+                              {r.sync === "synced"
+                                ? "已同步飞书"
+                                : r.sync === "pending"
+                                ? "待同步"
+                                : "本地记录"}
+                            </small>
+                          </div>
+                          <strong>
+                            {durationText(r.acceptedSeconds || 0)}
+                          </strong>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                ))}
+              </aside>
             )}
             {tab === "settings" && (
               <section className="settings">

@@ -28,6 +28,7 @@ type CounterProps = {
   resume: () => void;
   finish: () => void;
   confirm: (seconds: number, completed: number) => void;
+  discard: () => void;
   markSynced: (id: string) => void;
   startBreak: () => void;
   resetTimerAction: () => void;
@@ -282,6 +283,14 @@ const CounterProvider: React.FC = ({ children }) => {
         ),
       })
     );
+  const discard = () =>
+    action(() => {
+      const next = dataRef.current;
+      if (next.active?.status !== "review") return;
+      publish({ ...next, active: null });
+      setNotice("已放弃本次专注，未保存或同步。 ");
+      setError("");
+    });
   const startBreak = () =>
     action(() => {
       if (dataRef.current.active) throw new Error("请先保存当前专注");
@@ -308,6 +317,7 @@ const CounterProvider: React.FC = ({ children }) => {
         resume,
         finish,
         confirm,
+        discard,
         markSynced,
         startBreak,
         resetTimerAction: finish,

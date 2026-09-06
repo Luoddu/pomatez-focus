@@ -68,6 +68,14 @@ app
       assert.equal(win.isVisible(), false);
       assert.equal(win.isAlwaysOnTop(), true);
     });
+    check(
+      "native frame provides minimize/maximize and content insets",
+      () => {
+        assert.equal(win.isMinimizable(), true);
+        assert.equal(win.isMaximizable(), true);
+        assert.ok(win.getSize()[1] > win.getContentSize()[1]);
+      }
+    );
     const boundary = await js(
       `({node:typeof window.require,oldBridge:typeof window.electron,api:typeof window.focusApi.today})`
     );
@@ -96,6 +104,10 @@ app
     await wait(120);
     assert.equal((await stored()).active.status, "review");
     checks.push("early end opens inline review");
+    assert.equal(
+      await js(`Boolean(document.querySelector('.review .discard'))`),
+      true
+    );
     await click("保存专注记录");
     await wait(120);
     const saved = await stored();
@@ -105,6 +117,22 @@ app
       assert.ok(saved.records[0].acceptedSeconds >= 1);
       assert.equal(saved.active, null);
     });
+    // Discard only an unconfirmed session. Previously saved focus survives,
+    // no pending item exists to be picked up by the Feishu sync effect.
+    await click("开始专注");
+    await wait(300);
+    await click("结束");
+    await wait(100);
+    await click("放弃本次记录");
+    await wait(100);
+    const discarded = await stored();
+    assert.equal(discarded.active, null);
+    assert.deepEqual(discarded.records, saved.records);
+    await reload();
+    assert.deepEqual(await stored(), discarded);
+    checks.push(
+      "discard creates no record or sync item, preserves history after reload"
+    );
     const seed = {
       id: randomUUID(),
       task: {
@@ -112,7 +140,7 @@ app
         title: "整理阅读笔记 · 第 1 个番茄",
         source: "local",
       },
-      startedAt: Date.now() - 1499000,
+      startedAt: Date.now() - 25 * 60 * 60 * 1000,
       plannedSeconds: 1500,
       elapsedSeconds: 1499,
       status: "active",
@@ -167,17 +195,23 @@ app
       assert.equal(all.records[0].completedCount, 1);
       assert.ok(all.records[0].acceptedSeconds > 1500);
     });
+    const expandedSize = win.getSize();
     await js(
       `document.querySelector('[aria-label="切换小窗"]').click()`
     );
     await wait(150);
     check(
-      "compact native window uses 340 by 180 within one DIP rounding without showing",
+      "compact native window uses 360 by 220 within two DIP native-frame rounding without showing",
       () => {
         assert.ok(
           win
             .getSize()
-            .every((v, i) => Math.abs(v - [340, 180][i]) <= 1)
+            .every((v, i) => Math.abs(v - [360, 220][i]) <= 2),
+          JSON.stringify({
+            outer: win.getSize(),
+            content: win.getContentSize(),
+            minimum: win.getMinimumSize(),
+          })
         );
         assert.equal(win.isVisible(), false);
       }
@@ -196,15 +230,62 @@ app
     await wait(150);
     check("expand and repin work", () => {
       assert.ok(
-        win.getSize().every((v, i) => Math.abs(v - [560, 760][i]) <= 1)
+        win
+          .getSize()
+          .every((v, i) => Math.abs(v - expandedSize[i]) <= 2),
+        JSON.stringify({
+          expected: expandedSize,
+          actual: win.getSize(),
+          bounds: win.getBounds(),
+          normal: win.getNormalBounds(),
+          minimum: win.getMinimumSize(),
+          maximum: win.getMaximumSize(),
+        })
       );
       assert.equal(win.isAlwaysOnTop(), true);
     });
+    win.setSize(900, 700);
+    await wait(100);
+    const resized = win.getSize();
+    await js(`document.querySelector('[aria-label="置顶"]').click()`);
+    await wait(100);
+    assert.deepEqual(win.getSize(), resized);
+    checks.push("pin toggle preserves resized window dimensions");
+    win.setSize(760, 580);
+    await wait(150);
+    assert.equal(
+      await js(
+        `document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth`
+      ),
+      true
+    );
+    checks.push(
+      "minimum full window keeps both panels without horizontal clipping"
+    );
+    win.setSize(...expandedSize);
+    await wait(150);
+    const layout = await js(`(()=>{
+      const a=document.querySelector('.timer-page').getBoundingClientRect();
+      const b=document.querySelector('.history-panel').getBoundingClientRect();
+      return {sideBySide:a.right<=b.left,rows:document.querySelectorAll('.records li').length,
+        total:document.querySelector('[data-stat="总番茄"] strong').textContent,
+        today:document.querySelector('[data-stat="今日番茄"] strong').textContent,
+        groups:document.querySelectorAll('.record-day').length};
+    })()`);
+    assert.deepEqual(layout, {
+      sideBySide: true,
+      rows: 2,
+      total: "1",
+      today: "0",
+      groups: 2,
+    });
+    checks.push(
+      "timer/history visible together with correct achievement totals"
+    );
     fs.writeFileSync(
       path.join(artifacts, "desktop-preview.png"),
       (await win.capturePage()).toPNG()
     );
-    await click("专注记录");
     await wait(120);
     fs.writeFileSync(
       path.join(artifacts, "records.png"),
