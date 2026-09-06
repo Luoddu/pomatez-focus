@@ -54,3 +54,7 @@ fs.cpSync(
   { recursive: true }
 );
 console.log("Pomatez Focus desktop build complete.");
+fs.copyFileSync(
+  path.join(root, "LICENSE"),
+  path.join(root, "app/electron/build/LICENSE.pomatez.txt")
+);
