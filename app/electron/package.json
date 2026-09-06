@@ -1,16 +1,15 @@
 {
-  "name": "pomatez",
-  "version": "1.11.0",
+  "name": "pomatez-focus",
+  "version": "0.1.0-preview.1",
   "private": true,
   "license": "MIT",
   "main": "./build/main.js",
   "author": {
-    "name": "Roldan Montilla Jr",
-    "email": "roldanjrmontilla@gmail.com",
-    "url": "https://github.com/roldanjr"
+    "name": "Luoddu",
+    "url": "https://github.com/Luoddu"
   },
-  "repository": "https://github.com/zidoro/pomatez",
-  "description": "Attractive pomodoro timer for Windows, Mac, and Linux.",
+  "repository": "https://github.com/Luoddu/pomatez-focus",
+  "description": "Desktop focus timer with explicit overtime confirmation and Feishu Base session sync.",
   "scripts": {
     "prepare": "yarn build",
     "clean": "rimraf dist/ build/",
@@ -40,9 +39,9 @@
     "test": "jest --watchAll"
   },
   "build": {
-    "productName": "Pomatez",
-    "appId": "com.roldanjr.pomatez",
-    "copyright": "Copyright © 2020 ${author}",
+    "productName": "Pomatez Focus",
+    "appId": "io.github.luoddu.pomatezfocus",
+    "copyright": "Pomatez contributors and Luoddu, MIT",
     "afterSign": "./electron-builder/afterSign.js",
     "files": [
       "build"
@@ -64,10 +63,10 @@
       "icon": "./build/assets/logo-dark.ico"
     },
     "portable": {
-      "artifactName": "Pomatez-v${version}-win-${arch}-portable.${ext}"
+      "artifactName": "Pomatez-Focus-v${version}-win-${arch}-portable.${ext}"
     },
     "nsis": {
-      "artifactName": "Pomatez-v${version}-win-${arch}-setup.${ext}"
+      "artifactName": "Pomatez-Focus-v${version}-win-${arch}-setup.${ext}"
     },
     "linux": {
       "artifactName": "Pomatez-v${version}-linux-${arch}.${ext}",
@@ -81,9 +80,11 @@
     },
     "snap": {
       "category": "Utility"
-    }
+    },
+    "publish": null
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "@pomatez/shareables": "^1.0.0",
     "@types/discord-rpc": "^4.0.9",
     "discord-rpc": "^4.0.1",
@@ -93,9 +94,7 @@
     "electron-updater": "^6.6.2",
     "lodash.debounce": "^4.0.8",
     "node-notifier": "10.0.1",
-    "uuid": "7.0.3"
-  },
-  "devDependencies": {
+    "uuid": "7.0.3",
     "@jest-runner/electron": "^3.0.0",
     "@types/lodash.debounce": "^4.0.6",
     "@types/node-notifier": "8.0.2",

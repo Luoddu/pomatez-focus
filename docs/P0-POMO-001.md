@@ -1,6 +1,6 @@
 # P0-POMO-001 — Pomatez Focus
 
-Status: IN_PROGRESS. Owner: Codex /root. This is the independent module execution card; it does not change any host project's status.
+Status: IN_PROGRESS — desktop and Feishu session sync verified; dashboard UI and independent review remain open. Owner: Codex /root. This is the independent module execution card; it does not change any host project's status.
 
 ## Authorized outcome
 
@@ -32,3 +32,7 @@ Allowed writes: this independent repository's app/, tests/, docs/, scripts/, pac
 One root implementer, zero subagents. One active build/test process per purpose. No scheduled/background monitor. Native tools use CreateNoWindow/windowsHide. Read-only transient retries: at most one. Unknown same-root failure twice: stop the affected step and classify; do not stack patches for lifecycle faults. Check status/baseline, changed paths and resource ownership at first edit, each stage and each commit. Other host worktrees are outside this module's write set. Timebox: one active work session; preserve partial evidence if an external prerequisite blocks a stage.
 
 Rollback: close the fork, retain/export local records, restore the previous local commit/build. Never delete upstream history or user records; disable the Feishu connector to stop external writes. No force push. Learning review: none at bootstrap — no new validated cross-task engineering finding yet.
+
+## Current checkpoint
+
+See ACCEPTANCE.md for paired checks and outstanding work. A public prerelease may describe the tested subset and its remaining dashboard setup; do not label the three stages DONE. No new native console or visible test window was launched. The existing Feishu UI could be read by accessibility, but input was rejected by the OS; no chart configuration was claimed. Publishing uses a dedicated fork branch, not upstream master.

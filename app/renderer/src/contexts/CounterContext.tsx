@@ -1,451 +1,320 @@
-import React, { useCallback, useEffect, useState } from "react";
-import useStayAwake from "use-stay-awake";
-import { setPlay, setRound, setTimerType } from "store";
-import { useNotification } from "hooks";
-import { isEqualToOne, padNum } from "utils";
+// Adapted from Pomatez's CounterProvider: one elapsed-time loop owns focus and break timing.
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FocusSession,
+  FocusTask,
+  advanceSession,
+  confirmSession,
+  restoreSession,
+  timeParts,
+  upsertRecord,
+} from "focus/session";
 
-import notificationIcon from "assets/logos/notification-dark.png";
-
-import breakFinishedWav from "assets/audios/break-finished.wav";
-import focusFinishedWav from "assets/audios/focus-finished.wav";
-import sessionCompletedWav from "assets/audios/session-completed.wav";
-import sixtySecondsLeftWav from "assets/audios/sixty-seconds-left.wav";
-import specialBreakStartedWav from "assets/audios/special-break-started.wav";
-import thirtySecondsLeftWav from "assets/audios/thirty-seconds-left.wav";
-import { useAppDispatch, useAppSelector } from "hooks/storeHooks";
-import { TimerStatus } from "store/timer/types";
-
+const STORAGE_KEY = "pomatez-focus-v1";
+type Data = { active: FocusSession | null; records: FocusSession[] };
 type CounterProps = {
   count: number;
   duration: number;
-  timerType?: TimerStatus;
-  resetTimerAction?: () => void;
-  shouldFullscreen?: boolean;
+  shouldFullscreen: boolean;
+  timerType?: any;
+  active: FocusSession | null;
+  records: FocusSession[];
+  notice: string;
+  error: string;
+  blocked: boolean;
+  restSeconds: number;
+  begin: (task: FocusTask, minutes: number) => void;
+  pause: () => void;
+  resume: () => void;
+  finish: () => void;
+  confirm: (seconds: number, completed: number) => void;
+  markSynced: (id: string) => void;
+  startBreak: () => void;
+  resetTimerAction: () => void;
 };
-
-const CounterContext = React.createContext<CounterProps>({
-  count: 0,
-  duration: 0,
-});
-
+const CounterContext = React.createContext<CounterProps>(
+  {} as CounterProps
+);
 const CounterProvider: React.FC = ({ children }) => {
-  const dispatch = useAppDispatch();
-
-  const { timer, config } = useAppSelector((state) => ({
-    timer: state.timer,
-    config: state.config,
-  }));
-
-  const settings = useAppSelector((state) => state.settings);
-
-  const { preventSleeping, allowSleeping } = useStayAwake();
-
-  const notification = useNotification(
-    {
-      icon: notificationIcon,
-      mute: !settings.notificationSoundOn,
-    },
-    settings.notificationType !== "none"
-  );
-
-  const [shouldFullscreen, setShouldFullscreen] = useState(false);
-
-  const [count, setCount] = useState(config.stayFocus * 60);
-  const [lastCountTime, setLastCountTime] = useState(Date.now());
-  const [hasNotified30Seconds, setHasNotified30Seconds] =
-    useState(false);
-  const [hasNotified60Seconds, setHasNotified60Seconds] =
-    useState(false);
-  const [hasNotifiedBreak, setHasNotifiedBreak] = useState(false);
-
-  const [duration, setDuration] = useState(config.stayFocus * 60);
-
-  const setTimerDuration = useCallback((time: number) => {
-    setDuration(time * 60);
-    setCount(time * 60);
-    setLastCountTime(Date.now());
-    setHasNotified30Seconds(false);
-    if (time > 1) {
-      setHasNotified60Seconds(false);
-    }
-    setHasNotifiedBreak(false);
+  const [data, setData] = useState<Data>({ active: null, records: [] });
+  const dataRef = useRef(data);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const fatal = useRef(false);
+  const lastTick = useRef(performance.now());
+  const lastSave = useRef(0);
+  const [restSeconds, setRestSeconds] = useState(0);
+  const restRef = useRef(0);
+  const notified = useRef(false);
+  const publish = useCallback((next: Data, save = true) => {
+    if (save) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    dataRef.current = next;
+    setData(next);
   }, []);
-
-  // @ts-expect-error
-  window.isUserHaveSession = () => {
+  const fail = useCallback((e: any) => {
+    fatal.current = true;
+    setError(
+      e?.message || "无法保存记录，已暂停计时。请导出数据后重试。"
+    );
+    if (dataRef.current.active) {
+      const next = {
+        ...dataRef.current,
+        active: {
+          ...dataRef.current.active,
+          status: "paused" as const,
+        },
+      };
+      dataRef.current = next;
+      setData(next);
+    }
+  }, []);
+  useEffect(() => {
     try {
-      return count < config.stayFocus * 60 || timer.round > 1;
-    } catch (_) {
-      return false;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          !Array.isArray(parsed.records) ||
+          parsed.records.some(
+            (r: any) =>
+              !r.id ||
+              r.status !== "saved" ||
+              !Number.isFinite(r.acceptedSeconds)
+          )
+        )
+          throw new Error(
+            "本地记录格式异常，请先导出数据，暂不覆盖原始记录。"
+          );
+        const active = restoreSession(parsed.active);
+        publish({ active, records: parsed.records });
+        if (active)
+          setNotice(
+            "已恢复未结束的专注并暂停；关闭期间不计时，可继续或结束确认。"
+          );
+      }
+    } catch (e) {
+      fail(e);
+    }
+  }, [publish, fail]);
+  const settle = useCallback(() => {
+    const now = performance.now();
+    const delta = Math.max(0, (now - lastTick.current) / 1000);
+    lastTick.current = now;
+    const current = dataRef.current;
+    if (
+      !current.active ||
+      current.active.status !== "active" ||
+      fatal.current
+    )
+      return current;
+    // A long event-loop/system suspension is not silently treated as focused work.
+    if (delta > 5) {
+      const next = {
+        ...current,
+        active: {
+          ...current.active,
+          status: "paused" as const,
+          recovered: true,
+        },
+      };
+      publish(next);
+      setNotice("检测到休眠或计时中断，已暂停；缺失时段未自动计入。");
+      return next;
+    }
+    const active = advanceSession(current.active, delta);
+    if (
+      active.elapsedSeconds >= active.plannedSeconds &&
+      !notified.current
+    ) {
+      notified.current = true;
+      setNotice(
+        "本轮时间已到，正在记录额外时间；结束时由你确认是否计入。"
+      );
+      (window as any).focusApi?.remind().catch(() => {});
+    }
+    const next = { ...current, active };
+    const save = now - lastSave.current >= 1000;
+    if (save) lastSave.current = now;
+    publish(next, save);
+    return next;
+  }, [publish]);
+  useEffect(() => {
+    const tick = setInterval(() => {
+      try {
+        const before = lastTick.current;
+        settle();
+        if (restRef.current > 0) {
+          restRef.current = Math.max(
+            0,
+            restRef.current - (performance.now() - before) / 1000
+          );
+          setRestSeconds(restRef.current);
+          if (restRef.current === 0)
+            setNotice("休息结束，可以选择下一个番茄。");
+        }
+      } catch (e) {
+        fail(e);
+      }
+    }, 250);
+    const persist = () => {
+      try {
+        publish(settle());
+      } catch (e) {
+        fail(e);
+      }
+    };
+    const unsubscribe = (window as any).focusApi?.onSuspend(() => {
+      try {
+        const current = dataRef.current;
+        if (current.active?.status === "active") {
+          publish({
+            ...current,
+            active: {
+              ...current.active,
+              status: "paused",
+              recovered: true,
+            },
+          });
+          setNotice("电脑已休眠，专注已暂停；唤醒后可继续或结束确认。");
+        }
+        lastTick.current = performance.now();
+      } catch (e) {
+        fail(e);
+      }
+    });
+    window.addEventListener("beforeunload", persist);
+    return () => {
+      clearInterval(tick);
+      unsubscribe?.();
+      window.removeEventListener("beforeunload", persist);
+    };
+  }, [settle, publish, fail]);
+  const action = (fn: () => void) => {
+    if (!fatal.current) {
+      try {
+        fn();
+      } catch (e: any) {
+        setError(e.message);
+      }
     }
   };
-
-  const resetTimerAction = useCallback(() => {
-    switch (timer.timerType) {
-      case TimerStatus.STAY_FOCUS:
-        setTimerDuration(config.stayFocus);
-        break;
-      case TimerStatus.SHORT_BREAK:
-        setTimerDuration(config.shortBreak);
-        break;
-      case TimerStatus.LONG_BREAK:
-        setTimerDuration(config.longBreak);
-        break;
-      case TimerStatus.SPECIAL_BREAK:
-        setTimerDuration(duration / 60);
-        break;
-    }
-  }, [
-    config.longBreak,
-    config.stayFocus,
-    config.shortBreak,
-    timer.timerType,
-    duration,
-    setTimerDuration,
-  ]);
-
-  useEffect(() => {
-    if (timer.playing) {
-      setLastCountTime(Date.now());
-    }
-  }, [timer.playing]);
-
-  useEffect(() => {
-    if (timer.playing && timer.timerType !== TimerStatus.STAY_FOCUS) {
-      preventSleeping();
-    } else {
-      allowSleeping();
-    }
-  }, [timer.playing, timer.timerType, preventSleeping, allowSleeping]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    const { firstBreak, secondBreak, thirdBreak, fourthBreak } =
-      config.specialBreaks;
-
-    if (timer.playing) {
-      interval = setInterval(() => {
-        const date = new Date();
-        const currentTime =
-          padNum(date.getHours()) + ":" + padNum(date.getMinutes());
-
-        if (timer.timerType !== TimerStatus.SPECIAL_BREAK) {
-          if (firstBreak && currentTime === firstBreak.fromTime) {
-            dispatch(setTimerType(TimerStatus.SPECIAL_BREAK));
-            setTimerDuration(firstBreak.duration);
-            notification(
-              "Special break started.",
-              {
-                body: `Enjoy your ${firstBreak.duration} ${
-                  isEqualToOne(firstBreak.duration)
-                    ? "minute"
-                    : "minutes"
-                } special break.`,
-              },
-              specialBreakStartedWav
-            );
-            return;
-          }
-
-          if (secondBreak && currentTime === secondBreak.fromTime) {
-            dispatch(setTimerType(TimerStatus.SPECIAL_BREAK));
-            setTimerDuration(secondBreak.duration);
-            notification(
-              "Special break started.",
-              {
-                body: `Enjoy your ${secondBreak.duration} ${
-                  isEqualToOne(secondBreak.duration)
-                    ? "minute"
-                    : "minutes"
-                } special break.`,
-              },
-              specialBreakStartedWav
-            );
-            return;
-          }
-
-          if (thirdBreak && currentTime === thirdBreak.fromTime) {
-            dispatch(setTimerType(TimerStatus.SPECIAL_BREAK));
-            setTimerDuration(thirdBreak.duration);
-            notification(
-              "Special break started.",
-              {
-                body: `Enjoy your ${thirdBreak.duration} ${
-                  isEqualToOne(thirdBreak.duration)
-                    ? "minute"
-                    : "minutes"
-                } special break.`,
-              },
-              specialBreakStartedWav
-            );
-            return;
-          }
-
-          if (fourthBreak && currentTime === fourthBreak.fromTime) {
-            dispatch(setTimerType(TimerStatus.SPECIAL_BREAK));
-            setTimerDuration(fourthBreak.duration);
-            notification(
-              "Special break started.",
-              {
-                body: `Enjoy your ${fourthBreak.duration} ${
-                  isEqualToOne(fourthBreak.duration)
-                    ? "minute"
-                    : "minutes"
-                } special break.`,
-              },
-              specialBreakStartedWav
-            );
-            return;
-          }
-        } else {
-          return clearInterval(interval);
-        }
-      }, 500);
-    }
-
-    return () => clearInterval(interval);
-  }, [
-    config.specialBreaks,
-    timer.timerType,
-    timer.playing,
-    dispatch,
-    notification,
-    setTimerDuration,
-  ]);
-
-  useEffect(() => {
-    switch (timer.timerType) {
-      case TimerStatus.STAY_FOCUS:
-        setTimerDuration(config.stayFocus);
-        break;
-      case TimerStatus.SHORT_BREAK:
-        setTimerDuration(config.shortBreak);
-        break;
-      case TimerStatus.LONG_BREAK:
-        setTimerDuration(config.longBreak);
-        break;
-    }
-  }, [
-    setTimerDuration,
-    timer.timerType,
-    config.stayFocus,
-    config.shortBreak,
-    config.longBreak,
-  ]);
-
-  useEffect(() => {
-    let timerInterval: NodeJS.Timeout;
-
-    // calculate how far off a full second the countdown timer is and adjust the countdown timer accordingly
-    const offset = count % 1;
-    if (timer.playing) {
-      timerInterval = setInterval(() => {
-        setCount((prevState) => {
-          // Calculate time passed since last count
-          const now = Date.now();
-          const timePassed = now - lastCountTime;
-
-          setLastCountTime(Date.now());
-          return prevState - timePassed / 1000;
+  const begin = (task: FocusTask, minutes: number) =>
+    action(() => {
+      if (dataRef.current.active)
+        throw new Error("请先结束并确认当前专注");
+      if (
+        !task?.id ||
+        !task.title.trim() ||
+        !Number.isFinite(minutes) ||
+        minutes < 1 ||
+        minutes > 180
+      )
+        throw new Error("请选择任务，并设置 1–180 分钟");
+      restRef.current = 0;
+      setRestSeconds(0);
+      notified.current = false;
+      setNotice("");
+      setError("");
+      lastTick.current = performance.now();
+      const active: FocusSession = {
+        id: crypto.randomUUID(),
+        task,
+        startedAt: Date.now(),
+        plannedSeconds: minutes * 60,
+        elapsedSeconds: 0,
+        status: "active",
+        sync: "local",
+      };
+      publish({ ...dataRef.current, active });
+    });
+  const pause = () =>
+    action(() => {
+      const next = settle();
+      if (next.active?.status === "active")
+        publish({
+          ...next,
+          active: { ...next.active, status: "paused" },
         });
-      }, offset * 1000);
-    }
-
-    return () => clearInterval(timerInterval);
-  }, [timer.playing, lastCountTime, count]);
-
-  useEffect(() => {
-    if (settings.notificationType === "extra") {
-      if (count <= 60 && count > 0 && !hasNotified60Seconds) {
-        setHasNotified60Seconds(true);
-        if (timer.timerType === TimerStatus.SHORT_BREAK) {
-          notification(
-            "60 seconds left.",
-            { body: "Prepare yourself to stay focused again." },
-            settings.enableVoiceAssistance && sixtySecondsLeftWav
-          );
-        } else if (timer.timerType === TimerStatus.LONG_BREAK) {
-          notification(
-            "60 seconds left.",
-            { body: "Prepare yourself to stay focused again." },
-            settings.enableVoiceAssistance && sixtySecondsLeftWav
-          );
-        } else if (timer.timerType === TimerStatus.SPECIAL_BREAK) {
-          notification(
-            "60 seconds left.",
-            { body: "Prepare yourself to stay focused again." },
-            settings.enableVoiceAssistance && sixtySecondsLeftWav
-          );
-        }
-      } else if (
-        count <= 30 &&
-        count > 0 &&
-        timer.timerType === TimerStatus.STAY_FOCUS &&
-        !hasNotified30Seconds
-      ) {
-        setHasNotified30Seconds(true);
-        notification(
-          "30 seconds left.",
-          { body: "Pause all media playing if there's one." },
-          settings.enableVoiceAssistance && thirtySecondsLeftWav
-        );
+    });
+  const resume = () =>
+    action(() => {
+      const next = dataRef.current;
+      if (next.active?.status === "paused") {
+        lastTick.current = performance.now();
+        publish({
+          ...next,
+          active: { ...next.active, status: "active" },
+        });
+        setError("");
       }
-    }
-
-    if (count <= 0 && !hasNotifiedBreak) {
-      setHasNotifiedBreak(true);
-      switch (timer.timerType) {
-        case TimerStatus.STAY_FOCUS:
-          if (timer.round < config.sessionRounds) {
-            setTimeout(() => {
-              notification(
-                "Focus time finished.",
-                {
-                  body: `Enjoy your ${config.shortBreak} ${
-                    isEqualToOne(config.shortBreak)
-                      ? "minute"
-                      : "minutes"
-                  } short break.`,
-                },
-                settings.enableVoiceAssistance && focusFinishedWav
-              );
-
-              dispatch(setTimerType(TimerStatus.SHORT_BREAK));
-            }, 1000);
-          } else {
-            setTimeout(() => {
-              notification(
-                "Session rounds completed.",
-                {
-                  body: `Enjoy your ${config.longBreak} ${
-                    isEqualToOne(config.longBreak)
-                      ? "minute"
-                      : "minutes"
-                  } long break.`,
-                },
-                settings.enableVoiceAssistance && sessionCompletedWav
-              );
-
-              dispatch(setTimerType(TimerStatus.LONG_BREAK));
-            }, 1000);
-          }
-          break;
-
-        case TimerStatus.SHORT_BREAK:
-          setTimeout(() => {
-            notification(
-              "Break time finished.",
-              {
-                body: `Stay focused as much as possible for ${
-                  config.stayFocus
-                } ${
-                  isEqualToOne(config.stayFocus) ? "minute" : "minutes"
-                }.`,
-              },
-              settings.enableVoiceAssistance && breakFinishedWav
-            );
-
-            dispatch(setTimerType(TimerStatus.STAY_FOCUS));
-            dispatch(setRound(timer.round + 1));
-
-            if (!settings.autoStartWorkTime) {
-              dispatch(setPlay(false));
-            }
-          }, 1000);
-          break;
-
-        case TimerStatus.LONG_BREAK:
-          setTimeout(() => {
-            notification(
-              "Break time finished.",
-              {
-                body: `Stay focused as much as possible for ${
-                  config.stayFocus
-                } ${
-                  isEqualToOne(config.stayFocus) ? "minute" : "minutes"
-                }.`,
-              },
-              settings.enableVoiceAssistance && breakFinishedWav
-            );
-
-            dispatch(setTimerType(TimerStatus.STAY_FOCUS));
-            dispatch(setRound(1));
-
-            if (!settings.autoStartWorkTime) {
-              dispatch(setPlay(false));
-            }
-          }, 1000);
-          break;
-
-        case TimerStatus.SPECIAL_BREAK:
-          setTimeout(() => {
-            notification(
-              "Break time finished.",
-              {
-                body: `Stay focused as much as possible for ${
-                  config.stayFocus
-                } ${
-                  isEqualToOne(config.stayFocus) ? "minute" : "minutes"
-                }.`,
-              },
-              settings.enableVoiceAssistance && breakFinishedWav
-            );
-
-            dispatch(setTimerType(TimerStatus.STAY_FOCUS));
-
-            if (!settings.autoStartWorkTime) {
-              dispatch(setPlay(false));
-            }
-          }, 1000);
-          break;
-      }
-    }
-  }, [
-    count,
-    timer.round,
-    timer.playing,
-    timer.timerType,
-    dispatch,
-    notification,
-    config.stayFocus,
-    config.shortBreak,
-    config.longBreak,
-    config.sessionRounds,
-    settings.notificationType,
-    settings.autoStartWorkTime,
-    settings.enableVoiceAssistance,
-    hasNotified30Seconds,
-    hasNotified60Seconds,
-    hasNotifiedBreak,
-    setHasNotified30Seconds,
-    setHasNotified60Seconds,
-    setHasNotifiedBreak,
-  ]);
-
-  useEffect(() => {
-    if (settings.enableFullscreenBreak) {
-      if (timer.timerType !== TimerStatus.STAY_FOCUS) {
-        setShouldFullscreen(true);
-      } else {
-        setShouldFullscreen(false);
-      }
-    }
-  }, [settings.enableFullscreenBreak, timer.timerType]);
-
+    });
+  const finish = () =>
+    action(() => {
+      const next = settle();
+      if (next.active && next.active.status !== "review")
+        publish({
+          ...next,
+          active: {
+            ...next.active,
+            endedAt: Date.now(),
+            status: "review",
+          },
+        });
+    });
+  const confirm = (seconds: number, completed: number) =>
+    action(() => {
+      const next = dataRef.current;
+      if (!next.active) throw new Error("当前没有待确认记录");
+      const record = confirmSession(next.active, seconds, completed);
+      publish({
+        active: null,
+        records: upsertRecord(next.records, record),
+      });
+      setNotice("专注记录已保存。");
+      setError("");
+    });
+  const markSynced = (id: string) =>
+    action(() =>
+      publish({
+        ...dataRef.current,
+        records: dataRef.current.records.map((r) =>
+          r.id === id ? { ...r, sync: "synced" as const } : r
+        ),
+      })
+    );
+  const startBreak = () =>
+    action(() => {
+      if (dataRef.current.active) throw new Error("请先保存当前专注");
+      restRef.current = 300;
+      setRestSeconds(300);
+      lastTick.current = performance.now();
+      setNotice("休息中，休息时间不计入专注。");
+    });
+  const count = data.active ? timeParts(data.active).remaining : 1500;
   return (
     <CounterContext.Provider
       value={{
-        count: Math.ceil(count),
-        duration,
-        resetTimerAction,
-        shouldFullscreen,
-        timerType: timer.timerType,
+        count,
+        duration: data.active?.plannedSeconds || 1500,
+        shouldFullscreen: false,
+        active: data.active,
+        records: data.records,
+        notice,
+        error,
+        blocked: fatal.current,
+        restSeconds,
+        begin,
+        pause,
+        resume,
+        finish,
+        confirm,
+        markSynced,
+        startBreak,
+        resetTimerAction: finish,
       }}
     >
       {children}
     </CounterContext.Provider>
   );
 };
-
 export { CounterContext, CounterProvider };

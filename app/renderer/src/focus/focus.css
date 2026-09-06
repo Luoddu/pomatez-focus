@@ -1,0 +1,431 @@
+:root {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #252936;
+  background: #f8faff;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: #647086;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+button:hover {
+  background: #e9eeff;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #4c6fff;
+  outline-offset: 2px;
+}
+input,
+select {
+  color: #333c50;
+  border: 1px solid #e0e5ee;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  min-width: 0;
+}
+h1 {
+  font-size: 21px;
+}
+h2 {
+  font-size: 17px;
+}
+h3 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+p {
+  line-height: 1.6;
+}
+small,
+.hint {
+  color: #8b94a5;
+  font-size: 12px;
+}
+em {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+}
+.focus-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.titlebar {
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 18px;
+  -webkit-app-region: drag;
+  border-bottom: 1px solid #edf0f6;
+  color: #788298;
+  font-size: 13px;
+}
+.titlebar b {
+  font-weight: 500;
+}
+.titlebar div {
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+.titlebar button {
+  font-size: 19px;
+  padding: 3px 10px;
+}
+.titlebar .selected {
+  color: #4c6fff;
+}
+nav {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 17px 10px 9px;
+  flex-shrink: 0;
+}
+nav button {
+  font-size: 14px;
+  padding: 9px 17px;
+  border-radius: 24px;
+}
+nav .current {
+  background: #e8edff;
+  color: #4c6fff;
+}
+.content {
+  overflow: auto;
+  flex: 1;
+  padding: 10px 28px 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: auto;
+}
+.task-picker {
+  display: flex;
+  gap: 7px;
+  margin: 4px 0 14px;
+}
+.task-picker select,
+.task-picker input {
+  flex: 1;
+  width: 0;
+  border-color: #e7ebf3;
+  background: transparent;
+}
+.task-picker button {
+  color: #4c6fff;
+}
+.timer-page {
+  text-align: center;
+}
+.dial {
+  position: relative;
+  width: 252px;
+  height: 252px;
+  margin: 12px auto;
+}
+.dial svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.dial circle {
+  fill: none;
+  stroke-width: 3;
+}
+.track {
+  stroke: #e1e5ee;
+}
+.progress {
+  stroke: #4c6fff;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s linear;
+}
+.dial > div {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.time {
+  font-size: 58px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.duration {
+  font-size: 13px;
+  color: #929bad;
+  display: block;
+  margin: 7px auto 17px;
+}
+.duration input {
+  width: 61px;
+  padding: 5px 2px;
+  text-align: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #dee4f2;
+  border-radius: 0;
+}
+.actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin: 10px auto;
+}
+.primary,
+.outline {
+  border-radius: 25px;
+  padding: 11px 27px;
+}
+.primary {
+  color: white;
+  background: #4c6fff;
+}
+.primary:hover {
+  background: #3e60ec;
+}
+.outline {
+  border: 1px solid #4c6fff;
+  color: #4c6fff;
+}
+.text-button {
+  color: #8592ab;
+  font-size: 12px;
+  margin: 7px 0;
+}
+.overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 24px 0 0;
+  text-align: left;
+}
+.overview > div {
+  background: #eff3fb;
+  padding: 14px 20px;
+  border-radius: 12px;
+}
+.overview strong {
+  display: block;
+  font-size: 27px;
+  font-weight: 400;
+  margin-bottom: 5px;
+}
+.overview small {
+  display: block;
+}
+.review {
+  background: white;
+  border: 1px solid #e0e6f4;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 15px 0;
+  text-align: left;
+}
+.review h2 {
+  margin: 0;
+}
+.review p {
+  font-size: 13px;
+  color: #858fa5;
+}
+.review small {
+  display: block;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+.choices {
+  display: flex;
+  gap: 8px;
+}
+.choices button {
+  background: #edf1ff;
+  font-size: 12px;
+  color: #4c6fff;
+}
+.fields {
+  display: flex;
+  gap: 12px;
+  margin: 18px 0;
+}
+.fields label {
+  flex: 1;
+  font-size: 12px;
+  color: #6c788e;
+}
+.fields input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+.review .primary {
+  width: 100%;
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.records {
+  padding: 0;
+  list-style: none;
+}
+.records li {
+  display: flex;
+  gap: 12px;
+  padding: 20px 0;
+  border-bottom: 1px solid #ecf0f6;
+  align-items: flex-start;
+}
+.record-dot {
+  color: #6582ff;
+  background: #e8edff;
+  border-radius: 50%;
+  padding: 3px 6px;
+}
+.records li > div {
+  flex: 1;
+  min-width: 0;
+}
+.records p {
+  font-size: 11px;
+  color: #8c95a6;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.records strong {
+  font-size: 16px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.records h3 {
+  overflow-wrap: anywhere;
+}
+.empty {
+  padding: 40px 10px;
+  text-align: center;
+  color: #919baa;
+}
+.notice {
+  flex-shrink: 0;
+  text-align: center;
+  min-height: 34px;
+  padding: 9px 20px;
+  font-size: 11px;
+  color: #8591a8;
+  border-top: 1px solid #edf0f6;
+  line-height: 1.6;
+}
+.settings {
+  padding-bottom: 15px;
+}
+.settings p {
+  font-size: 13px;
+  color: #8591a5;
+}
+.settings label {
+  display: block;
+  font-size: 12px;
+  color: #66738a;
+  margin: 14px 0;
+}
+.settings label input {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+}
+.settings h2 {
+  margin-top: 26px;
+}
+.mini {
+  padding: 12px 18px;
+}
+.mini-task {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #8a95a9;
+}
+.mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.mini-row > strong {
+  font-size: 36px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mini .actions {
+  gap: 6px;
+  margin: 10px 0;
+}
+.mini button {
+  font-size: 11px;
+  padding: 8px 11px;
+}
+.mini small {
+  font-size: 10px;
+}
+.compact .titlebar {
+  padding-left: 14px;
+}
+.compact .titlebar button {
+  padding: 3px 8px;
+}
+@media (max-width: 440px) {
+  .content {
+    padding: 8px 18px 18px;
+  }
+  nav {
+    gap: 2px;
+  }
+  nav button {
+    padding: 8px 14px;
+  }
+  .dial {
+    width: 224px;
+    height: 224px;
+  }
+  .time {
+    font-size: 50px;
+  }
+  .overview {
+    gap: 10px;
+  }
+  .fields {
+    gap: 8px;
+  }
+}

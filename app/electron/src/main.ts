@@ -1,542 +1,183 @@
+// Desktop window/tray lifecycle adapted from Pomatez v1.11.0.
 import {
-  BrowserWindow,
   app,
+  BrowserWindow,
   ipcMain,
-  globalShortcut,
   Menu,
   Tray,
   shell,
-  nativeImage,
-  dialog,
+  powerMonitor,
 } from "electron";
-import debounce from "lodash.debounce";
-import notifier from "node-notifier";
 import path from "path";
-import {
-  SET_ALWAYS_ON_TOP,
-  SET_FULLSCREEN_BREAK,
-  MINIMIZE_WINDOW,
-  CLOSE_WINDOW,
-  SET_UI_THEME,
-  SET_NATIVE_TITLEBAR,
-  SHOW_WINDOW,
-  RELEASE_NOTES_LINK,
-  TRAY_ICON_UPDATE,
-  SET_COMPACT_MODE,
-  SET_OPEN_AT_LOGIN,
-  SET_ENABLE_RPC,
-} from "@pomatez/shareables";
-import {
-  activateGlobalShortcuts,
-  activateAutoUpdate,
-  blockShortcutKeys,
-  getIcon,
-  isWindow,
-  isMacOS,
-  getFromStorage,
-  createContextMenu,
-  initializeRPC,
-  uninitializeRPC,
-  isUserHaveSession,
-} from "./helpers";
-import isDev from "electron-is-dev";
-import store from "./store";
-
-import {
-  FullscreenState,
-  setFullscreenBreakHandler,
-} from "./lifecycleEventHandlers/fullScreenBreak";
-import WindowsToaster from "node-notifier/notifiers/toaster";
-import NotificationCenter from "node-notifier/notifiers/notificationcenter";
-
-const onProduction = app.isPackaged;
-
-const notificationIcon = path.join(
-  __dirname,
-  "assets/notification-dark.png"
+import fs from "fs";
+import { FocusService } from "./focus/service";
+const headless = process.env.POMATEZ_HEADLESS === "1";
+app.setName("Pomatez Focus");
+app.setPath(
+  "userData",
+  process.env.POMATEZ_PROFILE ||
+    path.join(app.getPath("appData"), "pomatez-focus")
 );
-
-const trayIcon = path.join(__dirname, "assets/tray-dark.png");
-
-const onlySingleInstance = app.requestSingleInstanceLock();
-
-const applicationMenu = isMacOS()
-  ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }])
-  : null;
-Menu.setApplicationMenu(applicationMenu);
-
-const getFrameHeight = () => {
-  if (isWindow()) {
-    return 502;
-  } else {
-    if (store.safeGet("useNativeTitlebar")) {
-      return 488;
-    }
-    return 502;
+app.setAppUserModelId("io.github.luoddu.pomatezfocus");
+const single = app.requestSingleInstanceLock();
+let win: BrowserWindow | null = null,
+  tray: Tray | null = null,
+  quitting = false;
+const service = new FocusService();
+const show = () => {
+  if (!headless && win) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
   }
 };
-
-let tray: Tray | null = null;
-
-let win: BrowserWindow | null;
-
-let isRecreatingWindow = false;
-
-type WindowStateProps = {
-  isOnCompactMode: boolean;
-} & FullscreenState;
-
-const windowState: WindowStateProps = {
-  isFullscreen: false,
-  isOnCompactMode: false,
-};
-
-function createMainWindow() {
-  win = new BrowserWindow({
-    width: 340,
-    height: getFrameHeight(),
-    resizable: true,
-    maximizable: false,
-    show: false,
-    frame: store.safeGet("useNativeTitlebar"),
-    icon: getIcon(),
-    backgroundColor: store.safeGet("isDarkMode") ? "#141e25" : "#fff",
-    webPreferences: {
-      contextIsolation: true,
-      backgroundThrottling: false,
-      preload: path.join(__dirname, "preload.js"),
-    },
-  });
-
-  // Open the DevTools.
-  if (isDev) win.webContents.openDevTools({ mode: "detach" });
-
-  win.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url);
-    return { action: "deny" };
-  });
-
-  win.loadURL(
-    !onProduction
-      ? "http://localhost:3000"
-      : `file://${path.join(__dirname, "index.html")}`
-  );
-
-  win.once("ready-to-show", () => {
-    win?.show();
-  });
-
-  win.on(
-    "minimize",
-    debounce(
-      async () => {
-        try {
-          if (win) {
-            const data = await getFromStorage(win, "state");
-            if (data.settings.minimizeToTray) {
-              if (!windowState.isFullscreen) {
-                win?.hide();
-                if (tray === null && data.settings.minimizeToTray) {
-                  createSystemTray();
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.log(error);
-        }
-      },
-      1000,
-      { leading: true }
+const handler = (name: string, fn: (value: any) => any) =>
+  ipcMain.handle(`focus:${name}`, async (event, value) => {
+    if (
+      !win ||
+      event.sender !== win.webContents ||
+      event.senderFrame !== win.webContents.mainFrame
     )
-  );
-  /**
-   * This only exists to counteract an issue with linux where leave-full-screen triggers every time this is called on linux (when exiting fullscreen)
-   *
-   * It may be fixed in a future version of linux.
-   *
-   * If you try to set the size smaller than the minimum allowed it will also cause issues here.
-   *
-   * @param width
-   * @param height
-   */
-  function setSizeIfDiff(width: number, height: number) {
-    // Just to stop an infinite loop in the case of a bug
-    const minSize = win?.getMinimumSize();
-    width = Math.max(width, minSize?.[0] || 0);
-    height = Math.max(height, minSize?.[1] || 0);
-    const size = win?.getSize();
-    if (!size || size[0] !== width || size[1] !== height) {
-      win?.setSize(width, height);
-    }
-  }
-
-  win.on("leave-full-screen", () => {
-    if (windowState.isOnCompactMode) {
-      setSizeIfDiff(340, 100);
-      // Windows doesn't like trying to set it as not resizeable it along with everything else that's going on
-      setTimeout(() => {
-        win?.setResizable(false);
-      });
-    } else {
-      setSizeIfDiff(340, getFrameHeight());
-    }
-  });
-
-  win.on(
-    "close",
-    debounce(
-      async (e) => {
-        e.preventDefault();
-        try {
-          if (win) {
-            const data = await getFromStorage(win, "state");
-            if (!data.settings.closeToTray) {
-              app.exit();
-            } else {
-              if (!windowState.isFullscreen) {
-                win?.hide();
-                if (tray === null && data.settings.closeToTray) {
-                  createSystemTray();
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.log(error);
-        }
-      },
-      1000,
-      { leading: true }
-    )
-  );
-
-  createContextMenu(win);
-}
-
-const trayTooltip = "Just click to restore.";
-
-const contextMenu = Menu.buildFromTemplate([
-  {
-    label: "Restore the app",
-    click: () => {
-      win?.show();
-    },
-  },
-  {
-    label: "Quit",
-    click: async () => {
-      if (!win || !(await isUserHaveSession(win))) {
-        app.exit();
-        return;
-      }
-
-      const quitConfirmButtons = ["Yes, end session", "Cancel"];
-      const enum QuitConfirm {
-        YES,
-        NO,
-      }
-
-      // https://www.electronjs.org/docs/latest/api/dialog#dialogshowmessageboxsyncwindow-options
-      // First argument is optional; null will not throw
-      const response = dialog.showMessageBoxSync(win!, {
-        type: "question",
-        title: "Confirm Exit",
-        message: "Are you sure you want to end the session?",
-        buttons: quitConfirmButtons,
-        defaultId: QuitConfirm.NO, // Cancel as default (better UX)
-        cancelId: QuitConfirm.NO, // Esc/Cancel = Cancel,
-        icon: getIcon(),
-      });
-
-      if (response === QuitConfirm.YES) {
-        app.exit();
-      }
-    },
-  },
-]);
-
-function createSystemTray() {
-  tray = new Tray(trayIcon);
-
-  tray.setToolTip(trayTooltip);
-  tray.setContextMenu(contextMenu);
-
-  tray?.on("click", () => {
-    if (!win?.isVisible()) {
-      win?.show();
-    } else {
-      if (!win?.isFullScreen()) {
-        win?.hide();
-      }
-    }
-  });
-}
-
-type NotificationProps = {
-  title: string;
-  message: string;
-  actions: string[];
-  callback?: (err: Error | null, response: string) => void;
-};
-
-function notify(props: NotificationProps) {
-  // This is because it can take different types depending on the initialised OS.
-  // Just for some reason, whoever sorted the types out of this library only really considered JS rather than TS.
-  const notification: WindowsToaster.Notification &
-    NotificationCenter.Notification = {
-    icon: notificationIcon,
-    title: props.title,
-    message: props.message,
-    actions: props.actions,
-    appID: "com.roldanjr.pomatez",
-    sound: true,
-    wait: true,
-  };
-
-  notifier.notify(notification, (err, response) => {
-    if (props.callback) props.callback(err, response);
-  });
-}
-
-if (!onlySingleInstance) {
-  app.quit();
-} else {
-  app.on("second-instance", () => {
-    if (win) {
-      if (win.isMinimized()) {
-        win.restore();
-      } else if (!win.isVisible()) {
-        win.show();
-      } else {
-        win.focus();
-      }
-    }
-  });
-
-  app.whenReady().then(async () => {
-    if (isDev) {
-      console.log("Installing devtools");
-      const extensions = ["REACT_DEVELOPER_TOOLS", "REDUX_DEVTOOLS"];
-      const installer = await import("electron-devtools-installer");
-      console.log(installer);
-
-      for (const tool of extensions) {
-        try {
-          //@ts-expect-error
-          await installer.default(installer[tool], true);
-        } catch (e) {
-          console.log(e);
-        }
-      }
-    }
-
-    createMainWindow();
+      throw new Error("Untrusted sender");
     try {
-      if (win) {
-        const data = await getFromStorage(win, "state");
-        if (data.settings.enableRPC) {
-          initializeRPC();
+      return { ok: true, value: await fn(value) };
+    } catch (e: any) {
+      return { ok: false, error: e.message || "操作失败" };
+    }
+  });
+if (!single) app.quit();
+else {
+  Menu.setApplicationMenu(null);
+  app.on("second-instance", show);
+  app
+    .whenReady()
+    .then(async () => {
+      win = new BrowserWindow({
+        width: 560,
+        height: 760,
+        minWidth: 340,
+        minHeight: 180,
+        resizable: true,
+        maximizable: false,
+        show: false,
+        frame: false,
+        alwaysOnTop: true,
+        backgroundColor: "#f8faff",
+        icon: path.join(__dirname, "assets/logo-dark.ico"),
+        webPreferences: {
+          preload: path.join(__dirname, "preload.js"),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          backgroundThrottling: false,
+        },
+      });
+      win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      win.webContents.on("will-navigate", (e) => e.preventDefault());
+      win.webContents.session.setPermissionRequestHandler(
+        (_web, _permission, callback) => callback(false)
+      );
+      win.webContents.session.setPermissionCheckHandler(() => false);
+      win.webContents.session.on("will-download", (_event, item) => {
+        if (!item.getURL().startsWith("blob:file:")) {
+          item.cancel();
+          return;
         }
-      }
-    } catch (error) {
-      console.log(error);
-    }
-
-    if (onProduction) {
-      if (win) {
-        const blockKeys = [
-          "CommandOrControl+R",
-          "CommandOrControl+Shift+R",
-          "CommandOrControl+Alt+Q",
-          "F11",
-        ];
-        blockShortcutKeys(win, blockKeys);
-      }
-    }
-
-    activateGlobalShortcuts([
-      {
-        key: "Alt+Shift+H",
-        callback: () => {
+        const file = path.join(
+          app.getPath("downloads"),
+          `focus-records-${Date.now()}.json`
+        );
+        if (fs.existsSync(file)) {
+          item.cancel();
+          return;
+        }
+        item.setSavePath(file);
+      });
+      handler("status", () => service.status());
+      handler("configure", (value) => service.configure(value));
+      handler("today", () => service.today());
+      handler("setup", () => service.setup());
+      handler("sync", (value) => service.sync(value));
+      handler("windowMode", (value) => {
+        if (
+          typeof value?.compact !== "boolean" ||
+          typeof value?.pinned !== "boolean"
+        )
+          throw new Error("Invalid window mode");
+        win!.setAlwaysOnTop(value.pinned);
+        win!.setResizable(!value.compact);
+        win!.setMinimumSize(340, value.compact ? 180 : 500);
+        win!.setSize(
+          value.compact ? 340 : 560,
+          value.compact ? 180 : 760
+        );
+        return { compact: value.compact, pinned: win!.isAlwaysOnTop() };
+      });
+      handler("minimize", () => {
+        if (!headless) win?.minimize();
+      });
+      handler("hide", () => win?.hide());
+      handler("remind", () => {
+        if (!headless) shell.beep();
+      });
+      win.on("close", (event) => {
+        if (!quitting) {
+          event.preventDefault();
           win?.hide();
-        },
-      },
-      {
-        key: "Alt+Shift+S",
-        callback: () => {
-          win?.show();
-        },
-      },
-    ]);
-
-    const autoUpdater = activateAutoUpdate({
-      onUpdateAvailable: (info) => {
-        notify({
-          title: "NEW UPDATE IS AVAILABLE",
-          message: `App version ${info.version} ready to be downloaded.`,
-          actions: ["View Release Notes"],
-          callback: (err, response) => {
-            if (!err) {
-              if (response === "view release notes") {
-                shell.openExternal(RELEASE_NOTES_LINK);
-              }
-            }
-          },
-        });
-      },
-      onUpdateDownloaded: (info) => {
-        notify({
-          title: "READY TO BE INSTALLED",
-          message: "Update has been successfully downloaded.",
-          // Temporarily commented out due to an issue with snoretoast https://github.com/mikaelbr/node-notifier/issues/332
-          actions: ["Quit and Install" /*, "Install it Later"*/],
-          callback: (err, response) => {
-            if (!err) {
-              //if (response === "quit and install") {
-              autoUpdater.quitAndInstall();
-              //}
-            }
-          },
-        });
-      },
+        }
+      });
+      win.on("closed", () => {
+        win = null;
+      });
+      powerMonitor.on("suspend", () =>
+        win?.webContents.send("focus:suspend")
+      );
+      powerMonitor.on("resume", () =>
+        win?.webContents.send("focus:suspend")
+      );
+      if (!headless) {
+        tray = new Tray(path.join(__dirname, "assets/tray-dark.png"));
+        tray.setToolTip("Pomatez Focus · 点击恢复");
+        tray.setContextMenu(
+          Menu.buildFromTemplate([
+            { label: "显示番茄小窗", click: show },
+            {
+              label: "退出（保留专注）",
+              click: () => {
+                quitting = true;
+                app.quit();
+              },
+            },
+          ])
+        );
+        tray.on("click", () =>
+          win?.isVisible() ? win.hide() : show()
+        );
+      }
+      win.once("ready-to-show", show);
+      await win.loadFile(path.join(__dirname, "index.html"));
+      if (headless && process.env.POMATEZ_SMOKE_TEST === "1") {
+        if (
+          win.isVisible() ||
+          !(await win.webContents.executeJavaScript(
+            "Boolean(document.querySelector('.focus-app'))"
+          ))
+        )
+          throw new Error("Smoke check failed");
+        console.log("Pomatez Focus ready (hidden)");
+        quitting = true;
+        app.quit();
+      }
+    })
+    .catch(() => {
+      console.error(
+        "Desktop startup failed. Check the installed application files."
+      );
+      app.exit(1);
     });
-  });
 }
-
-ipcMain.on(SET_ALWAYS_ON_TOP, (e, { alwaysOnTop }) => {
-  win?.setAlwaysOnTop(alwaysOnTop);
+app.on("before-quit", () => {
+  quitting = true;
 });
-
-ipcMain.on(SET_FULLSCREEN_BREAK, (e, args) => {
-  setFullscreenBreakHandler(args, {
-    win,
-    tray,
-    trayTooltip,
-    contextMenu,
-    isFullscreen: windowState.isFullscreen,
-  });
-});
-
-ipcMain.on(SET_COMPACT_MODE, (e, args) => {
-  if (args.compactMode) {
-    win?.setMinimumSize(340, 100);
-    win?.setSize(340, 100);
-    win?.setResizable(false);
-    windowState.isOnCompactMode = true;
-  } else {
-    win?.setResizable(true);
-    windowState.isOnCompactMode = false;
-    win?.setMinimumSize(340, getFrameHeight());
-    win?.setSize(340, getFrameHeight());
-  }
-});
-
-ipcMain.on(SET_UI_THEME, (e, { isDarkMode }) => {
-  store.safeSet("isDarkMode", isDarkMode);
-});
-
-ipcMain.on(SHOW_WINDOW, () => {
-  if (!win?.isVisible()) {
-    win?.show();
-  } else {
-    win?.focus();
-  }
-});
-
-ipcMain.on(MINIMIZE_WINDOW, (e, { minimizeToTray }) => {
-  if (!minimizeToTray) {
-    win?.minimize();
-  } else {
-    if (tray === null) {
-      createSystemTray();
-    }
-    win?.hide();
-  }
-});
-
-ipcMain.on(CLOSE_WINDOW, (e, { closeToTray }) => {
-  if (!closeToTray) {
-    app.exit();
-  } else {
-    if (tray === null) {
-      createSystemTray();
-    }
-    win?.hide();
-  }
-});
-
-ipcMain.on(SET_NATIVE_TITLEBAR, (e, { useNativeTitlebar }) => {
-  if (store.safeGet("useNativeTitlebar") !== useNativeTitlebar) {
-    store.safeSet("useNativeTitlebar", useNativeTitlebar);
-    const bounds = win?.getBounds();
-    setTimeout(() => {
-      isRecreatingWindow = true;
-      win?.destroy();
-      win = null;
-      createMainWindow();
-      isRecreatingWindow = false;
-      if (bounds) {
-        // Set in createMainWindow but the ts compiler seems to see it as never
-        (win as BrowserWindow | null)?.setBounds(bounds);
-      }
-      if (onProduction && win) {
-        blockShortcutKeys(win, [
-          "CommandOrControl+R",
-          "CommandOrControl+Shift+R",
-          "CommandOrControl+Alt+Q",
-          "F11",
-        ]);
-      }
-    }, 1000);
-  }
-});
-
-ipcMain.on(TRAY_ICON_UPDATE, (e, dataUrl) => {
-  const image = nativeImage.createFromDataURL(dataUrl);
-  tray?.setImage(image);
-});
-
-ipcMain.on(SET_OPEN_AT_LOGIN, (e, { openAtLogin }) => {
-  const storeOpenAtLogin = store.safeGet("openAtLogin");
-
-  if (storeOpenAtLogin !== openAtLogin) {
-    store.safeSet("openAtLogin", openAtLogin);
-
-    app.setLoginItemSettings({
-      openAtLogin: openAtLogin,
-      openAsHidden: openAtLogin,
-    });
-  }
-});
-
-ipcMain.on(SET_ENABLE_RPC, (e, { enableRPC }) => {
-  const enableRPCAtLogin = store.safeGet("openAtLogin");
-
-  if (enableRPCAtLogin !== enableRPC) {
-    store.safeSet("openAtLogin", enableRPC);
-    if (enableRPC) {
-      initializeRPC();
-    } else {
-      uninitializeRPC();
-    }
-  }
-});
-
-app.on("window-all-closed", () => {
-  if (!isRecreatingWindow && process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow();
-  }
-});
-
-app.on("will-quit", () => {
-  globalShortcut.unregisterAll();
-});
-
-app.setAppUserModelId("com.roldanjr.pomatez");
+app.on("window-all-closed", () => app.quit());
+app.on("activate", show);

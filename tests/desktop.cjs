@@ -1,0 +1,257 @@
+// Runs the real Electron main/preload/production renderer, always hidden.
+const { app, BrowserWindow, powerMonitor } = require("electron");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { randomUUID } = require("node:crypto");
+if (
+  process.env.POMATEZ_HEADLESS !== "1" ||
+  !process.env.POMATEZ_PROFILE
+)
+  throw Error("Hidden isolated profile required");
+const root = path.resolve(__dirname, ".."),
+  artifacts = path.join(root, "artifacts");
+fs.mkdirSync(artifacts, { recursive: true });
+const downloads = path.join(artifacts, "test-downloads", randomUUID());
+fs.mkdirSync(downloads, { recursive: true });
+app.setPath("downloads", downloads);
+require("../app/electron/build/main.js");
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const checks = [];
+const errors = [];
+const check = (name, fn) => {
+  fn();
+  checks.push(name);
+};
+const deadline = setTimeout(() => {
+  console.error("Hidden desktop test timed out");
+  app.exit(2);
+}, 45000);
+app
+  .whenReady()
+  .then(async () => {
+    let win;
+    for (let n = 0; n < 100; n++) {
+      win = BrowserWindow.getAllWindows()[0];
+      if (
+        win &&
+        !win.webContents.isLoadingMainFrame() &&
+        win.webContents.getURL().startsWith("file:")
+      )
+        break;
+      await wait(100);
+    }
+    assert.ok(win);
+    win.on("show", () => errors.push("Unexpected visible window"));
+    win.webContents.on("console-message", (_event, level, message) => {
+      if (level >= 3) errors.push(message);
+    });
+    const js = (code) => win.webContents.executeJavaScript(code, true);
+    const click = (text) =>
+      js(
+        `(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(
+          text
+        )});if(!e)throw Error('Missing button');e.click()})()`
+      );
+    const stored = () =>
+      js(`JSON.parse(localStorage.getItem('pomatez-focus-v1'))`);
+    const reload = async () => {
+      const done = new Promise((r) =>
+        win.webContents.once("did-finish-load", r)
+      );
+      win.webContents.reload();
+      await done;
+      await wait(350);
+    };
+    await wait(500);
+    check("window starts hidden and always on top", () => {
+      assert.equal(win.isVisible(), false);
+      assert.equal(win.isAlwaysOnTop(), true);
+    });
+    const boundary = await js(
+      `({node:typeof window.require,oldBridge:typeof window.electron,api:typeof window.focusApi.today})`
+    );
+    check("renderer is isolated with narrow bridge", () =>
+      assert.deepEqual(boundary, {
+        node: "undefined",
+        oldBridge: "undefined",
+        api: "function",
+      })
+    );
+    await click("开始专注");
+    await wait(1000);
+    await click("暂停");
+    await wait(80);
+    const paused = await stored();
+    await wait(650);
+    assert.ok(paused.active.elapsedSeconds > 0.5);
+    assert.equal(
+      (await stored()).active.elapsedSeconds,
+      paused.active.elapsedSeconds
+    );
+    checks.push("real interval advances; pause does not accumulate");
+    await click("继续专注");
+    await wait(650);
+    await click("结束");
+    await wait(120);
+    assert.equal((await stored()).active.status, "review");
+    checks.push("early end opens inline review");
+    await click("保存专注记录");
+    await wait(120);
+    const saved = await stored();
+    check("early focus saved with manual zero completion", () => {
+      assert.equal(saved.records.length, 1);
+      assert.equal(saved.records[0].completedCount, 0);
+      assert.ok(saved.records[0].acceptedSeconds >= 1);
+      assert.equal(saved.active, null);
+    });
+    const seed = {
+      id: randomUUID(),
+      task: {
+        id: "synthetic",
+        title: "整理阅读笔记 · 第 1 个番茄",
+        source: "local",
+      },
+      startedAt: Date.now() - 1499000,
+      plannedSeconds: 1500,
+      elapsedSeconds: 1499,
+      status: "active",
+      sync: "local",
+    };
+    // Seed before React mounts, after the old page's legitimate beforeunload persistence.
+    win.webContents.debugger.attach("1.3");
+    await win.webContents.debugger.sendCommand("Page.enable");
+    const script = await win.webContents.debugger.sendCommand(
+      "Page.addScriptToEvaluateOnNewDocument",
+      {
+        source: `localStorage.setItem('pomatez-focus-v1',${JSON.stringify(
+          JSON.stringify({ active: seed, records: saved.records })
+        )})`,
+      }
+    );
+    await reload();
+    await win.webContents.debugger.sendCommand(
+      "Page.removeScriptToEvaluateOnNewDocument",
+      { identifier: script.identifier }
+    );
+    win.webContents.debugger.detach();
+    assert.equal((await stored()).active.status, "paused");
+    assert.equal((await stored()).active.elapsedSeconds, 1499);
+    assert.equal(
+      await js(
+        `document.querySelector('[aria-label="选择番茄"]').selectedOptions[0].textContent`
+      ),
+      seed.task.title
+    );
+    checks.push(
+      "reload restores paused without adding shutdown gap and retains the active task title"
+    );
+    await click("继续专注");
+    await wait(2200);
+    const overtime = await stored();
+    check("expiry stays active and measures overtime", () => {
+      assert.equal(overtime.active.status, "active");
+      assert.ok(overtime.active.elapsedSeconds > 1500);
+    });
+    await click("结束");
+    await wait(100);
+    await click("额外时间也计入");
+    await js(
+      `(()=>{const input=document.querySelector('[aria-label="完成番茄数"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1');input.dispatchEvent(new Event('input',{bubbles:true}))})()`
+    );
+    await click("保存专注记录");
+    await wait(150);
+    const all = await stored();
+    check("overtime selection/count saved once", () => {
+      assert.equal(all.records.length, 2);
+      assert.equal(all.records[0].completedCount, 1);
+      assert.ok(all.records[0].acceptedSeconds > 1500);
+    });
+    await js(
+      `document.querySelector('[aria-label="切换小窗"]').click()`
+    );
+    await wait(150);
+    check(
+      "compact native window uses 340 by 180 within one DIP rounding without showing",
+      () => {
+        assert.ok(
+          win
+            .getSize()
+            .every((v, i) => Math.abs(v - [340, 180][i]) <= 1)
+        );
+        assert.equal(win.isVisible(), false);
+      }
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "compact.png"),
+      (await win.capturePage()).toPNG()
+    );
+    await js(`document.querySelector('[aria-label="置顶"]').click()`);
+    await wait(100);
+    assert.equal(win.isAlwaysOnTop(), false);
+    await js(`document.querySelector('[aria-label="置顶"]').click()`);
+    await js(
+      `document.querySelector('[aria-label="切换小窗"]').click()`
+    );
+    await wait(150);
+    check("expand and repin work", () => {
+      assert.ok(
+        win.getSize().every((v, i) => Math.abs(v - [560, 760][i]) <= 1)
+      );
+      assert.equal(win.isAlwaysOnTop(), true);
+    });
+    fs.writeFileSync(
+      path.join(artifacts, "desktop-preview.png"),
+      (await win.capturePage()).toPNG()
+    );
+    await click("专注记录");
+    await wait(120);
+    fs.writeFileSync(
+      path.join(artifacts, "records.png"),
+      (await win.capturePage()).toPNG()
+    );
+    await click("导出");
+    await wait(500);
+    const exports = fs.readdirSync(downloads);
+    assert.equal(exports.length, 1);
+    assert.equal(
+      JSON.parse(
+        fs.readFileSync(path.join(downloads, exports[0]), "utf8")
+      ).records.length,
+      2
+    );
+    checks.push("JSON export saves records without a dialog");
+    await click("番茄专注");
+    await click("开始专注");
+    await wait(300);
+    powerMonitor.emit("suspend");
+    await wait(150);
+    assert.equal((await stored()).active.status, "paused");
+    powerMonitor.emit("resume");
+    await wait(150);
+    assert.equal((await stored()).active.status, "paused");
+    checks.push("native suspend/resume events leave focus paused");
+    const limits = await js(
+      `Promise.all([window.focusApi.windowMode({compact:'invalid',pinned:true}).then(()=>false,()=>true),window.focusApi.sync({}).then(()=>false,()=>true)])`
+    );
+    assert.deepEqual(limits, [true, true]);
+    checks.push(
+      "invalid bridge inputs rejected while normal window operations work"
+    );
+    check("no visible test window or renderer errors", () => {
+      assert.equal(win.isVisible(), false);
+      assert.deepEqual(errors, []);
+    });
+    fs.writeFileSync(
+      path.join(artifacts, "desktop-test.json"),
+      JSON.stringify({ passed: checks.length, checks }, null, 2)
+    );
+    console.log(JSON.stringify({ passed: checks.length, checks }));
+    clearTimeout(deadline);
+    app.quit();
+  })
+  .catch((e) => {
+    console.error(e.stack);
+    clearTimeout(deadline);
+    app.exit(1);
+  });

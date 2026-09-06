@@ -22,3 +22,9 @@ yarn-error.log*
 *.iml
 /lerna-debug.log
 /release/
+
+# Local credentials, personal exports and temporary developer tooling.
+/.local-tools/
+*.enc
+focus-records-*.json
+feishu-credentials*
