@@ -64,10 +64,38 @@ app
       await wait(350);
     };
     await wait(500);
-    check("window starts hidden and always on top", () => {
-      assert.equal(win.isVisible(), false);
-      assert.equal(win.isAlwaysOnTop(), true);
+    check(
+      "expanded window starts hidden and does not cover other applications",
+      () => {
+        assert.equal(win.isVisible(), false);
+        assert.equal(win.isAlwaysOnTop(), false);
+      }
+    );
+    const requestedExpandedPin = await js(
+      `window.focusApi.windowMode({compact:false,pinned:true})`
+    );
+    assert.deepEqual(requestedExpandedPin, {
+      compact: false,
+      pinned: false,
     });
+    const peer = new BrowserWindow({
+      show: false,
+      webPreferences: { sandbox: true },
+    });
+    assert.equal(peer.isAlwaysOnTop(), false);
+    assert.equal(win.isAlwaysOnTop(), false);
+    peer.destroy();
+    checks.push(
+      "expanded pin requests stay normal alongside another ordinary window"
+    );
+    const focusCalls = [];
+    for (const name of ["focus", "show", "showInactive"]) {
+      const original = win[name].bind(win);
+      win[name] = (...args) => {
+        focusCalls.push(name);
+        return original(...args);
+      };
+    }
     check(
       "native frame provides minimize/maximize and content insets",
       () => {
@@ -214,6 +242,7 @@ app
           })
         );
         assert.equal(win.isVisible(), false);
+        assert.equal(win.isAlwaysOnTop(), true);
       }
     );
     fs.writeFileSync(
@@ -224,11 +253,29 @@ app
     await wait(100);
     assert.equal(win.isAlwaysOnTop(), false);
     await js(`document.querySelector('[aria-label="置顶"]').click()`);
+    await wait(100);
+    assert.equal(win.isAlwaysOnTop(), true);
+    await reload();
+    assert.equal(
+      await js(
+        `document.querySelector('.focus-app').classList.contains('compact')`
+      ),
+      true
+    );
+    assert.equal(
+      await js(
+        `document.querySelector('[aria-label="置顶"]').getAttribute('aria-pressed')`
+      ),
+      "true"
+    );
+    checks.push(
+      "compact reload reads actual native window mode and pin state"
+    );
     await js(
       `document.querySelector('[aria-label="切换小窗"]').click()`
     );
     await wait(150);
-    check("expand and repin work", () => {
+    check("expanding restores bounds and releases topmost", () => {
       assert.ok(
         win
           .getSize()
@@ -242,15 +289,17 @@ app
           maximum: win.getMaximumSize(),
         })
       );
-      assert.equal(win.isAlwaysOnTop(), true);
+      assert.equal(win.isAlwaysOnTop(), false);
     });
     win.setSize(900, 700);
     await wait(100);
     const resized = win.getSize();
-    await js(`document.querySelector('[aria-label="置顶"]').click()`);
+    await js(`window.focusApi.windowMode({compact:false,pinned:true})`);
     await wait(100);
     assert.deepEqual(win.getSize(), resized);
-    checks.push("pin toggle preserves resized window dimensions");
+    checks.push(
+      "expanded pin normalization preserves resized window dimensions"
+    );
     win.setSize(760, 580);
     await wait(150);
     assert.equal(
@@ -322,6 +371,7 @@ app
     check("no visible test window or renderer errors", () => {
       assert.equal(win.isVisible(), false);
       assert.deepEqual(errors, []);
+      assert.deepEqual(focusCalls, []);
     });
     fs.writeFileSync(
       path.join(artifacts, "desktop-test.json"),

@@ -41,7 +41,7 @@ export default function FocusApp() {
     [selected, setSelected] = useState(demo[0].id);
   const [minutes, setMinutes] = useState(25),
     [compact, setCompact] = useState(false),
-    [pinned, setPinned] = useState(true);
+    [pinned, setPinned] = useState(false);
   const [tab, setTab] = useState("timer"),
     [connected, setConnected] = useState(false),
     [message, setMessage] = useState("");
@@ -107,14 +107,20 @@ export default function FocusApp() {
   };
   useEffect(() => {
     run(refresh);
+    api()
+      ?.windowState()
+      .then((state: { compact: boolean; pinned: boolean }) => {
+        setCompact(state.compact);
+        setPinned(state.pinned);
+      })
+      .catch(() => setMessage("无法读取窗口状态，请重试切换小窗。"));
   }, []); // One read at launch; subsequent refreshes are explicit.
   useEffect(() => {
     if (active?.status === "review") {
       setAccepted((Math.floor(timeParts(active).base) / 60).toFixed(2));
       setCompleted(0);
       setTab("timer");
-      setCompact(false);
-      api()?.windowMode({ compact: false, pinned });
+      windowMode(false, false);
     }
     // Initialize once when entering review; elapsed/pin renders must not reset the user's edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,10 +146,18 @@ export default function FocusApp() {
     if (pendingIds && connected) sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingIds, connected]);
-  const windowMode = (small: boolean, pin: boolean) => {
-    setCompact(small);
-    setPinned(pin);
-    api()?.windowMode({ compact: small, pinned: pin });
+  const windowMode = async (small: boolean, pin: boolean) => {
+    try {
+      const state = api()
+        ? await api().windowMode({ compact: small, pinned: pin })
+        : { compact: small, pinned: small && pin };
+      setCompact(state.compact);
+      setPinned(state.pinned);
+      if (small && pin && !state.pinned)
+        setMessage("置顶未生效，可点击置顶按钮重试。");
+    } catch {
+      setMessage("窗口切换未完成，请重试。");
+    }
   };
   const exportRecords = () => {
     const blob = new Blob(
@@ -217,18 +231,24 @@ export default function FocusApp() {
         </span>
         <div>
           <button
-            title={pinned ? "取消置顶" : "置顶"}
+            title={
+              !compact
+                ? "切换为置顶小窗"
+                : pinned
+                ? "取消置顶"
+                : "置顶小窗"
+            }
             aria-label="置顶"
             aria-pressed={pinned}
             className={pinned ? "selected" : ""}
-            onClick={() => windowMode(compact, !pinned)}
+            onClick={() => windowMode(true, !pinned)}
           >
             ⌖
           </button>
           <button
             title={compact ? "展开" : "小窗"}
             aria-label="切换小窗"
-            onClick={() => windowMode(!compact, pinned)}
+            onClick={() => windowMode(!compact, !compact)}
           >
             {compact ? "↗" : "↙"}
           </button>

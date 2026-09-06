@@ -67,7 +67,7 @@ else {
         minimizable: true,
         show: false,
         frame: true,
-        alwaysOnTop: true,
+        alwaysOnTop: false,
         backgroundColor: "#f8faff",
         icon: path.join(__dirname, "assets/logo-dark.ico"),
         webPreferences: {
@@ -104,13 +104,21 @@ else {
       handler("today", () => service.today());
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
+      handler("windowState", () => ({
+        compact: compactMode,
+        pinned: win!.isAlwaysOnTop(),
+      }));
       handler("windowMode", (value) => {
         if (
           typeof value?.compact !== "boolean" ||
           typeof value?.pinned !== "boolean"
         )
           throw new Error("Invalid window mode");
-        win!.setAlwaysOnTop(value.pinned);
+        // Expanded windows must yield to other applications. On Windows the
+        // default floating level is repositioned behind the taskbar on focus;
+        // use the documented non-taskbar-relative level for the compact timer.
+        const shouldPin = value.compact && value.pinned;
+        if (!shouldPin) win!.setAlwaysOnTop(false);
         if (value.compact !== compactMode) {
           if (value.compact) {
             expandedBounds = win!.getNormalBounds();
@@ -129,6 +137,11 @@ else {
           }
           compactMode = value.compact;
         }
+        if (shouldPin)
+          win!.setAlwaysOnTop(
+            true,
+            process.platform === "win32" ? "pop-up-menu" : "floating"
+          );
         return { compact: value.compact, pinned: win!.isAlwaysOnTop() };
       });
       handler("minimize", () => {

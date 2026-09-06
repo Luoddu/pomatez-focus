@@ -1,6 +1,19 @@
-# 0.1.0-preview.2 验证范围
+# 0.1.0-preview.3 验证范围
 
-## 本次体验反馈修订
+## 置顶与应用切换修订
+
+四处预检、故障分类、范围、停止线与回滚见 [模块执行卡](P0-POMO-001.md#screenshottopmost-repair-2026-09-06)。
+
+- 已验证：生产构建、13 项逻辑/API 回归、21 项隐藏 Electron 桌面检查和真实进程重启通过。实际 main/preload/renderer 验证展开态为非置顶，显式请求 expanded+pinned 仍返回 pinned=false；普通对照窗口同为非置顶。紧凑态可置顶、取消和重新置顶；返回展开释放置顶。没有调用 focus/show/showInactive，没有可见测试窗口。
+- 已验证：小窗重载读取原生 compact/pinned 状态；保留前次尺寸；今日与历史跨日期汇总正确；确认、放弃、保存、导出和暂停恢复继续通过。
+- 已验证：preview.3 Windows portable 打包通过，实际便携启动链在独立隐藏配置中退出码为 0；归档私人路径检查为 0，内置上游 MIT 许可证逐字节一致。便携文件 SHA-256：517fbf9408f1ec86b78643b9942f010eb1e7208cc57ef364a50939df0d199379。
+- 已确认原因：旧版大窗口默认置顶会遮住其他普通窗口。与启动应用失败不同，本次从应用窗口策略修复。
+- 部分确认：Electron 34.5.8 默认 floating 将窗口排在任务栏之后，并在重新激活时重做此定位；改用官方 pop-up-menu 可绕开这条路径。此前 native frame=false/true 对照都曾在同一桌面会话无法置顶，随后未改代码即恢复并通过 19 项旧版复测。真实 Snipaste 2.11.300.0 Store 包的截图进入/退出链未自动复现，不能把屏幕共享的同类案例当成本机已修复证明。
+- 上游证据：[固定版本置顶文档](https://github.com/electron/electron/blob/v34.5.8/docs/api/base-window.md#winsetalwaysontopflag-level-relativelevel)、[固定版本窗口实现](https://github.com/electron/electron/blob/v34.5.8/shell/browser/native_window_views.cc#L1701)、[Windows 屏幕共享后丢失置顶案例](https://github.com/electron/electron/issues/28052)、[Microsoft SetWindowPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos)。Snipaste FAQ/CLI 官方 wiki 为当前说明，不是 2.11.300.0 的固定实现源码；本次不调用截图命令、不改 Snipaste 配置、不采集用户桌面。
+- 待实际体验：在展开态从任务栏切换其他应用；在置顶小窗中开始/退出 Snipaste 截图后确认小窗仍可保持置顶、Snipaste 可正常操作且键盘焦点不被抢走。pop-up-menu 在 Windows 上高于任务栏，故只用于小窗；小窗若被人为拖到任务栏上可局部遮挡，取消置顶或移动即可。
+- Learning-Review: none — 现有官方 API 的本模块策略修正；Snipaste 因果链尚未本机完整验证，不作为已验证通用工程教训。
+
+## preview.2 体验反馈修订（历史验证）
 
 四处预检、基线、范围与回滚见 [模块执行卡](P0-POMO-001.md#preview-feedback-revision-2026-09-06)。
 

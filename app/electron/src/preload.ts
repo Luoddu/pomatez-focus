@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("focusApi", {
   setup: () => invoke("setup"),
   sync: (value: any) => invoke("sync", value),
   windowMode: (value: any) => invoke("windowMode", value),
+  windowState: () => invoke("windowState"),
   minimize: () => invoke("minimize"),
   hide: () => invoke("hide"),
   remind: () => invoke("remind"),
