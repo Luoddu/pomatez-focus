@@ -102,6 +102,9 @@ else {
       handler("status", () => service.status());
       handler("configure", (value) => service.configure(value));
       handler("today", () => service.today());
+      handler("generateToday", () => service.generateToday());
+      handler("adjustToday", (value) => service.adjustToday(value));
+      handler("completeToday", (value) => service.completeToday(value));
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
       handler("windowState", () => ({
@@ -168,7 +171,7 @@ else {
       );
       if (!headless) {
         tray = new Tray(path.join(__dirname, "assets/tray-dark.png"));
-        tray.setToolTip("Pomatez Focus · 点击恢复");
+        tray.setToolTip("番茄农场 · 点击恢复");
         tray.setContextMenu(
           Menu.buildFromTemplate([
             { label: "显示番茄小窗", click: show },

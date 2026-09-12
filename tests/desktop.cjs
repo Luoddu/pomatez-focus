@@ -49,12 +49,20 @@ app
     const js = (code) => win.webContents.executeJavaScript(code, true);
     const click = (text) =>
       js(
-        `(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(
+        `(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===${JSON.stringify(
+          text
+        )}||b.textContent===${JSON.stringify(
           text
         )});if(!e)throw Error('Missing button');e.click()})()`
       );
     const stored = () =>
       js(`JSON.parse(localStorage.getItem('pomatez-focus-v1'))`);
+    // 「结束」需二次确认：第一次进入确认态，再点「确认结束」才真正结束
+    const finish2 = async () => {
+      await click("结束");
+      await wait(120);
+      await click("确认结束");
+    };
     const reload = async () => {
       const done = new Promise((r) =>
         win.webContents.once("did-finish-load", r)
@@ -126,17 +134,17 @@ app
       paused.active.elapsedSeconds
     );
     checks.push("real interval advances; pause does not accumulate");
-    await click("继续专注");
+    await click("继续");
     await wait(650);
-    await click("结束");
+    await finish2();
     await wait(120);
     assert.equal((await stored()).active.status, "review");
     checks.push("early end opens inline review");
     assert.equal(
-      await js(`Boolean(document.querySelector('.review .discard'))`),
+      await js(`Boolean(document.querySelector('.review-card .discard'))`),
       true
     );
-    await click("保存专注记录");
+    await click("记录番茄");
     await wait(120);
     const saved = await stored();
     check("early focus saved with manual zero completion", () => {
@@ -149,9 +157,9 @@ app
     // no pending item exists to be picked up by the Feishu sync effect.
     await click("开始专注");
     await wait(300);
-    await click("结束");
+    await finish2();
     await wait(100);
-    await click("放弃本次记录");
+    await click("放弃本次");
     await wait(100);
     const discarded = await stored();
     assert.equal(discarded.active, null);
@@ -193,29 +201,28 @@ app
     win.webContents.debugger.detach();
     assert.equal((await stored()).active.status, "paused");
     assert.equal((await stored()).active.elapsedSeconds, 1499);
-    assert.equal(
-      await js(
-        `document.querySelector('[aria-label="选择番茄"]').selectedOptions[0].textContent`
-      ),
-      seed.task.title
+    const currentTaskText = await js(
+      `document.querySelector('.current-task').textContent`
     );
+    assert.ok(currentTaskText.includes("整理阅读笔记"));
+    assert.ok(currentTaskText.includes("第 1 个番茄"));
     checks.push(
       "reload restores paused without adding shutdown gap and retains the active task title"
     );
-    await click("继续专注");
+    await click("继续");
     await wait(2200);
     const overtime = await stored();
     check("expiry stays active and measures overtime", () => {
       assert.equal(overtime.active.status, "active");
       assert.ok(overtime.active.elapsedSeconds > 1500);
     });
-    await click("结束");
+    await finish2();
     await wait(100);
     await click("额外时间也计入");
     await js(
-      `(()=>{const input=document.querySelector('[aria-label="完成番茄数"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1');input.dispatchEvent(new Event('input',{bubbles:true}))})()`
+      `(()=>{const b=[...document.querySelectorAll('.quick-counts .count-btn')].find(x=>x.textContent==='1');if(!b)throw Error('quick-select 1 missing');b.click()})()`
     );
-    await click("保存专注记录");
+    await click("记录番茄");
     await wait(150);
     const all = await stored();
     check("overtime selection/count saved once", () => {
@@ -314,8 +321,8 @@ app
     win.setSize(...expandedSize);
     await wait(150);
     const layout = await js(`(()=>{
-      const a=document.querySelector('.timer-page').getBoundingClientRect();
-      const b=document.querySelector('.history-panel').getBoundingClientRect();
+      const a=document.querySelector('.left-col').getBoundingClientRect();
+      const b=document.querySelector('.right-col').getBoundingClientRect();
       return {sideBySide:a.right<=b.left,rows:document.querySelectorAll('.records li').length,
         total:document.querySelector('[data-stat="总番茄"] strong').textContent,
         today:document.querySelector('[data-stat="今日番茄"] strong').textContent,
@@ -351,7 +358,6 @@ app
       2
     );
     checks.push("JSON export saves records without a dialog");
-    await click("番茄专注");
     await click("开始专注");
     await wait(300);
     powerMonitor.emit("suspend");

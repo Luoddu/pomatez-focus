@@ -6,6 +6,7 @@ import {
   advanceSession,
   confirmSession,
   restoreSession,
+  returnFromReview,
   timeParts,
   upsertRecord,
 } from "focus/session";
@@ -20,6 +21,7 @@ type CounterProps = {
   active: FocusSession | null;
   records: FocusSession[];
   notice: string;
+  noticeSeq: number;
   error: string;
   blocked: boolean;
   restSeconds: number;
@@ -29,8 +31,13 @@ type CounterProps = {
   finish: () => void;
   confirm: (seconds: number, completed: number) => void;
   discard: () => void;
-  markSynced: (id: string) => void;
+  returnToTiming: () => void;
+  markSynced: (
+    id: string,
+    receipt?: { completedCount?: number; planId?: string }
+  ) => void;
   startBreak: () => void;
+  addManual: (record: FocusSession) => void;
   resetTimerAction: () => void;
 };
 const CounterContext = React.createContext<CounterProps>(
@@ -39,7 +46,13 @@ const CounterContext = React.createContext<CounterProps>(
 const CounterProvider: React.FC = ({ children }) => {
   const [data, setData] = useState<Data>({ active: null, records: [] });
   const dataRef = useRef(data);
-  const [notice, setNotice] = useState("");
+  const [noticeText, setNoticeText] = useState("");
+  // 相同文案的连续通知也要重新触发（React 同值 setState 会跳过重渲染）
+  const [noticeSeq, setNoticeSeq] = useState(0);
+  const setNotice = useCallback((text: string) => {
+    setNoticeText(text);
+    setNoticeSeq((n) => n + 1);
+  }, []);
   const [error, setError] = useState("");
   const fatal = useRef(false);
   const lastTick = useRef(performance.now());
@@ -96,7 +109,7 @@ const CounterProvider: React.FC = ({ children }) => {
     } catch (e) {
       fail(e);
     }
-  }, [publish, fail]);
+  }, [publish, fail, setNotice]);
   const settle = useCallback(() => {
     const now = performance.now();
     const delta = Math.max(0, (now - lastTick.current) / 1000);
@@ -138,7 +151,7 @@ const CounterProvider: React.FC = ({ children }) => {
     if (save) lastSave.current = now;
     publish(next, save);
     return next;
-  }, [publish]);
+  }, [publish, setNotice]);
   useEffect(() => {
     const tick = setInterval(() => {
       try {
@@ -189,7 +202,7 @@ const CounterProvider: React.FC = ({ children }) => {
       unsubscribe?.();
       window.removeEventListener("beforeunload", persist);
     };
-  }, [settle, publish, fail]);
+  }, [settle, publish, fail, setNotice]);
   const action = (fn: () => void) => {
     if (!fatal.current) {
       try {
@@ -225,6 +238,9 @@ const CounterProvider: React.FC = ({ children }) => {
         elapsedSeconds: 0,
         status: "active",
         sync: "local",
+        syncTarget: "plan",
+        segments: [],
+        segmentOpen: false,
       };
       publish({ ...dataRef.current, active });
     });
@@ -244,7 +260,11 @@ const CounterProvider: React.FC = ({ children }) => {
         lastTick.current = performance.now();
         publish({
           ...next,
-          active: { ...next.active, status: "active" },
+          active: {
+            ...next.active,
+            status: "active",
+            segmentOpen: false,
+          },
         });
         setError("");
       }
@@ -274,12 +294,25 @@ const CounterProvider: React.FC = ({ children }) => {
       setNotice("专注记录已保存。");
       setError("");
     });
-  const markSynced = (id: string) =>
+  // receipt.completedCount 是原表行“本次达标”标记（0/1），不回写覆盖
+  // 本地记录里用户确认的番茄数；只补记 syncedPlanId
+  const markSynced = (
+    id: string,
+    receipt?: { completedCount?: number; planId?: string }
+  ) =>
     action(() =>
       publish({
         ...dataRef.current,
         records: dataRef.current.records.map((r) =>
-          r.id === id ? { ...r, sync: "synced" as const } : r
+          r.id === id
+            ? {
+                ...r,
+                sync: "synced" as const,
+                ...(receipt?.planId
+                  ? { syncedPlanId: receipt.planId }
+                  : {}),
+              }
+            : r
         ),
       })
     );
@@ -291,6 +324,17 @@ const CounterProvider: React.FC = ({ children }) => {
       setNotice("已放弃本次专注，未保存或同步。 ");
       setError("");
     });
+  // 结束确认屏返回继续计时：走与暂停/恢复相同的状态机路径（review → paused），
+  // 不新增并行计时逻辑；分钟数由 elapsedSeconds 原样保留，不会重复累计
+  const returnToTiming = () =>
+    action(() => {
+      const next = dataRef.current;
+      if (next.active?.status !== "review") return;
+      lastTick.current = performance.now();
+      publish({ ...next, active: returnFromReview(next.active) });
+      setNotice("已返回继续计时；当前已暂停，点「继续」接着计时。");
+      setError("");
+    });
   const startBreak = () =>
     action(() => {
       if (dataRef.current.active) throw new Error("请先保存当前专注");
@@ -298,6 +342,37 @@ const CounterProvider: React.FC = ({ children }) => {
       setRestSeconds(300);
       lastTick.current = performance.now();
       setNotice("休息中，休息时间不计入专注。");
+    });
+  const addManual = (record: FocusSession) =>
+    action(() => {
+      if (dataRef.current.active)
+        throw new Error("请先结束并确认当前专注再补记");
+      if (!record?.id || !record.task?.id || record.status !== "saved")
+        throw new Error("补记记录格式不正确");
+      if (
+        !Number.isFinite(record.startedAt) ||
+        record.startedAt > Date.now() + 60_000
+      )
+        throw new Error("补记的开始时间不能在未来");
+      if (
+        !Number.isFinite(record.acceptedSeconds) ||
+        (record.acceptedSeconds as number) < 0 ||
+        (record.acceptedSeconds as number) > 600 * 60
+      )
+        throw new Error("补记的专注时长必须在 1–600 分钟");
+      if (
+        record.completedCount != null &&
+        (!Number.isInteger(record.completedCount) ||
+          record.completedCount < 0 ||
+          record.completedCount > 100)
+      )
+        throw new Error("补记的番茄数必须是 0–100 的整数");
+      publish({
+        ...dataRef.current,
+        records: upsertRecord(dataRef.current.records, record),
+      });
+      setNotice("已补记专注记录。");
+      setError("");
     });
   const count = data.active ? timeParts(data.active).remaining : 1500;
   return (
@@ -308,7 +383,8 @@ const CounterProvider: React.FC = ({ children }) => {
         shouldFullscreen: false,
         active: data.active,
         records: data.records,
-        notice,
+        notice: noticeText,
+        noticeSeq,
         error,
         blocked: fatal.current,
         restSeconds,
@@ -318,8 +394,10 @@ const CounterProvider: React.FC = ({ children }) => {
         finish,
         confirm,
         discard,
+        returnToTiming,
         markSynced,
         startBreak,
+        addManual,
         resetTimerAction: finish,
       }}
     >

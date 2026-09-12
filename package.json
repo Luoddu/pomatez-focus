@@ -32,7 +32,7 @@
     "tauri:dev-with-updater": "yarn tauri dev --config ./release.conf.json",
     "tauri:updateversion": "node ./app/tauri/util/cargo-version-updater.js",
     "build:focus": "node scripts/build-focus.cjs",
-    "test:focus": "node --test tests/session.test.mjs tests/feishu.test.cjs",
+    "test:focus": "node --test tests/session.test.mjs tests/feishu.test.cjs tests/plan.test.cjs",
     "test:desktop": "node scripts/test-desktop.cjs",
     "package:focus": "node scripts/package-focus.cjs"
   },

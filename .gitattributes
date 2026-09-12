@@ -2,3 +2,12 @@
 docs/images/desktop.png binary chengxing-binary-allow
 docs/images/compact.png binary chengxing-binary-allow
 docs/images/records.png binary chengxing-binary-allow
+
+app/electron/src/assets/logo-dark.ico binary chengxing-binary-allow
+app/electron/src/assets/logo-dark.png binary chengxing-binary-allow
+app/electron/src/assets/logo-dark@2x.png binary chengxing-binary-allow
+app/electron/src/assets/tray-dark.png binary chengxing-binary-allow
+app/renderer/src/assets/logos/logo-dark.ico binary chengxing-binary-allow
+app/renderer/src/assets/logos/logo-dark.png binary chengxing-binary-allow
+app/renderer/src/assets/logos/logo-dark@2x.png binary chengxing-binary-allow
+app/renderer/src/assets/logos/tray-dark.png binary chengxing-binary-allow

@@ -26,7 +26,7 @@ app
     const js = (c) => w.webContents.executeJavaScript(c, true);
     if (process.env.POMATEZ_TEST_PHASE === "start") {
       await js(
-        `[...document.querySelectorAll('button')].find(b=>b.textContent==='开始专注').click()`
+        `[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='开始专注'||b.textContent==='开始专注').click()`
       );
       await wait(1000);
     } else {

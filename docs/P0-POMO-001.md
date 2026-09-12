@@ -1,57 +1,23 @@
-# P0-POMO-001 — Pomatez Focus
+# P0-POMO-001 — preview.17 公开源码快照
 
-Status: IN_PROGRESS — desktop and Feishu session sync verified; dashboard UI and independent review remain open. Owner: Codex /root. This is the independent module execution card; it does not change any host project's status.
+- 角色：模块实现与发布；状态源为本卡，验收见 ACCEPTANCE.md。
+- 授权：用户明确要求导出打码截图后推送至自己的 GitHub。仅推送 Luoddu/pomatez-focus 的 codex/feishu-focus；不发布安装包、不触碰上游远端。
+- 基线：公开提交 511633f61d2a221c2d2cba4c04560129aebc5efa。导出最新开发源码，以单独提交衔接公开历史，不推送带有私人截图的开发中间提交。
+- 允许写集：README.md、.gitattributes、app/ 中本版变更、package.json、tests/ 本版回归、scripts/gen-logo.cjs、scripts/shot-readme.cjs，以及 docs/ 当前使用说明、来源、验收、本卡和打码 desktop.png。实际提交必须使用显式文件清单。
+- 不纳入：design/ 原始截图、私人任务示例、凭证、运行配置、用户数据、构建产物、临时工具、开发中间历史；不修改根项目共享控制文件。
+- 独占资源：独立发布 worktree；测试使用隔离 profile 和隐藏窗口，不停止用户运行中的 App。
+- 上下文：模块执行卡、版本控制约束、当前代码、README、现有验收与本地提交扫描器。第三方接口未变，不加载无关根架构与历史全文。
+- 升级：远端发生并发改动、发现敏感数据、测试功能回归或目标分支变化时暂停相应发布步骤，查明原因。
+- 并发复核：导出前、构建后、提交与推送前核对 HEAD、工作树与远端；不覆盖其他写者。
+- 预算：不启用子 Agent、计划任务或持久后台；一轮构建与关联回归，失败按根因定位；发布只做一次明确快进推送，不盲目重放外部副作用。
+- 验收：公开截图无法读出任务内容且布局可辨；私人历史不随推送进入远端且公开上游历史仍保留；打码不影响计时/同步功能且模拟测试通过；不写真实账户且隔离桌面流程仍可运行。
+- 回滚：推送前可保留独立分支；推送后通过后续修正提交回滚，不 force、不改写共享历史。开发分支与用户安装目录不变。
 
-## Authorized outcome
+## 四处自检
 
-Deliver a Windows desktop focus timer, an optional Feishu Base connector, and a public fork with source, attribution, documentation and a tested prerelease. The user authorized all three stages and publication to their GitHub account on 2026-09-06. Working name: pomatez-focus. Never display development consoles or launch visible test windows.
+1. 当前现状：公开分支停留于 preview.1 时期；最新源码包含四象限、农场、原表回写、补记和手动同步；开发历史包含旧截图，需选择性导出。
+2. 第三方：复用既有锁文件及 Electron 34.5.8/Pomatez v1.11.0，未改变第三方运行语义；来源与固定提交见 UPSTREAM.md。无需新增接口调研。
+3. Learning/helper：复用现有显式路径提交、工作树/暂存区扫描以及 shot-readme 导出工具；不新增凭证或运行服务。
+4. 同类验收：复用会话/飞书/计划/生成/周统计测试与 manual-sync-desktop 隔离桌面脚本；本次重跑结果写入 ACCEPTANCE.md。
 
-Upstream: zidoro/pomatez v1.11.0, c2727800c6272573590911e9ee81637b89e55d5f, MIT. Preserve upstream attribution and history. Publication target: Luoddu/pomatez-focus; no writes to upstream. Public material contains only generic source, synthetic examples and sanitized verification evidence. Personal task data, tokens and machine configuration are excluded.
-
-## Scope and sources checked
-
-1. Current state: unmodified upstream checkout. User plans one row per intended pomodoro in an existing Feishu Base. User manually decides completion and count. Windows, always-on-top compact window; dashboard in Feishu.
-2. Fixed official sources: upstream CONTRIBUTING.md:30–66, package.json:8–32, app/electron/package.json; renderer CounterContext.tsx:239–255 and 296–332 (single timer loop and automatic break transition), timer/types.ts:9–14 (no overtime state). Dida help article 6950408124297641984 documents opt-in overtime and duration correction. Electron 34.5.8 is fixed by upstream.
-3. Existing helpers and lessons: upstream desktop/compact/tray infrastructure; existing private Feishu Bitable v1 integration and DPAPI channel were inspected, not copied into the public repository. Existing Learning entries concern unrelated gateway permission resolution, not timer implementation. Use existing local commit/pre-scan helpers only as developer tooling, outside published paths.
-4. Prior acceptance: existing private Feishu integration has generation and repeat-run evidence, but no timer/recovery acceptance. New synthetic timer and sync acceptance required; no claim that previous evidence proves this app works.
-
-## Reuse decision and bounded deviation
-
-Adopt the fixed Electron/React build and native window infrastructure. Thin-adapt the existing single CounterProvider for explicit session end, overtime and persistence. Add task mapping and restricted main-process Feishu API access through public Bitable v1 APIs. The upstream timer automatically switches to a break, so configuration alone cannot implement the confirmed overtime choice. Do not introduce a second ticking engine, scheduler, cloud service or task-planning database. Alternative Super Productivity has documented APIs but its compact overlay and detailed session timeline need additional components; prioritize this smaller desktop fork while validating the actual cost.
-
-## Stages and paired acceptance
-
-- S1 Desktop: selectable synthetic/local task; start/pause/resume/early end; time-up reminder without auto-completion; overtime inclusion/exclusion/custom duration; local records; compact always-on-top window; recovery pauses an interrupted session. Pauses and shutdown gaps must not inflate time; normal continued focus and accepted overtime must count. One timer only, no repeated finalization.
-- S2 Feishu: list only today's planned rows; append confirmed sessions keyed by a stable session ID; retries do not duplicate records; explicit user-selected completion only. A failed sync preserves a local pending record and a retry must succeed after connectivity is restored. Tokens stay encrypted in the main process; renderer gets only connection status and selected records. Existing unrelated tasks and planned rows are not deleted. Use synthetic records for live verification.
-- S3 Public prerelease: compile Windows portable build; documented startup/settings/recovery/known limits; synthetic screenshots; fixed upstream source and changes documented; staged and outgoing delta scanned before push. Clean checkout must build. Do not publish personal records, credentials, private documentation, or unverified stable claims. Independent human usability review remains distinct from automated checks.
-
-## Execution boundaries
-
-Allowed writes: this independent repository's app/, tests/, docs/, scripts/, package manifests/lock, README, changelog, ignore files, branding/build configuration; local excluded development tools and build/test profiles. No host repository edits, services, remote workers, system settings, upstream PRs, new paid services, or model calls. Optional Feishu writes are confined to the user's existing target Base and a dedicated focus-session table, with a preview/schema check before mutation. No automatic task completion. No live data in screenshots.
-
-One root implementer, zero subagents. One active build/test process per purpose. No scheduled/background monitor. Native tools use CreateNoWindow/windowsHide. Read-only transient retries: at most one. Unknown same-root failure twice: stop the affected step and classify; do not stack patches for lifecycle faults. Check status/baseline, changed paths and resource ownership at first edit, each stage and each commit. Other host worktrees are outside this module's write set. Timebox: one active work session; preserve partial evidence if an external prerequisite blocks a stage.
-
-Rollback: close the fork, retain/export local records, restore the previous local commit/build. Never delete upstream history or user records; disable the Feishu connector to stop external writes. No force push. Learning review: none at bootstrap — no new validated cross-task engineering finding yet.
-
-## Current checkpoint
-
-### Screenshot/topmost repair (2026-09-06)
-
-- Role/task: isolated module implementer and card owner / P0-POMO-001; baseline 025a317a3de5e96e9aaeb12c0795b12be71c04b6 on task/p0-pomo-001-desktop, clean at entry. User identified Snipaste and explicitly requested research then repair. Scope: app window policy, narrow window IPC/UI state, tests and preview docs/package version; no timer/Feishu/credentials/schema changes. Existing user process stays untouched. Zero subagents, no background monitor, one build/test per purpose, one active work session. Same native root failure after a product patch stops local patching and returns to full-chain diagnosis.
-- Four sources: (1) current main.ts starts both expanded and compact windows alwaysOnTop=true; renderer sets pinned=true and ignores the native IPC return value; previous minimal frame=false/true controls both failed native topmost in the affected desktop session, then both passed without product changes; (2) fixed Electron 34.5.8 docs/api/base-window.md:806–836 and shell/browser/native_window_views.cc:1006–1030,1541–1550,1701–1708; Microsoft SetWindowPos remarks on topmost/non-topmost ordering; (3) existing windowMode bridge, hidden native probe, desktop/restart tests and commit helpers reused; previous targeted Learning search has no matching lesson; (4) latest 19 desktop checks and process restart passed after the desktop state recovered, including the strengthened cross-date totals assertion. No claim that those tests reproduce Snipaste.
-- T0 classification: expanded-window occlusion is a confirmed policy defect, not failure to launch other apps. Snipaste 2.11.300.0 Store package is present. Its screenshot-to-demotion chain is user-reported, not captured in an automated live reproduction. The fixed Electron default `floating` path calls SetWindowPos behind Shell_TrayWnd on pin/focus; upstream electron/electron#28052 reports demotion with Zoom screen sharing on Electron 13 and identifies this same path, but differs in app/version. Hypothesis: taskbar-relative placement explains intermittent native demotion; no assertion that Snipaste itself has a bug. Snipaste current official FAQ/CLI wiki is read only, not a version-matched implementation source; no Snipaste configuration or executable changes are authorized here.
-- Official first repair: use a normal non-topmost expanded window; apply documented `pop-up-menu` level only to user-enabled compact mode, avoiding taskbar-relative placement. Main process normalizes expanded pinned=false and reports actual native state to the UI. The pin action in expanded mode enters the small window. Keep foreground focus unchanged when pin/mode changes. No native dependency, polling, forced refocus loop, or Snipaste interception. Cost is one existing policy/IPC edit versus a new OS hook/scheduler with larger maintenance and capture interference; choose the public API adaptation.
-- Paired acceptance: expanded view never keeps topmost even when IPC requests it, while compact can pin/unpin/re-pin; pin/mode changes do not call focus/show or change active sessions; native return and button state agree after reload; timer/review/discard/sync regressions remain pass. Hidden tests cover real Electron main/preload/renderer and second ordinary hidden window. Actual Snipaste capture/taskbar switching remains user live acceptance: capture may cover the timer temporarily, completion must leave pin preference usable; expanded must yield normally to another app, compact must not steal keyboard focus. Do not call hidden tests proof of that complete real interaction.
-- Rollback: retain preview.2 and local data; restore previous code/binary if the compact level interferes with Snipaste or taskbar. Links and evidence details go in ACCEPTANCE.md. No root shared-state edits. Learning disposition required at commit.
-
-### Preview feedback revision (2026-09-06)
-
-- Role: isolated module implementer / module card owner, P0-POMO-001. Baseline and coordination ref: ed345b726b09c48028dfaf29915ea0d6c644015d / task/p0-pomo-001-desktop; clean before edits, other clean detached checkout has no overlapping writer.
-- User requests: discard the current unconfirmed session, native Windows caption buttons, simultaneous timer and achievement/history panels. Preserve existing saved records and connector semantics. This revision does not delete previously saved or remote records.
-- Allowed writes: renderer focus UI/CSS and CounterContext, Electron main window options, desktop tests, preview version metadata and module documentation. Exclusive resources: this module build output and isolated hidden test profiles; no ports/services/schema changes. Keep user trial process/profile untouched during tests; launch the updated product after validation.
-- Required context: module card, current UI/provider/main, scripts/test-desktop.cjs, tests/desktop.cjs, ACCEPTANCE.md, host dispatch/version-control and context policy. Not loaded: private reference materials, host roadmap and unrelated services. Escalate if credential, shared interface or permission changes become necessary.
-- Four sources: (1) current source confirms review has save only, main frame=false/maximizable=false, records on separate tab; (2) Electron v34.5.8 official docs/api/structures/base-window-options.md lines 15–23, 49–50, 81–84 specify native frame and caption capabilities, https://raw.githubusercontent.com/electron/electron/v34.5.8/docs/api/structures/base-window-options.md ; (3) reuse existing provider publish/persistence, record store and windowMode IPC, existing build/package/hidden-process helpers; host Learning search for Electron/番茄/置顶 found no matching lesson, incidental generic 窗口 results unrelated; (4) extend existing desktop/restart acceptance, retain timer/API regressions.
-- Paired acceptance: discard removes only the active review and never creates a pending sync record, while existing records and subsequent saving survive reload; native frame allows normal minimize/maximize/restore, while pin changes do not resize the window; full view shows timer and dated history concurrently with correct today/total sums, compact mode retains usable controls and returns to prior size.
-- Budget: one implementer, zero subagents, one build/test per purpose, no monitor or automatic extra network writes; one work session, existing retry/stop rules. Green/yellow/red review before edit, after tests and before commit. Learning review recorded in revision acceptance. Rollback to previous preview binary/commit with user data retained.
-
-See ACCEPTANCE.md for paired checks and outstanding work. A public prerelease may describe the tested subset and its remaining dashboard setup; do not label the three stages DONE. No new native console or visible test window was launched. The existing Feishu UI could be read by accessibility, but input was rejected by the OS; no chart configuration was claimed. Publishing uses a dedicated fork branch, not upstream master.
+Learning 判断：本次采用已有隐私导出和隔离提交机制，没有发现需要新设工程规则的可复用教训；不向根 Learning 写入模块发布状态。

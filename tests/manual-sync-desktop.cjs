@@ -1,0 +1,42 @@
+// Real hidden Electron main/preload/renderer; synthetic service, no external writes.
+const {app,BrowserWindow}=require('electron');
+const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
+const {randomUUID}=require('node:crypto');
+const {FocusService}=require('../app/electron/build/focus/service.js');
+process.env.POMATEZ_HEADLESS='1';
+process.env.POMATEZ_PROFILE=path.join(__dirname,'../artifacts/test-profiles',randomUUID());
+let configured=true,calls=0,release;
+FocusService.prototype.status=()=>({configured,sourceKey:'synthetic'});
+FocusService.prototype.today=async()=>[{id:'p1',planId:'p1',taskId:'t1',title:'Synthetic task · 第 1 个番茄',source:'feishu',sourceKey:'synthetic',quadrant:'iu'}];
+FocusService.prototype.sync=async r=>{calls++;assert.equal(r.sync,'pending');if(calls===1)throw Error('Synthetic offline');await new Promise(resolve=>release=resolve);return {synced:true,planId:'p1',completedCount:1};};
+require('../app/electron/build/main.js');
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const deadline=setTimeout(()=>app.exit(2),30000);
+app.whenReady().then(async()=>{try{
+ let win;for(let n=0;n<150;n++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoadingMainFrame()&&win.webContents.getURL().startsWith('file:'))break;await wait(50)}
+ assert.ok(win);
+ const js=s=>win.webContents.executeJavaScript(s,true);
+ const until=async f=>{for(let i=0;i<150;i++){if(await f())return;await wait(30)}throw Error('Timed out')};
+ const click=t=>js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===${JSON.stringify(t)}||b.textContent===${JSON.stringify(t)});if(!b)throw Error('Missing button '+${JSON.stringify(t)});b.click()})()`);
+ const stored=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
+ await until(()=>js("Boolean(document.querySelector('[aria-label=\"手动同步\"]'))"));
+ assert.equal(await js("document.querySelector('[aria-label=\"手动同步\"]').disabled"),true);
+ await click('补记');await js(`(()=>{const s=document.querySelector('#manual-task');s.value='p1';s.dispatchEvent(new Event('change',{bubbles:true}));const input=document.querySelector('#manual-when');const d=new Date(Date.now()-3600000);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,d.toISOString().slice(0,16));input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+ await js("[...document.querySelectorAll('.manual-form button')].find(b=>b.textContent.includes('保存')).click()");
+ await until(()=>js("document.querySelector('[role=alert]')?.textContent.includes('Synthetic offline')"));
+ assert.equal((await stored()).records[0].sync,'pending');assert.equal(calls,1);
+ assert.match(await js("document.querySelector('[aria-label=\"手动同步\"]').textContent"),/1/);
+ await click('手动同步');await until(()=>!!release);
+ assert.equal(await js("document.querySelector('[aria-label=\"手动同步\"]').disabled"),true);
+ assert.equal(await js("document.querySelector('[aria-label=\"手动同步\"]').textContent"),'同步中…');
+ await click('手动同步');assert.equal(calls,2);release();
+ await until(async()=> (await stored()).records[0].sync==='synced');
+ await until(()=>js("document.querySelector('[aria-label=\"手动同步\"]').textContent==='手动同步'"));
+ assert.equal((await stored()).records.length,1);assert.equal(await js("document.querySelector('[aria-label=\"手动同步\"]').disabled"),true);
+ assert.ok(await js("[...document.querySelectorAll('button')].some(b=>b.textContent==='补记')"));
+ configured=false;await click('刷新今日番茄');await wait(150);
+ assert.equal(await js("document.querySelector('[aria-label=\"手动同步\"]').title"),'请先连接飞书');
+ assert.equal(win.isVisible(),false);
+ const result={passed:4,checks:['manual entry fails visibly and preserves pending record','adjacent manual retry syncs the existing record','in-flight clicks cannot duplicate requests; empty queue disables button','disconnected hint and existing manual-entry controls preserved']};
+ fs.writeFileSync(path.join(__dirname,'../artifacts/manual-sync-test.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));clearTimeout(deadline);app.exit(0);
+ }catch(e){console.error(e.stack);clearTimeout(deadline);app.exit(1)}});

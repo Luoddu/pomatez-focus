@@ -7,6 +7,9 @@ const invoke = async (name: string, value?: any) => {
 contextBridge.exposeInMainWorld("focusApi", {
   status: () => invoke("status"),
   today: () => invoke("today"),
+  generateToday: () => invoke("generateToday"),
+  adjustToday: (value: any) => invoke("adjustToday", value),
+  completeToday: (value: any) => invoke("completeToday", value),
   configure: (value: any) => invoke("configure", value),
   setup: () => invoke("setup"),
   sync: (value: any) => invoke("sync", value),

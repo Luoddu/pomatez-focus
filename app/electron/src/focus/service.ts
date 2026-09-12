@@ -2,7 +2,12 @@ import { app, safeStorage } from "electron";
 import fs from "fs";
 import path from "path";
 import https from "https";
-import { Feishu, Request, validateConnection } from "./feishu";
+import {
+  Feishu,
+  Request,
+  validateConnection,
+  connectionKey,
+} from "./feishu";
 
 export const request: Request = (method, route, body, token) =>
   new Promise((resolve, reject) => {
@@ -84,7 +89,11 @@ export class FocusService {
         throw new Error("本机凭证无法解密，请重新连接飞书");
       }
     }
-    return { configured: !!this.client };
+    return {
+      configured: !!this.client,
+      quadrantField: this.client?.quadrantFieldResolved ?? null,
+      sourceKey: this.client ? connectionKey(this.client.config) : null,
+    };
   }
   async configure(value: any) {
     this.cryptoReady();
@@ -108,10 +117,60 @@ export class FocusService {
   today() {
     return this.connected().today();
   }
-  setup() {
-    return this.connected().setup();
+  // 计划表写入串行化：生成与 ± 共用一把锁，避免 list-then-write 交错出重复键
+  private planWriting = false;
+  private adjusting = new Set<string>();
+  async generateToday() {
+    if (this.planWriting) throw new Error("今日番茄正在生成中，请稍候");
+    this.planWriting = true;
+    try {
+      return await this.connected().generateToday();
+    } finally {
+      this.planWriting = false;
+    }
   }
-  sync(value: any) {
-    return this.connected().sync(value);
+  async adjustToday(value: any) {
+    const taskId = value?.taskId,
+      delta = value?.delta;
+    if (typeof taskId !== "string" || (delta !== 1 && delta !== -1))
+      throw new Error("番茄调整参数无效");
+    if (this.planWriting) throw new Error("正在写入番茄计划，请稍候");
+    if (this.adjusting.has(taskId))
+      throw new Error("该任务正在调整中，请稍候");
+    this.planWriting = true;
+    this.adjusting.add(taskId);
+    try {
+      return await this.connected().adjustToday(taskId, delta);
+    } finally {
+      this.planWriting = false;
+      this.adjusting.delete(taskId);
+    }
+  }
+  // 右键标记完成：与 ±/生成共用计划表写入锁
+  async completeToday(value: any) {
+    const planId = value?.planId;
+    if (typeof planId !== "string") throw new Error("完成参数无效");
+    if (this.planWriting) throw new Error("正在写入番茄计划，请稍候");
+    this.planWriting = true;
+    try {
+      return await this.connected().completePlan(planId);
+    } finally {
+      this.planWriting = false;
+    }
+  }
+  setup() {
+    return this.connected().setupPlans();
+  }
+  // 计划表方向的同步（含确认 N 个番茄的多行完成/补行）与生成、±、
+  // 右键完成共用 planWriting 锁，避免 list-then-write 交错出重复键
+  async sync(value: any) {
+    if (value?.syncTarget !== "plan") return this.connected().sync(value);
+    if (this.planWriting) throw new Error("正在写入番茄计划，请稍候");
+    this.planWriting = true;
+    try {
+      return await this.connected().sync(value);
+    } finally {
+      this.planWriting = false;
+    }
   }
 }
