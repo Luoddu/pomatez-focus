@@ -1,5 +1,11 @@
 import { createHash } from "crypto";
 import {
+  HISTORY_FIELD,
+  historyRecord,
+  readHistory,
+  mergeHistory,
+} from "./history";
+import {
   PLAN_FIELDS,
   FREE_TITLE,
   ledgerField,
@@ -365,10 +371,15 @@ export class Feishu {
     // 已收 x/y 聚合：y=今日该任务番茄行总数（含已完成+待办），x=已完成行数；
     // 完成判定沿用同步链路口径——已完成勾选，或分钟台账累计达到目标
     const harvestKey = (r: any) =>
-      linkedRecordIds(r.fields?.[this.config.taskField], linkedTable)[0] ||
-      "";
+      linkedRecordIds(
+        r.fields?.[this.config.taskField],
+        linkedTable
+      )[0] || "";
     const harvestOf = (r: any) => harvestKey(r) || r.record_id;
-    const harvest = new Map<string, { done: number; planned: number }>();
+    const harvest = new Map<
+      string,
+      { done: number; planned: number }
+    >();
     for (const r of inRange) {
       let done = r.fields?.[this.config.completedField] === true;
       if (!done)
@@ -497,7 +508,9 @@ export class Feishu {
     ] as [string, number][]) {
       const f = taskFields.filter((f: any) => f.field_name === name);
       if (f.length !== 1 || f[0].type !== type)
-        throw new Error(`任务表字段「${name}」缺失或类型不符，请到飞书检查`);
+        throw new Error(
+          `任务表字段「${name}」缺失或类型不符，请到飞书检查`
+        );
     }
     const resolution = resolveTodayCountField(taskFields);
     if (!resolution.field)
@@ -521,7 +534,9 @@ export class Feishu {
       throw new Error(
         `${invalid} 个今日任务的「${resolution.name}」不是 0–${MAX_PER_TASK} 的整数，未写入；请到飞书修正后重试`
       );
-    const known = new Set(taskRecords.map((r: any) => String(r.record_id)));
+    const known = new Set(
+      taskRecords.map((r: any) => String(r.record_id))
+    );
     const candidates = new Set(plans.map((p) => p.recordId));
     const scan = scanExisting(pomodoroRecords, {
       dayMs,
@@ -533,9 +548,18 @@ export class Feishu {
       candidateTaskIds: candidates,
       linkIds: (v: any) => linkedRecordIds(v, taskTableId),
     });
-    const plan = pomodoroPlan(plans, scan.keyCounts, scan.blocked, dateKey);
+    const plan = pomodoroPlan(
+      plans,
+      scan.keyCounts,
+      scan.blocked,
+      dateKey
+    );
     let created = 0;
-    for (let offset = 0; offset < plan.specs.length; offset += BATCH_SIZE) {
+    for (
+      let offset = 0;
+      offset < plan.specs.length;
+      offset += BATCH_SIZE
+    ) {
       const chunk = plan.specs.slice(offset, offset + BATCH_SIZE);
       const token = clientToken(
         `today-pomodoro-create|${this.config.appToken}|${chunk
@@ -572,13 +596,17 @@ export class Feishu {
           taskTableId
         );
         if (ids.length !== 1) continue;
-        const sequence = pomodoroSequence(textValue(r.fields?.["番茄"]));
+        const sequence = pomodoroSequence(
+          textValue(r.fields?.["番茄"])
+        );
         if (sequence <= 0) continue;
         const key = `${ids[0]}|${dateKey}|${sequence}`;
         counts.set(key, (counts.get(key) || 0) + 1);
       }
       if (plan.specs.some((s) => counts.get(s.key) !== 1))
-        throw new Error("生成后回读校验未通过（缺失或重复），请到飞书核对");
+        throw new Error(
+          "生成后回读校验未通过（缺失或重复），请到飞书核对"
+        );
     }
     return {
       created,
@@ -597,7 +625,8 @@ export class Feishu {
   // 最高序号的未完成行；任务表计数字段保持不动
   async adjustToday(taskRecordId: any, delta: any, now = new Date()) {
     id(taskRecordId);
-    if (delta !== 1 && delta !== -1) throw new Error("番茄调整幅度无效");
+    if (delta !== 1 && delta !== -1)
+      throw new Error("番茄调整幅度无效");
     const { path, fields } = await this.planSchema();
     const seqFields = fields.filter(
       (f: any) => f.field_name === "番茄" && f.type === 1
@@ -613,8 +642,10 @@ export class Feishu {
       localDayOf(r.fields?.[this.config.dateField]) === dayMs &&
       linkedRecordIds(r.fields?.[this.config.taskField], linkedTable)
         .length === 1 &&
-      linkedRecordIds(r.fields?.[this.config.taskField], linkedTable)[0] ===
-        taskRecordId;
+      linkedRecordIds(
+        r.fields?.[this.config.taskField],
+        linkedTable
+      )[0] === taskRecordId;
     const rows = (await this.list(`${path}/records`)).filter(mine);
     const keyed = rows
       .map((r) => ({
@@ -642,7 +673,8 @@ export class Feishu {
         }
       );
       const recordId = created.data?.record?.record_id;
-      if (!recordId) throw new Error("新增番茄未返回标识，请刷新后核对");
+      if (!recordId)
+        throw new Error("新增番茄未返回标识，请刷新后核对");
       // readback：该幂等键必须恰好存在一次
       const count = (await this.list(`${path}/records`)).filter(
         (r) =>
@@ -650,13 +682,16 @@ export class Feishu {
           pomodoroSequence(textValue(r.fields?.["番茄"])) === sequence
       ).length;
       if (count !== 1)
-        throw new Error("新增后回读校验未通过（缺失或重复），请到飞书核对");
+        throw new Error(
+          "新增后回读校验未通过（缺失或重复），请到飞书核对"
+        );
       return { action: "added", sequence, recordId };
     }
     // 减号：只删最高序号的待办行；已勾选完成或已有专注分钟的行不删，
     // 避免丢掉已发生的专注记录
     const removable = keyed.filter((x) => {
-      if (x.r.fields?.[this.config.completedField] === true) return false;
+      if (x.r.fields?.[this.config.completedField] === true)
+        return false;
       try {
         return ledgerSeconds(readLedger(x.r.fields)) === 0;
       } catch {
@@ -668,7 +703,10 @@ export class Feishu {
     const target = removable.reduce((a, b) =>
       b.sequence > a.sequence ? b : a
     );
-    await this.call("DELETE", `${path}/records/${id(target.r.record_id)}`);
+    await this.call(
+      "DELETE",
+      `${path}/records/${id(target.r.record_id)}`
+    );
     const still = (await this.list(`${path}/records`)).some(
       (r) => r.record_id === target.r.record_id
     );
@@ -730,6 +768,162 @@ export class Feishu {
           "专注会话表字段不匹配，请按文档检查；未修改现有字段"
         );
     return { ready: true };
+  }
+  // Metadata migration never replays minute accounting or completion writes.
+  async archiveHistory(input: any) {
+    const key = connectionKey(this.config);
+    let record = input;
+    if (input?.task?.source === "local" && input.sync === "local") {
+      record = {
+        ...input,
+        syncTarget: "plan",
+        task: {
+          id: input.task.id,
+          title: input.task.title,
+          kind: "free",
+          source: "feishu",
+          sourceKey: key,
+          ...(input.task.quadrant
+            ? { quadrant: input.task.quadrant }
+            : {}),
+        },
+      };
+      historyRecord(record, key); // Validate before any external side effect.
+      const receipt = await this.sync(record);
+      record = {
+        ...record,
+        syncedPlanId: receipt.planId,
+        sync: "synced",
+      };
+    }
+    const snapshot = historyRecord(record, key);
+    if (record.sync !== "synced")
+      throw Error("请先完成该记录的飞书记账，再共享成果");
+    const schema = await this.planSchema();
+    const column = schema.fields.filter(
+      (f) => f.field_name === HISTORY_FIELD
+    );
+    if (
+      column.length > 1 ||
+      (column.length === 1 && column[0].type !== 1)
+    )
+      throw Error("跨端专注记录字段必须是文本，未覆盖");
+    let planId = record.syncedPlanId || record.task.planId;
+    if (!planId && record.task.kind === "free") {
+      const matches = (
+        await this.list(`${schema.path}/records`)
+      ).filter((r) =>
+        readLedger(r.fields)?.entries.some((e) => e.id === record.id)
+      );
+      if (matches.length !== 1)
+        throw Error("无法定位自由番茄原行，请在原电脑核对");
+      planId = matches[0].record_id;
+    }
+    const route = `${schema.path}/records/${id(planId)}`;
+    const row = (await this.call("GET", route)).data?.record;
+    if (!row?.fields || row.record_id !== planId)
+      throw Error("历史番茄原行不存在，未创建替代行");
+    const linkedTable = schema.fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    if (
+      record.task.taskId &&
+      !linkedRecordIds(
+        row.fields[this.config.taskField],
+        linkedTable
+      ).includes(record.task.taskId)
+    )
+      throw Error("历史番茄的关联任务已改变，未覆盖");
+    if (record.syncTarget === "plan") {
+      const entry = readLedger(row.fields)?.entries.find(
+        (e) => e.id === record.id
+      );
+      if (
+        !entry ||
+        entry.seconds !== record.acceptedSeconds ||
+        entry.start !== record.startedAt ||
+        entry.end !== record.endedAt
+      )
+        throw Error("原表记账与本机历史不一致，未重复累计；请核对");
+    } else {
+      const table = await this.findTable(SESSION_TABLE);
+      const originals = (
+        await this.list(
+          `${this.root()}/tables/${id(table.table_id)}/records`
+        )
+      ).filter((r) => plain(r.fields?.["会话 ID"]) === record.id);
+      if (
+        originals.length !== 1 ||
+        !fieldsAgree(originals[0].fields, sessionFields(record))
+      )
+        throw Error("旧会话历史无法核对，未重复记账");
+    }
+    const before = textValue(row.fields[HISTORY_FIELD]);
+    const merged = mergeHistory(before, snapshot, key);
+    if (!column.length) {
+      await this.call(
+        "POST",
+        `${schema.path}/fields?client_token=${this.stableToken(
+          `${schema.table.table_id}|history-v1`
+        )}`,
+        { field_name: HISTORY_FIELD, type: 1 }
+      );
+      const fields = await this.list(`${schema.path}/fields`);
+      if (
+        !fields.some(
+          (f) => f.field_name === HISTORY_FIELD && f.type === 1
+        )
+      )
+        throw Error("跨端字段创建回读失败");
+    }
+    if (before !== merged) {
+      // Detect changes since the read. Feishu PUT is not a cross-device CAS;
+      // this release supports sequential devices, not simultaneous writers.
+      const latest = (await this.call("GET", route)).data?.record;
+      if (textValue(latest?.fields?.[HISTORY_FIELD]) !== before)
+        throw Error("另一台电脑已更新此记录，请重新同步");
+      await this.call("PUT", route, {
+        fields: { [HISTORY_FIELD]: merged },
+      });
+    }
+    const actual = (await this.call("GET", route)).data?.record;
+    if (textValue(actual?.fields?.[HISTORY_FIELD]) !== merged)
+      throw Error("跨端记录回读不符，请重新同步");
+    return { ...snapshot, syncedPlanId: planId, cloudSynced: true };
+  }
+
+  async history() {
+    const { path, fields } = await this.planSchema(),
+      key = connectionKey(this.config);
+    const column = fields.filter((f) => f.field_name === HISTORY_FIELD);
+    if (column.length > 1 || (column.length && column[0].type !== 1))
+      throw Error("跨端专注记录字段类型不符");
+    const rows = await this.list(`${path}/records`),
+      records: any[] = [],
+      ids = new Set<string>();
+    for (const row of rows) {
+      for (const record of readHistory(
+        row.fields?.[HISTORY_FIELD],
+        key
+      )) {
+        if (ids.has(record.id))
+          throw Error("云端不同番茄行包含重复专注 ID，请核对；未合并");
+        ids.add(record.id);
+        records.push({
+          ...record,
+          syncedPlanId: row.record_id,
+          cloudSynced: true,
+        });
+      }
+    }
+    const missing = rows.reduce(
+      (n, row) =>
+        n +
+        (readLedger(row.fields)?.entries.filter((e) => !ids.has(e.id))
+          .length || 0),
+      0
+    );
+    return { sourceKey: key, records, missing };
   }
   async sync(record: any) {
     if (record?.syncTarget === "plan") {
@@ -959,8 +1153,10 @@ export class Feishu {
       localDayOf(r.fields?.[this.config.dateField]) === dayMs &&
       linkedRecordIds(r.fields?.[this.config.taskField], linkedTable)
         .length === 1 &&
-      linkedRecordIds(r.fields?.[this.config.taskField], linkedTable)[0] ===
-        record.task.taskId;
+      linkedRecordIds(
+        r.fields?.[this.config.taskField],
+        linkedTable
+      )[0] === record.task.taskId;
     const bySequence = new Map<number, any>();
     for (const r of (await this.list(`${path}/records`)).filter(mine)) {
       const s = pomodoroSequence(textValue(r.fields?.["番茄"]));
@@ -975,9 +1171,13 @@ export class Feishu {
         if (s > MAX_PER_TASK)
           throw new Error(`超过单任务每日上限 ${MAX_PER_TASK} 个`);
         if (row) {
-          await this.call("PUT", `${path}/records/${id(row.record_id)}`, {
-            fields: { [this.config.completedField]: true },
-          });
+          await this.call(
+            "PUT",
+            `${path}/records/${id(row.record_id)}`,
+            {
+              fields: { [this.config.completedField]: true },
+            }
+          );
         } else {
           await this.call(
             "POST",

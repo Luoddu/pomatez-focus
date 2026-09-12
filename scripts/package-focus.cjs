@@ -10,6 +10,9 @@ const result = spawnSync(
     "--x64",
     "--publish",
     "never",
+    // Focus has no production npm dependencies; package the already-built app.
+    // Avoid reinstalling the unrelated upstream workspace dependency graph.
+    "--config.npmRebuild=false",
     `--config.electronDist=${path.join(
       root,
       "node_modules/electron/dist"

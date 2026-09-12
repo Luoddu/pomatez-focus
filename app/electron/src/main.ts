@@ -107,6 +107,9 @@ else {
       handler("completeToday", (value) => service.completeToday(value));
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
+      handler("history", () => service.history());
+      handler("archiveHistory", (value) => service.archiveHistory(value));
+      handler("backupHistory", (value) => service.backupHistory(value));
       handler("windowState", () => ({
         compact: compactMode,
         pinned: win!.isAlwaysOnTop(),

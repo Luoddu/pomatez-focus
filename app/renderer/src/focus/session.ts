@@ -30,6 +30,7 @@ export type FocusSession = {
   recovered?: boolean;
   syncTarget?: "plan";
   syncedPlanId?: string;
+  cloudSynced?: boolean;
   segments?: { start: number; end: number }[];
   segmentOpen?: boolean;
   sync: "local" | "pending" | "synced";

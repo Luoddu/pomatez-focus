@@ -161,10 +161,36 @@ export class FocusService {
   setup() {
     return this.connected().setupPlans();
   }
+  backupHistory(value: any) {
+    if (!value || !Array.isArray(value.records))
+      throw Error("历史备份格式无效");
+    const data = JSON.stringify(value);
+    if (Buffer.byteLength(data) > 16 * 1024 * 1024)
+      throw Error("历史备份过大，请先导出");
+    const directory = path.join(app.getPath("userData"), "backups");
+    fs.mkdirSync(directory, { recursive: true });
+    const target = path.join(directory, "before-cloud-history-v1.json");
+    if (!fs.existsSync(target))
+      fs.writeFileSync(target, data, { flag: "wx", mode: 0o600 });
+    return { backedUp: true };
+  }
+  history() {
+    return this.connected().history();
+  }
+  async archiveHistory(value: any) {
+    if (this.planWriting) throw Error("正在写入番茄计划，请稍候");
+    this.planWriting = true;
+    try {
+      return await this.connected().archiveHistory(value);
+    } finally {
+      this.planWriting = false;
+    }
+  }
   // 计划表方向的同步（含确认 N 个番茄的多行完成/补行）与生成、±、
   // 右键完成共用 planWriting 锁，避免 list-then-write 交错出重复键
   async sync(value: any) {
-    if (value?.syncTarget !== "plan") return this.connected().sync(value);
+    if (value?.syncTarget !== "plan")
+      return this.connected().sync(value);
     if (this.planWriting) throw new Error("正在写入番茄计划，请稍候");
     this.planWriting = true;
     try {

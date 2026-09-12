@@ -13,8 +13,18 @@ import ReviewPanel from "./components/ReviewPanel";
 import SettingsPanel, { FocusConfig } from "./components/SettingsPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import MiniView from "./components/MiniView";
-import { api, clock, groupTasks, parseTitle } from "./components/shared";
-import { weekTomatoes, weekQuadrants, quadrantCounts, quadrantToneList } from "./week";
+import {
+  api,
+  clock,
+  groupTasks,
+  parseTitle,
+} from "./components/shared";
+import {
+  weekTomatoes,
+  weekQuadrants,
+  quadrantCounts,
+  quadrantToneList,
+} from "./week";
 import "./focus.css";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
@@ -96,10 +106,31 @@ const demo: FocusTask[] = [
 // 让离线 demo 的月历有色阶、番茄地进入挂果阶段；连接飞书后完全不使用
 const demoHistory = (): FocusSession[] => {
   const days: [number, number][] = [
-    [0, 2], [1, 1], [3, 3], [4, 2], [6, 1], [7, 4], [8, 2], [10, 5],
-    [11, 1], [13, 2], [14, 6], [15, 3], [17, 2], [18, 1], [20, 4],
-    [21, 9], [22, 2], [24, 1], [25, 3], [27, 2], [28, 5], [29, 1],
-    [31, 2], [32, 4], [33, 1],
+    [0, 2],
+    [1, 1],
+    [3, 3],
+    [4, 2],
+    [6, 1],
+    [7, 4],
+    [8, 2],
+    [10, 5],
+    [11, 1],
+    [13, 2],
+    [14, 6],
+    [15, 3],
+    [17, 2],
+    [18, 1],
+    [20, 4],
+    [21, 9],
+    [22, 2],
+    [24, 1],
+    [25, 3],
+    [27, 2],
+    [28, 5],
+    [29, 1],
+    [31, 2],
+    [32, 4],
+    [33, 1],
   ];
   return days.map(([ago, count]) => {
     const started = new Date();
@@ -167,8 +198,11 @@ export default function FocusApp() {
   const active = timer.active,
     parts = active ? timeParts(active) : null;
   const pending = timer.records.filter((r) => r.sync === "pending");
-  const pendingRef = useRef(pending);
-  pendingRef.current = pending;
+  const historyPending = timer.records.filter(
+    (r) =>
+      !r.cloudSynced &&
+      (r.task.source === "local" || r.task.sourceKey === sourceKey)
+  );
   // Demo 模式把内存态演示记录叠在真实记录后展示；接入飞书后只用真实记录
   const shownRecords = useMemo(
     () => (api() ? timer.records : [...timer.records, ...demoSeed]),
@@ -184,7 +218,9 @@ export default function FocusApp() {
   // 番茄园周制：北京时间周一起算的本周完成数驱动田里生长；
   // ?farmNow=<ms> 仅供设计稿/截图脚本 mock 时刻（天空与周窗口同口径）
   const farmNow = useMemo(() => {
-    const v = new URLSearchParams(window.location.search).get("farmNow");
+    const v = new URLSearchParams(window.location.search).get(
+      "farmNow"
+    );
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, []);
@@ -195,7 +231,10 @@ export default function FocusApp() {
   // 象限色序列：田里果实按本周收获分布；果筐堆按累计收获分布（与
   // 「累计收获 N」口径一致，且不受星期几影响）
   const weekTones = useMemo(
-    () => quadrantToneList(weekQuadrants(shownRecords, farmNow ?? Date.now())),
+    () =>
+      quadrantToneList(
+        weekQuadrants(shownRecords, farmNow ?? Date.now())
+      ),
     [shownRecords, farmNow]
   );
   const pileTones = useMemo(
@@ -247,7 +286,9 @@ export default function FocusApp() {
           setCompact(state.compact);
           setPinned(state.pinned);
         })
-        .catch(() => notify("无法读取窗口状态，请重试切换小窗。", "error"));
+        .catch(() =>
+          notify("无法读取窗口状态，请重试切换小窗。", "error")
+        );
     // One read at launch; subsequent refreshes are explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -257,7 +298,10 @@ export default function FocusApp() {
       setAccepted((Math.floor(base) / 60).toFixed(2));
       // 按分钟/番茄时长自动预填完成番茄数（floor）；用户点过快选后停止跟随
       setCompleted(
-        Math.min(100, Math.max(0, Math.floor(base / active.plannedSeconds)))
+        Math.min(
+          100,
+          Math.max(0, Math.floor(base / active.plannedSeconds))
+        )
       );
       setCompletedTouched(false);
       windowMode(false, false);
@@ -281,31 +325,82 @@ export default function FocusApp() {
     setCompleted(value);
   };
   const sync = async () => {
-    if (!connected || syncing.current || !api()) return;
+    if (
+      !connected ||
+      !sourceKey ||
+      syncing.current ||
+      !api() ||
+      timer.blocked
+    )
+      return;
     syncing.current = true;
     setSyncBusy(true);
     try {
+      const eligible = (r: FocusSession) =>
+        !r.cloudSynced &&
+        (r.task.source === "local" || r.task.sourceKey === sourceKey);
+      if (timer.getSnapshot().records.some(eligible))
+        await api().backupHistory(timer.getSnapshot());
+      const failures: string[] = [];
       const attempted = new Set<string>();
       do {
-        for (const record of [...pendingRef.current].reverse()) {
+        for (let record of [...timer.getSnapshot().records]
+          .filter(eligible)
+          .reverse()) {
           if (attempted.has(record.id)) continue;
           attempted.add(record.id);
-          const receipt = await api().sync(record);
-          timer.markSynced(record.id, receipt);
-          // 确认 N 个番茄的多行完成可能部分失败：会话本体已同步，
-          // 未成的行号单独提示，可右键 chip 补标或到飞书核对
-          const failedRows = receipt?.completion?.failed;
-          if (failedRows?.length)
-            notify(
-              `「${parseTitle(record.task.title).name}」第 ${failedRows
-                .map((f: any) => f.sequence)
-                .join("、")} 个番茄未能标记完成：${failedRows[0].reason}`,
-              "error"
-            );
+          try {
+            let receipt: any;
+            if (record.sync === "pending") {
+              receipt = await api().sync(record);
+              timer.markSynced(record.id, receipt);
+              record = {
+                ...record,
+                sync: "synced",
+                ...(receipt?.planId
+                  ? { syncedPlanId: receipt.planId }
+                  : {}),
+              };
+            }
+            const archived = await api().archiveHistory(record);
+            timer.mergeCloud([archived], sourceKey);
+            // 确认 N 个番茄的多行完成可能部分失败：会话本体已同步，
+            // 未成的行号单独提示，可右键 chip 补标或到飞书核对
+            const failedRows = receipt?.completion?.failed;
+            if (failedRows?.length)
+              failures.push(
+                `「${
+                  parseTitle(record.task.title).name
+                }」第 ${failedRows
+                  .map((f: any) => f.sequence)
+                  .join("、")} 个番茄未能标记完成：${
+                  failedRows[0].reason
+                }`
+              );
+          } catch (e: any) {
+            failures.push(e.message || "一条专注记录未能同步");
+          }
         }
-        await refresh();
-      } while (pendingRef.current.some((r) => !attempted.has(r.id)));
-      notify("专注记录已同步到飞书。");
+      } while (
+        timer
+          .getSnapshot()
+          .records.some((r) => eligible(r) && !attempted.has(r.id))
+      );
+      const remote = await api().history();
+      if (remote.sourceKey !== sourceKey)
+        throw Error("飞书连接已变化，请重新同步");
+      timer.mergeCloud(remote.records, sourceKey);
+      await refresh();
+      if (remote.missing)
+        failures.push(
+          `还有 ${remote.missing} 条旧专注缺少完整明细，请在原电脑运行新版并同步。`
+        );
+      notify(
+        failures.length
+          ? `已同步可处理的成果，仍有待处理项：${failures[0]}`
+          : "专注成果已同步，其他电脑同步后即可查看。",
+        failures.length ? "error" : "info"
+      );
     } catch (e: any) {
       notify(`记录已保存在本机，待同步：${e.message}`, "error");
     } finally {
@@ -313,12 +408,19 @@ export default function FocusApp() {
       setSyncBusy(false);
     }
   };
-  const pendingIds = pending.map((r) => r.id).join(",");
+  const pendingIds = timer.records
+    .filter(
+      (r) =>
+        !r.cloudSynced &&
+        (r.task.source === "local" || r.task.sourceKey === sourceKey)
+    )
+    .map((r) => `${r.id}:${r.sync}`)
+    .join(",");
   // A pending-set change permits one attempt; a failed attempt waits for explicit retry.
   useEffect(() => {
-    if (pendingIds && connected) sync();
+    if (connected && sourceKey) sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingIds, connected]);
+  }, [pendingIds, connected, sourceKey]);
   const windowMode = async (small: boolean, pin: boolean) => {
     try {
       const state = api()
@@ -432,7 +534,9 @@ export default function FocusApp() {
     (async () => {
       try {
         await api().completeToday({ planId: task.planId || task.id });
-        notify(`已完成「${parsed.name} · 第 ${parsed.pomodoro} 个番茄」。`);
+        notify(
+          `已完成「${parsed.name} · 第 ${parsed.pomodoro} 个番茄」。`
+        );
         await refresh();
       } catch (e: any) {
         setTasks(rollback);
@@ -591,7 +695,7 @@ export default function FocusApp() {
           connected={connected}
           todayCount={todayCount}
           quadrantField={quadrantField}
-          pendingCount={pending.length}
+          pendingCount={historyPending.length}
           busy={busy}
           canConnect={!!api()}
           localTitle={localTitle}
@@ -641,7 +745,9 @@ export default function FocusApp() {
               }}
               onSaveNext={() => {
                 const target =
-                  active.task.kind === "free" ? makeFreeTask() : nextTask;
+                  active.task.kind === "free"
+                    ? makeFreeTask()
+                    : nextTask;
                 timer.confirm(
                   Math.round(Number(accepted) * 60),
                   completed
@@ -700,7 +806,7 @@ export default function FocusApp() {
           )}
           <HistoryPanel
             records={shownRecords}
-            pendingCount={pending.length}
+            pendingCount={historyPending.length}
             canSync={connected && !!api()}
             syncBusy={syncBusy}
             onSync={() => run(sync)}

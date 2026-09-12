@@ -1,5 +1,6 @@
 // Adapted from Pomatez's CounterProvider: one elapsed-time loop owns focus and break timing.
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { mergeCloudRecords } from "focus/cloud";
 import {
   FocusSession,
   FocusTask,
@@ -20,6 +21,8 @@ type CounterProps = {
   timerType?: any;
   active: FocusSession | null;
   records: FocusSession[];
+  mergeCloud: (records: FocusSession[], sourceKey: string) => void;
+  getSnapshot: () => Data;
   notice: string;
   noticeSeq: number;
   error: string;
@@ -375,6 +378,20 @@ const CounterProvider: React.FC = ({ children }) => {
       setError("");
     });
   const count = data.active ? timeParts(data.active).remaining : 1500;
+  const mergeCloud = (records: FocusSession[], sourceKey: string) => {
+    // Compute first: a conflicting response must leave all local state intact.
+    const merged = mergeCloudRecords(
+      dataRef.current.records,
+      records,
+      sourceKey
+    );
+    try {
+      publish({ ...dataRef.current, records: merged });
+    } catch (e) {
+      fail(e);
+      throw e;
+    }
+  };
   return (
     <CounterContext.Provider
       value={{
@@ -383,6 +400,8 @@ const CounterProvider: React.FC = ({ children }) => {
         shouldFullscreen: false,
         active: data.active,
         records: data.records,
+        mergeCloud,
+        getSnapshot: () => dataRef.current,
         notice: noticeText,
         noticeSeq,
         error,

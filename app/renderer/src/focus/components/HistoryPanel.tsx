@@ -21,10 +21,10 @@ const dayLabel = (value: number) => {
   return date.toLocaleDateString();
 };
 const syncText = (record: FocusSession) =>
-  record.sync === "synced"
+  record.cloudSynced ? "已共享到飞书" : record.sync === "synced"
     ? record.syncTarget === "plan"
-      ? "已同步飞书原番茄表"
-      : "已同步飞书会话表"
+      ? "已记账 · 待共享成果"
+      : "旧会话已记账 · 待共享成果"
     : record.sync === "pending"
     ? "待同步飞书"
     : "本地记录";
@@ -159,8 +159,8 @@ export default function HistoryPanel({
             <button
               className="btn-text"
               aria-label="手动同步"
-              title={!canSync ? "请先连接飞书" : pendingCount ? `同步 ${pendingCount} 条待同步记录` : "没有待同步记录"}
-              disabled={!canSync || syncBusy || pendingCount === 0}
+              title={!canSync ? "请先连接飞书" : "上传本机记录并获取其他电脑的专注成果"}
+              disabled={!canSync || syncBusy}
               onClick={onSync}
             >
               {syncBusy ? "同步中…" : `手动同步${pendingCount ? ` (${pendingCount})` : ""}`}
