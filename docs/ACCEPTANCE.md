@@ -22,7 +22,7 @@
 - 只导出当前产品源码、回归测试、品牌图标、去标识说明和打码截图。
 - 不导出 design 原始截图、运行配置、凭证、个人记录、临时工具或构建产物。
 - 以公开提交为父提交建立新的快进提交；不推送含有未打码截图的本地开发中间提交。
-- 公开 README 明确区分 preview.17 源码和 Releases 中的 preview.1 安装包；本次不创建 Release。
+- 源码导出阶段未创建 Release；用户追加授权后发布 preview.17 Windows 便携包，见下方打包验收。
 - 上游 MIT LICENSE、固定来源和已经公开的上游历史保留。
 
 ## 未验证与限制
@@ -33,3 +33,12 @@
 - 四象限缺失/未知值目前归入“不紧急不重要”；配置页应核对实际字段，避免误读优先级。
 
 任务边界、四处自检、正反验收与回滚见 [P0-POMO-001](P0-POMO-001.md)。Learning 判断：复用已有导出和隔离提交流程，没有新增可推广的工程教训；不将本次发布状态写入根共享 Learning。
+
+## Windows 便携发布验收（2026-09-12）
+
+- 固定 electron-builder 25.1.8 / Electron 34.5.8，以公开脱敏源码构建输出打包。
+- 首次打包的 npm 自动安装触发 peer dependency 冲突；原因是独立工作树使用共享开发依赖。应用 production dependencies 为空，使用固定版本支持的 npmRebuild=false 复用已验证依赖后完成打包；未更改锁文件或强制解析冲突。官方本地证据：app-builder-lib/out/packager.js:405、configuration.d.ts:121。
+- 归档 53 个路径，扫描 28 个文本文件，个人名称/路径匹配为 0，MIT LICENSE 与源码完全一致。
+- unpacked 隐藏启动输出 ready 并退出 0；portable 隐藏启动退出 0。均使用独立随机 profile，无真实凭证。解包版退出时有 Chromium 清理诊断，无启动断言失败。
+- EXE：75139324 字节；SHA-256：49ab9ad75dc0118abbedade525f44a141719d5749e4d4c4e64986ad153f62647。校验文件随 Release 提供。
+- 二进制仅作为 Release 附件上传，不进入 Git 历史。

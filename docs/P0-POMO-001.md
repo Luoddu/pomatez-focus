@@ -21,3 +21,15 @@
 4. 同类验收：复用会话/飞书/计划/生成/周统计测试与 manual-sync-desktop 隔离桌面脚本；本次重跑结果写入 ACCEPTANCE.md。
 
 Learning 判断：本次采用已有隐私导出和隔离提交机制，没有发现需要新设工程规则的可复用教训；不向根 Learning 写入模块发布状态。
+## preview.17 Windows 下载包发布（2026-09-12）
+
+用户追加明确授权：将新版便携包一起发布到 GitHub Releases。此前“不发布安装包”仅描述上一阶段范围，本阶段由本条取代。
+
+- 基线：553c2cdc4b8718e418807090dc7d1f8180ff7355；公开源码已脱敏且构建/逻辑/桌面检查通过。
+- 允许写集：本卡、README.md、ACCEPTANCE.md、CHANGELOG-FOCUS.md、docs/RELEASE-preview.17.md；本地忽略的 dist/artifacts 产物及发布工具输出。允许创建 v0.1.0-preview.17 预发布和上传 portable EXE、SHA256SUMS.txt；不改旧 Release、不推送开发历史。
+- 独占运行资源：当前独立发布 worktree 和随机隔离 smoke profile；隐藏运行，不关闭用户 App。
+- 四处自检：现状为源码 preview.17/可下载包 preview.1；固定 electron-builder 25.1.8 和既有 package-focus helper；GitHub CLI create --help 明确 target、draft、prerelease 和资产上传流程；复用既有归档检查与隐藏便携启动 smoke。
+- 验收：新下载包可启动且无真实账户访问，包内无个人任务/配置且 MIT LICENSE 保留，远端标签指向本版源码且上传资产大小/摘要与本地一致。
+- 预算：一轮打包、归档与启动验证；一份预发布；失败查明原因并核对远端状态后再决定恢复，不重复创建。
+- 回滚：保留旧版 Release；新包有问题时发布说明并通过后续修正版替换，不 force 改写 Git 历史。
+- Learning：使用既有打包、隔离验证与发布流程，未产生新的跨任务工程教训。

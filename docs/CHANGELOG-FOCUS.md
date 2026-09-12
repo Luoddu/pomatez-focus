@@ -1,6 +1,6 @@
 # 番茄农场更新记录
 
-## 0.1.0-preview.17（源码预览）
+## 0.1.0-preview.17（Windows 便携预览版）
 
 相对最初 preview.1：
 
@@ -12,4 +12,4 @@
 - 补记旁增加手动同步、待同步数量和忙碌状态，失败保留本地记录。
 - 公开截图遮盖任务名称，演示数据使用通用任务。
 
-这是 Windows x64 的预览源码。GitHub Releases 中的 preview.1 安装包不包含上述全部功能。
+源码与 Windows x64 便携包同步发布。下载新版请访问 [preview.17 Release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.17)。

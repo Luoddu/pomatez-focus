@@ -8,7 +8,7 @@
 
 [功能](#功能) · [开始使用](#开始使用) · [飞书联动](#飞书联动) · [本地开发](#本地开发) · [许可证](#许可证)
 
-> **版本状态（2026-09-12）**：当前源码为 `0.1.0-preview.17`。公开 [Releases](https://github.com/Luoddu/pomatez-focus/releases) 安装包仍为 `preview.1`，不包含下文全部新功能；体验最新功能请按下文从源码构建。当前仅验证 Windows x64，不标记为稳定版。
+> **版本状态（2026-09-12）**：当前源码与 Windows x64 便携包均为 `0.1.0-preview.17`。[下载新版 EXE](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.17/Pomatez-Focus-v0.1.0-preview.17-win-x64-portable.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.17)。当前仅验证 Windows x64，不标记为稳定版。
 
 ![番茄农场：四象限任务、收获农场、番茄月历和专注记录](docs/images/desktop.png)
 
@@ -29,7 +29,7 @@
 
 ## 开始使用
 
-1. 启动与你需要的功能对应的 Windows x64 portable 版本，无须部署服务器。
+1. 下载上方 Windows x64 portable `.exe` 并直接运行，无须部署服务器。GitHub 的 `Source code` 压缩包供开发者使用。
 2. 在四象限中选一个番茄，再点击“开始专注”。不选择任务时，按钮为“开始自由专注”。
 3. 需要离开时暂停，回来继续。点击结束后核对实际分钟和完成番茄数；也可返回计时继续工作。
 4. 点击“记录番茄”保存；不认可这次专注时选择放弃，不新增记录。
