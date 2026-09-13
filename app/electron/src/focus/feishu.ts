@@ -820,7 +820,14 @@ export class Feishu {
       planId = matches[0].record_id;
     }
     const route = `${schema.path}/records/${id(planId)}`;
-    const row = (await this.call("GET", route)).data?.record;
+    let row;
+    try {
+      row = (await this.call("GET", route)).data?.record;
+    } catch (e: any) {
+      if (/代码 1254043\b/.test(e.message || ""))
+        throw Error("历史番茄原行不存在，记录保留本机；请恢复飞书原行后重试");
+      throw e;
+    }
     if (!row?.fields || row.record_id !== planId)
       throw Error("历史番茄原行不存在，未创建替代行");
     const linkedTable = schema.fields.find(

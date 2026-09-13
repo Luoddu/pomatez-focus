@@ -55,3 +55,12 @@ test("conflicting counts and foreign/duplicate responses reject atomically", () 
     /不完整或重复/
   );
 });
+
+test('legacy empty association survives download and repeat merge, nonempty changes still reject', () => {
+  const old = r('legacy'); old.task.planId = 'p1'; old.task.taskId = ''; old.cloudSynced = undefined;
+  const incoming = { ...old, cloudSynced: true };
+  const merged = mergeCloudRecords([old], [incoming], 'base');
+  assert.equal(merged[0].task.taskId, '');
+  assert.deepEqual(mergeCloudRecords(merged, [incoming], 'base'), merged);
+  assert.throws(() => mergeCloudRecords([old], [{ ...incoming, task: { ...incoming.task, taskId: 'other' } }], 'base'), /任务关联/);
+});

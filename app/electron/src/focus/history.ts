@@ -48,7 +48,12 @@ export function historyRecord(r: any, sourceKey: string): any {
   };
   for (const k of ["planId", "taskId"])
     if (r.task[k] != null) {
-      if (!/^[A-Za-z0-9_-]{1,160}$/.test(r.task[k]))
+      // Older task snapshots use "" for a missing optional association.
+      // Preserve it verbatim so immutable local/cloud comparisons still match.
+      if (
+        typeof r.task[k] !== "string" ||
+        (r.task[k] !== "" && !/^[A-Za-z0-9_-]{1,160}$/.test(r.task[k]))
+      )
         throw Error("跨端任务标识无效");
       task[k] = r.task[k];
     }

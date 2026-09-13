@@ -8,7 +8,7 @@
 
 [功能](#功能) · [开始使用](#开始使用) · [飞书联动](#飞书联动) · [本地开发](#本地开发) · [许可证](#许可证)
 
-> **版本状态（2026-09-12）**：当前源码与 Windows x64 便携包均为 `0.1.0-preview.18`。[下载新版 EXE](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.18/Pomatez-Focus-v0.1.0-preview.18-win-x64-portable.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.18)。当前仅验证 Windows x64，不标记为稳定版。
+> **版本状态（2026-09-13）**：当前源码与 Windows x64 便携包均为 `0.1.0-preview.19`。[下载新版 EXE](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.19/Pomatez-Focus-v0.1.0-preview.19-win-x64-portable.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.19)。当前仅验证 Windows x64，不标记为稳定版。
 
 ![番茄农场：四象限任务、收获农场、番茄月历和专注记录](docs/images/desktop.png)
 
@@ -61,7 +61,7 @@
 
 ## 换电脑使用
 
-三台 Windows 电脑安装同一个 preview.18 版本，分别连接同一张飞书番茄表。先在保留完整历史的主力电脑打开新版并同步，再打开其他电脑。
+三台 Windows 电脑安装同一个 preview.19 版本，分别连接同一张飞书番茄表。先在保留完整历史的主力电脑打开新版并同步，再打开其他电脑。
 
 - 第一次补传前自动备份到应用数据目录的 backups/before-cloud-history-v1.json，包含本机记录与当前计时。
 - 原表新增可隐藏文本列“跨端专注记录”，保存任务/象限、时间段和用户确认番茄数；不要手工改动其 JSON。

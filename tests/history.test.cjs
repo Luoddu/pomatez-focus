@@ -174,3 +174,48 @@ test('changed task relation and incompatible history field reject while original
   await client.archiveHistory(s);
   assert.equal((await client.history()).records.length, 1);
 });
+test('legacy empty optional IDs round-trip without changing identity or accounting', async () => {
+  const { client, state } = harness();
+  const old = record(1500, { syncTarget: undefined, sync: 'synced' });
+  old.task.taskId = '';
+  const { sessionFields } = require('../app/electron/build/focus/feishu.js');
+  const original = client.request;
+  client.request = async (method, route, body, token) => {
+    if (method === 'GET' && route.split('?')[0].endsWith('/tables')) {
+      const response = await original(method, route, body, token);
+      response.data.items.push({ name: '专注会话', table_id: 'legacy' });
+      return response;
+    }
+    if (method === 'GET' && route.split('?')[0].endsWith('/legacy/records'))
+      return { data: { items: [{ record_id: 'legacy1', fields: sessionFields(old) }], has_more: false } };
+    return original(method, route, body, token);
+  };
+  const before = structuredClone(state.plans);
+  const result = await client.archiveHistory(old);
+  assert.equal(result.task.taskId, '');
+  assert.equal((await client.history()).records[0].task.taskId, '');
+  const writes = state.writes.length;
+  await client.archiveHistory(old);
+  assert.equal(state.writes.length, writes);
+  state.plans.forEach((row, i) => { const fields = { ...row.fields }; delete fields[HISTORY_FIELD]; assert.deepEqual(fields, before[i].fields); });
+  const { historyRecord } = require('../app/electron/build/focus/history.js');
+  assert.equal(historyRecord({ ...old, task: { ...old.task, planId: '' } }, key).task.planId, '');
+  for (const invalid of ['bad/id', ' ', 123, ['valid'], {}, 'a'.repeat(161)])
+    for (const field of ['taskId', 'planId'])
+      assert.throws(() => historyRecord({ ...old, task: { ...old.task, [field]: invalid } }, key), /任务标识无效/);
+});
+
+test('missing original row gives actionable error without writes; valid original still archives', async () => {
+  const { client, state } = harness(), r = record();
+  const s = saved(r, await client.sync(r)), original = client.request, writes = state.writes.length;
+  client.request = async (method, route, body, token) => {
+    if (method === 'GET' && route.split('?')[0].endsWith('/records/p1'))
+      throw Error('飞书请求未通过（HTTP 200，代码 1254043）。请检查权限或稍后重试。');
+    return original(method, route, body, token);
+  };
+  await assert.rejects(client.archiveHistory(s), /原行不存在.*保留本机/);
+  assert.equal(state.writes.length, writes);
+  client.request = original;
+  await client.archiveHistory(s);
+  assert.equal((await client.history()).records.length, 1);
+});
