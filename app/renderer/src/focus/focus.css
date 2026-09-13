@@ -1591,10 +1591,86 @@ input:focus-visible {
   }
 }
 
-/* ── 竖屏增强：宽度足够时统计卡横排四列，农场给固定高度不被纵排压没 ── */
+/* ── 竖屏增强：宽度足够时四象限放大、概览与月历并排、农场给固定高度不被纵排压没 ── */
 @media (orientation: portrait) and (min-width: 901px) {
+  /* 四象限整体放大约 1.25 倍：任务名、序号方块、象限标签与计数同步调大 */
+  .quadrants {
+    gap: 18px;
+  }
+  .quad {
+    padding: 18px 20px;
+  }
+  .quad-head {
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .pill {
+    height: 28px;
+    padding: 0 13px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+  .quad-count {
+    font-size: 15px;
+  }
+  .task {
+    padding: 8px 0;
+    min-height: 58px;
+    gap: 10px;
+  }
+  .task-name {
+    font-size: 19px;
+  }
+  .task-side {
+    gap: 8px;
+    padding-top: 3px;
+  }
+  .chips {
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .chip {
+    min-width: 42px;
+    height: 42px;
+    padding: 0 11px;
+    border-radius: 11px;
+    font-size: 17px;
+  }
+  .adjust-btn {
+    width: 27px;
+    height: 27px;
+    font-size: 17px;
+  }
+  .harvest-mini {
+    font-size: 14px;
+  }
+  .harvest-mini .cell {
+    width: 17px;
+    height: 10px;
+    border-radius: 5px;
+  }
+  .quad-empty {
+    font-size: 15px;
+  }
+  /* 概览与月历左右并排，记录通栏在下方 */
+  .right-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+  .side-section.records-section {
+    grid-column: 1 / -1;
+  }
+  .right-col .side-title {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .right-col > .side-section > .stat-grid,
+  .right-col > .side-section > .heatmap {
+    flex: 1;
+  }
   .stat-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
   /* 四张统计卡等高居中，数字与时长统一字号层级 */
   .stat {
@@ -1634,9 +1710,9 @@ input:focus-visible {
     min-width: 76px;
     text-align: right;
   }
-  /* 月历格子加大并水平居中，充分利用通栏宽度 */
+  /* 月历格子加大并水平居中，半宽列内不溢出 */
   .heatmap {
-    --hm-cell: 17px;
+    --hm-cell: 16px;
     --hm-dow-w: 22px;
     --hm-gap: 4px;
   }
