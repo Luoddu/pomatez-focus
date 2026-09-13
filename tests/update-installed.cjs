@@ -6,13 +6,15 @@ const {randomUUID, createHash} = require('node:crypto');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 if (process.platform !== 'win32' || process.env.POMATEZ_INSTALL_TEST !== '1') throw Error('Explicit Windows installer test required');
+const startPortable = process.env.POMATEZ_TEST_START_PORTABLE === '1';
 const dir = path.join(root, 'artifacts', 'update-installed', randomUUID());
 fs.mkdirSync(dir, {recursive:true});
 const profile = path.join(dir, 'profile'), install = path.join(dir, 'installed');
 const wait = ms => new Promise(r=>setTimeout(r,ms));
 const run = (exe,args,env={}) => new Promise((resolve,reject)=>{
   const out=fs.openSync(path.join(dir,'process.log'),'a');
-  const child=spawn(exe,args,{windowsHide:true,stdio:['ignore',out,out],env:{...process.env,...env}});
+  const childEnv={...process.env,...env};delete childEnv.ELECTRON_RUN_AS_NODE;
+  const child=spawn(exe,args,{windowsHide:true,stdio:['ignore',out,out],env:childEnv});
   child.on('error',reject); child.on('exit',code=>{fs.closeSync(out);code===0?resolve():reject(Error('Process exit '+code));});
 });
 let payload, metadata, requestCount=0;
@@ -40,7 +42,7 @@ const updaterModule=require.resolve('./build/focus/updater');const original=requ
 const {NsisUpdater}=require(${JSON.stringify(path.join(root,'node_modules/electron-updater'))});
 let controller;const events=[];
 require.cache[updaterModule].exports={...original,FocusUpdater:class extends original.FocusUpdater{
- constructor(publish,ready){super(s=>{events.push(s);publish(s)},ready,new NsisUpdater({provider:'generic',url:${JSON.stringify(feed)},channel:'preview'}));controller=this;}
+ constructor(publish,ready){const updater=new NsisUpdater({provider:'generic',url:${JSON.stringify(feed)},channel:'preview'});updater.on('error',e=>fs.writeFileSync(path.join(folder,'updater-error.txt'),e.stack));if(${startPortable})updater.installDirectory=${JSON.stringify(install)};super(s=>{events.push(s);publish(s)},ready,updater);controller=this;}
 }};
 require('./build/main');
 const deadline=setTimeout(()=>{fs.writeFileSync(path.join(folder,'failed.txt'),'timeout');app.exit(2)},90000);
@@ -91,7 +93,9 @@ app.whenReady().then(async()=>{
   for(const version of ['0.1.0-preview.19','0.1.0-preview.20']){
     const out=path.join(dir,version);
     fs.writeFileSync(path.join(fixture,'package.json'),JSON.stringify({name:identity,version,main:'fixture.cjs',author:'test',description:'Isolated updater verification',dependencies:{}}));
-    const config={appId:'io.github.luoddu.'+identity,productName:product,electronVersion:'34.5.8',electronDist:path.join(root,'node_modules/electron/dist'),npmRebuild:false,compression:'store',directories:{app:fixture,output:out},files:['build','fixture.cjs'],win:{target:'nsis'},nsis:{artifactName:'update.exe',oneClick:true,perMachine:false,createDesktopShortcut:false,createStartMenuShortcut:false,deleteAppDataOnUninstall:false},publish:{provider:'generic',url:feed,channel:'preview'}};
+    // Match production's portable+NSIS target set: it embeds app-update.yml
+    // before packaging both artifacts. A portable-only build omits that file.
+    const config={appId:'io.github.luoddu.'+identity,productName:product,electronVersion:'34.5.8',electronDist:path.join(root,'node_modules/electron/dist'),npmRebuild:false,compression:'store',directories:{app:fixture,output:out},files:['build','fixture.cjs'],win:{target:startPortable&&version.endsWith('.19')?['portable','nsis']:'nsis'},portable:{artifactName:'portable.exe'},nsis:{artifactName:'update.exe',oneClick:true,perMachine:false,createDesktopShortcut:false,createStartMenuShortcut:false,deleteAppDataOnUninstall:false},publish:{provider:'generic',url:feed,channel:'preview'}};
     const conf=path.join(dir,'builder.json');fs.writeFileSync(conf,JSON.stringify(config));
     await run(process.execPath,[path.join(root,'node_modules/electron-builder/out/cli/cli.js'),'--config',conf,'--win','--x64','--publish','never'],{CSC_IDENTITY_AUTO_DISCOVERY:'false'});
     console.log('Built isolated '+version);
@@ -99,7 +103,7 @@ app.whenReady().then(async()=>{
   payload=fs.readFileSync(path.join(dir,'0.1.0-preview.20/update.exe'));
   const hash=createHash('sha512').update(payload).digest('base64');
   metadata=JSON.stringify({version:'0.1.0-preview.20',files:[{url:'update.exe',sha512:hash,size:payload.length}],path:'update.exe',sha512:hash});
-  await run(path.join(dir,'0.1.0-preview.19/update.exe'),['/S','--force-run','/D='+install],{ELECTRON_RUN_AS_NODE:'',POMATEZ_HEADLESS:'1',POMATEZ_PROFILE:profile});
+  await run(path.join(dir,'0.1.0-preview.19',startPortable?'portable.exe':'update.exe'),startPortable?[]:['/S','--force-run','/D='+install],{ELECTRON_RUN_AS_NODE:'',POMATEZ_HEADLESS:'1',POMATEZ_PROFILE:profile});
   for(let i=0;i<160;i++){
     if(fs.existsSync(path.join(dir,'failed.txt')))throw Error(fs.readFileSync(path.join(dir,'failed.txt'),'utf8'));
     if(fs.existsSync(path.join(dir,'restarted.json')))break;
@@ -108,8 +112,8 @@ app.whenReady().then(async()=>{
   const restarted=JSON.parse(fs.readFileSync(path.join(dir,'restarted.json')));
   const downloaded=JSON.parse(fs.readFileSync(path.join(dir,'downloaded.json')));
   assert.equal(restarted.version,'0.1.0-preview.20');
-  const result={...restarted,...downloaded,requests:requestCount,actualNsis:true,sha512:hash};
-  fs.writeFileSync(path.join(root,'artifacts/update-installed-result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+  const result={...restarted,...downloaded,requests:requestCount,actualNsis:true,startPortable,sha512:hash};
+  fs.writeFileSync(path.join(root,'artifacts',startPortable?'update-portable-result.json':'update-installed-result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
   // NSIS' own uninstaller removes only this uniquely named fixture registration/files.
   const uninstaller=fs.readdirSync(install).find(n=>n.startsWith('Uninstall ')&&n.endsWith('.exe'));
   if(uninstaller)await run(path.join(install,uninstaller),['/S']);

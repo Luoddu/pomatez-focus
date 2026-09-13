@@ -36,6 +36,16 @@ NSIS 测试首次失败来自测试脚本使用了不存在的“返回专注”
 
 本机桌面快捷方式已切换到已校验 preview.20 便携包，保留 preview.19 文件及旧快捷方式回滚。现有运行进程未强制终止；电脑操作截图工具报 `SetIsBorderRequired failed: 不支持此接口 (0x80004002)`，无法可靠确认用户是否正在专注，因此不让安装器关闭旧进程。用户从托盘退出旧版后重开一次即可使用新入口；后续应用内更新安装到固定位置并更新快捷方式。
 
-正式 GitHub 发布结果在发布后追加核验；当前构建和安装测试不替代线上元数据检查。无用户任务/历史删除，无数据目录迁移，无凭证复制。回滚使用旧 EXE 和原用户数据。
+正式 GitHub 发布与线上元数据结果见下节。无用户任务/历史删除，无数据目录迁移，无凭证复制。回滚使用旧 EXE 和原用户数据。
 
 Learning: none - 本次采用固定官方 NSIS 路径并修正项目特有筛选字段，沿用既有隐藏运行、幂等、备份和存储身份规则；测试修正不构成新的跨任务治理规则。根共享文件未修改。
+
+## 公开发布与便携版过渡核验
+
+GitHub `v0.1.0-preview.20` 已发布（非 draft、prerelease），功能 commit `de902999e7501c25db93a69d8a255951a56e263b`。5 个资产均为 uploaded，GitHub 返回的各资产 SHA-256 与本地校验清单一致。
+
+直接调用生产 FocusUpdater 的固定 GitHub provider、只检查不下载：当前版本 preview.19 → available/远端 preview.20；当前版本 preview.20 → current/远端 preview.20。两个分支取得的 setup 路径及 SHA-512 均与已发布包一致，无 GitHub token。独立离屏设置页检查确认版本号与更新入口可见；使用模拟未连接状态，未展示用户凭证。
+
+追加运行 `POMATEZ_INSTALL_TEST=1 POMATEZ_TEST_START_PORTABLE=1` 的 `tests/update-installed.cjs`：从真实 portable 启动，经过实际下载、4 次进度事件、3 种活动状态保护、保存记录、安装到独立固定位置并自动重启，记录 1/1 保留，版本变为 preview.20。测试使用官方 installDirectory 选项限定自己的安装位置，不触碰正式安装。
+
+便携测试初始启动环境继承了 ELECTRON_RUN_AS_NODE，随后发现 portable-only 测试构建没有 app-update.yml；测试入口删除该环境变量，并按正式构建相同的 portable+NSIS targets 生成后通过。正式 portable 从一开始即使用双 target；另直接解包确认包含 resources/app-update.yml，内容为本仓 GitHub provider/preview 通道，故无需修改正式程序或重发包。
