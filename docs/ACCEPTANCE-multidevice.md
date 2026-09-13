@@ -51,3 +51,9 @@ preview.19 包验收：正式构建/portable 打包通过；A→B→A 三个独�
 App 需手动同步拉取已补传的快照；当前版本先尝试上传再下载，首轮可能保留旧失败提示，下载后待传项消失，下一轮同步可清除该提示。该 UI 顺序属于已知限制，本次不增加产品版本。
 
 Learning: none - 本次为授权的两条历史数据补传，使用既有校验、幂等令牌和读回机制，无新增通用工程规则。根共享文件未改。
+
+## 遗留模拟台账清理回执
+
+通过原私有验收 journal 的 created 行集合与 first/second/free UUID、合成时长备注及历史隔离日期精确核对，剩余 3 条为真实验收脚本合成数据，不是用户工作。完整备份保存在 App 数据目录 backups/removed-synthetic-plan-live-v1.json 后，仅删除对应 2 行测试数据；写守卫只允许该两条 DELETE。
+
+真实 GET 回读验收：deletedSyntheticRows=2，removedSyntheticEntries=3，sharedRealRecords=18，missing=0；清理前后全部真实跨端快照深度相等，行数仅减少 2。没有新增产品版本，没有删除用户真实任务/专注；刷新同步即可看到缺失提示消失。Learning: none - 一次性历史测试数据清理，沿用既有日志归属核验、备份及精确写入守卫，无新增跨任务规则。
