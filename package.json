@@ -33,7 +33,7 @@
     "tauri:updateversion": "node ./app/tauri/util/cargo-version-updater.js",
     "build:focus": "node scripts/build-focus.cjs",
     "test:focus": "node --test tests/session.test.mjs tests/feishu.test.cjs tests/plan.test.cjs",
-    "test:desktop": "node scripts/test-desktop.cjs",
+    "test:desktop": "node scripts/test-desktop.cjs && node scripts/test-portrait-desktop.cjs",
     "package:focus": "node scripts/package-focus.cjs"
   },
   "config": {

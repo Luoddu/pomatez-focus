@@ -1562,8 +1562,8 @@ input:focus-visible {
   }
 }
 
-/* ── 窄窗：右栏移到下方，操作条吸附底部（尺寸随全局等比放大） ── */
-@media (max-width: 900px) {
+/* ── 窄窗/竖屏：右栏移到下方，操作条吸附底部（尺寸随全局等比放大） ── */
+@media (max-width: 900px), (orientation: portrait) {
   .content {
     flex-direction: column;
     overflow-y: auto;
@@ -1588,5 +1588,19 @@ input:focus-visible {
   .timing-left {
     justify-content: flex-start;
     min-height: 560px;
+  }
+}
+
+/* ── 竖屏增强：宽度足够时统计卡横排四列，农场给固定高度不被纵排压没 ── */
+@media (orientation: portrait) and (min-width: 901px) {
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .farm-field {
+    flex: none;
+    height: 240px;
+  }
+  .records {
+    max-height: 400px;
   }
 }

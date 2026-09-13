@@ -55,14 +55,23 @@ else {
     .whenReady()
     .then(async () => {
       const area = screen.getPrimaryDisplay().workAreaSize;
+      const portrait = area.height > area.width;
+      // Portrait monitors get a taller, narrower window and lower minimums so
+      // half-screen tiling stays usable; landscape behavior is unchanged.
+      const expandedMinWidth = portrait ? 600 : 760;
+      const expandedMinHeight = portrait ? 520 : 580;
       let compactMode = false;
       let expandedBounds: Electron.Rectangle | null = null;
       let expandedMaximized = false;
       win = new BrowserWindow({
-        width: Math.min(1040, area.width),
-        height: Math.min(800, area.height),
-        minWidth: 760,
-        minHeight: 580,
+        width: portrait
+          ? Math.min(920, area.width)
+          : Math.min(1040, area.width),
+        height: portrait
+          ? Math.min(1500, area.height)
+          : Math.min(800, area.height),
+        minWidth: expandedMinWidth,
+        minHeight: expandedMinHeight,
         resizable: true,
         maximizable: true,
         minimizable: true,
@@ -109,30 +118,53 @@ else {
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
       handler("history", () => service.history());
-      handler("archiveHistory", (value) => service.archiveHistory(value));
+      handler("archiveHistory", (value) =>
+        service.archiveHistory(value)
+      );
       handler("backupHistory", (value) => service.backupHistory(value));
       const installUpdate = async () => {
-        if (updater.status().phase !== "downloaded") return updater.status();
-        const snapshot = await win!.webContents.executeJavaScript(`(() => {
+        if (updater.status().phase !== "downloaded")
+          return updater.status();
+        const snapshot = await win!.webContents
+          .executeJavaScript(`(() => {
           const value = JSON.parse(localStorage.getItem('pomatez-focus-v1') || '{}');
           if (value.active) return null;
           document.documentElement.inert = true;
           return value;
         })()`);
-        if (!snapshot) { updater.defer(); return updater.status(); }
+        if (!snapshot) {
+          updater.defer();
+          return updater.status();
+        }
         try {
           const backups = path.join(app.getPath("userData"), "backups");
-          fs.mkdirSync(backups, {recursive: true});
-          fs.writeFileSync(path.join(backups, `before-update-${Date.now()}.json`), JSON.stringify(snapshot), {flag: "wx"});
+          fs.mkdirSync(backups, { recursive: true });
+          fs.writeFileSync(
+            path.join(backups, `before-update-${Date.now()}.json`),
+            JSON.stringify(snapshot),
+            { flag: "wx" }
+          );
           updater.install();
         } finally {
-          if (updater.status().phase !== "installing" && win && !win.isDestroyed()) await win.webContents.executeJavaScript("document.documentElement.inert = false");
+          if (
+            updater.status().phase !== "installing" &&
+            win &&
+            !win.isDestroyed()
+          )
+            await win.webContents.executeJavaScript(
+              "document.documentElement.inert = false"
+            );
         }
         return updater.status();
       };
       const updater = new FocusUpdater(
-        (state) => { if (win && !win.isDestroyed()) win.webContents.send("focus:update-state", state); },
-        async () => { await installUpdate(); }
+        (state) => {
+          if (win && !win.isDestroyed())
+            win.webContents.send("focus:update-state", state);
+        },
+        async () => {
+          await installUpdate();
+        }
       );
       handler("updateStatus", () => updater.status());
       handler("checkUpdate", () => updater.check());
@@ -165,7 +197,7 @@ else {
           } else {
             win!.setResizable(true);
             win!.setMaximizable(true);
-            win!.setMinimumSize(760, 580);
+            win!.setMinimumSize(expandedMinWidth, expandedMinHeight);
             if (expandedBounds) win!.setBounds(expandedBounds);
             if (expandedMaximized) win!.maximize();
           }
