@@ -1,6 +1,6 @@
 {
   "name": "pomatez-focus",
-  "version": "0.1.0-preview.19",
+  "version": "0.1.0-preview.20",
   "private": true,
   "license": "MIT",
   "main": "./build/main.js",
@@ -66,7 +66,12 @@
       "artifactName": "Pomatez-Focus-v${version}-win-${arch}-portable.${ext}"
     },
     "nsis": {
-      "artifactName": "Pomatez-Focus-v${version}-win-${arch}-setup.${ext}"
+      "artifactName": "Pomatez-Focus-v${version}-win-${arch}-setup.${ext}",
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "番茄农场",
+      "createDesktopShortcut": "always",
+      "deleteAppDataOnUninstall": false
     },
     "linux": {
       "artifactName": "Pomatez-v${version}-linux-${arch}.${ext}",
@@ -81,7 +86,13 @@
     "snap": {
       "category": "Utility"
     },
-    "publish": null
+    "publish": {
+      "releaseType": "prerelease",
+      "repo": "pomatez-focus",
+      "owner": "Luoddu",
+      "channel": "preview",
+      "provider": "github"
+    }
   },
   "dependencies": {},
   "devDependencies": {
@@ -91,7 +102,7 @@
     "electron-is-dev": "^2.0.0",
     "electron-log": "^4.2.4",
     "electron-store": "^8.2.0",
-    "electron-updater": "^6.6.2",
+    "electron-updater": "6.8.3",
     "lodash.debounce": "^4.0.8",
     "node-notifier": "10.0.1",
     "uuid": "7.0.3",

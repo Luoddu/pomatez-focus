@@ -74,17 +74,31 @@ export function pomodoroSequence(text: string): number {
 }
 
 export type TaskPlan = { recordId: string; count: number };
+export function resolvePlanningMode(fields: any[]): "recent" | "date" {
+  const recent = fields.filter(f => f.field_name === "近日行动");
+  if (recent.length) {
+    if (recent.length !== 1 || recent[0].type !== 7)
+      throw Error("任务表「近日行动」必须是复选框");
+    return "recent";
+  }
+  const date = fields.filter(f => f.field_name === "计划日");
+  if (date.length !== 1 || date[0].type !== 5)
+    throw Error("任务表需要「近日行动」复选框或「计划日」日期字段");
+  return "date";
+}
 // 计划日=当天且番茄数为 1..max 整数的任务进入计划；非法值计数隔离，交由调用方报错
 export function collectTaskPlans(
   records: any[],
   countField: string,
   dayMs: number,
-  max = MAX_PER_TASK
+  max = MAX_PER_TASK,
+  mode: "recent" | "date" = "date"
 ): { plans: TaskPlan[]; invalid: number } {
   const plans: TaskPlan[] = [];
   let invalid = 0;
   for (const r of records) {
-    if (localDayOf(r.fields?.["计划日"]) !== dayMs) continue;
+    if (r.fields?.["完成"] === true || r.fields?.["放弃"] === true) continue;
+    if (mode === "recent" ? r.fields?.["近日行动"] !== true : localDayOf(r.fields?.["计划日"]) !== dayMs) continue;
     const state = integerFieldState(r.fields?.[countField]);
     if (!state.present || state.value === 0) continue;
     if (!state.valid || state.value < 0 || state.value > max) {

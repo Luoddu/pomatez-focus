@@ -12,6 +12,7 @@ import {
 import path from "path";
 import fs from "fs";
 import { FocusService } from "./focus/service";
+import { FocusUpdater } from "./focus/updater";
 const headless = process.env.POMATEZ_HEADLESS === "1";
 app.setName("Pomatez Focus");
 app.setPath(
@@ -110,6 +111,33 @@ else {
       handler("history", () => service.history());
       handler("archiveHistory", (value) => service.archiveHistory(value));
       handler("backupHistory", (value) => service.backupHistory(value));
+      const installUpdate = async () => {
+        if (updater.status().phase !== "downloaded") return updater.status();
+        const snapshot = await win!.webContents.executeJavaScript(`(() => {
+          const value = JSON.parse(localStorage.getItem('pomatez-focus-v1') || '{}');
+          if (value.active) return null;
+          document.documentElement.inert = true;
+          return value;
+        })()`);
+        if (!snapshot) { updater.defer(); return updater.status(); }
+        try {
+          const backups = path.join(app.getPath("userData"), "backups");
+          fs.mkdirSync(backups, {recursive: true});
+          fs.writeFileSync(path.join(backups, `before-update-${Date.now()}.json`), JSON.stringify(snapshot), {flag: "wx"});
+          updater.install();
+        } finally {
+          if (updater.status().phase !== "installing" && win && !win.isDestroyed()) await win.webContents.executeJavaScript("document.documentElement.inert = false");
+        }
+        return updater.status();
+      };
+      const updater = new FocusUpdater(
+        (state) => { if (win && !win.isDestroyed()) win.webContents.send("focus:update-state", state); },
+        async () => { await installUpdate(); }
+      );
+      handler("updateStatus", () => updater.status());
+      handler("checkUpdate", () => updater.check());
+      handler("downloadUpdate", () => updater.download());
+      handler("installUpdate", installUpdate);
       handler("windowState", () => ({
         compact: compactMode,
         pinned: win!.isAlwaysOnTop(),

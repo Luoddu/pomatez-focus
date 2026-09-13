@@ -7,6 +7,7 @@ const result = spawnSync(
     path.join(root, "node_modules/electron-builder/out/cli/cli.js"),
     "--win",
     "portable",
+    "nsis",
     "--x64",
     "--publish",
     "never",

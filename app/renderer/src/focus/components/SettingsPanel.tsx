@@ -1,5 +1,6 @@
 import React from "react";
 import { WindowControls } from "./shared";
+import UpdatePanel from "./UpdatePanel";
 
 export type FocusConfig = {
   appId: string;
@@ -87,6 +88,7 @@ export default function SettingsPanel({
             onTogglePin={onTogglePin}
           />
         </div>
+        <UpdatePanel />
         <div className="card settings-card">
           <h3>飞书连接</h3>
           <div className="conn-status">

@@ -447,6 +447,8 @@ export default function FocusApp() {
         const parts = [
           r.created > 0
             ? `已生成 ${r.created} 个今日番茄`
+            : r.eligibleTasks === 0
+              ? `没有可生成的任务：请${r.planningMode === "recent" ? "勾选近日行动" : "将任务计划日设为今天"}并填写今日计划番茄数（已完成或放弃的任务不生成）`
             : "今日番茄已齐全，无需生成",
         ];
         if (r.blocked > 0)

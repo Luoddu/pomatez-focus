@@ -21,6 +21,7 @@ import {
   BATCH_SIZE,
   resolveTodayCountField,
   collectTaskPlans,
+  resolvePlanningMode,
   scanExisting,
   pomodoroPlan,
   pomodoroSequence,
@@ -504,7 +505,6 @@ export class Feishu {
     const taskFields = await this.list(`${taskPath}/fields`);
     for (const [name, type] of [
       ["任务名称", 1],
-      ["计划日", 5],
     ] as [string, number][]) {
       const f = taskFields.filter((f: any) => f.field_name === name);
       if (f.length !== 1 || f[0].type !== type)
@@ -512,6 +512,7 @@ export class Feishu {
           `任务表字段「${name}」缺失或类型不符，请到飞书检查`
         );
     }
+    const planningMode = resolvePlanningMode(taskFields);
     const resolution = resolveTodayCountField(taskFields);
     if (!resolution.field)
       throw new Error(
@@ -528,7 +529,9 @@ export class Feishu {
     const { plans, invalid } = collectTaskPlans(
       taskRecords,
       resolution.name,
-      dayMs
+      dayMs,
+      MAX_PER_TASK,
+      planningMode
     );
     if (invalid > 0)
       throw new Error(
@@ -617,6 +620,8 @@ export class Feishu {
       capacityExceeded: plan.desired > DAILY_CAPACITY,
       capacityOverage: Math.max(0, plan.desired - DAILY_CAPACITY),
       fieldResolution: resolution.resolution,
+      planningMode,
+      eligibleTasks: plans.length,
     };
   }
   // 悬浮 ± 临时加减今日番茄：chips 的真相源是专注记录表的已生成行

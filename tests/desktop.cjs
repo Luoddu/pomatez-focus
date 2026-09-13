@@ -318,7 +318,9 @@ app
     checks.push(
       "minimum full window keeps both panels without horizontal clipping"
     );
-    win.setSize(...expandedSize);
+    // Test the desktop layout at an explicit wide content size, independent of
+    // the host monitor's work area and Windows display scaling.
+    win.setContentSize(1100, 760);
     await wait(150);
     const layout = await js(`(()=>{
       const a=document.querySelector('.left-col').getBoundingClientRect();

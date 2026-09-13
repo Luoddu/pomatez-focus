@@ -189,3 +189,32 @@ test("client token is deterministic and UUID-shaped", () => {
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/
   );
 });
+
+test('recent action selects checked tasks regardless of date, excludes completed/abandoned, and preserves exact counts', () => {
+  const { resolvePlanningMode } = require('../app/electron/build/focus/generate.js');
+  assert.equal(resolvePlanningMode([{field_name:'近日行动',type:7},{field_name:'计划日',type:5}]), 'recent');
+  assert.equal(resolvePlanningMode([{field_name:'计划日',type:5}]), 'date');
+  assert.throws(()=>resolvePlanningMode([{field_name:'近日行动',type:1},{field_name:'计划日',type:5}]), /复选框/);
+  const row=(id,n,extra={})=>({record_id:id,fields:{近日行动:true,今日计划番茄数:n,...extra}});
+  const source=[row('a',2),row('b',2),row('c',6),row('d',4),row('e',2),row('parent',null),row('done',4,{完成:true}),row('abandoned',3,{放弃:true}),row('unchecked',7,{近日行动:false,计划日:dayMs})];
+  const selected=collectTaskPlans(source,'今日计划番茄数',dayMs,50,'recent');
+  assert.equal(selected.invalid,0);assert.equal(selected.plans.length,5);assert.equal(selected.plans.reduce((n,p)=>n+p.count,0),16);
+  const keys=new Map();const first=pomodoroPlan(selected.plans,keys,new Set(),dateKey);assert.equal(first.specs.length,16);
+  first.specs.forEach(s=>keys.set(s.key,1));assert.equal(pomodoroPlan(selected.plans,keys,new Set(),dateKey).specs.length,0);
+  assert.equal(collectTaskPlans([row('bad',2.5)],'今日计划番茄数',dayMs,50,'recent').invalid,1);
+  assert.equal(collectTaskPlans([row('no',2,{近日行动:'true'})],'今日计划番茄数',dayMs,50,'recent').plans.length,0);
+});
+
+test('Feishu generation uses recent checkbox without task date column and remains idempotent', async () => {
+  const {harness}=require('./plan-fixture.cjs');const {client,state}=harness();state.plans=[];
+  state.tasks=[{record_id:'t1',fields:{任务名称:'Synthetic',近日行动:true,今日计划番茄数:3}},{record_id:'t2',fields:{任务名称:'Done',近日行动:true,今日计划番茄数:2,完成:true}}];
+  const original=client.request;
+  client.request=async(m,p,b,t)=>{
+    if(m==='GET'&&p.split('?')[0].endsWith('/tasks/fields'))return {data:{items:[{field_name:'任务名称',type:1},{field_name:'近日行动',type:7},{field_name:'今日计划番茄数',type:2}],has_more:false}};
+    if(m==='POST'&&p.split('?')[0].endsWith('/records/batch_create')) {const made=b.records.map((r,i)=>({record_id:'new'+(state.plans.length+i),fields:structuredClone(r.fields)}));state.plans.push(...made);return {data:{records:made}};}
+    return original(m,p,b,t);
+  };
+  const first=await client.generateToday();assert.equal(first.created,3);assert.equal(first.planningMode,'recent');assert.equal(first.eligibleTasks,1);
+  assert.equal((await client.generateToday()).created,0);assert.equal(state.plans.length,3);
+  state.tasks[0].fields.近日行动=false;assert.equal((await client.generateToday()).eligibleTasks,0);assert.equal(state.plans.length,3);
+});
