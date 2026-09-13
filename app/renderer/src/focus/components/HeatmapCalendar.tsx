@@ -16,7 +16,8 @@ const mondayOf = (day: Date) => {
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return d;
 };
-const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const dayKey = (d: Date) =>
+  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 // 番茄红色系分档：0/1/2-3/4-5/6-8/9+，不走线性插值
 const tier = (count: number) =>
   count <= 0
@@ -125,7 +126,7 @@ export default function HeatmapCalendar({
         <div
           className="hm-grid"
           style={{
-            gridTemplateColumns: `16px repeat(${weeks.length}, 13px)`,
+            gridTemplateColumns: `var(--hm-dow-w, 16px) repeat(${weeks.length}, var(--hm-cell, 13px))`,
           }}
         >
           <span className="hm-corner" />
@@ -147,9 +148,11 @@ export default function HeatmapCalendar({
                 return (
                   <span
                     key={dayKey(day)}
-                    className={`hm-cell hm-t${future ? 0 : tier(count)}${
-                      future ? " future" : ""
-                    }${day.getTime() === todayTs ? " today" : ""}`}
+                    className={`hm-cell hm-t${
+                      future ? 0 : tier(count)
+                    }${future ? " future" : ""}${
+                      day.getTime() === todayTs ? " today" : ""
+                    }`}
                     data-count={future ? "" : count}
                     onMouseEnter={
                       future ? undefined : (e) => showTip(e, day, stat)

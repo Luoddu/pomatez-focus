@@ -29,6 +29,26 @@ const deadline = setTimeout(() => {
   console.error("Portrait desktop test timed out");
   app.exit(2);
 }, 45000);
+const dayMs = 24 * 60 * 60 * 1000;
+const seedRecord = (daysAgo, hour, title, quadrant) => ({
+  id: randomUUID(),
+  task: { id: `synthetic-${title}`, title, source: "local", quadrant },
+  startedAt: Date.now() - daysAgo * dayMs - hour * 3600000,
+  endedAt: Date.now() - daysAgo * dayMs - hour * 3600000 + 1500000,
+  plannedSeconds: 1500,
+  elapsedSeconds: 1500,
+  acceptedSeconds: 1500,
+  completedCount: 1,
+  status: "saved",
+  sync: "local",
+});
+const seedRecords = [
+  seedRecord(0, 2, "整理阅读笔记", "iu"),
+  seedRecord(0, 1, "回复工作邮件", "inu"),
+  seedRecord(1, 5, "规划下一周任务", "uni"),
+  seedRecord(1, 3, "整理待办事项", "unu"),
+  seedRecord(3, 6, "阅读学习资料", "uni"),
+];
 app
   .whenReady()
   .then(async () => {
@@ -49,7 +69,30 @@ app
       if (level >= 3) errors.push(message);
     });
     const js = (code) => win.webContents.executeJavaScript(code, true);
+    // Seed saved records across three days before React mounts, so the
+    // stats/heatmap/records panels render real content (same technique as
+    // tests/desktop.cjs).
+    win.webContents.debugger.attach("1.3");
+    await win.webContents.debugger.sendCommand("Page.enable");
+    const script = await win.webContents.debugger.sendCommand(
+      "Page.addScriptToEvaluateOnNewDocument",
+      {
+        source: `localStorage.setItem('pomatez-focus-v1',${JSON.stringify(
+          JSON.stringify({ active: null, records: seedRecords })
+        )})`,
+      }
+    );
+    const reloaded = new Promise((r) =>
+      win.webContents.once("did-finish-load", r)
+    );
+    win.webContents.reload();
+    await reloaded;
     await wait(500);
+    await win.webContents.debugger.sendCommand(
+      "Page.removeScriptToEvaluateOnNewDocument",
+      { identifier: script.identifier }
+    );
+    win.webContents.debugger.detach();
     // Programmatic resize may exceed the host work area; content size is what
     // media queries see, so drive the viewport directly.
     win.setContentSize(900, 1600);
@@ -59,10 +102,22 @@ app
       const grid=getComputedStyle(document.querySelector('.stat-grid'));
       const farm=document.querySelector('.farm-field').getBoundingClientRect();
       const bar=getComputedStyle(document.querySelector('.action-bar'));
+      const stats=[...document.querySelectorAll('.stat')];
+      const statHeights=stats.map(s=>Math.round(s.getBoundingClientRect().height));
+      const statAlign=getComputedStyle(stats[0]).textAlign;
+      const fonts=stats.map(s=>getComputedStyle(s.querySelector('strong')).fontSize);
+      const cell=document.querySelector('.hm-cell').getBoundingClientRect();
+      const hm=document.querySelector('.hm-grid').getBoundingClientRect();
+      const sc=document.querySelector('.hm-scroll').getBoundingClientRect();
+      const recs=getComputedStyle(document.querySelector('.records'));
       return {direction:cs.flexDirection,
         columns:grid.gridTemplateColumns.split(' ').length,
         farmHeight:farm.height,barPosition:bar.position,
-        scrollable:document.querySelector('.content').scrollHeight>document.querySelector('.content').clientHeight};
+        statHeights,statAlign,fonts:[...new Set(fonts)],
+        cellSize:Math.round(cell.width),
+        hmMarginDelta:Math.abs((hm.left-sc.left)-(sc.right-hm.right)),
+        recordColumns:recs.gridTemplateColumns.split(' ').length,
+        recordDays:document.querySelectorAll('.record-day').length};
     })()`);
     check("portrait stacks panels in one column with four-up stats", () => {
       assert.equal(portrait.direction, "column");
@@ -71,6 +126,19 @@ app
     check("portrait keeps the farm visible and the action bar sticky", () => {
       assert.ok(portrait.farmHeight >= 200, JSON.stringify(portrait));
       assert.equal(portrait.barPosition, "sticky");
+    });
+    check("portrait stats are equal-height centered cards with one font tier", () => {
+      assert.equal(new Set(portrait.statHeights).size, 1, JSON.stringify(portrait));
+      assert.equal(portrait.statAlign, "center");
+      assert.equal(portrait.fonts.length, 1, JSON.stringify(portrait.fonts));
+    });
+    check("portrait heatmap uses larger centered cells", () => {
+      assert.ok(portrait.cellSize >= 16 && portrait.cellSize <= 18, JSON.stringify(portrait));
+      assert.ok(portrait.hmMarginDelta <= 4, JSON.stringify(portrait));
+    });
+    check("portrait records flow into two day-card columns", () => {
+      assert.equal(portrait.recordColumns, 2);
+      assert.ok(portrait.recordDays >= 3, JSON.stringify(portrait));
     });
     fs.writeFileSync(
       path.join(artifacts, "portrait-preview.png"),
@@ -83,15 +151,27 @@ app
       const grid=getComputedStyle(document.querySelector('.stat-grid'));
       const a=document.querySelector('.left-col').getBoundingClientRect();
       const b=document.querySelector('.right-col').getBoundingClientRect();
+      const cell=document.querySelector('.hm-cell').getBoundingClientRect();
+      const recs=getComputedStyle(document.querySelector('.records'));
+      const stats=[...document.querySelectorAll('.stat strong')];
       return {direction:cs.flexDirection,
         columns:grid.gridTemplateColumns.split(' ').length,
-        sideBySide:a.right<=b.left,rightWidth:b.width};
+        sideBySide:a.right<=b.left,rightWidth:b.width,
+        cellSize:Math.round(cell.width),recordsDisplay:recs.display,
+        fonts:[...new Set(stats.map(s=>getComputedStyle(s).fontSize))],
+        statAlign:getComputedStyle(document.querySelector('.stat')).textAlign};
     })()`);
     check("landscape keeps the original side-by-side layout", () => {
       assert.equal(landscape.direction, "row");
       assert.equal(landscape.columns, 2);
       assert.equal(landscape.sideBySide, true);
       assert.ok(Math.abs(landscape.rightWidth - 380) <= 2, JSON.stringify(landscape));
+    });
+    check("landscape keeps original heatmap cells, records list and stat style", () => {
+      assert.equal(landscape.cellSize, 13);
+      assert.equal(landscape.recordsDisplay, "block");
+      assert.ok(["left", "start"].includes(landscape.statAlign), landscape.statAlign);
+      assert.deepEqual(landscape.fonts.sort(), ["22px", "28px"], JSON.stringify(landscape.fonts));
     });
     fs.writeFileSync(
       path.join(artifacts, "landscape-preview.png"),

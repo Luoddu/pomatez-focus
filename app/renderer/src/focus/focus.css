@@ -1283,12 +1283,12 @@ input:focus-visible {
 .hm-grid {
   display: grid;
   grid-auto-rows: max-content;
-  gap: 3px;
+  gap: var(--hm-gap, 3px);
   width: max-content;
   margin: 0 auto;
 }
 .hm-corner {
-  width: 16px;
+  width: var(--hm-dow-w, 16px);
 }
 .hm-month {
   height: 14px;
@@ -1298,15 +1298,15 @@ input:focus-visible {
   white-space: nowrap;
 }
 .hm-dow {
-  width: 16px;
+  width: var(--hm-dow-w, 16px);
   font-size: 10px;
   line-height: 12px;
   color: var(--muted);
   white-space: nowrap;
 }
 .hm-cell {
-  width: 13px;
-  height: 13px;
+  width: var(--hm-cell, 13px);
+  height: var(--hm-cell, 13px);
   border-radius: 3px;
   display: inline-flex;
   align-items: center;
@@ -1596,11 +1596,48 @@ input:focus-visible {
   .stat-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+  /* 四张统计卡等高居中，数字与时长统一字号层级 */
+  .stat {
+    padding: 12px 10px;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .stat strong,
+  .stat strong.long {
+    font-size: clamp(18px, 2.2vw, 24px);
+  }
   .farm-field {
     flex: none;
     height: 240px;
   }
   .records {
-    max-height: 400px;
+    max-height: 480px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 10px 14px;
+    align-items: start;
+    padding: 10px 12px;
+  }
+  .records .empty {
+    grid-column: 1 / -1;
+  }
+  .record-day {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 14px;
+  }
+  .record .r-dur {
+    min-width: 76px;
+    text-align: right;
+  }
+  /* 月历格子加大并水平居中，充分利用通栏宽度 */
+  .heatmap {
+    --hm-cell: 17px;
+    --hm-dow-w: 22px;
+    --hm-gap: 4px;
   }
 }
