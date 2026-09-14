@@ -11,17 +11,51 @@ import {
 import HeatmapCalendar from "./HeatmapCalendar";
 import ManualEntry from "./ManualEntry";
 
+const WEEK_CHARS = "日一二三四五六";
 const dayLabel = (value: number) => {
   const date = new Date(value);
   const today = new Date();
-  if (date.toDateString() === today.toDateString()) return "今天";
+  const week = `周${WEEK_CHARS[date.getDay()]}`;
+  if (date.toDateString() === today.toDateString())
+    return `今天 · ${week}`;
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "昨天";
-  return date.toLocaleDateString();
+  if (date.toDateString() === yesterday.toDateString())
+    return `昨天 · ${week}`;
+  const md = `${date.getMonth() + 1}.${date.getDate()}`;
+  const year =
+    date.getFullYear() !== today.getFullYear()
+      ? `${date.getFullYear()}.`
+      : "";
+  return `${year}${md} · ${week}`;
+};
+// 今天空态邀请语：按本地日期做种子，一天内稳定
+const TODAY_INVITES = [
+  "田里还空着，种一颗 25 分钟的番茄吧 🍅",
+  "稻草人等你开工啦 🌾",
+  "今日第一颗番茄，就从现在开始 🌱",
+  "小种子已备好，点下开始就会发芽 🌱",
+  "农夫不忙，田里慌，来种一颗吧 🍅",
+  "今天的第一垄地，等你来翻 ✨",
+  "泡杯茶，点「开始自由专注」，番茄自己长 🍵",
+  "空田不丢人，种下就赢了 🌻",
+  "蝴蝶都来了，就差你的第一颗番茄 🦋",
+  "攒番茄的好天气，别浪费啦 ☀️",
+];
+const todayInvite = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor(
+    (now.getTime() - start.getTime()) / 86400000
+  );
+  return TODAY_INVITES[
+    (now.getFullYear() * 400 + dayOfYear) % TODAY_INVITES.length
+  ];
 };
 const syncText = (record: FocusSession) =>
-  record.cloudSynced ? "已共享到飞书" : record.sync === "synced"
+  record.cloudSynced
+    ? "已共享到飞书"
+    : record.sync === "synced"
     ? record.syncTarget === "plan"
       ? "已记账 · 待共享成果"
       : "旧会话已记账 · 待共享成果"
@@ -100,6 +134,10 @@ export default function HistoryPanel({
       else result.push({ date: label, records: [record] });
       return result;
     }, [] as { date: string; records: FocusSession[] }[]);
+  // 今天永远在最前，即使还没有任何记录
+  const todayKey = dayLabel(Date.now());
+  if (!groups.length || groups[0].date !== todayKey)
+    groups.unshift({ date: todayKey, records: [] });
   return (
     <div className="right-col">
       <div className="side-section">
@@ -159,11 +197,17 @@ export default function HistoryPanel({
             <button
               className="btn-text"
               aria-label="手动同步"
-              title={!canSync ? "请先连接飞书" : "上传本机记录并获取其他电脑的专注成果"}
+              title={
+                !canSync
+                  ? "请先连接飞书"
+                  : "上传本机记录并获取其他电脑的专注成果"
+              }
               disabled={!canSync || syncBusy}
               onClick={onSync}
             >
-              {syncBusy ? "同步中…" : `手动同步${pendingCount ? ` (${pendingCount})` : ""}`}
+              {syncBusy
+                ? "同步中…"
+                : `手动同步${pendingCount ? ` (${pendingCount})` : ""}`}
             </button>
             <button className="btn-text" onClick={onExport}>
               导出
@@ -181,51 +225,63 @@ export default function HistoryPanel({
           />
         )}
         <div className="card records">
-          {!records.length && (
-            <p className="empty">
-              从第一个番茄开始，留下你的专注记录。
-            </p>
-          )}
           {groups.map((group) => (
             <section className="record-day" key={group.date}>
-              <h4>{group.date}</h4>
-              <ul className="record-list">
-                {group.records.map((r) => {
-                  // 记录圆点按任务象限着色（与番茄园同一取数口径：
-                  // 记录里的任务快照，无象限归 free 中性色）
-                  const q =
-                    r.task?.quadrant === "iu" ||
-                    r.task?.quadrant === "inu" ||
-                    r.task?.quadrant === "uni" ||
-                    r.task?.quadrant === "unu"
-                      ? r.task.quadrant
-                      : "free";
-                  return (
-                  <li className="record" key={r.id}>
-                    <span className={`r-icon tone-${q}`}>
-                      <LogoIcon size={14} tone={QUADRANT_TONES[q]} />
-                    </span>
-                    <div className="r-main">
-                      <div className="r-line1">
-                        <span className="r-time">
-                          {recordTime(r.startedAt)} —{" "}
-                          {r.endedAt ? recordTime(r.endedAt) : ""}
+              <h4>
+                {group.date}
+                <span className="day-total">
+                  共{" "}
+                  {group.records.reduce(
+                    (total, r) => total + (r.completedCount || 0),
+                    0
+                  )}{" "}
+                  个番茄
+                </span>
+              </h4>
+              {group.records.length === 0 ? (
+                <p className="record-invite">{todayInvite()}</p>
+              ) : (
+                <ul className="record-list">
+                  {group.records.map((r) => {
+                    // 记录圆点按任务象限着色（与番茄园同一取数口径：
+                    // 记录里的任务快照，无象限归 free 中性色）
+                    const q =
+                      r.task?.quadrant === "iu" ||
+                      r.task?.quadrant === "inu" ||
+                      r.task?.quadrant === "uni" ||
+                      r.task?.quadrant === "unu"
+                        ? r.task.quadrant
+                        : "free";
+                    return (
+                      <li className="record" key={r.id}>
+                        <span className={`r-icon tone-${q}`}>
+                          <LogoIcon
+                            size={14}
+                            tone={QUADRANT_TONES[q]}
+                          />
                         </span>
-                        <span className="r-task">
-                          {parseTitle(r.task.title).name}
-                        </span>
-                        <span className="r-dur">
-                          {durationText(r.acceptedSeconds || 0)}
-                        </span>
-                      </div>
-                      <div className="r-sub">
-                        完成 {r.completedCount} 个 · {syncText(r)}
-                      </div>
-                    </div>
-                  </li>
-                  );
-                })}
-              </ul>
+                        <div className="r-main">
+                          <div className="r-line1">
+                            <span className="r-time">
+                              {recordTime(r.startedAt)} —{" "}
+                              {r.endedAt ? recordTime(r.endedAt) : ""}
+                            </span>
+                            <span className="r-task">
+                              {parseTitle(r.task.title).name}
+                            </span>
+                            <span className="r-dur">
+                              {durationText(r.acceptedSeconds || 0)}
+                            </span>
+                          </div>
+                          <div className="r-sub">
+                            完成 {r.completedCount} 个 · {syncText(r)}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </section>
           ))}
         </div>

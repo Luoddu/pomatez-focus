@@ -783,12 +783,6 @@ input:focus-visible {
   padding: 6px 0;
   overflow-y: auto;
 }
-.records .empty {
-  padding: 40px 10px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-}
 .record-day {
   padding: 8px 18px;
 }
@@ -797,6 +791,26 @@ input:focus-visible {
   color: var(--muted);
   font-weight: 600;
   padding: 4px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.record-day h4 .day-total {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+/* 今天还没有记录时的邀请语：虚线待耕地 */
+.record-invite {
+  margin: 4px 0 6px;
+  padding: 14px 12px;
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
 }
 .record-list {
   list-style: none;
@@ -1693,13 +1707,10 @@ input:focus-visible {
   .records {
     max-height: 480px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 10px 14px;
     align-items: start;
     padding: 10px 12px;
-  }
-  .records .empty {
-    grid-column: 1 / -1;
   }
   .record-day {
     border: 1px solid var(--border);
