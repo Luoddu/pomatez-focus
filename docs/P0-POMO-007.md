@@ -1,6 +1,6 @@
 # P0-POMO-007 — 连续右键完成
 
-状态：IN_PROGRESS。隔离模块实现者/负责人 Codex；本卡是任务状态源。
+状态：DONE。隔离模块实现者/负责人 Codex；本卡是任务状态源。
 用户授权优化连续标记完成并后台同步。基线 650ec2a，公开主线实时检查一致。写集：renderer focus 队列/UI、对应 tests、本卡与版本文件；复用原 completeToday IPC/飞书 PUT，不改凭证、接口、真实表或根仓。独占本工作树及合成测试 profile；不重启用户 App。无子 Agent、长期后台；只在 App 开启时处理用户明确提交的队列，失败显式重试。提交前复核远端/工作树，冲突只停对应步骤。
 
 四处预检：① FocusApp.tsx:597 全局 completing 阻塞，成功还整页刷新，失败回滚整个旧 tasks；service.ts:154 现有计划锁复用。② 不改变第三方语义/依赖，官方第三方迁移不适用；沿用 feishu.ts:826 completePlan 固定行 GET/PUT true/GET 幂等路径。③ 已检查 scripts/test-focus-all、package/build/repo-sync 与 Learning 中逐项持久结果、写后回读失败不等于未写的规则；复用现有本机持久化及 sourceKey 隔离方式。④ tests/plan.test.cjs、plan-desktop、shot-app 及 ACCEPTANCE-integration 为同类验收。
@@ -20,3 +20,18 @@ Learning：candidate — 乐观批量操作要按项持久化和失败隔离，�
 preview.27 已创建来源标签但未发布；封版前上述补检发现关联入口需一致处理，因此按不可覆盖版本规则改用 preview.28，保留旧 tag，不发布旧草稿。最终源码/包版本为 preview.28。
 
 补充同任务写入校验：该任务存在 pending/failed 完成标记时，± 提示先同步后调整，避免服务端仍按旧未完成行挑选删除目标；其他右键标记不受影响。桌面测试验证 ± 不调用适配器且剩余 chip 不丢；计时/确认/放弃正常。完整构建通过。
+
+交付写集补充：README.md 的当前版本、安装包链接与连续标记使用说明属于本次发布交付，待 Release 校验成功后与最终验收回执一起提交；不变更其他功能说明。
+
+
+## 最终发布回执
+
+已验证发布 v0.1.0-preview.28，Release ID 388926970，draft=false / prerelease=true，published_at=2026-09-15T07:37:13Z。源码与不可变 tag 指向 cc8b80b2ee572114c4faecfd3043ca101262f550；本次收尾仅改文档，不更换标签/安装包。
+
+六个远端资产全部 uploaded，逐项 size/SHA256 与本地一致；安装包 SHA256 9ba3919d3a94843bbb2545b5052fb8e9f8f118f3289d634a2af051768ce97f91，便携包 40ffd77b966178ad9ae55e8fecb8065e9875cb6a4a3729daa129d10130b6953d。preview.yml 的版本及 SHA512 匹配安装包；包内 source-version.json 为版本 0.1.0-preview.28、上述源码、dirty=false。
+
+实际打包 EXE 使用隔离空 profile 隐藏启动通过，设置显示版本一致；63 个 asar 条目，禁止私人路径命中 0，上游 LICENSE 原文一致。证据：本机 artifacts/package-verification.json、release-verified.json、completion-final-guard.log、tests-all.log、tests-desktop.log。
+
+初次大文件上传耗时过长，终止本次上传进程后回读草稿，只补传缺失的两个应用包；补传使用 Go 官方进程级 GODEBUG=http2client=0 选项（https://go.dev/src/net/http/transport.go 中 onceSetNextProtoDefaults），没有更改系统代理/网络配置。没有覆盖已上传文件；原因未作确定性归因，不将传输策略写进产品运行代码。补传与最终校验成功。
+
+本机用户启动目录已交付 preview.28 安装包和便携包；本轮临时 preview.27 放入 superseded-preview27，旧源标签和未发布草稿保留且注明已替代。没有替用户安装、重启或修改真实飞书。常用源码工作树跟踪 codex/feishu-focus 并快进到公开主线，README 当前下载入口为 preview.28。

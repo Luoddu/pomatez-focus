@@ -8,7 +8,7 @@
 
 [功能](#功能) · [开始使用](#开始使用) · [飞书联动](#飞书联动) · [本地开发](#本地开发) · [许可证](#许可证)
 
-> **版本状态（2026-09-15）**：`0.1.0-preview.26` 整合公开 preview.24 与本地 preview.25 功能，保留竖屏布局、每日汇总并加入提示音、生成进度与日期并集筛选。[下载安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.26/Pomatez-Focus-v0.1.0-preview.26-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.26)。当前仅验证 Windows x64，不标记为稳定版。
+> **版本状态（2026-09-15）**：`0.1.0-preview.28` 支持连续右键标记完成：先在本机保存并更新界面，再逐项后台同步；失败保留并可重试。保留既有竖屏、提示音和跨机同步功能。[下载安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.28/Pomatez-Focus-v0.1.0-preview.28-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.28)。当前仅验证 Windows x64，不标记为稳定版。
 
 ![番茄农场：四象限任务、收获农场、番茄月历和专注记录](docs/images/desktop.png)
 
@@ -114,3 +114,5 @@ node scripts/package-focus.cjs
 ## 许可证
 
 [MIT](LICENSE)。感谢 [Pomatez](https://github.com/zidoro/pomatez) 原作者及社区贡献者，固定上游来源见 [UPSTREAM.md](docs/UPSTREAM.md)。本项目是独立社区分支，与滴答清单、飞书无官方隶属关系，不使用其专有图像或商标素材。
+
+右键“标记完成”可连续使用，不增加专注分钟。待同步标记先保存在本机，App 开启时后台逐项处理，底部显示待同步数量；失败项点击“重试未同步项”。彻底退出后未处理项会在下次开启时恢复，失败项保留供重试。仍遵守原表只完成今天番茄的规则；同一任务有待同步标记时先完成同步，再增减计划数量。
