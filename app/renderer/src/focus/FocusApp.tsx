@@ -25,6 +25,7 @@ import {
   quadrantCounts,
   quadrantToneList,
 } from "./week";
+import { CompletionQueue } from "./completionQueue";
 import "./focus.css";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
@@ -177,7 +178,6 @@ export default function FocusApp() {
   const [busy, setBusy] = useState(false),
     [generating, setGenerating] = useState(false),
     [adjusting, setAdjusting] = useState(""),
-    [completing, setCompleting] = useState(""),
     [accepted, setAccepted] = useState("25"),
     [completed, setCompleted] = useState(0),
     [completedTouched, setCompletedTouched] = useState(false),
@@ -192,6 +192,21 @@ export default function FocusApp() {
     completedField: "已完成",
     quadrantField: "",
   });
+  const [completionQueue] = useState(
+    () => new CompletionQueue(localStorage)
+  );
+  const [queueRevision, setQueueRevision] = useState(0);
+  useEffect(
+    () =>
+      completionQueue.subscribe(() => setQueueRevision((n) => n + 1)),
+    [completionQueue]
+  );
+  const queued = completionQueue.entries.filter(
+    (e) => e.sourceKey === sourceKey && e.state !== "done"
+  );
+  const queueFailed = queued.filter((e) => e.state === "failed");
+  const boardTasks = completionQueue.project(tasks, sourceKey);
+  const refreshSequence = useRef(0);
   const syncing = useRef(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [demoSeed] = useState(demoHistory);
@@ -227,7 +242,8 @@ export default function FocusApp() {
   // ?genMock=1 仅供设计稿/截图脚本：不连飞书，本地按真实阶段顺序模拟推进
   const genMock = useMemo(
     () =>
-      new URLSearchParams(window.location.search).get("genMock") === "1",
+      new URLSearchParams(window.location.search).get("genMock") ===
+      "1",
     []
   );
   // 生成进度：主进程各阶段的真实事件经 preload 桥推到这里
@@ -281,6 +297,7 @@ export default function FocusApp() {
   };
   const refresh = async () => {
     if (!api()) return;
+    const sequence = ++refreshSequence.current;
     setLoadingTasks(true);
     try {
       const status = await api().status();
@@ -288,7 +305,9 @@ export default function FocusApp() {
       setSourceKey(status.sourceKey || null);
       if (status.configured) {
         const rows: FocusTask[] = await api().today();
+        if (sequence !== refreshSequence.current) return;
         setTasks(rows);
+        completionQueue.reconcile(status.sourceKey, rows);
         setTodayCount(rows.length);
         // 默认不预选；刷新只保留仍然存在的选中
         setSelected((previous) =>
@@ -302,7 +321,7 @@ export default function FocusApp() {
         setTasks((previous) => (previous.length ? previous : demo));
       }
     } finally {
-      setLoadingTasks(false);
+      if (sequence === refreshSequence.current) setLoadingTasks(false);
     }
   };
   useEffect(() => {
@@ -513,7 +532,11 @@ export default function FocusApp() {
           r.created > 0
             ? `已生成 ${r.created} 个今日番茄`
             : r.eligibleTasks === 0
-              ? `没有可生成的任务：请${r.planningMode === "recent" ? "勾选近日行动或将任务计划日设为今天" : "将任务计划日设为今天"}并填写今日计划番茄数（已完成或放弃的任务不生成）`
+            ? `没有可生成的任务：请${
+                r.planningMode === "recent"
+                  ? "勾选近日行动或将任务计划日设为今天"
+                  : "将任务计划日设为今天"
+              }并填写今日计划番茄数（已完成或放弃的任务不生成）`
             : "今日番茄已齐全，无需生成",
         ];
         if (r.blocked > 0)
@@ -587,32 +610,72 @@ export default function FocusApp() {
       }
     })();
   };
-  // 右键 chip「标记完成」：只勾飞书已完成，不建专注记录、不计分钟；
-  // 乐观移除 chip，失败回滚并报错
+  // Accept many clicks immediately; durable per-row intent is independent of
+  // the existing serialized Feishu write/readback and history synchronization.
+  const queueReady = useRef(false);
+  queueReady.current =
+    connected &&
+    !!sourceKey &&
+    !adjusting &&
+    !generating &&
+    !syncBusy &&
+    !busy;
+  useEffect(() => {
+    if (
+      !sourceKey ||
+      !queueReady.current ||
+      completionQueue.running ||
+      !completionQueue.entries.some(
+        (e) => e.sourceKey === sourceKey && e.state === "pending"
+      )
+    )
+      return;
+    completionQueue
+      .drain(
+        sourceKey,
+        async (planId) => {
+          const status = await api().status();
+          if (status.sourceKey !== sourceKey)
+            throw Error("飞书连接已改变，请切回原连接后重试。");
+          await api().completeToday({ planId });
+        },
+        () => queueReady.current
+      )
+      .then(() => {
+        // One refresh per drained batch, never one full refresh per click.
+        if (
+          !completionQueue.entries.some(
+            (e) => e.sourceKey === sourceKey && e.state === "pending"
+          )
+        )
+          return refresh();
+      })
+      .catch((e: any) => notify(e.message, "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    queueRevision,
+    sourceKey,
+    connected,
+    adjusting,
+    generating,
+    syncBusy,
+    busy,
+  ]);
   const completeChip = (task: FocusTask) => {
-    if (!api() || !connected) {
+    if (!api() || !connected || !sourceKey) {
       notify("请先在设置中连接飞书，再标记完成。", "error");
       return;
     }
-    if (completing || adjusting) return;
-    const rollback = tasks;
-    const parsed = parseTitle(task.title);
-    setCompleting(task.id);
-    setTasks(tasks.filter((t) => t.id !== task.id));
-    (async () => {
-      try {
-        await api().completeToday({ planId: task.planId || task.id });
-        notify(
-          `已完成「${parsed.name} · 第 ${parsed.pomodoro} 个番茄」。`
-        );
-        await refresh();
-      } catch (e: any) {
-        setTasks(rollback);
-        notify(e.message || "标记完成失败，请稍后重试", "error");
-      } finally {
-        setCompleting("");
-      }
-    })();
+    if (active?.task.id === task.id) {
+      notify("这个番茄正在专注中，请先结束并确认本次专注。", "error");
+      return;
+    }
+    try {
+      completionQueue.enqueue(task, sourceKey);
+      setSelected((previous) => (previous === task.id ? "" : previous));
+    } catch (e: any) {
+      notify(e.message, "error");
+    }
   };
   const exportRecords = () => {
     const blob = new Blob(
@@ -771,6 +834,11 @@ export default function FocusApp() {
           onConfig={setConfig}
           onSubmit={() =>
             run(async () => {
+              if (
+                completionQueue.running ||
+                completionQueue.entries.some((e) => e.state !== "done")
+              )
+                throw Error("请先同步完待完成标记，再更换飞书连接。");
               await api().configure(config);
               setConfig({ ...config, appSecret: "" });
               await refresh();
@@ -838,7 +906,7 @@ export default function FocusApp() {
             />
           ) : (
             <QuadrantBoard
-              tasks={tasks}
+              tasks={boardTasks}
               selected={selected}
               onSelect={(id) =>
                 setSelected((previous) => (previous === id ? "" : id))
@@ -848,7 +916,9 @@ export default function FocusApp() {
               onBegin={() => {
                 // Bind free focus to the current Base, never a future connection.
                 beginTask(
-                  tasks.find((t) => t.id === selected) || makeFreeTask()
+                  boardTasks.find(
+                    (t) => t.id === selected && t.kind !== "done"
+                  ) || makeFreeTask()
                 );
               }}
               onBreak={timer.startBreak}
@@ -869,7 +939,7 @@ export default function FocusApp() {
                   : ""
               }
               onComplete={completeChip}
-              completing={completing}
+              completing={""}
             />
           )}
           <HistoryPanel
@@ -878,7 +948,7 @@ export default function FocusApp() {
             canSync={connected && !!api()}
             syncBusy={syncBusy}
             onSync={() => run(sync)}
-            tasks={tasks}
+            tasks={boardTasks}
             onExport={exportRecords}
             onAddManual={timer.addManual}
             onGenerate={generate}
@@ -889,6 +959,37 @@ export default function FocusApp() {
             {...windowControls}
           />
         </main>
+      )}
+      {(queued.length > 0 || completionQueue.storageError) && (
+        <aside
+          className="completion-status"
+          role="status"
+          aria-label="完成标记同步"
+        >
+          <span>
+            {completionQueue.storageError ||
+              `已在本机标记，${queued.length} 个待同步到飞书 · 可继续标记`}
+          </span>
+          {queueFailed.length > 0 && (
+            <>
+              <span>
+                {queueFailed.length} 个暂未同步：
+                {queueFailed[0].task.title} — {queueFailed[0].error}
+              </span>
+              <button
+                onClick={() => {
+                  try {
+                    if (sourceKey) completionQueue.retry(sourceKey);
+                  } catch (e: any) {
+                    notify(e.message, "error");
+                  }
+                }}
+              >
+                重试未同步项
+              </button>
+            </>
+          )}
+        </aside>
       )}
       {toast && (
         <div

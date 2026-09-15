@@ -1756,3 +1756,6 @@ input:focus-visible {
     --hm-gap: 4px;
   }
 }
+
+.completion-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 20px; color: #344054; background: #eef2ff; border-top: 1px solid #d0d5dd; font-size: 14px; }
+.completion-status button { border: 1px solid #5265db; background: white; color: #3448ba; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
