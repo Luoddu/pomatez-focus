@@ -557,7 +557,7 @@ export default function FocusApp() {
       notify("请先在设置中连接飞书，再调整番茄数。", "error");
       return;
     }
-    const group = groupTasks(tasks).find((g) => g.key === taskId);
+    const group = groupTasks(boardTasks).find((g) => g.key === taskId);
     if (!group || adjusting) return;
     const rollback = tasks;
     if (delta === 1) {
@@ -746,17 +746,19 @@ export default function FocusApp() {
     );
   };
   // 同任务的下一个番茄（序号 +1），自由番茄没有“下一个”但总是可以再开一个
-  const nextTask = useMemo(() => {
+  const nextTask = (() => {
     if (!active || active.task.kind === "free") return null;
     const wanted = parseTitle(active.task.title).pomodoro + 1;
     return (
-      tasks.find(
+      boardTasks.find(
         (t) =>
+          t.kind !== "done" &&
+          t.kind !== "pending" &&
           t.taskId === active.task.taskId &&
           parseTitle(t.title).pomodoro === wanted
       ) || null
     );
-  }, [active, tasks]);
+  })();
   const nextAvailable = active?.task.kind === "free" || !!nextTask;
   const shownTime = parts?.overtime
     ? `+${clock(parts.overtime)}`

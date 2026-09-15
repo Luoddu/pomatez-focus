@@ -31,11 +31,12 @@ FocusService.prototype.history = () => client.history();
 FocusService.prototype.archiveHistory = (v) => client.archiveHistory(v);
 let release,
   fail = true;
-const gate = new Promise((r) => (release = r)),
-  calls = [];
+let gate = new Promise((r) => (release = r)),
+  blockId = "p1";
+const calls = [];
 FocusService.prototype.completeToday = async ({ planId }) => {
   calls.push(planId);
-  if (planId === "p1") await gate;
+  if (planId === blockId) await gate;
   if (planId === "p2" && fail) throw Error("Synthetic offline");
   return client.completePlan(planId);
 };
@@ -56,7 +57,7 @@ app.whenReady().then(async () => {
       await wait(50);
     }
     assert.equal(win.isVisible(), false);
-    const js = (s) => win.webContents.executeJavaScript(s, true);
+    const js = (s) => win.webContents.executeJavaScript(s, true).catch(e => { throw Error(s + "\n" + e.message); });
     const until = async (fn) => {
       for (let i = 0; i < 150; i++) {
         if (await fn()) return;
@@ -99,7 +100,13 @@ app.whenReady().then(async () => {
       ),
       /3 个待同步/
     );
-    require("node:fs").writeFileSync(path.join(__dirname,"../artifacts/completion-queue.png"),(await win.webContents.capturePage()).toPNG());
+    // Windows fractional DPI can put the bottom a fraction of a DIP beyond innerHeight.
+    assert.equal(
+      await js(
+        `(()=>{const r=document.querySelector('.completion-status').getBoundingClientRect();return r.height>0 && r.top>=0 && r.bottom<=innerHeight+1})()`
+      ),
+      true
+    );
     // Refresh returns all three still-pending remote rows: none may reappear.
     await js(
       `document.querySelector('[aria-label="刷新今日番茄"]').click()`
@@ -146,6 +153,55 @@ app.whenReady().then(async () => {
     );
     assert.deepEqual(calls, ["p1", "p2", "p3", "p2"]);
     assert.ok(state.plans.every((p) => p.fields["实际分钟"] == null));
+    // A marked next tomato must not be offered from the review screen while
+    // the network write is still blocked.
+    state.plans.forEach((p) => (p.fields["已完成"] = false));
+    await js(
+      `document.querySelector('[aria-label="刷新今日番茄"]').click()`
+    );
+    await until(() =>
+      js('document.querySelectorAll(".chip").length===3')
+    );
+    blockId = "p2";
+    gate = new Promise((r) => (release = r));
+    await js(
+      `document.querySelectorAll('.chip')[1].dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:200,clientY:200}))`
+    );
+    await until(() => js('!!document.querySelector(".ctx-item")'));
+    await js('document.querySelector(".ctx-item").click()');
+    await until(() =>
+      js('document.querySelectorAll(".chip").length===2')
+    );
+    await js('document.querySelector(".chip").click()');
+    const clickText = async (text) =>
+      js(
+        `(()=>{const b=[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||b.textContent.trim())===${JSON.stringify(
+          text
+        )});if(!b||b.disabled)throw Error('button unavailable');b.click()})()`
+      );
+    await until(() =>
+      js(`!document.querySelector('[aria-label="开始专注"]').disabled`)
+    );
+    await js(
+      `document.querySelector('[aria-label="开始专注"]').click()`
+    );
+    await until(() =>
+      js(
+        '!!document.querySelector(".timer-controls") || [...document.querySelectorAll("button")].some(b=>b.textContent.trim()==="结束")'
+      )
+    );
+    await clickText("结束");
+    await until(()=>js(`[...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-label')==='确认结束' && !b.disabled)`));
+    await clickText("确认结束");
+    await until(() => js('!!document.querySelector(".review-card")'));
+    assert.equal(
+      await js(
+        `[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='保存并开始下一个').disabled`
+      ),
+      true
+    );
+    await clickText("放弃本次");
+    release();
     console.log(
       "PASS: rapid triple completion before first reply; durable queue; isolated failure; restart; retry only failure; no focus minutes"
     );
