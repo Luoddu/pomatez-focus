@@ -1,6 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask } from "../session";
-import { QUADRANT_TONES } from "../week";
+import { QUADRANT_TONES, weekTomatoes } from "../week";
+import {
+  WEEK_GOAL_DEFAULT,
+  goalMet,
+  isValidGoal,
+  loadWeekGoals,
+  saveWeekGoal,
+  weekKeyOf,
+} from "../weekgoal";
 import {
   LogoIcon,
   WindowControls,
@@ -82,6 +90,7 @@ export default function HistoryPanel({
   onToggleSettings,
   onToggleCompact,
   onTogglePin,
+  onWeekGoalMet,
 }: {
   records: FocusSession[];
   pendingCount: number;
@@ -101,8 +110,40 @@ export default function HistoryPanel({
   onToggleSettings: () => void;
   onToggleCompact: () => void;
   onTogglePin: () => void;
+  onWeekGoalMet?: (total: number, goal: number) => void;
 }) {
   const [entryOpen, setEntryOpen] = useState(false);
+  // 周目标：覆盖表（仅按周键），chip 显示本周已收/目标，悬浮开弹窗仅改本周
+  const [goals, setGoals] = useState(loadWeekGoals);
+  const [goalOpen, setGoalOpen] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+  const [goalError, setGoalError] = useState("");
+  const weekTotal = weekTomatoes(records, Date.now());
+  const currentGoal = goals[weekKeyOf(Date.now())] ?? WEEK_GOAL_DEFAULT;
+  const weekMet = goalMet(weekTotal, currentGoal);
+  // 达成庆祝只在「本会话内由未达成变成达成」时触发一次；
+  // 挂载基线已达成（历史达成/重开 App）不重复播报
+  const celebratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = weekKeyOf(Date.now());
+    if (celebratedRef.current === null) {
+      celebratedRef.current = weekMet ? key : "";
+      return;
+    }
+    if (weekMet && celebratedRef.current !== key) {
+      celebratedRef.current = key;
+      onWeekGoalMet?.(weekTotal, currentGoal);
+    }
+  }, [weekMet, weekTotal, currentGoal, onWeekGoalMet]);
+  const saveGoal = () => {
+    const value = Number(goalInput);
+    if (!isValidGoal(value)) {
+      setGoalError("请输入 1–350 的整数");
+      return;
+    }
+    setGoals(saveWeekGoal(Date.now(), value));
+    setGoalError("");
+  };
   const todayRecords = records.filter(
     (r) =>
       new Date(r.startedAt).toDateString() === new Date().toDateString()
@@ -189,8 +230,68 @@ export default function HistoryPanel({
         </div>
       </div>
       <div className="side-section">
-        <div className="side-title">番茄月历</div>
-        <HeatmapCalendar records={records} />
+        <div className="side-title">
+          番茄月历
+          <span
+            className="weekgoal"
+            onMouseEnter={() => {
+              setGoalInput(String(currentGoal));
+              setGoalError("");
+              setGoalOpen(true);
+            }}
+            onMouseLeave={() => {
+              setGoalOpen(false);
+              setGoalError("");
+            }}
+          >
+            <button
+              type="button"
+              className={`weekgoal-chip${weekMet ? " met" : ""}`}
+              aria-label="周目标，悬浮设置"
+            >
+              周目标 {weekTotal}/{currentGoal}
+            </button>
+            {goalOpen && (
+              <div
+                className="weekgoal-pop"
+                role="dialog"
+                aria-label="设置本周目标"
+              >
+                <div className="weekgoal-row">
+                  <input
+                    type="number"
+                    min={1}
+                    max={350}
+                    step={1}
+                    value={goalInput}
+                    aria-label="本周目标数"
+                    onChange={(e) => setGoalInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveGoal();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-small outline"
+                    onClick={saveGoal}
+                  >
+                    保存
+                  </button>
+                </div>
+                {goalError ? (
+                  <div className="weekgoal-error" role="alert">
+                    {goalError}
+                  </div>
+                ) : (
+                  <div className="weekgoal-hint">
+                    仅本周生效，未设置的周默认 {WEEK_GOAL_DEFAULT}
+                  </div>
+                )}
+              </div>
+            )}
+          </span>
+        </div>
+        <HeatmapCalendar records={records} goals={goals} />
       </div>
       <div className="side-section records-section">
         <div className="side-title">

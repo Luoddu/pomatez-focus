@@ -26,6 +26,7 @@ import {
   quadrantToneList,
 } from "./week";
 import { CompletionQueue } from "./completionQueue";
+import { playTimeUp } from "./sound";
 import "./focus.css";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
@@ -962,6 +963,10 @@ export default function FocusApp() {
             genStageText={genStageText}
             onRefresh={() => run(refresh)}
             refreshBusy={busy || loadingTasks}
+            onWeekGoalMet={(total, goal) => {
+              notify(`本周目标达成 🍅（${total}/${goal}）`);
+              playTimeUp();
+            }}
             {...windowControls}
           />
         </main>

@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FocusSession } from "../session";
+import { beijingWeekStart } from "../week";
+import {
+  WEEK_GOAL_DEFAULT,
+  goalMet,
+  weekKeyOf,
+} from "../weekgoal";
+import { LogoIcon } from "./shared";
+
+const GOLD_TONE = "#e8a917";
 
 // 番茄月历：GitHub 贡献图式转置（列=周、行=周一~周日），当前周固定最右列，
 // 超出右栏宽度时横向滚动，默认停在最新一周。
@@ -34,8 +43,10 @@ const tier = (count: number) =>
 
 export default function HeatmapCalendar({
   records,
+  goals = {},
 }: {
   records: FocusSession[];
+  goals?: Record<string, number>;
 }) {
   const [tip, setTip] = useState<{
     text: string;
@@ -44,8 +55,9 @@ export default function HeatmapCalendar({
     flip: boolean;
   } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { weeks, byDay, todayTs } = useMemo(() => {
+  const { weeks, byDay, byWeek, todayTs } = useMemo(() => {
     const byDay = new Map<string, DayStat>();
+    const byWeek = new Map<string, number>();
     let earliest: number | null = null;
     for (const r of records) {
       if (r.status !== "saved") continue;
@@ -55,6 +67,9 @@ export default function HeatmapCalendar({
       stat.count += r.completedCount || 0;
       stat.seconds += r.acceptedSeconds || r.elapsedSeconds || 0;
       byDay.set(key, stat);
+      // 周聚合用与农场相同的北京时间周口径，目标判定跨组件一致
+      const wk = weekKeyOf(r.startedAt);
+      byWeek.set(wk, (byWeek.get(wk) || 0) + (r.completedCount || 0));
       if (earliest === null || d.getTime() < earliest)
         earliest = d.getTime();
     }
@@ -89,7 +104,7 @@ export default function HeatmapCalendar({
       lastLabelMonth = labelMonth;
       weeks.push({ key: dayKey(monday), label, days });
     }
-    return { weeks, byDay, todayTs: today.getTime() };
+    return { weeks, byDay, byWeek, todayTs: today.getTime() };
   }, [records]);
   // 默认停在最新（最右）一周；新记录到来也回到最右
   useEffect(() => {
@@ -145,6 +160,11 @@ export default function HeatmapCalendar({
                 const stat = byDay.get(dayKey(day));
                 const count = stat?.count || 0;
                 const future = day.getTime() > todayTs;
+                const wk = weekKeyOf(week.days[0].getTime());
+                const met = goalMet(
+                  byWeek.get(wk) || 0,
+                  goals[wk] ?? WEEK_GOAL_DEFAULT
+                );
                 return (
                   <span
                     key={dayKey(day)}
@@ -152,7 +172,7 @@ export default function HeatmapCalendar({
                       future ? 0 : tier(count)
                     }${future ? " future" : ""}${
                       day.getTime() === todayTs ? " today" : ""
-                    }`}
+                    }${met && !future ? " hm-goal-met" : ""}`}
                     data-count={future ? "" : count}
                     onMouseEnter={
                       future ? undefined : (e) => showTip(e, day, stat)
@@ -165,6 +185,26 @@ export default function HeatmapCalendar({
               })}
             </React.Fragment>
           ))}
+          <span className="hm-corner" />
+          {weeks.map((week) => {
+            const wk = weekKeyOf(week.days[0].getTime());
+            const met = goalMet(
+              byWeek.get(wk) || 0,
+              goals[wk] ?? WEEK_GOAL_DEFAULT
+            );
+            return (
+              <span className="hm-badge-slot" key={`badge-${week.key}`}>
+                {met && (
+                  <span
+                    className="hm-badge"
+                    title={`本周目标已达成（${byWeek.get(wk)} 个）`}
+                  >
+                    <LogoIcon size={12} tone={GOLD_TONE} />
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </div>
       </div>
       {tip && (

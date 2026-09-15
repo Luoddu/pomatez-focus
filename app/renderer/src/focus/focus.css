@@ -1388,6 +1388,88 @@ input:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
+.hm-cell.hm-goal-met {
+  background-image: linear-gradient(rgba(232, 169, 23, 0.22), rgba(232, 169, 23, 0.22));
+  box-shadow: 0 0 4px 1px rgba(232, 169, 23, 0.4);
+}
+.hm-badge-slot {
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hm-badge {
+  display: inline-flex;
+  animation: hm-badge-grow 0.45s ease-out both;
+  transform-origin: bottom center;
+}
+@keyframes hm-badge-grow {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── 周目标 chip + 悬浮设置 popover（挂在「番茄月历」标题行右侧） ── */
+.weekgoal {
+  position: relative;
+  margin-left: auto;
+}
+.weekgoal-chip {
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f0f1f4;
+  color: #6b7280;
+  cursor: default;
+  white-space: nowrap;
+}
+.weekgoal-chip.met {
+  color: #a97708;
+  background: #fdf3d7;
+  border-color: #ecd28a;
+}
+.weekgoal-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 200px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(31, 35, 41, 0.14);
+  padding: 10px 12px;
+}
+.weekgoal-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.weekgoal-row input {
+  width: 72px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.weekgoal-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+.weekgoal-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #c22f1f;
+}
 .heatmap-tip {
   position: fixed;
   transform: translate(-50%, calc(-100% - 8px));
