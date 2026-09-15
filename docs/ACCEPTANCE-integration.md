@@ -44,4 +44,16 @@
 
 Learning：candidate — 更大版本号和本地 origin 缓存不证明包含公开代码；必须核实时远端祖先、干净构建来源，并在非强制推送前复核。证据为本次旧分支拒绝、双分支 fixture 正反例与构建来源检查。根 Learning 不在本模块写集，候选留本验收。
 
-源码/安装包发布回读结果在 Release 与最终任务回执中确认，不把构建通过冒充已发布。
+## 发布与接力回读
+
+已发布 [v0.1.0-preview.26](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.26)，Release ID 388883556，published_at 2026-09-15T05:27:32Z，draft=false、prerelease=true。
+
+- 源码和不可变标签指向 ac3a0385f33b74d916e35891ea261ead8d19f59a；后续验收文档提交不更换标签或安装包。
+- setup、portable、blockmap、preview.yml、source-version.json、SHA256SUMS.txt 共 6 个资产均为 uploaded，逐项以 GitHub 返回的 size/SHA256 digest 对照本地文件通过。setup SHA256：61a9a9757805ab6a9006de8ddffc11b21b6351fa809156f5f012cd01404dca0b；portable：584b717fc00acb8f4b4680fd3f4aaf1cbeda0b99d528424facf2683ccf460cca。
+- 安装元数据的 SHA512 与 setup 一致。包内 source-version.json 的 version=0.1.0-preview.26、head=ac3a038…、dirty=false，与可见设置版本一致。
+- asar 57 个条目、禁止私人路径命中 0；上游 LICENSE 原文一致。实际打包 EXE 使用隔离空 profile 隐藏启动，版本、设置、生成进度 API、提示音接口通过；仅终止本次测试进程。证据：artifacts/package-verification.json。
+- 公开主线服务器保护回读 enforce_admins=true、allow_force_pushes=false、allow_deletions=false；保留普通快进推送，无强制 PR 或新增状态门槛。官方依据：https://docs.github.com/en/rest/branches/branch-protection?apiVersion=2022-11-28 。
+- 常用本地工作树已切到跟踪 origin/codex/feishu-focus 的同名分支；旧 Kimi 源分支 62ef659 保留，旧命名分支归档为 archive/feishu-focus-before-20260915。本地 pre-push hook 已启用；最终文档通过同一受保护主线正常快进推送。
+- 安装包与便携包已复制到既有用户启动目录，未覆盖旧版本。未替用户安装或重启，未修改真实飞书和个人历史。
+
+其他机器仍须获取新版源码并执行 dev:setup；服务器保护防止强推和删除，本地检查阻止从落后来源构建发布。两者不能替代代码审查，也不声称阻止人为绕过后发生的语义回退。

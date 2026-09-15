@@ -1,12 +1,12 @@
 # P0-POMO-006 — 跨机版本整合与发布防错
 
-状态：IN_PROGRESS。负责人：Codex；本卡是独立番茄模块的任务状态源。
+状态：DONE。负责人：Codex；本卡是独立番茄模块的任务状态源。已发布 v0.1.0-preview.26，源码 ac3a0385f33b74d916e35891ea261ead8d19f59a；验收见 ACCEPTANCE-integration.md。
 
 ## 授权与范围
 
 2026-09-15 用户明确要求接力已完成的 Kimi 工作，检查既有修改、整合、推送并防止再次漏合。允许公开源码与安装包发布到既有 Luoddu/pomatez-focus；不操作飞书真实数据、不读取凭证正文、不重启用户应用、不改根仓、不中断其他模块。
 
-基线：公开分支 codex/feishu-focus@44a77b4（preview.24）；本地交付 62ef659；共同代码基线 c836a8a。独立整合分支 task/p0-pomo-006-integrate；原工作树保持不变。允许 app/、scripts/、tests/ 中两线相关代码、版本、构建脚本，以及本卡/验收/公开开发说明/AGENTS.md。排除旧私人开发历史、私人截图和环境配置；使用公开基线上的逐文件三方整合，记录源 commit，避免将未公开历史作为 merge parent 上传。
+基线：公开分支 codex/feishu-focus@44a77b4（preview.24）；本地交付 62ef659；共同代码基线 c836a8a。独立整合分支 task/p0-pomo-006-integrate；整合期间原工作树保持不变，交付后在干净状态切回跟踪公开主线的 codex/feishu-focus。允许 app/、scripts/、tests/ 中两线相关代码、版本、构建脚本，以及本卡/验收/公开开发说明/AGENTS.md。排除旧私人开发历史、私人截图和环境配置；使用公开基线上的逐文件三方整合，记录源 commit，避免将未公开历史作为 merge parent 上传。
 
 独占资源：本任务工作树和 artifacts 下测试 profile、构建输出；无生产进程、端口、数据库租约。开工、提交、推送前重新核对本地状态与实时远端 SHA；远端前进只暂停发布并先整合。无子 Agent、定时或长期后台；未知同因两次失败先定位，不盲重试。
 
@@ -25,3 +25,5 @@
 - 回滚：旧公开 preview.24 与本地 62ef659 保留，不 reset/force；用户数据不迁移。
 
 Learning 判断随验收记录；根共享 Learning 不在本模块写集。证据最终集中于 ACCEPTANCE-integration.md。
+
+发布防错补充（同一用户授权范围）：已读 GitHub Branch Protection REST 官方说明，确认公开主线此前 protected=false。仅对既有 codex/feishu-focus 启用禁止 force push/删除并对管理员生效；不要求新增 PR 审批、不增加身份权限，不改变其他分支。回读配置并以正常快进文档推送验证合法工作仍可进行；不实际尝试破坏性强推。该可逆设置补足其他电脑尚未更新本地 hook 的空档。
