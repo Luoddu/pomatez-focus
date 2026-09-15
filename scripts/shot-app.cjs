@@ -378,6 +378,63 @@ app
       pass: await js(`!document.querySelector('.heatmap-tip')`),
     });
 
+    // 周目标 chip：默认 60，悬浮开 popover；把目标改为本周已收数即达成
+    results.push({
+      check: "week goal chip shows this-week progress over default 60",
+      pass: await js(
+        `(()=>{const c=document.querySelector('.weekgoal-chip');return Boolean(c)&&/^周目标 [1-9]\\d*\\/60$/.test(c.textContent)})()`
+      ),
+    });
+    const weekTotal = await js(
+      `Number(document.querySelector('.weekgoal-chip').textContent.match(/周目标 (\\d+)\\//)[1])`
+    );
+    await js(
+      `document.querySelector('.weekgoal').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}))`
+    );
+    await wait(150);
+    results.push({
+      check: "week goal popover opens on hover with prefilled input",
+      pass: await js(
+        `(()=>{const p=document.querySelector('.weekgoal-pop');return Boolean(p)&&p.querySelector('input').value==='60'})()`
+      ),
+    });
+    await shot("board-weekgoal");
+    await js(
+      `(()=>{const i=document.querySelector('.weekgoal-pop input');const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(i,'${weekTotal}');i.dispatchEvent(new Event('input',{bubbles:true}))})()`
+    );
+    await js(`document.querySelector('.weekgoal-pop button').click()`);
+    await wait(300);
+    results.push({
+      check: "saving a reached goal marks chip met, stores only this week key, and toasts",
+      pass: await js(`(()=>{
+        const c=document.querySelector('.weekgoal-chip');
+        const stored=JSON.parse(localStorage.getItem('pomatez-focus-weekgoal-v1')||'{}');
+        const keys=Object.keys(stored);
+        const t=document.querySelector('.toast');
+        return Boolean(c)&&c.classList.contains('met')
+          &&c.textContent==='周目标 ${weekTotal}/${weekTotal}'
+          &&keys.length===1&&stored[keys[0]]===${weekTotal}
+          &&/^\\d{4}-\\d{2}-\\d{2}$/.test(keys[0])
+          &&Boolean(t)&&t.textContent.includes('本周目标达成');
+      })()`),
+    });
+    results.push({
+      check: "met week column glows gold and carries a tomato badge",
+      pass: await js(
+        `Boolean(document.querySelector('.hm-badge'))&&document.querySelectorAll('.hm-cell.hm-goal-met').length>0`
+      ),
+    });
+    await shot("board-weekgoal-met");
+    await js(
+      `document.querySelector('.weekgoal').dispatchEvent(new MouseEvent('mouseout',{bubbles:true,relatedTarget:document.body}))`
+    );
+    await js(`document.querySelector('.toast-close')?.click()`);
+    await wait(150);
+    results.push({
+      check: "week goal popover closes after mouse leaves",
+      pass: await js(`!document.querySelector('.weekgoal-pop')`),
+    });
+
     await click("开始专注");
     await wait(500);
     results.push({
