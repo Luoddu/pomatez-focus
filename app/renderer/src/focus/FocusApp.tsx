@@ -557,6 +557,10 @@ export default function FocusApp() {
       notify("请先在设置中连接飞书，再调整番茄数。", "error");
       return;
     }
+    if (completionQueue.entries.some(e => e.sourceKey === sourceKey && e.task.taskId === taskId && e.state !== "done")) {
+      notify("该任务还有待同步的完成标记，请同步后再调整番茄数；其他番茄仍可继续标记。", "error");
+      return;
+    }
     const group = groupTasks(boardTasks).find((g) => g.key === taskId);
     if (!group || adjusting) return;
     const rollback = tasks;

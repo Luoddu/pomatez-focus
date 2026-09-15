@@ -26,6 +26,8 @@ FocusService.prototype.status = () => ({
   configured: true,
   sourceKey: connectionKey(config),
 });
+let adjustCalls = 0;
+FocusService.prototype.adjustToday = () => { adjustCalls++; throw Error("should not adjust queued task"); };
 FocusService.prototype.today = () => client.today();
 FocusService.prototype.history = () => client.history();
 FocusService.prototype.archiveHistory = (v) => client.archiveHistory(v);
@@ -172,6 +174,11 @@ app.whenReady().then(async () => {
     await until(() =>
       js('document.querySelectorAll(".chip").length===2')
     );
+    await js(`document.querySelector('.task').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}))`);
+    await until(()=>js('!!document.querySelector(".adjust-btn")'));
+    await js('document.querySelector(".adjust-btn").click()');
+    assert.equal(adjustCalls,0);
+    assert.equal(await js('document.querySelectorAll(".chip").length'),2);
     await js('document.querySelector(".chip").click()');
     const clickText = async (text) =>
       js(
