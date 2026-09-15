@@ -751,6 +751,30 @@ input:focus-visible {
 .side-title-actions .gen-btn {
   font-size: 13px;
 }
+/* 生成进度：按钮内 spinner + 概览行下方阶段文字（低调、无弹窗无遮罩） */
+.gen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gen-spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #d3d9e4;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: gen-spin 0.8s linear infinite;
+}
+@keyframes gen-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.gen-progress {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 2px 0 8px;
+}
 /* 概览标题行：动作按钮与窗口控制成组靠右，避免两个 auto 边距把按钮挤到中间 */
 .side-title-actions + .win-controls {
   margin-left: 4px;
@@ -1213,6 +1237,10 @@ input:focus-visible {
   background: #fff;
   border: 1px solid var(--line);
   color: #4b5563;
+}
+.sound-toggle.on {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 .about-line {
   font-size: 14px;

@@ -135,7 +135,7 @@ app.whenReady().then(async () => {
       0
     );
     assert.ok(
-      await js("document.body.textContent.includes('正在读取今日番茄')")
+      await js("document.querySelector('[aria-label=\"刷新今日番茄\"]').disabled")
     );
     release();
     const expected = { classified: [1, 1, 1, 1], unknown: 0 };
@@ -165,7 +165,7 @@ app.whenReady().then(async () => {
       JSON.stringify({
         passed: 3,
         checks: [
-          "delayed startup shows loading without demo plans",
+          "delayed startup disables refresh and never shows demo plans",
           "rich links classify after load and refresh through real IPC",
           "failed refresh preserves classified plans and shows error",
         ],

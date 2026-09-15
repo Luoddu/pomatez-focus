@@ -79,6 +79,9 @@ export function resolvePlanningMode(fields: any[]): "recent" | "date" {
   if (recent.length) {
     if (recent.length !== 1 || recent[0].type !== 7)
       throw Error("任务表「近日行动」必须是复选框");
+    const dates = fields.filter(f => f.field_name === "计划日");
+    if (dates.length > 1 || (dates.length === 1 && dates[0].type !== 5))
+      throw Error("任务表「计划日」必须是唯一的日期字段");
     return "recent";
   }
   const date = fields.filter(f => f.field_name === "计划日");
@@ -86,7 +89,7 @@ export function resolvePlanningMode(fields: any[]): "recent" | "date" {
     throw Error("任务表需要「近日行动」复选框或「计划日」日期字段");
   return "date";
 }
-// 计划日=当天且番茄数为 1..max 整数的任务进入计划；非法值计数隔离，交由调用方报错
+// 近日行动勾选 OR 计划日=当天；每条任务只收一次，番茄数仍须为 1..max 整数。
 export function collectTaskPlans(
   records: any[],
   countField: string,
@@ -98,7 +101,9 @@ export function collectTaskPlans(
   let invalid = 0;
   for (const r of records) {
     if (r.fields?.["完成"] === true || r.fields?.["放弃"] === true) continue;
-    if (mode === "recent" ? r.fields?.["近日行动"] !== true : localDayOf(r.fields?.["计划日"]) !== dayMs) continue;
+    const scheduledToday = localDayOf(r.fields?.["计划日"]) === dayMs;
+    const recentAction = mode === "recent" && r.fields?.["近日行动"] === true;
+    if (!recentAction && !scheduledToday) continue;
     const state = integerFieldState(r.fields?.[countField]);
     if (!state.present || state.value === 0) continue;
     if (!state.valid || state.value < 0 || state.value > max) {

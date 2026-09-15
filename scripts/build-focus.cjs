@@ -3,6 +3,13 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "..");
+const { git } = require("./repo-sync.cjs");
+const sourceState = () => ({
+  head: git(root, ["rev-parse", "HEAD"]).stdout.trim(),
+  dirty: Boolean(git(root, ["status", "--porcelain"]).stdout.trim()),
+  version: JSON.parse(fs.readFileSync(path.join(root, "app/electron/package.json"), "utf8")).version,
+});
+const source = sourceState();
 function run(script, args, cwd = root, env = {}) {
   const result = spawnSync(
     process.execPath,
@@ -89,3 +96,8 @@ fs.copyFileSync(
   path.join(root, "LICENSE"),
   path.join(root, "app/electron/build/LICENSE.pomatez.txt")
 );
+const after = sourceState();
+if (source.head !== after.head || source.version !== after.version || after.dirty) source.dirty = true;
+fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
+fs.writeFileSync(path.join(root, "artifacts/focus-build.json"), JSON.stringify(source, null, 2));
+fs.writeFileSync(path.join(root, "app/electron/build/source-version.json"), JSON.stringify(source, null, 2));

@@ -35,4 +35,10 @@ contextBridge.exposeInMainWorld("focusApi", {
     ipcRenderer.on("focus:suspend", listener);
     return () => ipcRenderer.removeListener("focus:suspend", listener);
   },
+  onGenerateProgress: (callback: (progress: any) => void) => {
+    const listener = (_event: any, progress: any) => callback(progress);
+    ipcRenderer.on("focus:generate-progress", listener);
+    return () =>
+      ipcRenderer.removeListener("focus:generate-progress", listener);
+  },
 });

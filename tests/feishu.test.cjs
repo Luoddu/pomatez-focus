@@ -470,7 +470,9 @@ function generateHarness(options = {}) {
     if (route.startsWith("auth/"))
       return { tenant_access_token: "synthetic", expire: 7200 };
     const url = route.split("?")[0];
-    const items = (value) => ({ data: { items: value, has_more: false } });
+    const items = (value) => ({
+      data: { items: value, has_more: false },
+    });
     if (url.endsWith("/tables"))
       return items([
         { name: "专注记录", table_id: "plans" },
@@ -491,7 +493,10 @@ function generateHarness(options = {}) {
     if (url.endsWith("/tasks/records")) return items(state.taskRecords);
     if (url.endsWith("/plans/records") && method === "GET")
       return items(state.plans);
-    if (url.endsWith("/plans/records/batch_create") && method === "POST") {
+    if (
+      url.endsWith("/plans/records/batch_create") &&
+      method === "POST"
+    ) {
       const made = body.records.map((r, i) => ({
         record_id: `new${state.created.length + i}`,
         fields: r.fields,
@@ -504,7 +509,10 @@ function generateHarness(options = {}) {
   };
   return {
     state,
-    client: new Feishu({ ...config, ...(options.config || {}) }, request),
+    client: new Feishu(
+      { ...config, ...(options.config || {}) },
+      request
+    ),
   };
 }
 const plannedTask = (id, count, date = midnight) => ({
@@ -525,7 +533,11 @@ test("generateToday creates only missing pomodoros and a rerun is idempotent", a
     plans: [
       {
         record_id: "x1",
-        fields: { 计划日: midnight, 任务: ["t1"], 番茄: [{ text: "1" }] },
+        fields: {
+          计划日: midnight,
+          任务: ["t1"],
+          番茄: [{ text: "1" }],
+        },
       },
     ],
   });
@@ -538,17 +550,64 @@ test("generateToday creates only missing pomodoros and a rerun is idempotent", a
     .map((r) => `${r.fields["任务"][0]}|${r.fields["番茄"]}`)
     .sort();
   assert.deepEqual(keys, ["t1|2", "t2|1"]);
-  for (const r of state.created) assert.equal(r.fields["计划日"], midnight);
+  for (const r of state.created)
+    assert.equal(r.fields["计划日"], midnight);
   const second = await client.generateToday(now);
   assert.equal(second.created, 0);
   assert.equal(second.alreadyPresent, 3);
   assert.equal(state.created.length, 2);
 });
+test("generateToday emits real stage events in order with write progress", async () => {
+  const { client } = generateHarness({
+    taskRecords: [plannedTask("t1", 2), plannedTask("t2", 3)],
+  });
+  const events = [];
+  const r = await client.generateToday(now, (p) => events.push(p));
+  assert.equal(r.created, 5);
+  assert.deepEqual(
+    events.map((e) => e.stage),
+    ["connect", "tasks", "records", "plan", "write", "verify"]
+  );
+  assert.deepEqual(
+    events.filter((e) => e.stage === "write"),
+    [{ stage: "write", done: 5, total: 5, batch: 1, batches: 1 }]
+  );
+});
+test("generateToday reports batch x/y when writing crosses a batch boundary", async () => {
+  // 11 个任务 × 单任务上限 50 = 550 条 > BATCH_SIZE 500 → 两批写入
+  const { client } = generateHarness({
+    taskRecords: Array.from({ length: 11 }, (_, i) =>
+      plannedTask(`t${i}`, 50)
+    ),
+  });
+  const events = [];
+  const r = await client.generateToday(now, (p) => events.push(p));
+  assert.equal(r.created, 550);
+  const writes = events.filter((e) => e.stage === "write");
+  assert.deepEqual(
+    writes.map((e) => [e.batch, e.batches, e.done, e.total]),
+    [
+      [1, 2, 500, 550],
+      [2, 2, 550, 550],
+    ]
+  );
+  // 无待写入时不报 write/verify 阶段（全量已存在）
+  const again = [];
+  const second = await client.generateToday(now, (p) => again.push(p));
+  assert.equal(second.created, 0);
+  assert.deepEqual(
+    again.map((e) => e.stage),
+    ["connect", "tasks", "records", "plan"]
+  );
+});
 test("generateToday rejects invalid today counts without writing", async () => {
   const { client, state } = generateHarness({
     taskRecords: [plannedTask("t1", 2.5)],
   });
-  await assert.rejects(() => client.generateToday(now), /不是 0–50 的整数/);
+  await assert.rejects(
+    () => client.generateToday(now),
+    /不是 0–50 的整数/
+  );
   assert.equal(state.created.length, 0);
 });
 test("generateToday reports a missing or ambiguous count field instead of creating it", async () => {
@@ -559,7 +618,10 @@ test("generateToday reports a missing or ambiguous count field instead of creati
     ],
     taskRecords: [plannedTask("t1", 2)],
   });
-  await assert.rejects(() => missing.client.generateToday(now), /缺少「今日计划番茄数」/);
+  await assert.rejects(
+    () => missing.client.generateToday(now),
+    /缺少「今日计划番茄数」/
+  );
   const ambiguous = generateHarness({
     taskFields: [
       { field_name: "任务名称", type: 1 },
@@ -569,7 +631,10 @@ test("generateToday reports a missing or ambiguous count field instead of creati
     ],
     taskRecords: [plannedTask("t1", 2)],
   });
-  await assert.rejects(() => ambiguous.client.generateToday(now), /只保留一个/);
+  await assert.rejects(
+    () => ambiguous.client.generateToday(now),
+    /只保留一个/
+  );
   const legacy = generateHarness({
     taskFields: [
       { field_name: "任务名称", type: 1 },
@@ -607,8 +672,14 @@ test("generateToday isolates tasks with multi-linked or duplicate-keyed records"
   const dup = generateHarness({
     taskRecords: [plannedTask("t1", 2)],
     plans: [
-      { record_id: "x1", fields: { 计划日: midnight, 任务: ["t1"], 番茄: "1" } },
-      { record_id: "x2", fields: { 计划日: midnight, 任务: ["t1"], 番茄: "1" } },
+      {
+        record_id: "x1",
+        fields: { 计划日: midnight, 任务: ["t1"], 番茄: "1" },
+      },
+      {
+        record_id: "x2",
+        fields: { 计划日: midnight, 任务: ["t1"], 番茄: "1" },
+      },
     ],
   });
   const dupResult = await dup.client.generateToday(now);
@@ -617,7 +688,10 @@ test("generateToday isolates tasks with multi-linked or duplicate-keyed records"
 });
 
 // ── 已收 x/y 聚合与悬浮 ± 调整（补建行/删行口径） ──
-const { clientToken, dateKeyOf } = require("../app/electron/build/focus/generate.js");
+const {
+  clientToken,
+  dateKeyOf,
+} = require("../app/electron/build/focus/generate.js");
 function adjustHarness(options = {}) {
   const state = {
     created: [],
@@ -630,7 +704,9 @@ function adjustHarness(options = {}) {
     if (route.startsWith("auth/"))
       return { tenant_access_token: "synthetic", expire: 7200 };
     const url = route.split("?")[0];
-    const items = (value) => ({ data: { items: value, has_more: false } });
+    const items = (value) => ({
+      data: { items: value, has_more: false },
+    });
     if (url.endsWith("/tables"))
       return items([
         { name: "专注记录", table_id: "plans" },
@@ -667,7 +743,10 @@ function adjustHarness(options = {}) {
       return items([
         {
           record_id: "t1",
-          fields: { 任务名称: [{ text: "写周报" }], 四象限: "重要且紧急" },
+          fields: {
+            任务名称: [{ text: "写周报" }],
+            四象限: "重要且紧急",
+          },
         },
       ]);
     if (url.endsWith("/plans/records") && method === "GET")
@@ -692,7 +771,10 @@ function adjustHarness(options = {}) {
   };
   return {
     state,
-    client: new Feishu({ ...config, ...(options.config || {}) }, request),
+    client: new Feishu(
+      { ...config, ...(options.config || {}) },
+      request
+    ),
   };
 }
 const planRow = (id, seq, extra = {}) => ({
@@ -754,7 +836,10 @@ test("ledger-complete rows count as harvested even without the checkbox", async 
 
 test("fully completed task stays visible as a done placeholder row", async () => {
   const { client } = adjustHarness({
-    plans: [planRow("p1", 1, { 已完成: true }), planRow("p2", 2, { 已完成: true })],
+    plans: [
+      planRow("p1", 1, { 已完成: true }),
+      planRow("p2", 2, { 已完成: true }),
+    ],
   });
   const rows = await client.today(now);
   assert.equal(rows.length, 1);
@@ -764,6 +849,96 @@ test("fully completed task stays visible as a done placeholder row", async () =>
   assert.equal(rows[0].quadrant, "iu");
   assert.equal(rows[0].doneToday, 2);
   assert.equal(rows[0].plannedToday, 2);
+});
+
+test("yesterday's completed focus is hidden even when its plan moves to today", async () => {
+  const plans = [
+    planRow("p1", 1, { 已完成: true, 专注日期: midnight - 86400000 }),
+    planRow("p2", 2),
+  ];
+  const before = structuredClone(plans);
+  const { client } = adjustHarness({ plans });
+  const rows = await client.today(now);
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ["p2"]
+  );
+  assert.equal(rows[0].doneToday, 0);
+  assert.equal(rows[0].plannedToday, 1);
+  assert.deepEqual(plans, before);
+});
+
+test("today's focus stays visible despite an older plan date; tomorrow it disappears", async () => {
+  const { client } = adjustHarness({
+    plans: [
+      planRow("p1", 1, {
+        已完成: true,
+        计划日: midnight - 86400000,
+        专注日期: midnight,
+      }),
+    ],
+  });
+  const rows = await client.today(now);
+  assert.equal(rows[0].kind, "done");
+  assert.equal(rows[0].doneToday, 1);
+  assert.deepEqual(
+    await client.today(new Date(midnight + 86400000)),
+    []
+  );
+});
+
+test("multi-pomodoro completion uses the shared session date for its exact range", async () => {
+  const startedAt = midnight - 86400000 + 36000000;
+  const record = {
+    id: randomUUID(),
+    task: {
+      id: "p1",
+      planId: "p1",
+      taskId: "t1",
+      title: "Synthetic",
+      source: "feishu",
+      sourceKey: connectionKey(config),
+    },
+    startedAt,
+    endedAt: startedAt + 7500000,
+    plannedSeconds: 1500,
+    elapsedSeconds: 7500,
+    acceptedSeconds: 7500,
+    completedCount: 5,
+    status: "saved",
+    sync: "synced",
+  };
+  const plans = Array.from({ length: 5 }, (_, i) =>
+    planRow(`p${i + 1}`, i + 1, { 已完成: true })
+  );
+  plans[0].fields.跨端专注记录 = JSON.stringify({
+    version: 1,
+    records: [record],
+  });
+  const { client } = adjustHarness({ plans });
+  assert.deepEqual(await client.today(now), []);
+  plans.push(planRow("p6", 6, { 已完成: true, 专注日期: midnight }));
+  const rows = await client.today(now);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].doneToday, 1);
+  assert.equal(rows[0].plannedToday, 1);
+});
+
+test("ledger timestamps exclude yesterday without needing a focus date column", async () => {
+  const row = ledgerRow("p1", 1, 1500);
+  const ledger = JSON.parse(row.fields.专注同步明细);
+  for (const e of ledger.entries) {
+    e.start -= 86400000;
+    e.end -= 86400000;
+    for (const s of e.spans) {
+      s.start -= 86400000;
+      s.end -= 86400000;
+    }
+  }
+  row.fields.专注同步明细 = JSON.stringify(ledger);
+  row.fields.已完成 = true;
+  const { client } = adjustHarness({ plans: [row] });
+  assert.deepEqual(await client.today(now), []);
 });
 
 test("adjust +1 creates the next sequence with the generator idempotency key", async () => {
@@ -780,7 +955,9 @@ test("adjust +1 creates the next sequence with the generator idempotency key", a
   const expected = clientToken(
     `today-pomodoro-create|baseDemo|t1|${dateKeyOf(midnight)}|3`
   );
-  assert.ok(state.created[0].route.includes(`client_token=${expected}`));
+  assert.ok(
+    state.created[0].route.includes(`client_token=${expected}`)
+  );
   // 再 +1 递增到 4
   const again = await client.adjustToday("t1", 1, now);
   assert.equal(again.sequence, 4);
@@ -792,13 +969,21 @@ test("adjust +1 readback failure throws after a single create call", async () =>
     plans: [planRow("p1", 1)],
     persistCreate: false,
   });
-  await assert.rejects(() => client.adjustToday("t1", 1, now), /回读校验/);
+  await assert.rejects(
+    () => client.adjustToday("t1", 1, now),
+    /回读校验/
+  );
   assert.equal(state.created.length, 1);
 });
 
 test("adjust +1 enforces the per-task daily cap", async () => {
-  const { client, state } = adjustHarness({ plans: [planRow("p1", 50)] });
-  await assert.rejects(() => client.adjustToday("t1", 1, now), /最多 50/);
+  const { client, state } = adjustHarness({
+    plans: [planRow("p1", 50)],
+  });
+  await assert.rejects(
+    () => client.adjustToday("t1", 1, now),
+    /最多 50/
+  );
   assert.equal(state.created.length, 0);
 });
 

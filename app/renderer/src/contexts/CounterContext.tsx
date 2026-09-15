@@ -1,6 +1,7 @@
 // Adapted from Pomatez's CounterProvider: one elapsed-time loop owns focus and break timing.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mergeCloudRecords } from "focus/cloud";
+import { playTimeUp, playRestEnd } from "focus/sound";
 import {
   FocusSession,
   FocusTask,
@@ -147,6 +148,7 @@ const CounterProvider: React.FC = ({ children }) => {
       setNotice(
         "本轮时间已到，正在记录额外时间；结束时由你确认是否计入。"
       );
+      playTimeUp();
       (window as any).focusApi?.remind().catch(() => {});
     }
     const next = { ...current, active };
@@ -166,8 +168,10 @@ const CounterProvider: React.FC = ({ children }) => {
             restRef.current - (performance.now() - before) / 1000
           );
           setRestSeconds(restRef.current);
-          if (restRef.current === 0)
+          if (restRef.current === 0) {
             setNotice("休息结束，可以选择下一个番茄。");
+            playRestEnd();
+          }
         }
       } catch (e) {
         fail(e);

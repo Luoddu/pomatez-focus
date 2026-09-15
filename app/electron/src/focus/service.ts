@@ -4,6 +4,7 @@ import path from "path";
 import https from "https";
 import {
   Feishu,
+  GenerateProgress,
   Request,
   validateConnection,
   connectionKey,
@@ -120,11 +121,15 @@ export class FocusService {
   // 计划表写入串行化：生成与 ± 共用一把锁，避免 list-then-write 交错出重复键
   private planWriting = false;
   private adjusting = new Set<string>();
+  // 生成进度事件出口：main.ts 在窗口就绪后挂到 webContents.send
+  public onGenerateProgress?: (p: GenerateProgress) => void;
   async generateToday() {
     if (this.planWriting) throw new Error("今日番茄正在生成中，请稍候");
     this.planWriting = true;
     try {
-      return await this.connected().generateToday();
+      return await this.connected().generateToday(undefined, (p) =>
+        this.onGenerateProgress?.(p)
+      );
     } finally {
       this.planWriting = false;
     }

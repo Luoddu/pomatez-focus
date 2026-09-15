@@ -34,7 +34,13 @@
     "build:focus": "node scripts/build-focus.cjs",
     "test:focus": "node --test tests/session.test.mjs tests/feishu.test.cjs tests/plan.test.cjs",
     "test:desktop": "node scripts/test-desktop.cjs && node scripts/test-portrait-desktop.cjs",
-    "package:focus": "node scripts/package-focus.cjs"
+    "package:focus": "node scripts/package-focus.cjs",
+    "check:sync": "node scripts/repo-sync.cjs",
+    "version:prepare": "node scripts/next-version.cjs --bump",
+    "push:focus": "node scripts/push-focus.cjs",
+    "dev:setup": "node scripts/dev-setup.cjs",
+    "test:sync": "node --test tests/repo-sync.test.cjs",
+    "test:focus:all": "node scripts/test-focus-all.cjs"
   },
   "config": {
     "commitizen": {

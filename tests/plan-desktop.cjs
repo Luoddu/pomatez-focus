@@ -25,6 +25,10 @@ FocusService.prototype.status = () => ({
 FocusService.prototype.today = () => client.today();
 FocusService.prototype.sync = (value) => client.sync(value);
 FocusService.prototype.setup = () => client.setupPlans();
+// The current save path also archives and reloads shared history before refresh.
+// Keep the entire adapter chain synthetic, not just the old sync endpoint.
+FocusService.prototype.history = () => client.history();
+FocusService.prototype.archiveHistory = (value) => client.archiveHistory(value);
 require("../app/electron/build/main.js");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const deadline = setTimeout(() => app.exit(2), 35000);
@@ -136,11 +140,12 @@ app.whenReady().then(async () => {
       await js(
         "Boolean(document.querySelector('[aria-label=\"完成番茄数\"]'))"
       ),
-      false
+      true
     );
+    assert.equal(await js("document.querySelector('[aria-label=\"0 个番茄\"]').getAttribute('aria-pressed')"), "true");
     await click("记录番茄");
     await until(
-      async () => (await stored()).records[0]?.sync === "synced"
+      async () => (await stored()).records.find((r) => r.id === first.id)?.cloudSynced === true
     );
     assert.equal(state.plans[0].fields["实际分钟"], 12);
     assert.notEqual(state.plans[0].fields["已完成"], true);
@@ -148,17 +153,20 @@ app.whenReady().then(async () => {
     assert.equal(task.creditedSeconds, 720);
     const second = record(780, { status: "review", task });
     await seed(second);
+    // Current review intentionally exposes manual count confirmation. The
+    // minutes accumulate across sessions, while the user confirms the harvest.
+    await click("1 个番茄");
     await click("记录番茄");
     await until(
-      async () => (await stored()).records[0]?.sync === "synced"
+      async () => (await stored()).records.find((r) => r.id === second.id)?.cloudSynced === true
     );
     assert.equal(state.plans[0].fields["实际分钟"], 25);
     assert.equal(state.plans[0].fields["已完成"], true);
     assert.equal(state.plans[1].fields["已完成"], undefined);
-    assert.deepEqual(
-      (await stored()).records.map((r) => r.completedCount),
-      [1, 0]
-    );
+    const saved = (await stored()).records;
+    // Shared-history merge sorts by time; these synthetic durations can overlap.
+    assert.equal(saved.find((r) => r.id === first.id).completedCount, 0);
+    assert.equal(saved.find((r) => r.id === second.id).completedCount, 1);
     await until(() =>
       js("document.querySelectorAll('.chip').length===1")
     );
@@ -181,21 +189,21 @@ app.whenReady().then(async () => {
     await until(() =>
       js("document.body.textContent.includes('待同步')")
     );
-    assert.equal((await stored()).records[0].sync, "pending");
+    assert.equal((await stored()).records.find((r) => r.id === free.id).sync, "pending");
     assert.equal(state.plans.length, 2);
     state.fail = false;
     await click("设置");
     await wait(100);
     await click("立即重试");
     await until(
-      async () => (await stored()).records[0].sync === "synced"
+      async () => (await stored()).records.find((r) => r.id === free.id)?.cloudSynced === true
     );
     assert.equal(state.plans.length, 3);
     assert.equal(state.plans[2].fields["番茄"], "自由番茄");
     assert.equal(state.plans[2].fields["实际分钟"], 25);
     assert.equal(state.tasks[1].fields["任务名称"], "自由番茄");
     const before = state.writes.length;
-    await client.sync((await stored()).records[0]);
+    await client.sync((await stored()).records.find((r) => r.id === free.id));
     assert.equal(state.writes.length, before);
     checks.push(
       "offline free focus stays local pending; explicit retry creates one same-table linked row"

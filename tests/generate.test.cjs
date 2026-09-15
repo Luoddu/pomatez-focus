@@ -198,11 +198,38 @@ test('recent action selects checked tasks regardless of date, excludes completed
   const row=(id,n,extra={})=>({record_id:id,fields:{近日行动:true,今日计划番茄数:n,...extra}});
   const source=[row('a',2),row('b',2),row('c',6),row('d',4),row('e',2),row('parent',null),row('done',4,{完成:true}),row('abandoned',3,{放弃:true}),row('unchecked',7,{近日行动:false,计划日:dayMs})];
   const selected=collectTaskPlans(source,'今日计划番茄数',dayMs,50,'recent');
-  assert.equal(selected.invalid,0);assert.equal(selected.plans.length,5);assert.equal(selected.plans.reduce((n,p)=>n+p.count,0),16);
-  const keys=new Map();const first=pomodoroPlan(selected.plans,keys,new Set(),dateKey);assert.equal(first.specs.length,16);
+  assert.equal(selected.invalid,0);assert.equal(selected.plans.length,6);assert.equal(selected.plans.reduce((n,p)=>n+p.count,0),23);
+  const keys=new Map();const first=pomodoroPlan(selected.plans,keys,new Set(),dateKey);assert.equal(first.specs.length,23);
   first.specs.forEach(s=>keys.set(s.key,1));assert.equal(pomodoroPlan(selected.plans,keys,new Set(),dateKey).specs.length,0);
   assert.equal(collectTaskPlans([row('bad',2.5)],'今日计划番茄数',dayMs,50,'recent').invalid,1);
   assert.equal(collectTaskPlans([row('no',2,{近日行动:'true'})],'今日计划番茄数',dayMs,50,'recent').plans.length,0);
+});
+
+test('today OR recent selects each task once and preserves exclusions and counts', () => {
+  const row=(id,extra={})=>({record_id:id,fields:{今日计划番茄数:2,...extra}});
+  const records=[row('both',{近日行动:true,计划日:dayMs}),row('dateOnly',{近日行动:false,计划日:dayMs+12*3600000}),row('recentOnly',{近日行动:true,计划日:dayMs-86400000}),row('yesterday',{计划日:dayMs-86400000}),row('tomorrow',{计划日:dayMs+86400000}),row('done',{计划日:dayMs,完成:true}),row('abandoned',{计划日:dayMs,放弃:true}),row('empty',{计划日:dayMs,今日计划番茄数:null}),row('zero',{计划日:dayMs,今日计划番茄数:0})];
+  const before=structuredClone(records);
+  assert.deepEqual(collectTaskPlans(records,'今日计划番茄数',dayMs,50,'recent'),{plans:[{recordId:'both',count:2},{recordId:'dateOnly',count:2},{recordId:'recentOnly',count:2}],invalid:0});
+  assert.deepEqual(records,before);
+  const {resolvePlanningMode}=require('../app/electron/build/focus/generate.js');
+  assert.throws(()=>resolvePlanningMode([{field_name:'近日行动',type:7},{field_name:'计划日',type:1}]),/日期字段/);
+});
+
+test('Feishu generation creates the union once and readback shows the date-only task', async () => {
+  const {harness}=require('./plan-fixture.cjs');const {client,state}=harness();state.plans=[];
+  const today=dayStart(new Date());
+  state.tasks=[{record_id:'t1',fields:{任务名称:'Recent',近日行动:true,今日计划番茄数:2}},{record_id:'t2',fields:{任务名称:'Scheduled',近日行动:false,计划日:today,今日计划番茄数:3}},{record_id:'t3',fields:{任务名称:'Both',近日行动:true,计划日:today,今日计划番茄数:1}}];
+  const original=client.request;
+  client.request=async(m,p,b,t)=>{
+    if(m==='GET'&&p.split('?')[0].endsWith('/tasks/fields'))return {data:{items:[{field_name:'任务名称',type:1},{field_name:'近日行动',type:7},{field_name:'计划日',type:5},{field_name:'今日计划番茄数',type:2}],has_more:false}};
+    if(m==='POST'&&p.split('?')[0].endsWith('/records/batch_create')) {const made=b.records.map((r,i)=>({record_id:'new'+(state.plans.length+i),fields:structuredClone(r.fields)}));state.plans.push(...made);return {data:{records:made}};}
+    return original(m,p,b,t);
+  };
+  assert.equal((await client.generateToday()).created,6);
+  assert.equal((await client.generateToday()).created,0);
+  assert.equal(state.plans.filter(r=>r.fields.任务[0]==='t2').length,3);
+  assert.equal(state.plans.filter(r=>r.fields.任务[0]==='t3').length,1);
+  assert.equal((await client.today()).filter(r=>r.taskId==='t2').length,3);
 });
 
 test('Feishu generation uses recent checkbox without task date column and remains idempotent', async () => {

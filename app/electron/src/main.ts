@@ -21,11 +21,20 @@ app.setPath(
     path.join(app.getPath("appData"), "pomatez-focus")
 );
 app.setAppUserModelId("io.github.luoddu.pomatezfocus");
+// 合成提示音需在无人值守的到点时刻也能出声（无媒体文件，仅 Web Audio）
+app.commandLine.appendSwitch(
+  "autoplay-policy",
+  "no-user-gesture-required"
+);
 const single = app.requestSingleInstanceLock();
 let win: BrowserWindow | null = null,
   tray: Tray | null = null,
   quitting = false;
 const service = new FocusService();
+// 生成进度：真实阶段事件从 service 转发到渲染层（窗口未就绪时丢弃即可，
+// 渲染层的初始「正在连接飞书…」不依赖该通道）
+service.onGenerateProgress = (p) =>
+  win?.webContents.send("focus:generate-progress", p);
 const show = () => {
   if (!headless && win) {
     if (win.isMinimized()) win.restore();

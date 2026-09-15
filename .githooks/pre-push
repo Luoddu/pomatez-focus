@@ -1,0 +1,34 @@
+#!/bin/sh
+# No forced canonical branch/tag updates. Other refs are not managed here.
+while read local_ref local_sha remote_ref remote_sha
+do
+  case "$remote_ref" in
+    refs/heads/codex/feishu-focus)
+      head=$(git rev-parse HEAD) || exit 1
+      if [ "$local_sha" != "$head" ]; then
+        echo "Push the verified current HEAD, not another local branch." >&2
+        exit 1
+      fi
+      node scripts/repo-sync.cjs || exit 1
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "Commit changes before pushing public source." >&2
+        exit 1
+      fi
+      ;;
+    refs/tags/v0.1.0-preview.*)
+      if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ "$local_sha" != "$remote_sha" ]; then
+        echo "Published preview tags are immutable." >&2
+        exit 1
+      fi
+      if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        node scripts/repo-sync.cjs --release || exit 1
+        version=$(node -p "require('./app/electron/package.json').version") || exit 1
+        commit=$(git rev-parse "$local_sha^{commit}") || exit 1
+        if [ "${remote_ref#refs/tags/v}" != "$version" ] || [ "$commit" != "$(git rev-parse HEAD)" ]; then
+          echo "Release tag must match the current source version and commit." >&2
+          exit 1
+        fi
+      fi
+      ;;
+  esac
+done

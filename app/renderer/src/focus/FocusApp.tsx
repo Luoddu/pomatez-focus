@@ -224,6 +224,34 @@ export default function FocusApp() {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, []);
+  // ?genMock=1 仅供设计稿/截图脚本：不连飞书，本地按真实阶段顺序模拟推进
+  const genMock = useMemo(
+    () =>
+      new URLSearchParams(window.location.search).get("genMock") === "1",
+    []
+  );
+  // 生成进度：主进程各阶段的真实事件经 preload 桥推到这里
+  const [genStage, setGenStage] = useState<{
+    stage: string;
+    done?: number;
+    total?: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!api() || !api().onGenerateProgress) return;
+    return api().onGenerateProgress((p: any) => setGenStage(p));
+  }, []);
+  const GEN_STAGE_TEXT: Record<string, string> = {
+    connect: "正在连接飞书…",
+    tasks: "正在读取任务…",
+    records: "正在读取专注记录…",
+    plan: "正在规划今日番茄…",
+    verify: "正在回读校验…",
+  };
+  const genStageText = genStage
+    ? genStage.stage === "write"
+      ? `正在写入 ${genStage.done}/${genStage.total}…`
+      : GEN_STAGE_TEXT[genStage.stage] || "正在生成…"
+    : "";
   const weeklyTomatoes = useMemo(
     () => weekTomatoes(shownRecords, farmNow ?? Date.now()),
     [shownRecords, farmNow]
@@ -434,13 +462,50 @@ export default function FocusApp() {
       notify("窗口切换未完成，请重试。", "error");
     }
   };
-  // 生成今日番茄：App 内原生走飞书 API，不弹任何外部窗口
+  // 生成今日番茄：App 内原生走飞书 API，不弹任何外部窗口。
+  // 点击后立即进入「连接飞书」阶段文字（乐观首帧），随后由主进程
+  // 真实阶段事件推进；generating 锁 + 按钮 disabled 双重防重入
   const generate = () => {
+    if (generating) return;
+    if (genMock) {
+      // 截图/设计稿 mock：按真实阶段顺序本地推进（无网络、不写任何数据）
+      const seq: {
+        stage: string;
+        done?: number;
+        total?: number;
+        wait: number;
+      }[] = [
+        { stage: "connect", wait: 600 },
+        { stage: "tasks", wait: 700 },
+        { stage: "records", wait: 600 },
+        { stage: "plan", wait: 700 },
+        { stage: "write", done: 3, total: 8, wait: 700 },
+        { stage: "write", done: 8, total: 8, wait: 600 },
+        { stage: "verify", wait: 600 },
+      ];
+      setGenerating(true);
+      setGenStage({ stage: "connect" });
+      let elapsed = 0;
+      const timers = seq.map((s) => {
+        const t = setTimeout(() => setGenStage(s), elapsed);
+        elapsed += s.wait;
+        return t;
+      });
+      timers.push(
+        setTimeout(() => {
+          setGenerating(false);
+          setGenStage(null);
+          notify("模拟生成完成（截图 mock，未连接飞书）。");
+        }, elapsed)
+      );
+      return;
+    }
     if (!api() || !connected) {
       notify("请先在设置中连接飞书，再生成今日番茄。", "error");
       return;
     }
     setGenerating(true);
+    setGenStage({ stage: "connect" });
     run(async () => {
       try {
         const r = await api().generateToday();
@@ -448,7 +513,7 @@ export default function FocusApp() {
           r.created > 0
             ? `已生成 ${r.created} 个今日番茄`
             : r.eligibleTasks === 0
-              ? `没有可生成的任务：请${r.planningMode === "recent" ? "勾选近日行动" : "将任务计划日设为今天"}并填写今日计划番茄数（已完成或放弃的任务不生成）`
+              ? `没有可生成的任务：请${r.planningMode === "recent" ? "勾选近日行动或将任务计划日设为今天" : "将任务计划日设为今天"}并填写今日计划番茄数（已完成或放弃的任务不生成）`
             : "今日番茄已齐全，无需生成",
         ];
         if (r.blocked > 0)
@@ -459,6 +524,7 @@ export default function FocusApp() {
         await refresh();
       } finally {
         setGenerating(false);
+        setGenStage(null);
       }
     });
   };
@@ -817,6 +883,7 @@ export default function FocusApp() {
             onAddManual={timer.addManual}
             onGenerate={generate}
             generating={generating}
+            genStageText={genStageText}
             onRefresh={() => run(refresh)}
             refreshBusy={busy || loadingTasks}
             {...windowControls}

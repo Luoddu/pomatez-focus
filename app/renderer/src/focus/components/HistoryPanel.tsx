@@ -74,6 +74,7 @@ export default function HistoryPanel({
   onAddManual,
   onGenerate,
   generating,
+  genStageText,
   onRefresh,
   refreshBusy,
   pinned,
@@ -92,6 +93,7 @@ export default function HistoryPanel({
   onAddManual: (record: FocusSession) => void;
   onGenerate: () => void;
   generating: boolean;
+  genStageText: string;
   onRefresh: () => void;
   refreshBusy: boolean;
   pinned: boolean;
@@ -145,10 +147,11 @@ export default function HistoryPanel({
           概览
           <span className="side-title-actions">
             <button
-              className="btn-text gen-btn"
+              className={`btn-text gen-btn${generating ? " busy" : ""}`}
               disabled={refreshBusy || generating}
               onClick={onGenerate}
             >
+              {generating && <span className="gen-spinner" aria-hidden="true" />}
               {generating ? "生成中…" : "生成今日番茄"}
             </button>
             <button
@@ -169,6 +172,11 @@ export default function HistoryPanel({
             onTogglePin={onTogglePin}
           />
         </div>
+        {generating && genStageText && (
+          <div className="gen-progress" role="status">
+            {genStageText}
+          </div>
+        )}
         <div className="stat-grid">
           {stats.map(([label, value]) => (
             <div className="card stat" key={label} data-stat={label}>
@@ -197,11 +205,7 @@ export default function HistoryPanel({
             <button
               className="btn-text"
               aria-label="手动同步"
-              title={
-                !canSync
-                  ? "请先连接飞书"
-                  : "上传本机记录并获取其他电脑的专注成果"
-              }
+              title={!canSync ? "请先连接飞书" : pendingCount ? `上传 ${pendingCount} 条待同步记录并获取其他电脑成果` : "获取其他电脑的专注成果"}
               disabled={!canSync || syncBusy}
               onClick={onSync}
             >

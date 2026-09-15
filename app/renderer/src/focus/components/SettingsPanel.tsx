@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { WindowControls } from "./shared";
 import UpdatePanel from "./UpdatePanel";
+import { isSoundEnabled, setSoundEnabled, playRestEnd } from "../sound";
 
 export type FocusConfig = {
   appId: string;
@@ -75,6 +76,7 @@ export default function SettingsPanel({
   onToggleCompact: () => void;
   onTogglePin: () => void;
 }) {
+  const [soundOn, setSoundOn] = useState(isSoundEnabled);
   return (
     <div className="settings-scroll">
       <div className="settings-col">
@@ -167,6 +169,28 @@ export default function SettingsPanel({
           </div>
         </div>
         <div className="card settings-card">
+          <h3>提示音</h3>
+          <div className="sync-row">
+            <span className="sync-text">
+              计时到点与休息结束时播放合成提示音
+            </span>
+            <div className="spacer" />
+            <button
+              type="button"
+              className={`btn-small outline sound-toggle${soundOn ? " on" : ""}`}
+              aria-pressed={soundOn}
+              onClick={() => {
+                const next = !soundOn;
+                setSoundEnabled(next);
+                setSoundOn(next);
+                if (next) playRestEnd();
+              }}
+            >
+              {soundOn ? "已开启" : "已关闭"}
+            </button>
+          </div>
+        </div>
+        <div className="card settings-card">
           <h3>本地番茄</h3>
           <div className="sync-row">
             <input
@@ -188,7 +212,7 @@ export default function SettingsPanel({
         <div className="card settings-card">
           <h3>关于</h3>
           <div className="about-line">
-            版本 <span className="ver">0.1.0-preview.17</span>
+            版本 <span className="ver">0.1.0-preview.26</span>
             <br />
             基于开源项目 pomatez 二次开发（MIT License，© roldanjr
             及贡献者）

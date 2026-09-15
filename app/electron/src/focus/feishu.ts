@@ -42,6 +42,15 @@ export type Connection = {
   quadrantField?: string;
   appToken?: string;
 };
+// 生成今日番茄的阶段进度：经 service → main 进程 webContents.send →
+// preload 桥转发给渲染层做阶段文字；write 阶段带 done/total/batch/batches
+export type GenerateProgress = {
+  stage: "connect" | "tasks" | "records" | "plan" | "write" | "verify";
+  done?: number;
+  total?: number;
+  batch?: number;
+  batches?: number;
+};
 export type Request = (
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
@@ -355,20 +364,92 @@ export class Feishu {
         now.getDate() + 1
       ).getTime();
     const rows = await this.list(`${path}/records`);
+    const linkedTable = fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    const taskOf = (r: any) =>
+      linkedRecordIds(
+        r.fields?.[this.config.taskField],
+        linkedTable
+      )[0] || "";
+    // Multi-pomodoro confirmation stores its timestamp on the selected row only.
+    // Recover the exact contiguous range from the immutable shared session, never
+    // infer completion from another task's title or copy dates across the whole task.
+    const completedAt = new Map<string, number>();
+    for (const anchor of rows) {
+      let records: any[] = [];
+      try {
+        records = readHistory(
+          anchor.fields?.[HISTORY_FIELD],
+          connectionKey(this.config)
+        );
+      } catch {
+        /* History sync reports malformed envelopes separately. */
+      }
+      for (const record of records) {
+        if (
+          record.task.planId !== anchor.record_id ||
+          record.task.taskId !== taskOf(anchor)
+        )
+          continue;
+        const first = pomodoroSequence(
+          textValue(anchor.fields?.["番茄"])
+        );
+        if (first <= 0 || record.completedCount < 1) continue;
+        for (const row of rows) {
+          const seq = pomodoroSequence(textValue(row.fields?.["番茄"]));
+          if (
+            taskOf(row) === taskOf(anchor) &&
+            localDayOf(row.fields?.[this.config.dateField]) ===
+              localDayOf(anchor.fields?.[this.config.dateField]) &&
+            seq >= first &&
+            seq < first + record.completedCount
+          ) {
+            completedAt.set(
+              row.record_id,
+              Math.max(
+                completedAt.get(row.record_id) || 0,
+                record.startedAt
+              )
+            );
+          }
+        }
+      }
+    }
+    const isDone = (r: any) => {
+      if (r.fields?.[this.config.completedField] === true) return true;
+      try {
+        const ledger = readLedger(r.fields);
+        return !!ledger && ledgerSeconds(ledger) >= ledger.target;
+      } catch {
+        return false;
+      }
+    };
     const inRange = rows.filter((r) => {
       const f = r.fields || {};
-      return (
-        typeof f[this.config.dateField] === "number" &&
-        f[this.config.dateField] >= start &&
-        f[this.config.dateField] < end
-      );
+      let date = f[this.config.dateField];
+      if (isDone(r)) {
+        // Actual focus day takes precedence over a rescheduled plan day.
+        // Legacy manually checked rows with no date evidence retain their plan day.
+        date = completedAt.get(r.record_id) ?? f["专注日期"] ?? date;
+        if (
+          !completedAt.has(r.record_id) &&
+          typeof f["专注日期"] !== "number"
+        ) {
+          try {
+            const entries = readLedger(f)?.entries;
+            if (entries?.length)
+              date = Math.max(...entries.map((e) => e.start));
+          } catch {
+            /* Keep legacy plan date. */
+          }
+        }
+      }
+      return typeof date === "number" && date >= start && date < end;
     });
     const selected = inRange.filter(
       (r) => r.fields[this.config.completedField] !== true
     );
-    const linkedTable = fields.find(
-      (f) => f.field_name === this.config.taskField
-    )?.property?.table_id;
     // 已收 x/y 聚合：y=今日该任务番茄行总数（含已完成+待办），x=已完成行数；
     // 完成判定沿用同步链路口径——已完成勾选，或分钟台账累计达到目标
     const harvestKey = (r: any) =>
@@ -486,7 +567,11 @@ export class Feishu {
   }
   // 生成今日番茄：移植 Invoke-FeishuTodayPomodoroGeneration.ps1 的幂等算法；
   // 字段缺失/歧义直接报错，不在 App 内自动改表结构
-  async generateToday(now = new Date()) {
+  async generateToday(
+    now = new Date(),
+    progress?: (p: GenerateProgress) => void
+  ) {
+    progress?.({ stage: "connect" });
     const { path, fields } = await this.planSchema();
     const seqFields = fields.filter(
       (f: any) => f.field_name === "番茄" && f.type === 1
@@ -502,10 +587,12 @@ export class Feishu {
         "专注记录表的「任务」字段不是单向关联，请到飞书检查"
       );
     const taskPath = `${this.root()}/tables/${id(taskTableId)}`;
+    progress?.({ stage: "tasks" });
     const taskFields = await this.list(`${taskPath}/fields`);
-    for (const [name, type] of [
-      ["任务名称", 1],
-    ] as [string, number][]) {
+    for (const [name, type] of [["任务名称", 1]] as [
+      string,
+      number
+    ][]) {
       const f = taskFields.filter((f: any) => f.field_name === name);
       if (f.length !== 1 || f[0].type !== type)
         throw new Error(
@@ -525,6 +612,7 @@ export class Feishu {
     const dayMs = dayStart(now),
       dateKey = dateKeyOf(dayMs);
     const taskRecords = await this.list(`${taskPath}/records`);
+    progress?.({ stage: "records" });
     const pomodoroRecords = await this.list(`${path}/records`);
     const { plans, invalid } = collectTaskPlans(
       taskRecords,
@@ -551,6 +639,7 @@ export class Feishu {
       candidateTaskIds: candidates,
       linkIds: (v: any) => linkedRecordIds(v, taskTableId),
     });
+    progress?.({ stage: "plan" });
     const plan = pomodoroPlan(
       plans,
       scan.keyCounts,
@@ -558,10 +647,11 @@ export class Feishu {
       dateKey
     );
     let created = 0;
+    const batches = Math.ceil(plan.specs.length / BATCH_SIZE);
     for (
-      let offset = 0;
+      let offset = 0, batch = 0;
       offset < plan.specs.length;
-      offset += BATCH_SIZE
+      offset += BATCH_SIZE, batch++
     ) {
       const chunk = plan.specs.slice(offset, offset + BATCH_SIZE);
       const token = clientToken(
@@ -586,9 +676,17 @@ export class Feishu {
       if (!Array.isArray(made) || made.length !== chunk.length)
         throw new Error("飞书生成返回数量不符，请到飞书核对后重试");
       created += made.length;
+      progress?.({
+        stage: "write",
+        done: created,
+        total: plan.specs.length,
+        batch: batch + 1,
+        batches,
+      });
     }
     if (plan.specs.length) {
       // readback：生成的每个幂等键都必须存在且唯一
+      progress?.({ stage: "verify" });
       const readback = await this.list(`${path}/records`);
       const counts = new Map<string, number>();
       for (const r of readback) {
@@ -830,7 +928,9 @@ export class Feishu {
       row = (await this.call("GET", route)).data?.record;
     } catch (e: any) {
       if (/代码 1254043\b/.test(e.message || ""))
-        throw Error("历史番茄原行不存在，记录保留本机；请恢复飞书原行后重试");
+        throw Error(
+          "历史番茄原行不存在，记录保留本机；请恢复飞书原行后重试"
+        );
       throw e;
     }
     if (!row?.fields || row.record_id !== planId)
