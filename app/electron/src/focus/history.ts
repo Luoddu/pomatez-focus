@@ -80,6 +80,21 @@ export function historyRecord(r: any, sourceKey: string): any {
       throw Error("专注修改版本无效");
     result.revision = r.revision;
   }
+  if (r.previousTasks != null) {
+    if (
+      !Array.isArray(r.previousTasks) ||
+      r.previousTasks.length > 100 ||
+      r.previousTasks.length > (r.revision || 0)
+    )
+      throw Error("任务修改来源无效");
+    result.previousTasks = r.previousTasks.map(
+      (task: any) =>
+        historyRecord(
+          { ...r, task, previousTasks: undefined },
+          sourceKey
+        ).task
+    );
+  }
   if (r.completionOwnedPlanIds != null) {
     if (
       !Array.isArray(r.completionOwnedPlanIds) ||

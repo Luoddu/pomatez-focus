@@ -33,7 +33,12 @@ export default function ManualEntry({
   const groups = useMemo(
     () =>
       tasks
-        .filter((t) => t.kind !== "done" && t.kind !== "pending")
+        .filter(
+          (t) =>
+            t.kind !== "done" &&
+            t.kind !== "pending" &&
+            t.id !== initial?.task.id
+        )
         .map((t) => ({
           id: t.id,
           label:
@@ -42,7 +47,7 @@ export default function ManualEntry({
             parseTitle(t.title).pomodoro +
             " 个番茄",
         })),
-    [tasks]
+    [tasks, initial]
   );
   const changeMinutes = (value: number) => {
     const mins = Math.round(value);
@@ -57,24 +62,39 @@ export default function ManualEntry({
     if (!initial && next > 0) changeMinutes(next * 25);
   };
   const save = () => {
-    const sameTime = !!initial && when === localInputValue(initial.startedAt) && minutes === (initial.acceptedSeconds || 0) / 60;
-    const startedAt = sameTime ? initial!.startedAt : new Date(when).getTime();
+    const sameTime =
+      !!initial &&
+      when === localInputValue(initial.startedAt) &&
+      minutes === (initial.acceptedSeconds || 0) / 60;
+    const startedAt = sameTime
+      ? initial!.startedAt
+      : new Date(when).getTime();
     if (!when || !Number.isFinite(startedAt))
       return setError("请选择开始时间");
     if (startedAt > Date.now()) return setError("开始时间不能在未来");
-    if (!Number.isFinite(minutes) || minutes < (initial ? 0 : 1) || minutes > 600 || (!initial && !Number.isInteger(minutes)))
+    if (
+      !Number.isFinite(minutes) ||
+      minutes < (initial ? 0 : 1) ||
+      minutes > 600 ||
+      (!initial && !Number.isInteger(minutes))
+    )
       return setError("时长必须是 1–600 分钟");
     if (!Number.isInteger(count) || count < 0 || count > 100)
       return setError("番茄数必须是 0–100 的整数");
     if (startedAt + minutes * 60000 > Date.now() + 60000)
       return setError("结束时间不能在未来，请调整开始时间或时长");
-    const task: FocusTask = initial?.task ||
-      tasks.find((t) => t.id === taskId) || {
-        id: crypto.randomUUID(),
-        title: "自由番茄",
-        kind: "free",
-        source: "local",
-      };
+    const chosen =
+      initial?.task.id === taskId
+        ? initial.task
+        : tasks.find((t) => t.id === taskId);
+    if (!chosen && taskId !== "free")
+      return setError("所选任务已变化，请重新选择");
+    const task: FocusTask = chosen || {
+      id: crypto.randomUUID(),
+      title: "自由番茄",
+      kind: "free",
+      source: "local",
+    };
     const seconds = minutes * 60;
     try {
       onSave({
@@ -82,12 +102,14 @@ export default function ManualEntry({
         id: initial?.id || crypto.randomUUID(),
         task,
         startedAt,
-        endedAt: sameTime ? initial!.endedAt : startedAt + seconds * 1000,
+        endedAt: sameTime
+          ? initial!.endedAt
+          : startedAt + seconds * 1000,
         plannedSeconds: initial?.plannedSeconds || 1500,
         elapsedSeconds: sameTime ? initial!.elapsedSeconds : seconds,
-        segments: sameTime ? initial!.segments : [
-          { start: startedAt, end: startedAt + seconds * 1000 },
-        ],
+        segments: sameTime
+          ? initial!.segments
+          : [{ start: startedAt, end: startedAt + seconds * 1000 }],
         acceptedSeconds: seconds,
         completedCount: count,
         status: "saved",
@@ -105,11 +127,10 @@ export default function ManualEntry({
         <label htmlFor="manual-task">任务</label>
         <select
           id="manual-task"
-          disabled={!!initial}
           value={taskId}
           onChange={(e) => setTaskId(e.target.value)}
         >
-          <option value="free">自由专注</option>
+          {!initial && <option value="free">自由专注</option>}
           {initial && (
             <option value={initial.task.id}>
               {parseTitle(initial.task.title).name}

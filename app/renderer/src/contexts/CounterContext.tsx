@@ -1,6 +1,8 @@
 // Adapted from Pomatez's CounterProvider: one elapsed-time loop owns focus and break timing.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mergeCloudRecords } from "focus/cloud";
+import { bindQuickSessions } from "focus/quickTasks";
+import type { QuickTask } from "focus/editQueue";
 import { playTimeUp, playRestEnd } from "focus/sound";
 import {
   FocusSession,
@@ -24,6 +26,7 @@ type CounterProps = {
   records: FocusSession[];
   mergeCloud: (records: FocusSession[], sourceKey: string) => void;
   getSnapshot: () => Data;
+  bindQuick: (q: QuickTask, rows: FocusTask[]) => void;
   notice: string;
   noticeSeq: number;
   error: string;
@@ -420,6 +423,10 @@ const CounterProvider: React.FC = ({ children }) => {
         records: data.records,
         mergeCloud,
         getSnapshot: () => dataRef.current,
+        bindQuick: (q, rows) => {
+          if (fatal.current) throw Error("本机存储异常，未绑定任务");
+          publish(bindQuickSessions(dataRef.current, q, rows));
+        },
         notice: noticeText,
         noticeSeq,
         error,

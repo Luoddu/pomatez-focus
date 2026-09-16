@@ -37,6 +37,7 @@ const GroupList = ({
   const canComplete = (task: FocusTask) =>
     !!onComplete &&
     !!task.taskId &&
+    !task.quickTask &&
     task.kind !== "free" &&
     task.kind !== "pending";
   return (
@@ -53,7 +54,7 @@ const GroupList = ({
         const canAdjust =
           !!onAdjust &&
           !!taskId &&
-          !group.tasks.some((t) => t.kind === "free");
+          !group.tasks.some((t) => t.kind === "free" || t.quickTask);
         const busy = adjusting === group.key;
         // 计时中的任务不允许减：该行可能已有未同步的专注分钟
         const timing = !!activeTaskId && activeTaskId === taskId;
@@ -70,7 +71,12 @@ const GroupList = ({
             }}
           >
             <div className="task-main">
-              <div className="task-name">{group.name}</div>
+              <div className="task-name">
+                {group.name}
+                {group.tasks.some((t) => t.quickTask) && (
+                  <small> · 待同步，可专注</small>
+                )}
+              </div>
               <div className="chips">
                 {rows.map((task) => (
                   <button

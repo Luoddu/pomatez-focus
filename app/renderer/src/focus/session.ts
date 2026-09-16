@@ -6,6 +6,7 @@ export type FocusTask = {
   planId?: string;
   taskId?: string;
   sourceKey?: string;
+  quickTask?: { id: string; sequence: number };
   // free=自由番茄；done=今日已全部完成的占位行；pending=± 乐观更新的临时行
   kind?: "free" | "done" | "pending";
   creditedSeconds?: number;
@@ -32,6 +33,7 @@ export type FocusSession = {
   syncedPlanId?: string;
   cloudSynced?: boolean;
   revision?: number;
+  previousTasks?: FocusTask[];
   completionOwnedPlanIds?: string[];
   segments?: { start: number; end: number }[];
   segmentOpen?: boolean;

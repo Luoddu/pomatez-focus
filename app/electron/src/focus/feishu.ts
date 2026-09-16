@@ -1,5 +1,12 @@
 import { createHash } from "crypto";
 import {
+  MOVE_FIELD,
+  readMove,
+  sameEdit,
+  RecordMove,
+  MoveStep,
+} from "./move";
+import {
   HISTORY_FIELD,
   historyRecord,
   readHistory,
@@ -14,6 +21,7 @@ import {
   ledgerSeconds,
   mergePlan,
   correctPlan,
+  removePlanRecord,
   fieldsAgree,
 } from "./plan";
 import {
@@ -322,6 +330,37 @@ export class Feishu {
     return { table, path, fields };
   }
   // 四象限为可选增强：字段缺失、探测失败或标签不匹配都不得影响今日列表
+  private async guardRecordMoves(
+    schema: { path: string; fields: any[] },
+    record?: any
+  ) {
+    if (!schema.fields.some((f) => f.field_name === MOVE_FIELD)) return;
+    const rows = await this.list(`${schema.path}/records`),
+      key = connectionKey(this.config);
+    if (
+      rows.some((r) =>
+        readMove(
+          r.fields?.[MOVE_FIELD],
+          key,
+          this.config.completedField
+        )
+      )
+    )
+      throw Error(
+        "有任务修改尚未同步完成，请先重试记录修改；新专注已保留本机"
+      );
+    if (
+      record &&
+      rows.some((row) =>
+        readHistory(row.fields?.[HISTORY_FIELD], key).some(
+          (r) =>
+            r.id === record.id &&
+            (r.revision || 0) > (record.revision || 0)
+        )
+      )
+    )
+      throw Error("此记录已在另一台电脑修改，请同步最新成果后再操作");
+  }
   private async resolveQuadrantField(linkedTable: string) {
     const wanted = (this.config.quadrantField ?? "").trim();
     try {
@@ -358,13 +397,15 @@ export class Feishu {
     const after = historyRecord(input?.after, key);
     if (
       before.id !== after.id ||
-      JSON.stringify(before.task) !== JSON.stringify(after.task) ||
       (after.revision || 0) !== (before.revision || 0) + 1 ||
       before.syncTarget !== "plan" ||
       after.syncTarget !== "plan"
     )
-      throw Error("修改必须保留原记录、原任务，并递增一个版本");
+      throw Error("修改必须保留原记录，并递增一个版本");
+    if (JSON.stringify(before.task) !== JSON.stringify(after.task))
+      return this.moveRecord(before, after);
     const schema = await this.planSchema();
+    await this.guardRecordMoves(schema);
     const rows = await this.list(`${schema.path}/records`);
     const matches = rows.filter((r) =>
       readLedger(r.fields)?.entries.some((e) => e.id === before.id)
@@ -530,6 +571,358 @@ export class Feishu {
       warning: warnings[0] || "",
     };
   }
+  private async moveRecord(before: any, requested: any) {
+    const key = connectionKey(this.config),
+      schema = await this.planSchema();
+    const completed = this.config.completedField;
+    const taskTable = schema.fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    const rows = await this.list(`${schema.path}/records`);
+    const identity = (r: any) =>
+      JSON.stringify([
+        linkedRecordIds(r.fields?.[this.config.taskField], taskTable),
+        localDayOf(r.fields?.[this.config.dateField]),
+        textValue(r.fields?.番茄),
+      ]);
+    const moves = rows
+      .map((row) => ({
+        row,
+        move: readMove(row.fields?.[MOVE_FIELD], key, completed),
+      }))
+      .filter((x) => x.move);
+    let pending = moves.find((x) => x.move!.before.id === before.id);
+    if (moves.some((x) => x.move!.before.id !== before.id))
+      throw Error("另一条记录正在修改任务，请先完成该记录同步");
+    if (
+      pending &&
+      (JSON.stringify(pending.move!.before) !==
+        JSON.stringify(before) ||
+        !sameEdit(pending.move!.after, requested))
+    )
+      throw Error("这条记录已有不同的任务修改，请先同步原修改");
+    const target = rows.find(
+      (r) => r.record_id === requested.task.planId
+    );
+    if (
+      !target ||
+      requested.task.id !== requested.task.planId ||
+      JSON.stringify(
+        linkedRecordIds(
+          target.fields?.[this.config.taskField],
+          taskTable
+        )
+      ) !== JSON.stringify([requested.task.taskId])
+    )
+      throw Error("目标番茄或任务关联无效，请刷新后重新选择");
+    if (!pending) {
+      const source = rows.find((r) =>
+        readHistory(r.fields?.[HISTORY_FIELD], key).some(
+          (r) => r.id === before.id
+        )
+      );
+      const already = readHistory(
+        target.fields?.[HISTORY_FIELD],
+        key
+      ).find((r) => r.id === before.id);
+      // A lost final acknowledgment is an ordinary idempotent retry.
+      if (
+        already &&
+        sameEdit(already, requested) &&
+        already.previousTasks?.some(
+          (t: any) => JSON.stringify(t) === JSON.stringify(before.task)
+        )
+      )
+        return {
+          record: {
+            ...already,
+            syncedPlanId: target.record_id,
+            cloudSynced: true,
+          },
+          warning: "",
+        };
+      if (
+        !source ||
+        source.record_id === target.record_id ||
+        (before.task.planId &&
+          source.record_id !== before.task.planId) ||
+        (before.task.taskId &&
+          JSON.stringify(
+            linkedRecordIds(
+              source.fields?.[this.config.taskField],
+              taskTable
+            )
+          ) !== JSON.stringify([before.task.taskId]))
+      )
+        throw Error("无法唯一定位原任务，先同步后重新修改");
+      const oldHistory = readHistory(
+        source.fields?.[HISTORY_FIELD],
+        key
+      );
+      if (
+        JSON.stringify(oldHistory.find((r) => r.id === before.id)) !==
+        JSON.stringify(before)
+      )
+        throw Error("此记录已在另一台电脑修改，请同步后重新编辑");
+      const sourcePatch: any = removePlanRecord(source.fields, before);
+      const after = historyRecord(
+        {
+          ...requested,
+          completionOwnedPlanIds: [],
+          previousTasks: [...(before.previousTasks || []), before.task],
+        },
+        key
+      );
+      const destination = mergePlan(
+        target.fields,
+        after,
+        completed
+      ).patch;
+      const first = pomodoroSequence(textValue(target.fields?.番茄));
+      const day = localDayOf(target.fields?.[this.config.dateField]);
+      if (
+        first < 1 ||
+        day == null ||
+        first + after.completedCount - 1 > MAX_PER_TASK
+      )
+        throw Error("目标番茄序号、日期或完成数量无效");
+      // Stable empty plan creation uses the existing generator identity. No focus
+      // accounting changes until the full recoverable intent is stored below.
+      const targetRows = [];
+      for (let n = first; n < first + after.completedCount; n++) {
+        const mine = (r: any) =>
+          localDayOf(r.fields?.[this.config.dateField]) === day &&
+          JSON.stringify(
+            linkedRecordIds(
+              r.fields?.[this.config.taskField],
+              taskTable
+            )
+          ) === JSON.stringify([after.task.taskId]) &&
+          pomodoroSequence(textValue(r.fields?.番茄)) === n;
+        let matches = rows.filter(mine);
+        if (!matches.length) {
+          await this.call(
+            "POST",
+            `${schema.path}/records?client_token=${clientToken(
+              `today-pomodoro-create|${this.config.appToken}|${
+                after.task.taskId
+              }|${dateKeyOf(day)}|${n}`
+            )}`,
+            {
+              fields: {
+                番茄: String(n),
+                [this.config.taskField]: [after.task.taskId],
+                [this.config.dateField]: day,
+              },
+            }
+          );
+          matches = (await this.list(`${schema.path}/records`)).filter(
+            mine
+          );
+          if (matches.length === 1) rows.push(matches[0]);
+        }
+        if (matches.length !== 1)
+          throw Error("目标任务存在重复番茄，请先核对");
+        targetRows.push(matches[0]);
+      }
+      const patches = new Map<string, any>([
+        [source.record_id, sourcePatch],
+        [target.record_id, destination],
+      ]);
+      for (const row of targetRows) {
+        patches.set(row.record_id, {
+          ...(patches.get(row.record_id) || {}),
+          [completed]: true,
+        });
+        if (row.fields?.[completed] !== true)
+          after.completionOwnedPlanIds.push(row.record_id);
+      }
+      if (
+        destination[completed] === true &&
+        target.fields?.[completed] !== true &&
+        !after.completionOwnedPlanIds.includes(target.record_id)
+      )
+        after.completionOwnedPlanIds.push(target.record_id);
+      const oldFirst = pomodoroSequence(textValue(source.fields?.番茄));
+      const sourceTask = linkedRecordIds(
+        source.fields?.[this.config.taskField],
+        taskTable
+      )[0];
+      const sourceDay = localDayOf(
+        source.fields?.[this.config.dateField]
+      );
+      const sameSource = (r: any) =>
+        localDayOf(r.fields?.[this.config.dateField]) === sourceDay &&
+        JSON.stringify(
+          linkedRecordIds(r.fields?.[this.config.taskField], taskTable)
+        ) === JSON.stringify([sourceTask]);
+      let warning = "";
+      for (const row of rows.filter(sameSource)) {
+        const n = pomodoroSequence(textValue(row.fields?.番茄));
+        if (
+          row.record_id !== source.record_id &&
+          (n < oldFirst || n >= oldFirst + before.completedCount)
+        )
+          continue;
+        if (row.fields?.[completed] !== true) continue;
+        const owned = before.completionOwnedPlanIds?.includes(
+          row.record_id
+        );
+        const otherLedger = readLedger(
+          row.record_id === source.record_id ? sourcePatch : row.fields
+        );
+        const claimed = rows.filter(sameSource).some((anchor) =>
+          readHistory(anchor.fields?.[HISTORY_FIELD], key).some(
+            (other) => {
+              const start = pomodoroSequence(
+                textValue(anchor.fields?.番茄)
+              );
+              return (
+                other.id !== before.id &&
+                other.completedCount > 0 &&
+                n >= start &&
+                n < start + other.completedCount
+              );
+            }
+          )
+        );
+        if (!owned || ledgerSeconds(otherLedger) > 0 || claimed) {
+          if (!owned)
+            warning =
+              "记录已转移；原任务有缺少归属的完成勾选，已保留，请到飞书核对";
+          continue;
+        }
+        // A shared source/target task can overlap; the new completion wins.
+        if (!targetRows.some((r) => r.record_id === row.record_id))
+          patches.set(row.record_id, {
+            ...(patches.get(row.record_id) || {}),
+            [completed]: false,
+          });
+      }
+      sourcePatch[HISTORY_FIELD] = JSON.stringify({
+        version: 1,
+        records: oldHistory.filter((r) => r.id !== before.id),
+      });
+      patches.get(source.record_id)[HISTORY_FIELD] =
+        sourcePatch[HISTORY_FIELD];
+      patches.get(target.record_id)[HISTORY_FIELD] = mergeHistory(
+        target.fields?.[HISTORY_FIELD],
+        after,
+        key
+      );
+      const steps: MoveStep[] = Array.from(patches).map(
+        ([rowId, patch]) => {
+          const row = rows.find((r) => r.record_id === rowId)!;
+          const original = Object.fromEntries(
+            Object.keys(patch).map((k) => [
+              k,
+              k === completed
+                ? row.fields?.[k] === true
+                : ["实际分钟", "专注日期"].includes(k)
+                ? row.fields?.[k] ?? null
+                : textValue(row.fields?.[k]),
+            ])
+          );
+          return {
+            rowId,
+            identity: identity(row),
+            before: original,
+            after: patch,
+          };
+        }
+      );
+      const move: RecordMove = {
+        version: 1,
+        before,
+        after,
+        steps,
+        warning,
+      };
+      const raw = JSON.stringify(move);
+      readMove(raw, key, completed); // Capacity/schema validation before first accounting write.
+      const columns = schema.fields.filter(
+        (f) => f.field_name === MOVE_FIELD
+      );
+      if (
+        columns.length > 1 ||
+        (columns.length && columns[0].type !== 1)
+      )
+        throw Error("专注任务迁移须为唯一文本字段");
+      if (!columns.length) {
+        await this.call(
+          "POST",
+          `${schema.path}/fields?client_token=${clientToken(
+            `${schema.path}|record-move-v1`
+          )}`,
+          { field_name: MOVE_FIELD, type: 1 }
+        );
+        const actual = await this.list(`${schema.path}/fields`);
+        if (
+          actual.filter(
+            (f) => f.field_name === MOVE_FIELD && f.type === 1
+          ).length !== 1
+        )
+          throw Error("迁移字段回读失败");
+      }
+      const route = `${schema.path}/records/${id(source.record_id)}`;
+      await this.call("PUT", route, { fields: { [MOVE_FIELD]: raw } });
+      const saved = (await this.call("GET", route)).data?.record;
+      if (textValue(saved?.fields?.[MOVE_FIELD]) !== raw)
+        throw Error("任务修改意图回读失败，可重试");
+      pending = { row: source, move };
+    }
+    const move = pending.move!,
+      sourcePath = `${schema.path}/records/${id(
+        pending.row.record_id
+      )}`;
+    const verifyStep = async (step: MoveStep) => {
+      const row = (
+        await this.call(
+          "GET",
+          `${schema.path}/records/${id(step.rowId)}`
+        )
+      ).data?.record;
+      if (
+        !row ||
+        identity(row) !== step.identity ||
+        (!fieldsAgree(row.fields, step.before) &&
+          !fieldsAgree(row.fields, step.after))
+      )
+        throw Error(
+          "任务修改期间原表有其他变化，已保留迁移明细，请核对后重试"
+        );
+      return row;
+    };
+    for (const step of move.steps) await verifyStep(step);
+    for (const step of move.steps) {
+      const row = await verifyStep(step),
+        route = `${schema.path}/records/${id(step.rowId)}`;
+      if (!fieldsAgree(row.fields, step.after))
+        await this.call("PUT", route, { fields: step.after });
+      const actual = (await this.call("GET", route)).data?.record;
+      if (!actual || !fieldsAgree(actual.fields, step.after))
+        throw Error("任务修改回读失败，可安全重试");
+    }
+    await this.call("PUT", sourcePath, {
+      fields: { [MOVE_FIELD]: "" },
+    });
+    if (
+      textValue(
+        (await this.call("GET", sourcePath)).data?.record?.fields?.[
+          MOVE_FIELD
+        ]
+      )
+    )
+      throw Error("任务修改完成确认失败，可重试");
+    return {
+      record: {
+        ...move.after,
+        syncedPlanId: move.after.task.planId,
+        cloudSynced: true,
+      },
+      warning: move.warning,
+    };
+  }
   async createQuickTask(input: any) {
     const labels: Record<string, string> = {
       iu: "重要且紧急",
@@ -676,7 +1069,33 @@ export class Feishu {
       )
     )
       throw Error("任务已创建，番茄计划待重试核对");
-    return { taskId, created: true };
+    const doneToday = plans.filter(
+      (r) => r.fields?.[this.config.completedField] === true
+    ).length;
+    const taskRows = Array.from({ length: input.count }, (_, i) => {
+      const r = plans.find(
+        (r) => pomodoroSequence(textValue(r.fields?.番茄)) === i + 1
+      )!;
+      const ledger = readLedger(r.fields);
+      return {
+        id: r.record_id,
+        planId: r.record_id,
+        taskId,
+        title: `${input.title.trim()} · 第 ${i + 1} 个番茄`,
+        source: "feishu",
+        sourceKey: input.sourceKey,
+        quadrant: input.quadrant,
+        doneToday,
+        plannedToday: plans.length,
+        ...(r.fields?.[this.config.completedField] === true
+          ? { kind: "done" }
+          : {}),
+        creditedSeconds: ledgerSeconds(ledger),
+        goalSeconds: ledger?.target,
+        appliedSessionIds: ledger?.entries.map((e) => e.id) || [],
+      };
+    });
+    return { taskId, created: true, tasks: taskRows };
   }
   async today(now = new Date()) {
     const { path, fields } = await this.planSchema();
@@ -900,6 +1319,7 @@ export class Feishu {
   ) {
     progress?.({ stage: "connect" });
     const { path, fields } = await this.planSchema();
+    await this.guardRecordMoves({ path, fields });
     const seqFields = fields.filter(
       (f: any) => f.field_name === "番茄" && f.type === 1
     );
@@ -1058,6 +1478,7 @@ export class Feishu {
     if (delta !== 1 && delta !== -1)
       throw new Error("番茄调整幅度无效");
     const { path, fields } = await this.planSchema();
+    await this.guardRecordMoves({ path, fields });
     const seqFields = fields.filter(
       (f: any) => f.field_name === "番茄" && f.type === 1
     );
@@ -1152,7 +1573,8 @@ export class Feishu {
   // 勾选（已完成===true 时 patch 继续带 true），不会被后续同步刷回
   async completePlan(recordId: any, now = new Date()) {
     id(recordId);
-    const { path } = await this.planSchema();
+    const { path, fields } = await this.planSchema();
+    await this.guardRecordMoves({ path, fields });
     const row = (
       await this.call("GET", `${path}/records/${id(recordId)}`)
     ).data?.record;
@@ -1230,6 +1652,7 @@ export class Feishu {
     if (record.sync !== "synced")
       throw Error("请先完成该记录的飞书记账，再共享成果");
     const schema = await this.planSchema();
+    await this.guardRecordMoves(schema, record);
     const column = schema.fields.filter(
       (f) => f.field_name === HISTORY_FIELD
     );
@@ -1340,11 +1763,34 @@ export class Feishu {
     const rows = await this.list(`${path}/records`),
       records: any[] = [],
       ids = new Set<string>();
+    const moving = new Map<string, any>();
+    for (const row of rows) {
+      const move = readMove(
+        row.fields?.[MOVE_FIELD],
+        key,
+        this.config.completedField
+      );
+      if (move) {
+        if (moving.has(move.before.id))
+          throw Error("重复任务迁移，未合并");
+        moving.set(move.before.id, {
+          ...move.before,
+          syncedPlanId: row.record_id,
+          cloudSynced: true,
+        });
+      }
+    }
+    // Other computers see one consistent old record until all move steps commit.
+    for (const record of Array.from(moving.values())) {
+      ids.add(record.id);
+      records.push(record);
+    }
     for (const row of rows) {
       for (const record of readHistory(
         row.fields?.[HISTORY_FIELD],
         key
       )) {
+        if (moving.has(record.id)) continue;
         if (ids.has(record.id))
           throw Error("云端不同番茄行包含重复专注 ID，请核对；未合并");
         ids.add(record.id);
@@ -1475,6 +1921,7 @@ export class Feishu {
   }
   private async writePlan(record: any) {
     const { path, fields } = await this.planSchema();
+    await this.guardRecordMoves({ path, fields }, record);
     if (
       !PLAN_FIELDS.every((f) =>
         fields.some(

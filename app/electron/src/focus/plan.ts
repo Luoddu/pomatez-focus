@@ -76,7 +76,9 @@ export const ledgerSeconds = (l: Ledger | null) =>
 function derived(l: Ledger) {
   return {
     实际分钟: ledgerSeconds(l) / 60,
-    专注日期: Math.max(...l.entries.map((e) => e.start)),
+    专注日期: l.entries.length
+      ? Math.max(...l.entries.map((e) => e.start))
+      : null,
     专注时间段: l.entries
       .map(
         (e) =>
@@ -131,13 +133,22 @@ export function correctPlan(
 }
 export function fieldsAgree(actual: any, expected: any) {
   return Object.entries(expected).every(([k, v]) =>
-    typeof v === "number"
+    v == null
+      ? actual[k] == null
+      : typeof v === "number"
       ? Number.isFinite(Number(actual[k])) &&
         Math.abs(Number(actual[k]) - v) < 0.00001
       : typeof v === "boolean"
       ? (actual[k] === true) === v
       : textValue(actual[k]) === v
   );
+}
+export function removePlanRecord(fields: any, record: any) {
+  // Reuse correction validation, including manual edits to derived columns.
+  correctPlan(fields, record, record, "__unused_completion");
+  const ledger = readLedger(fields)!;
+  ledger.entries = ledger.entries.filter((e) => e.id !== record.id);
+  return derived(ledger);
 }
 export function mergePlan(
   fields: any,

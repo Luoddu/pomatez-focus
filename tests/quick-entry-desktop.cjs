@@ -28,6 +28,7 @@ let shared = [],
   holdRefresh = false,
   creates = 0,
   corrected = 0;
+let releaseCreate;
 FocusService.prototype.status = () => ({
   configured: true,
   sourceKey: "synthetic",
@@ -62,7 +63,13 @@ FocusService.prototype.correctRecord = async ({ before, after }) => {
   assert.equal(after.revision, 1);
   assert.equal(before.id, shared[0].id);
   assert.equal(after.id, before.id);
-  const record = { ...after, cloudSynced: true };
+  assert.equal(before.task.id, "p1");
+  assert.equal(after.task.id, "p2");
+  const record = {
+    ...after,
+    previousTasks: [before.task],
+    cloudSynced: true,
+  };
   shared = [record];
   return { record };
 };
@@ -71,19 +78,25 @@ FocusService.prototype.createQuickTask = async (value) => {
   creates++;
   if (!intent) intent = value.id;
   else assert.equal(value.id, intent);
-  if (creates === 1) throw Error("Synthetic quick task offline");
+  if (creates === 1) {
+    await new Promise((r) => {
+      releaseCreate = r;
+    });
+    throw Error("Synthetic quick task offline");
+  }
   assert.equal(value.quadrant, "inu");
   assert.equal(value.count, 2);
-  tasks.push({
-    id: "quick1",
-    planId: "quick1",
+  const rows = [1, 2].map((n) => ({
+    id: "quick" + n,
+    planId: "quick" + n,
     taskId: "quick",
-    title: `${value.title} · 第 1 个番茄`,
+    title: `${value.title} · 第 ${n} 个番茄`,
     source: "feishu",
     sourceKey: "synthetic",
     quadrant: value.quadrant,
-  });
-  return { created: true, taskId: "quick" };
+  }));
+  tasks.push(...rows);
+  return { created: true, taskId: "quick", tasks: rows };
 };
 require("../app/electron/build/main.js");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -191,6 +204,13 @@ app.whenReady().then(async () => {
     await click("开始专注");
     await until(async () => (await stored()).active?.task.id === "p2");
     await click("修改记录 " + originalId);
+    assert.equal(
+      await js("document.querySelector('#manual-task').disabled"),
+      false
+    );
+    await js(
+      "(()=>{const e=document.querySelector('#manual-task'); e.value='p2'; e.dispatchEvent(new Event('change',{bubbles:true}));})()"
+    );
     await set('[aria-label="补记番茄数"]', 1);
     await click("保存修改");
     assert.equal((await outbox())[0].kind, "edit");
@@ -201,6 +221,7 @@ app.whenReady().then(async () => {
     assert.equal((await stored()).records.length, 1);
     assert.equal((await stored()).active.task.id, "p2");
     assert.equal((await stored()).records[0].completedCount, 1);
+    assert.equal((await stored()).records[0].task.id, "p2");
     // Return to board without recording synthetic active focus.
     await click("结束");
     await click("确认结束");
@@ -216,18 +237,54 @@ app.whenReady().then(async () => {
     await set('[aria-label="新增任务名称"]', "Synthetic quick task");
     await set('[aria-label="新增任务番茄数"]', 2);
     await click("添加");
+    await until(() => !!releaseCreate);
+    assert.equal(
+      await js(
+        "[...document.querySelectorAll('.task')].find(t=>t.textContent.includes('Synthetic quick task')).querySelectorAll('.chip').length"
+      ),
+      2
+    );
+    await js(
+      "[...document.querySelectorAll('.task')].find(t=>t.textContent.includes('Synthetic quick task')).querySelectorAll('.chip')[1].click()"
+    );
+    await click("开始专注");
+    await until(
+      async () =>
+        (await stored()).active?.task.quickTask?.sequence === 2
+    );
+    const startedId = (await stored()).active.id;
+    releaseCreate();
     await until(async () => (await outbox())[0]?.state === "failed");
     // Renderer reload preserves failed intention and does not automatically repeat it.
-    await js("location.reload()");
+    await new Promise((resolve) => {
+      win.webContents.once("did-finish-load", resolve);
+      win.webContents.reload();
+    });
     await until(() =>
       js(
         "!![...document.querySelectorAll('button')].find(b=>b.textContent==='重试修改与新增任务')"
       )
     );
     assert.equal(creates, 1);
+    await until(
+      async () => (await stored()).active?.status === "paused"
+    );
     await click("重试修改与新增任务");
     await until(async () => (await outbox()).length === 0);
     assert.equal(creates, 2);
+    assert.equal((await stored()).active.id, startedId);
+    assert.equal((await stored()).active.task.planId, "quick2");
+    assert.equal((await stored()).active.task.quickTask, undefined);
+    await click("结束");
+    await click("确认结束");
+    await until(() =>
+      js(
+        "!![...document.querySelectorAll('button')].find(b=>b.textContent.includes('放弃'))"
+      )
+    );
+    await js(
+      "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('放弃')).click()"
+    );
     holdRefresh = true;
     await click("刷新今日番茄");
     await until(() => !!releaseRefresh);
@@ -246,7 +303,7 @@ app.whenReady().then(async () => {
     releaseRefresh();
     assert.equal(win.isVisible(), false);
     const result = {
-      passed: 8,
+      passed: 12,
       checks: [
         "count presets duration/start",
         "duration never changes count",
@@ -256,6 +313,10 @@ app.whenReady().then(async () => {
         "quick task retries same intent",
         "pending quick task survives renderer reload",
         "start selected tomato during task refresh",
+        "record task selector changes assignment while another focus continues",
+        "quick task has all chips before network acknowledgment",
+        "unresolved task starts focus immediately",
+        "real renderer reload and retry bind same active session to actual row",
       ],
     };
     fs.writeFileSync(

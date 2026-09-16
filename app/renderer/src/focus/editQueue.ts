@@ -1,4 +1,4 @@
-import type { FocusSession, FocusQuadrant } from "./session";
+import type { FocusSession, FocusQuadrant, FocusTask } from "./session";
 
 export type QuickTask = {
   id: string;
@@ -21,6 +21,7 @@ export type OutboxItem = {
   payload: QuickTask | PendingEdit;
   state: "pending" | "failed";
   error?: string;
+  taskRows?: FocusTask[];
 };
 const KEY = "pomatez-quick-edit-outbox-v1";
 export class EditQueue {
@@ -41,7 +42,9 @@ export class EditQueue {
             !r.id ||
             !r.sourceKey ||
             !r.payload ||
-            (r.kind === "edit" && (!r.payload.before?.id || r.payload.before.id !== r.payload.after?.id)) ||
+            (r.kind === "edit" &&
+              (!r.payload.before?.id ||
+                r.payload.before.id !== r.payload.after?.id)) ||
             !["task", "edit"].includes(r.kind) ||
             !["pending", "failed"].includes(r.state)
         )
@@ -89,6 +92,33 @@ export class EditQueue {
           ? { ...e, state: "pending", error: undefined }
           : e
       )
+    );
+  }
+  resolveTask(
+    id: string,
+    rows: FocusTask[],
+    bind: (task: FocusTask) => FocusTask
+  ) {
+    const item = this.entries.find(
+      (e) => e.id === id && e.kind === "task"
+    );
+    if (!item) throw Error("新增任务队列不存在");
+    const q = item.payload as QuickTask;
+    // Persist identity mapping and dependent edits together, before retiring intent.
+    this.save(
+      this.entries.map((e) => {
+        if (e.id === id) return { ...e, taskRows: rows };
+        if (e.kind !== "edit" || e.sourceKey !== q.sourceKey) return e;
+        const p = e.payload as PendingEdit;
+        return {
+          ...e,
+          payload: {
+            ...p,
+            before: { ...p.before, task: bind(p.before.task) },
+            after: { ...p.after, task: bind(p.after.task) },
+          },
+        };
+      })
     );
   }
   async drain(

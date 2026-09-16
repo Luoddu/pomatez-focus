@@ -14,6 +14,12 @@ import {
 } from "./session";
 import { EditQueue, PendingEdit, QuickTask } from "./editQueue";
 import {
+  projectQuickTasks,
+  quickRows,
+  bindQuickTask,
+  validateQuickReceipt,
+} from "./quickTasks";
+import {
   readTaskSnapshot,
   writeTaskSnapshot,
   taskDay,
@@ -225,7 +231,6 @@ export default function FocusApp() {
     (e) => e.sourceKey === sourceKey && e.state !== "done"
   );
   const queueFailed = queued.filter((e) => e.state === "failed");
-  const boardTasks = completionQueue.project(tasks, sourceKey);
   const refreshSequence = useRef(0);
   const syncing = useRef(false);
   const [syncBusy, setSyncBusy] = useState(false);
@@ -237,6 +242,12 @@ export default function FocusApp() {
   );
   const outbox = editQueue.entries.filter(
     (e) => e.sourceKey === sourceKey
+  );
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const boardTasks = completionQueue.project(
+    projectQuickTasks(tasks, outbox, sourceKey),
+    sourceKey
   );
   const editingIds = outbox
     .filter((e) => e.kind === "edit")
@@ -377,7 +388,13 @@ export default function FocusApp() {
         setTodayCount(rows.length);
         // 默认不预选；刷新只保留仍然存在的选中
         setSelected((previous) =>
-          rows.some((t) => t.id === previous) ? previous : ""
+          projectQuickTasks(
+            rows,
+            editQueue.entries,
+            status.sourceKey
+          ).some((t) => t.id === previous)
+            ? previous
+            : ""
         );
         // today() 完成四象限探测后重读 status，拿到命中结果
         const after = await api().status();
@@ -451,6 +468,9 @@ export default function FocusApp() {
       !api() ||
       timer.blocked ||
       editQueue.running ||
+      editQueue.entries.some(
+        (e) => e.sourceKey === sourceKey && e.state === "pending"
+      ) ||
       completionQueue.running
     )
       return;
@@ -458,6 +478,7 @@ export default function FocusApp() {
     setSyncBusy(true);
     try {
       const eligible = (r: FocusSession) =>
+        !r.task.quickTask &&
         !r.cloudSynced &&
         (r.task.source === "local" || r.task.sourceKey === sourceKey);
       if (timer.getSnapshot().records.some(eligible))
@@ -541,7 +562,7 @@ export default function FocusApp() {
         !r.cloudSynced &&
         (r.task.source === "local" || r.task.sourceKey === sourceKey)
     )
-    .map((r) => `${r.id}:${r.sync}`)
+    .map((r) => `${r.id}:${r.sync}:${r.task.planId || ""}`)
     .join(",");
   // A pending-set change permits one attempt; a failed attempt waits for explicit retry.
   useEffect(() => {
@@ -628,14 +649,50 @@ export default function FocusApp() {
           const currentStatus = await api().status();
           if (currentStatus.sourceKey !== item.sourceKey)
             throw Error("飞书连接已变化，待同步内容仍保留在原表队列");
-          if (item.kind === "task")
-            await api().createQuickTask(item.payload);
-          else {
+          if (item.kind === "task") {
+            const q = item.payload as QuickTask;
+            const rows: FocusTask[] =
+              item.taskRows || (await api().createQuickTask(q)).tasks;
+            validateQuickReceipt(q, rows);
+            editQueue.resolveTask(item.id, rows, (task) =>
+              bindQuickTask(task, q, rows)
+            );
+            timer.bindQuick(q, rows);
+            // Invalidate an older full refresh before applying the verified receipt.
+            ++refreshSequence.current;
+            setLoadingTasks(false);
+            const isToday = q.day === new Date().setHours(0, 0, 0, 0);
+            const fresh = isToday
+              ? [
+                  ...tasksRef.current.filter(
+                    (t) => t.taskId !== rows[0].taskId
+                  ),
+                  ...rows,
+                ]
+              : tasksRef.current;
+            if (!writeTaskSnapshot(localStorage, sourceKey, fresh))
+              throw Error(
+                "任务已同步，但启动缓存未保存，保留回执等待重试"
+              );
+            tasksRef.current = fresh;
+            setTasks(fresh);
+            setTodayCount(fresh.length);
+            setSelected((previous) => {
+              const i = quickRows(q).findIndex(
+                (t) => t.id === previous
+              );
+              return i < 0 ? previous : rows[i].id;
+            });
+          } else {
             const edit = item.payload as PendingEdit;
             let latest = timer
               .getSnapshot()
               .records.find((r) => r.id === edit.before.id);
             if (!latest) throw Error("原记录不存在，修改未发送");
+            if (latest.task.quickTask || edit.after.task.quickTask)
+              throw Error(
+                "此任务尚未同步，请先重试新增任务，再重试记录修改"
+              );
             // Finish any in-flight original write before submitting its explicit correction.
             if (!latest.cloudSynced) {
               if (latest.sync === "pending") {
@@ -650,14 +707,24 @@ export default function FocusApp() {
               latest = archived;
             }
             const before = {
-              ...latest,
               ...edit.before,
-              task: latest!.task,
+              task:
+                edit.before.task.source === "local"
+                  ? latest!.task
+                  : edit.before.task,
               sync: "synced",
-              completionOwnedPlanIds: latest!.completionOwnedPlanIds,
+              completionOwnedPlanIds:
+                edit.before.completionOwnedPlanIds ||
+                ((latest!.revision || 0) === (edit.before.revision || 0)
+                  ? latest!.completionOwnedPlanIds
+                  : undefined),
             };
             const after = {
               ...before,
+              task:
+                edit.after.task.id === edit.before.task.id
+                  ? latest!.task
+                  : edit.after.task,
               startedAt: edit.after.startedAt,
               endedAt: edit.after.endedAt,
               elapsedSeconds: edit.after.elapsedSeconds,
@@ -669,8 +736,8 @@ export default function FocusApp() {
             const result = await api().correctRecord({ before, after });
             timer.mergeCloud([result.record], sourceKey);
             if (result.warning) notify(result.warning, "error");
+            await refresh();
           }
-          await refresh();
         },
         () => editReady.current && !syncing.current
       )
