@@ -212,7 +212,7 @@ export default function SettingsPanel({
         <div className="card settings-card">
           <h3>关于</h3>
           <div className="about-line">
-            版本 <span className="ver">0.1.0-preview.29</span>
+            版本 <span className="ver">0.1.0-preview.30</span>
             <br />
             基于开源项目 pomatez 二次开发（MIT License，© roldanjr
             及贡献者）
