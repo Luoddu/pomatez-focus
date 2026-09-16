@@ -58,7 +58,7 @@ const GroupList = ({
         const timing = !!activeTaskId && activeTaskId === taskId;
         return (
           <div
-            className="task"
+            className={`task${complete ? " complete" : ""}`}
             key={group.key}
             onMouseOver={() => setHover(group.key)}
             onMouseOut={(e) => {

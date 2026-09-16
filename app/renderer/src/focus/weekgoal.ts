@@ -78,3 +78,16 @@ export function saveWeekGoal(
 export function goalMet(count: number, goal: number): boolean {
   return count > 0 && count >= goal;
 }
+
+// chip 进度条比例：0–1，越界收敛；无有效目标按 0
+export function goalProgressRatio(total: number, goal: number): number {
+  if (!Number.isFinite(goal) || goal <= 0 || total <= 0) return 0;
+  return Math.min(1, total / goal);
+}
+
+// 进度填充色：淡番茄红 → 饱满红（不透明度随比例加深，文字始终可读）
+export function goalFill(ratio: number): string {
+  const r = Math.min(1, Math.max(0, ratio));
+  const alpha = Math.round((0.1 + 0.3 * r) * 100) / 100;
+  return `rgba(194, 47, 31, ${alpha})`;
+}

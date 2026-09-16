@@ -221,10 +221,10 @@ input:focus-visible {
 .pill {
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 10px;
-  border-radius: 11px;
-  font-size: 13px;
+  height: 24px;
+  padding: 0 11px;
+  border-radius: 12px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -281,12 +281,16 @@ input:focus-visible {
   border-top: 1px solid #f2f4f7;
 }
 .task-name {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* 已完成任务名保持原字号，只突出未完成的 */
+.task.complete .task-name {
+  font-size: 15px;
 }
 .quad-empty {
   font-size: 13px;
@@ -1440,15 +1444,54 @@ input:focus-visible {
   margin-left: auto;
 }
 .weekgoal-chip {
+  position: relative;
+  overflow: hidden;
   font-size: 12px;
   line-height: 1;
-  padding: 5px 10px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: #f0f1f4;
   color: #6b7280;
   cursor: default;
   white-space: nowrap;
+}
+/* 进度填充：从左向右铺开，宽度/颜色随本周已收比例平滑加深 */
+.wg-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  transition:
+    width 0.5s ease-out,
+    background-color 0.5s ease-out;
+  pointer-events: none;
+}
+.weekgoal-chip.met .wg-fill {
+  background: rgba(232, 169, 23, 0.3);
+}
+.wg-text {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+}
+/* 目标值强调：更大更粗深色；进度数字保持常规 */
+.wg-goal {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3f4650;
+}
+.wg-now {
+  font-variant-numeric: tabular-nums;
+}
+.weekgoal-chip.met .wg-goal {
+  color: #8a6107;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wg-fill {
+    transition: none;
+  }
 }
 .weekgoal-chip.met {
   color: #a97708;
@@ -1749,10 +1792,10 @@ input:focus-visible {
     margin-bottom: 8px;
   }
   .pill {
-    height: 28px;
-    padding: 0 13px;
-    border-radius: 14px;
-    font-size: 16px;
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 15px;
+    font-size: 17px;
   }
   .quad-count {
     font-size: 15px;
@@ -1763,6 +1806,9 @@ input:focus-visible {
     gap: 10px;
   }
   .task-name {
+    font-size: 20px;
+  }
+  .task.complete .task-name {
     font-size: 19px;
   }
   .task-side {

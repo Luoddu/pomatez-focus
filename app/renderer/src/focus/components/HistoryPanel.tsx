@@ -3,12 +3,15 @@ import { FocusSession, FocusTask } from "../session";
 import { QUADRANT_TONES, weekTomatoes } from "../week";
 import {
   WEEK_GOAL_DEFAULT,
+  goalFill,
   goalMet,
+  goalProgressRatio,
   isValidGoal,
   loadWeekGoals,
   saveWeekGoal,
   weekKeyOf,
 } from "../weekgoal";
+import { useCountUp } from "../countup";
 import {
   LogoIcon,
   WindowControls,
@@ -152,15 +155,17 @@ export default function HistoryPanel({
     list: FocusSession[],
     pick: (r: FocusSession) => number
   ) => list.reduce((total, r) => total + (pick(r) || 0), 0);
+  // 保存番茄后概览数字 count-up 滚动到新值（纯展示层，减动效时跳变）
+  const shownTodayTomatoes = useCountUp(
+    sum(todayRecords, (r) => r.completedCount || 0)
+  );
+  const shownTodaySeconds = useCountUp(
+    sum(todayRecords, (r) => r.acceptedSeconds || 0)
+  );
+  const shownWeekTotal = useCountUp(weekTotal);
   const stats: [string, string][] = [
-    [
-      "今日番茄",
-      String(sum(todayRecords, (r) => r.completedCount || 0)),
-    ],
-    [
-      "今日专注时长",
-      durationText(sum(todayRecords, (r) => r.acceptedSeconds || 0)),
-    ],
+    ["今日番茄", String(shownTodayTomatoes)],
+    ["今日专注时长", durationText(shownTodaySeconds)],
     ["总番茄", String(sum(records, (r) => r.completedCount || 0))],
     [
       "总专注时长",
@@ -249,7 +254,24 @@ export default function HistoryPanel({
               className={`weekgoal-chip${weekMet ? " met" : ""}`}
               aria-label="周目标，悬浮设置"
             >
-              周目标 {weekTotal}/{currentGoal}
+              <span
+                className="wg-fill"
+                aria-hidden="true"
+                style={{
+                  width: `${Math.round(goalProgressRatio(weekTotal, currentGoal) * 1000) / 10}%`,
+                  ...(weekMet
+                    ? {}
+                    : {
+                        background: goalFill(
+                          goalProgressRatio(weekTotal, currentGoal)
+                        ),
+                      }),
+                }}
+              />
+              <span className="wg-text">
+                周目标 <span className="wg-now">{shownWeekTotal}</span>/
+                <span className="wg-goal">{currentGoal}</span>
+              </span>
             </button>
             {goalOpen && (
               <div
