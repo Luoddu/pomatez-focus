@@ -40,6 +40,22 @@ of a proxy, DNS, IPC or OS storage failure. No network/system settings changed.
   checks a new today() call, rather than accepting a no-op renderer navigation.
 - All data synthetic; no user app restart, credential access or live Feishu writes.
 
+## Release verification
+
+Published preview.32 from clean source `51ef132be6635abc92e43f8ac76f85284fa3490e`.
+ASAR provenance and version match; setup SHA-512 matches preview.yml. All six
+GitHub release assets' sizes and SHA-256 match local output; published tag resolves
+to the packaged commit. Initial combined upload timed out; readback showed only
+four small assets, so only the two missing EXEs were retried individually. No
+asset was overwritten. User app was not interrupted.
+
+- Setup SHA-256: `cf581d76e53ad0591198147df4735dedccbec2d03a89decd44bad5c087352be5`.
+- Portable SHA-256: `cb64af995957217dc08a2caf176ebaf4dc1399f1cf0e49af61182c74bcb4e5d8`.
+- https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.32
+
+README and delivery receipt are a subsequent docs-only commit; release tag stays
+on the actual packaged source.
+
 ## Limits / recovery
 
 Upgrading from versions without task cache requires one successful initial read to

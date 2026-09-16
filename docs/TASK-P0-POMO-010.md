@@ -1,6 +1,8 @@
 # P0-POMO-010 — usable startup with task snapshot
 
-Status: VERIFIED; preview.32 packaging next. Module implementer/context owner: /root.
+Status: DELIVERED; preview.32 published. Module implementer/context owner: /root.
+Packaged source: 51ef132be6635abc92e43f8ac76f85284fa3490e.
+Release: https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.32
 Baseline: 4a04ee641a586c5935cd913ae17933fee7b525e0 (preview.31).
 Branch: task/p0-pomo-010-startup-cache; coordination: origin/codex/feishu-focus.
 
