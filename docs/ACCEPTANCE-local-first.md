@@ -72,3 +72,20 @@ Learning review: existing stable-intent (`LEARN-P1-UI-123-01`) and real lifecycl
 (`LEARN-P1-UI-129-01`) lessons apply; no new distinct cross-task lesson. Root Learning
 and shared control documents are unchanged. Rollback source: task baseline above;
 preserve user data and pending queue, never reset user records.
+
+## Published artifact checkpoint — 2026-09-16
+
+- Clean built source and public tag: `c8028d4d03559a96572a8e944f39c903f17622a5`.
+- `v0.1.0-preview.33` is published as a prerelease (not a draft).
+- Setup, portable, setup blockmap, preview feed, source provenance and SHA256SUMS
+  are all present: **6/6 remote sizes and GitHub SHA-256 digests match local files**.
+- Packaged ASAR provenance matches clean source/version; update-feed SHA-512 matches
+  the setup EXE. The clean packaged build also passed the 12-check interaction and
+  6-check actual process lifecycle tests again.
+- Source pushed non-force to `codex/feishu-focus`; tag verified with live ls-remote.
+  This documentation follow-up does not change the packaged source commit.
+- Separate reviewer: not assigned; task remains REVIEW rather than claiming
+  independent sign-off. User installation and live Feishu acceptance were not
+  performed automatically; no running personal application was interrupted.
+
+[Release and verification files](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.33)

@@ -1,6 +1,7 @@
 # P0-POMO-011 — local-first quick tasks and record reassignment
 
-Status: IN_PROGRESS. Module implementer/context owner: /root.
+Status: REVIEW (implemented, tested and published; no separate reviewer assigned).
+Module implementer/context owner: /root.
 Baseline: 6a8bc82f7b60312db38239c1514098110ed89b16 (preview.32).
 Branch: task/p0-pomo-011-local-first. Authority: current user requests, including
 task reassignment follow-up; standing source/installer publishing authorization.
@@ -50,3 +51,12 @@ Status/ref/worktree checks at first write, commit, release. Bounded retries; no
 background monitors. Previous installer rollback retains records and pending work;
 do not downgrade an in-flight move. Evidence in module acceptance; Learning review
 applies existing stable-intent/lifecycle guidance, root Learning remains untouched.
+
+## Handoff
+
+Packaged/published source: `c8028d4d03559a96572a8e944f39c903f17622a5`.
+Release: `v0.1.0-preview.33`, public tag exactly matches that SHA.
+Acceptance and release verification: `ACCEPTANCE-local-first.md`.
+No overlapping worktree writes or user-process interruption. Other computers
+must update before reading moved records. Functional work and release complete;
+independent review is not represented as performed by this implementer.
