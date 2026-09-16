@@ -259,6 +259,7 @@ input:focus-visible {
   min-height: 0;
 }
 .task {
+  position: relative;
   padding: 5px 0;
   min-height: 46px;
   display: flex;
@@ -352,10 +353,29 @@ input:focus-visible {
   opacity: 0.6;
 }
 
-/* ── 任务行右侧：悬浮 ± 与「已收 x/y」进度格 ── */
+/* ── 任务行右侧：悬浮 ± 与「已收 x/y」进度格 ──
+   ± 是绝对定位覆盖层：出现/消失不挤占布局，任务名不换行、计数不动 */
 .adjust-btns {
+  position: absolute;
+  top: 5px;
+  right: 0;
+  z-index: 6;
   display: inline-flex;
   gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 10px rgba(31, 35, 41, 0.14);
+  animation: adjust-in 0.15s ease-out;
+}
+@keyframes adjust-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .adjust-btn {
   width: 22px;
@@ -1764,6 +1784,9 @@ input:focus-visible {
     width: 27px;
     height: 27px;
     font-size: 17px;
+  }
+  .adjust-btns {
+    top: 8px;
   }
   .harvest-mini {
     font-size: 14px;
