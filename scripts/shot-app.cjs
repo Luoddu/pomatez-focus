@@ -121,10 +121,23 @@ app
       ),
     });
     // 悬浮任务行浮现 ±；全完成组 − 置灰、＋ 可用
+    // 布局零位移验收：悬浮前后所有任务行/任务名/已收计数/chip 几何必须完全一致
+    const layoutSnapshot = `JSON.stringify([...document.querySelectorAll('.task, .task-name, .harvest-mini, .chip')].map(e=>{const r=e.getBoundingClientRect();return [Math.round(r.x*100),Math.round(r.y*100),Math.round(r.width*100),Math.round(r.height*100)]}))`;
+    const layoutBeforeHover = await js(layoutSnapshot);
     await js(
       `(()=>{const t=[...document.querySelectorAll('.task')].find(x=>x.querySelector('.task-name')?.textContent.includes('阅读学习资料'));if(!t)throw Error('no metal task');t.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}))})()`
     );
     await wait(150);
+    results.push({
+      check: "hover adjust overlay does not shift any task layout",
+      pass: (await js(layoutSnapshot)) === layoutBeforeHover,
+    });
+    results.push({
+      check: "adjust buttons render as an out-of-flow overlay",
+      pass: await js(
+        `getComputedStyle(document.querySelector('.adjust-btns')).position==='absolute'`
+      ),
+    });
     results.push({
       check: "hover reveals minus and plus buttons on the task row",
       pass: await js(
@@ -169,6 +182,10 @@ app
     results.push({
       check: "adjust buttons hide after mouse leaves",
       pass: await js(`!document.querySelector('.adjust-btns')`),
+    });
+    results.push({
+      check: "layout is identical again after the overlay hides",
+      pass: (await js(layoutSnapshot)) === layoutBeforeHover,
     });
 
     // chip 右键菜单：单选项「标记完成」；未连接飞书点击报错且 chip 保留
