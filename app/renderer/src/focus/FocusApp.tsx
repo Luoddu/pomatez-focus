@@ -27,6 +27,10 @@ import {
 } from "./week";
 import { CompletionQueue } from "./completionQueue";
 import { playTimeUp } from "./sound";
+import {
+  shouldGenerateSilently,
+  silentGenerateNotice,
+} from "./silentgen";
 import "./focus.css";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
@@ -178,6 +182,7 @@ export default function FocusApp() {
     setToast({ id: ++toastSeq.current, text, kind });
   const [busy, setBusy] = useState(false),
     [generating, setGenerating] = useState(false),
+    [silentGenerating, setSilentGenerating] = useState(false),
     [adjusting, setAdjusting] = useState(""),
     [accepted, setAccepted] = useState("25"),
     [completed, setCompleted] = useState(0),
@@ -486,7 +491,7 @@ export default function FocusApp() {
   // 点击后立即进入「连接飞书」阶段文字（乐观首帧），随后由主进程
   // 真实阶段事件推进；generating 锁 + 按钮 disabled 双重防重入
   const generate = () => {
-    if (generating) return;
+    if (generating || silentGenerating) return;
     if (genMock) {
       // 截图/设计稿 mock：按真实阶段顺序本地推进（无网络、不写任何数据）
       const seq: {
@@ -522,6 +527,24 @@ export default function FocusApp() {
     }
     if (!api() || !connected) {
       notify("请先在设置中连接飞书，再生成今日番茄。", "error");
+      return;
+    }
+    // 当天已生成过（今日计划行非空）：后台静默重跑——不弹进度、不锁界面，
+    // 安静合并飞书变化；仅真实新增时轻提示，无变化不打扰。
+    if (shouldGenerateSilently(todayCount)) {
+      setSilentGenerating(true);
+      (async () => {
+        try {
+          const r = await api().generateToday();
+          await refresh();
+          const notice = silentGenerateNotice(r);
+          if (notice) notify(notice);
+        } catch (e: any) {
+          notify(e.message || "后台更新今日番茄失败，请稍后重试", "error");
+        } finally {
+          setSilentGenerating(false);
+        }
+      })();
       return;
     }
     setGenerating(true);
