@@ -1,6 +1,8 @@
 # P0-POMO-009 — quick entry and nonblocking focus
 
-Status: VERIFIED; release packaging pending. Module execution card; owner /root.
+Status: DELIVERED; preview.31 published. Module execution card; owner /root.
+Release source: 97d9e4f7961848461aa63faf7c6e62fd0cf222bd.
+Release: https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.31
 Baseline: 354410f1abd58da37c17a1d1a5170beb35c2cba9 (preview.30).
 Branch: task/p0-pomo-009-quick-entry; coordination ref origin/codex/feishu-focus.
 

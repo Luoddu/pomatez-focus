@@ -37,6 +37,19 @@ Scope and four-source precheck: TASK-P0-POMO-009.md.
 - No private Feishu test tasks created; tests run with synthetic service/adapter
   and isolated profiles. No user app stopped or credentials accessed.
 
+## Release verification (2026-09-16)
+
+- Clean packaged source: `97d9e4f7961848461aa63faf7c6e62fd0cf222bd`,
+  version `0.1.0-preview.31`; ASAR package/provenance matches.
+- Source pushed to the existing `codex/feishu-focus` public branch.
+- All six release assets uploaded and their GitHub SHA-256 digests and byte sizes
+  matched local artifacts before publication. Setup metadata SHA-512 also matched.
+- Published release: https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.31
+- Setup SHA-256: `45e745a71c62d3cbc42c80e8dc7163433d0d7068e08965f7785849b88c30a579`.
+- Portable SHA-256: `c3216ad3e3a359352785b8eaea383b507a1e3dcd0d832b7d1aa67cd49158178e`.
+- README and this delivery receipt follow as a docs-only commit; release remains
+  bound to the packaged source above. User app is not restarted automatically.
+
 ## Limits / recovery
 
 Some old sessions lack ownership of additional completed plan rows. Corrections
