@@ -120,6 +120,32 @@ app
         `(()=>{const b=[...document.querySelectorAll('.harvest-mini.done')].find(x=>x.textContent.includes('已收 2/2 ✓'));if(!b)return false;const task=b.closest('.task');return Boolean(task)&&!task.querySelector('.chip')&&task.querySelector('.task-name').textContent.includes('回复工作邮件')&&task.querySelectorAll('.cell.on').length===2})()`
       ),
     });
+    // 字号层级：未完成任务名大于已完成；象限标题 pill 增大
+    results.push({
+      check: "unfinished task names are larger than finished ones",
+      pass: await js(
+        `(()=>{const open=[...document.querySelectorAll('.task:not(.complete) .task-name')].find(x=>x.textContent.includes('阅读学习资料'));const done=document.querySelector('.task.complete .task-name');if(!open||!done)return false;return parseFloat(getComputedStyle(open).fontSize)>parseFloat(getComputedStyle(done).fontSize)})()`
+      ),
+    });
+    results.push({
+      check: "quadrant title pills use the enlarged font size",
+      pass: await js(
+        `parseFloat(getComputedStyle(document.querySelector('.quad-head .pill')).fontSize)>=14`
+      ),
+    });
+    // 周目标 chip：目标值强调 + 进度填充层
+    results.push({
+      check: "week goal chip emphasizes the goal over the progress number",
+      pass: await js(
+        `(()=>{const c=document.querySelector('.weekgoal-chip');if(!c)return false;const g=c.querySelector('.wg-goal'),n=c.querySelector('.wg-now');if(!g||!n)return false;const gs=getComputedStyle(g),ns=getComputedStyle(n);return parseFloat(gs.fontSize)>parseFloat(ns.fontSize)&&Number(gs.fontWeight)>Number(ns.fontWeight)})()`
+      ),
+    });
+    results.push({
+      check: "week goal chip carries a progress fill matching this week's ratio",
+      pass: await js(
+        `(()=>{const f=document.querySelector('.weekgoal-chip .wg-fill');if(!f)return false;const w=parseFloat(f.style.width);return w>0&&w<=100&&getComputedStyle(f).transition.includes('width')})()`
+      ),
+    });
     // 悬浮任务行浮现 ±；全完成组 − 置灰、＋ 可用
     // 布局零位移验收：悬浮前后所有任务行/任务名/已收计数/chip 几何必须完全一致
     const layoutSnapshot = `JSON.stringify([...document.querySelectorAll('.task, .task-name, .harvest-mini, .chip')].map(e=>{const r=e.getBoundingClientRect();return [Math.round(r.x*100),Math.round(r.y*100),Math.round(r.width*100),Math.round(r.height*100)]}))`;
@@ -540,6 +566,13 @@ app
     const before = await js(
       `JSON.parse(localStorage.getItem('pomatez-focus-v1')).records.length`
     );
+    // count-up 起点：保存前的今日番茄数与周目标进度数字
+    const todayStatBefore = await js(
+      `Number(document.querySelector('[data-stat="今日番茄"] strong').textContent)`
+    );
+    const wgNowBefore = await js(
+      `Number(document.querySelector('.weekgoal-chip .wg-now').textContent)`
+    );
     await click("记录番茄");
     await wait(300);
     const after = await js(
@@ -553,6 +586,26 @@ app
       ),
     });
     await shot("board-saved");
+    // count-up 动效结束态：概览数字与 chip 进度最终都落到新值
+    await wait(700);
+    results.push({
+      check: "today tomatoes stat counts up to the new total",
+      pass:
+        (await js(
+          `Number(document.querySelector('[data-stat="今日番茄"] strong').textContent)`
+        )) ===
+        todayStatBefore + 1,
+    });
+    results.push({
+      check: "week goal progress number counts up in sync",
+      pass:
+        (await js(
+          `Number(document.querySelector('.weekgoal-chip .wg-now').textContent)`
+        )) ===
+        wgNowBefore + 1,
+    });
+    await shotClip("board-weekgoal-closeup", ".weekgoal");
+    await shotClip("board-stats-countup", ".stat-grid");
     // 信息类 toast 约 3 秒自动消失
     await wait(3400);
     results.push({

@@ -127,7 +127,8 @@ app
         rightDisplay:getComputedStyle(rc).display,
         sideBySide:Math.abs(r[0].top-r[1].top)<=2&&r[1].left>r[0].left+50,
         recordsFullWidth:Math.abs(r[2].width-rcRect.width)<=2&&r[2].top>r[0].top+50,
-        taskFont:getComputedStyle(document.querySelector('.task-name')).fontSize,
+        taskFont:getComputedStyle(document.querySelector('.task:not(.complete) .task-name')).fontSize,
+        doneFont:(document.querySelector('.task.complete .task-name')?getComputedStyle(document.querySelector('.task.complete .task-name')).fontSize:null),
         chipHeight:Math.round(document.querySelector('.chip').getBoundingClientRect().height),
         firstH4,secondH4,inviteText:invite?invite.textContent:null,
         todayEmpty:days[0].querySelectorAll('.record').length===0};
@@ -140,7 +141,8 @@ app
       assert.equal(portrait.recordsFullWidth, true, JSON.stringify(portrait));
     });
     check("portrait quadrants scale up for readability", () => {
-      assert.equal(portrait.taskFont, "19px");
+      assert.equal(portrait.taskFont, "20px");
+      assert.equal(portrait.doneFont, "19px");
       assert.ok(portrait.chipHeight >= 40, JSON.stringify(portrait));
     });
     check("portrait keeps the farm visible and the action bar sticky", () => {
@@ -192,7 +194,8 @@ app
         statAlign:getComputedStyle(document.querySelector('.stat')).textAlign,
         rightDisplay:rc.display,
         stacked:sections[1].top>=sections[0].bottom-2,
-        taskFont:getComputedStyle(document.querySelector('.task-name')).fontSize,
+        taskFont:getComputedStyle(document.querySelector('.task:not(.complete) .task-name')).fontSize,
+        doneFont:(document.querySelector('.task.complete .task-name')?getComputedStyle(document.querySelector('.task.complete .task-name')).fontSize:null),
         chipHeight:Math.round(document.querySelector('.chip').getBoundingClientRect().height),
         firstH4:days[0].querySelector('h4').textContent,
         secondH4:days[1].querySelector('h4').textContent,
@@ -213,7 +216,8 @@ app
     check("landscape keeps stacked right column and original quadrant scale", () => {
       assert.equal(landscape.rightDisplay, "flex");
       assert.equal(landscape.stacked, true, JSON.stringify(landscape));
-      assert.equal(landscape.taskFont, "15px");
+      assert.equal(landscape.taskFont, "16px");
+      assert.equal(landscape.doneFont, "15px");
       assert.equal(landscape.chipHeight, 34);
     });
     check("landscape also shows today invite, weekday and day totals", () => {
