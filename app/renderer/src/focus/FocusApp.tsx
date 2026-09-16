@@ -13,6 +13,11 @@ import {
   timeParts,
 } from "./session";
 import { EditQueue, PendingEdit, QuickTask } from "./editQueue";
+import {
+  readTaskSnapshot,
+  writeTaskSnapshot,
+  taskDay,
+} from "./taskSnapshot";
 import QuadrantBoard from "./components/QuadrantBoard";
 import FocusTimer from "./components/FocusTimer";
 import ReviewPanel from "./components/ReviewPanel";
@@ -169,6 +174,9 @@ export default function FocusApp() {
     ),
     [selected, setSelected] = useState("");
   const [loadingTasks, setLoadingTasks] = useState(() => !!api());
+  const [connectionReady, setConnectionReady] = useState(() => !api());
+  const taskScope = useRef<string | null>(null);
+  const cacheWarningShown = useRef(false);
   const [minutes, setMinutes] = useState(25),
     [compact, setCompact] = useState(false),
     [pinned, setPinned] = useState(false);
@@ -325,13 +333,47 @@ export default function FocusApp() {
     setLoadingTasks(true);
     try {
       const status = await api().status();
+      if (sequence !== refreshSequence.current) return;
       setConnected(status.configured);
       setSourceKey(status.sourceKey || null);
+      setConnectionReady(true);
       if (status.configured) {
+        const day = taskDay();
+        const scope = `${status.sourceKey}|${day}`;
+        if (taskScope.current !== scope) {
+          taskScope.current = scope;
+          const cached = readTaskSnapshot(
+            localStorage,
+            status.sourceKey
+          );
+          setTasks(cached || []);
+          setTodayCount(cached?.length ?? null);
+          setSelected("");
+        }
         const rows: FocusTask[] = await api().today();
         if (sequence !== refreshSequence.current) return;
+        if (day !== taskDay()) {
+          setTasks([]);
+          setSelected("");
+          taskScope.current = null;
+          return;
+        }
+        // Persist before retiring acknowledged completion intents. A restart must
+        // never revive a completed chip from an older snapshot.
+        const cached = writeTaskSnapshot(
+          localStorage,
+          status.sourceKey,
+          rows
+        );
+        if (!cached && !cacheWarningShown.current) {
+          cacheWarningShown.current = true;
+          notify(
+            "任务已加载，但未能保存启动缓存；下次打开仍需联网读取。",
+            "error"
+          );
+        }
         setTasks(rows);
-        completionQueue.reconcile(status.sourceKey, rows);
+        if (cached) completionQueue.reconcile(status.sourceKey, rows);
         setTodayCount(rows.length);
         // 默认不预选；刷新只保留仍然存在的选中
         setSelected((previous) =>
@@ -339,10 +381,16 @@ export default function FocusApp() {
         );
         // today() 完成四象限探测后重读 status，拿到命中结果
         const after = await api().status();
+        if (sequence !== refreshSequence.current) return;
         setQuadrantField(after.quadrantField ?? null);
       } else {
         // Demo tasks are only appropriate once local mode is confirmed.
-        setTasks((previous) => (previous.length ? previous : demo));
+        taskScope.current = null;
+        setTasks((previous) =>
+          previous.length && previous.every((t) => t.source === "local")
+            ? previous
+            : demo
+        );
       }
     } finally {
       if (sequence === refreshSequence.current) setLoadingTasks(false);
@@ -402,7 +450,8 @@ export default function FocusApp() {
       syncing.current ||
       !api() ||
       timer.blocked ||
-      editQueue.running || completionQueue.running
+      editQueue.running ||
+      completionQueue.running
     )
       return;
     syncing.current = true;
@@ -830,7 +879,8 @@ export default function FocusApp() {
     if (
       !sourceKey ||
       !queueReady.current ||
-      editQueue.running || syncing.current ||
+      editQueue.running ||
+      syncing.current ||
       completionQueue.running ||
       !completionQueue.entries.some(
         (e) => e.sourceKey === sourceKey && e.state === "pending"
@@ -846,7 +896,8 @@ export default function FocusApp() {
             throw Error("飞书连接已改变，请切回原连接后重试。");
           await api().completeToday({ planId });
         },
-        () => queueReady.current && !editQueue.running && !syncing.current
+        () =>
+          queueReady.current && !editQueue.running && !syncing.current
       )
       .then(() => {
         // One refresh per drained batch, never one full refresh per click.
@@ -1132,7 +1183,7 @@ export default function FocusApp() {
                 );
               }}
               onBreak={timer.startBreak}
-              busy={loadingTasks && tasks.length === 0}
+              busy={!connectionReady}
               blocked={timer.blocked}
               canBreak={timer.records.length > 0}
               restSeconds={timer.restSeconds}
