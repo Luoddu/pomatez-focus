@@ -80,6 +80,8 @@ export default function HistoryPanel({
   tasks,
   onExport,
   onAddManual,
+  onEdit,
+  editingIds = [],
   onGenerate,
   generating,
   genStageText,
@@ -100,6 +102,8 @@ export default function HistoryPanel({
   tasks: FocusTask[];
   onExport: () => void;
   onAddManual: (record: FocusSession) => void;
+  onEdit?: (before: FocusSession, after: FocusSession) => void;
+  editingIds?: string[];
   onGenerate: () => void;
   generating: boolean;
   genStageText: string;
@@ -113,6 +117,9 @@ export default function HistoryPanel({
   onWeekGoalMet?: (total: number, goal: number) => void;
 }) {
   const [entryOpen, setEntryOpen] = useState(false);
+  const [editRecord, setEditRecord] = useState<FocusSession | null>(
+    null
+  );
   // 周目标：覆盖表（仅按周键），chip 显示本周已收/目标，悬浮开弹窗仅改本周
   const [goals, setGoals] = useState(loadWeekGoals);
   const [goalOpen, setGoalOpen] = useState(false);
@@ -192,7 +199,9 @@ export default function HistoryPanel({
               disabled={refreshBusy || generating}
               onClick={onGenerate}
             >
-              {generating && <span className="gen-spinner" aria-hidden="true" />}
+              {generating && (
+                <span className="gen-spinner" aria-hidden="true" />
+              )}
               {generating ? "生成中…" : "生成今日番茄"}
             </button>
             <button
@@ -306,7 +315,13 @@ export default function HistoryPanel({
             <button
               className="btn-text"
               aria-label="手动同步"
-              title={!canSync ? "请先连接飞书" : pendingCount ? `上传 ${pendingCount} 条待同步记录并获取其他电脑成果` : "获取其他电脑的专注成果"}
+              title={
+                !canSync
+                  ? "请先连接飞书"
+                  : pendingCount
+                  ? `上传 ${pendingCount} 条待同步记录并获取其他电脑成果`
+                  : "获取其他电脑的专注成果"
+              }
               disabled={!canSync || syncBusy}
               onClick={onSync}
             >
@@ -327,6 +342,18 @@ export default function HistoryPanel({
               setEntryOpen(false);
             }}
             onCancel={() => setEntryOpen(false)}
+          />
+        )}
+        {editRecord && onEdit && (
+          <ManualEntry
+            key={editRecord.id}
+            initial={editRecord}
+            tasks={tasks}
+            onSave={(record) => {
+              onEdit(editRecord, record);
+              setEditRecord(null);
+            }}
+            onCancel={() => setEditRecord(null)}
           />
         )}
         <div className="card records">
@@ -380,6 +407,21 @@ export default function HistoryPanel({
                           </div>
                           <div className="r-sub">
                             完成 {r.completedCount} 个 · {syncText(r)}
+                            {onEdit && (
+                              <button
+                                className="btn-text record-edit"
+                                aria-label={`修改记录 ${r.id}`}
+                                disabled={editingIds.includes(r.id)}
+                                onClick={() => {
+                                  setEntryOpen(false);
+                                  setEditRecord(r);
+                                }}
+                              >
+                                {editingIds.includes(r.id)
+                                  ? "修改待同步"
+                                  : "修改"}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </li>

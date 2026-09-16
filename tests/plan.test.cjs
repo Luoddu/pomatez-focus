@@ -202,7 +202,10 @@ test("completePlan writes only the checkbox; no minutes, no new rows", async () 
 test("completePlan is idempotent; a lost first response retries without a second PUT", async () => {
   const { state, client } = harness();
   state.lose = true;
-  await assert.rejects(() => client.completePlan("p1"), /lost response/);
+  await assert.rejects(
+    () => client.completePlan("p1"),
+    /lost response/
+  );
   // 丢失的写入实际已生效；重试命中「已完成即保持」直接成功，不再 PUT
   const again = await client.completePlan("p1");
   assert.equal(again.completed, true);
@@ -222,7 +225,10 @@ test("completePlan rejects unknown, non-today and malformed rows", async () => {
     },
   });
   await assert.rejects(() => client.completePlan("nope"), /已不存在/);
-  await assert.rejects(() => client.completePlan("old"), /只能完成今天/);
+  await assert.rejects(
+    () => client.completePlan("old"),
+    /只能完成今天/
+  );
   await assert.rejects(() => client.completePlan("../p1"), /格式错误/);
   assert.equal(state.writes.length, 0);
 });
@@ -244,7 +250,13 @@ test("confirming N marks the selected row and following rows; minutes stay on th
   // 12 分钟 < 25 分钟目标：mergePlan 不会自动勾选，勾选完全来自手动选 N
   const receipt = await client.sync(record(720, { completedCount: 2 }));
   assert.equal(receipt.completedCount, 0);
-  assert.deepEqual(receipt.completion, { marked: 2, failed: [] });
+  assert.deepEqual(
+    {
+      marked: receipt.completion.marked,
+      failed: receipt.completion.failed,
+    },
+    { marked: 2, failed: [] }
+  );
   assert.equal(state.plans[0].fields["已完成"], true);
   assert.equal(state.plans[1].fields["已完成"], true);
   // 分钟台账只记在被选中行，不拆分
@@ -263,7 +275,13 @@ test("missing rows are auto-created with the generator idempotency key; a later 
   // 只计划了 2 行却记了 4 个：补建第 3、4 行并一并标记完成
   const r = record(3300, { completedCount: 4 });
   const receipt = await client.sync(r);
-  assert.deepEqual(receipt.completion, { marked: 4, failed: [] });
+  assert.deepEqual(
+    {
+      marked: receipt.completion.marked,
+      failed: receipt.completion.failed,
+    },
+    { marked: 4, failed: [] }
+  );
   assert.equal(state.plans.length, 4);
   const dayMs = dayStart(new Date()),
     dateKey = dateKeyOf(dayMs);
@@ -316,7 +334,13 @@ test("already-completed rows in the range are skipped without extra writes", asy
   const { state, client } = harness();
   state.plans[1].fields["已完成"] = true;
   const receipt = await client.sync(record(720, { completedCount: 2 }));
-  assert.deepEqual(receipt.completion, { marked: 2, failed: [] });
+  assert.deepEqual(
+    {
+      marked: receipt.completion.marked,
+      failed: receipt.completion.failed,
+    },
+    { marked: 2, failed: [] }
+  );
   // 被选中行 PUT 两次（台账合并 + 勾选），已勾选的第 2 行没有任何写入
   const puts = state.writes.filter((w) => w.method === "PUT");
   assert.equal(puts.length, 2);

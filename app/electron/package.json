@@ -1,6 +1,6 @@
 {
   "name": "pomatez-focus",
-  "version": "0.1.0-preview.30",
+  "version": "0.1.0-preview.31",
   "private": true,
   "license": "MIT",
   "main": "./build/main.js",

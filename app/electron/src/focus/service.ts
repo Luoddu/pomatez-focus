@@ -118,6 +118,26 @@ export class FocusService {
   today() {
     return this.connected().today();
   }
+  async createQuickTask(value: any) {
+    if (this.planWriting)
+      throw Error("飞书正在同步，任务已保留，可稍后重试");
+    this.planWriting = true;
+    try {
+      return await this.connected().createQuickTask(value);
+    } finally {
+      this.planWriting = false;
+    }
+  }
+  async correctRecord(value: any) {
+    if (this.planWriting)
+      throw Error("飞书正在同步，修改已保留，可稍后重试");
+    this.planWriting = true;
+    try {
+      return await this.connected().correctRecord(value);
+    } finally {
+      this.planWriting = false;
+    }
+  }
   // 计划表写入串行化：生成与 ± 共用一把锁，避免 list-then-write 交错出重复键
   private planWriting = false;
   private adjusting = new Set<string>();

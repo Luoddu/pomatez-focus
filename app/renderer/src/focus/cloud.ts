@@ -30,6 +30,22 @@ export function mergeCloudRecords(
         old.task.sourceKey !== sourceKey
       )
         throw Error("相同记录 ID 属于不同飞书表，未合并");
+      const oldRevision = old.revision || 0,
+        incomingRevision = r.revision || 0;
+      if (!Number.isInteger(incomingRevision) || incomingRevision < 0)
+        throw Error("云端记录版本无效");
+      if (incomingRevision < oldRevision) continue;
+      if (incomingRevision > oldRevision) {
+        if (
+          old.task.source !== "feishu" ||
+          old.task.planId !== r.task.planId ||
+          old.task.taskId !== r.task.taskId ||
+          old.task.title !== r.task.title
+        )
+          throw Error("修改记录的任务关联不符，未覆盖");
+        byId.set(r.id, r);
+        continue;
+      }
       for (const key of [
         "startedAt",
         "endedAt",

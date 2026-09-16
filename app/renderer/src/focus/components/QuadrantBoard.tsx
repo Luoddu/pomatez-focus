@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { FocusTask } from "../session";
+import { FocusTask, FocusQuadrant } from "../session";
+import QuickTaskEntry from "./QuickTaskEntry";
 import { QuadrantKey } from "../week";
 import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import FarmField from "./FarmField";
@@ -208,6 +209,7 @@ export default function QuadrantBoard({
   activeTaskId,
   onComplete,
   completing,
+  onAddTask,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -230,7 +232,13 @@ export default function QuadrantBoard({
   activeTaskId: string;
   onComplete?: (task: FocusTask) => void;
   completing: string;
+  onAddTask?: (
+    title: string,
+    quadrant: FocusQuadrant,
+    count: number
+  ) => void;
 }) {
+  const [adding, setAdding] = useState<FocusQuadrant | null>(null);
   const selectedRow = tasks.find((t) => t.id === selected);
   const selectedTask = selectedRow ? selectedRow.title : "";
   // 象限缺失或无法识别的任务全部归入“不紧急不重要”
@@ -249,7 +257,24 @@ export default function QuadrantBoard({
               <div className="quad-head">
                 <span className={`pill ${q.pill}`}>{q.label}</span>
                 <span className="quad-count">{list.length} 个任务</span>
+                {onAddTask && (
+                  <button
+                    className="quad-add ghost-btn"
+                    aria-label={`在${q.label}新增任务`}
+                    title="新增任务"
+                    onClick={() => setAdding(q.key)}
+                  >
+                    ＋
+                  </button>
+                )}
               </div>
+              {adding === q.key && onAddTask && (
+                <QuickTaskEntry
+                  quadrant={q.key}
+                  onAdd={onAddTask}
+                  onClose={() => setAdding(null)}
+                />
+              )}
               <GroupList
                 tasks={list}
                 selected={selected}

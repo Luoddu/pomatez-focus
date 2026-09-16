@@ -1,6 +1,36 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mergeCloudRecords } from "../app/renderer/src/focus/cloud.ts";
+test("explicit correction revision wins, stale reply cannot revert it, equal-version conflicts still fail", () => {
+  const old = r("revision"),
+    updated = { ...r("revision", 1), revision: 1, acceptedSeconds: 60 };
+  assert.equal(
+    mergeCloudRecords([old], [updated], "base")[0].completedCount,
+    1
+  );
+  assert.equal(
+    mergeCloudRecords([updated], [old], "base")[0].revision,
+    1
+  );
+  assert.throws(
+    () =>
+      mergeCloudRecords(
+        [updated],
+        [{ ...updated, completedCount: 9 }],
+        "base"
+      ),
+    /不同/
+  );
+  assert.throws(
+    () =>
+      mergeCloudRecords(
+        [old],
+        [{ ...updated, task: { ...updated.task, planId: "other" } }],
+        "base"
+      ),
+    /关联/
+  );
+});
 const r = (id, count = 3) => ({
   id,
   task: {
@@ -56,11 +86,25 @@ test("conflicting counts and foreign/duplicate responses reject atomically", () 
   );
 });
 
-test('legacy empty association survives download and repeat merge, nonempty changes still reject', () => {
-  const old = r('legacy'); old.task.planId = 'p1'; old.task.taskId = ''; old.cloudSynced = undefined;
+test("legacy empty association survives download and repeat merge, nonempty changes still reject", () => {
+  const old = r("legacy");
+  old.task.planId = "p1";
+  old.task.taskId = "";
+  old.cloudSynced = undefined;
   const incoming = { ...old, cloudSynced: true };
-  const merged = mergeCloudRecords([old], [incoming], 'base');
-  assert.equal(merged[0].task.taskId, '');
-  assert.deepEqual(mergeCloudRecords(merged, [incoming], 'base'), merged);
-  assert.throws(() => mergeCloudRecords([old], [{ ...incoming, task: { ...incoming.task, taskId: 'other' } }], 'base'), /任务关联/);
+  const merged = mergeCloudRecords([old], [incoming], "base");
+  assert.equal(merged[0].task.taskId, "");
+  assert.deepEqual(
+    mergeCloudRecords(merged, [incoming], "base"),
+    merged
+  );
+  assert.throws(
+    () =>
+      mergeCloudRecords(
+        [old],
+        [{ ...incoming, task: { ...incoming.task, taskId: "other" } }],
+        "base"
+      ),
+    /任务关联/
+  );
 });

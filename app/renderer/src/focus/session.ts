@@ -31,6 +31,8 @@ export type FocusSession = {
   syncTarget?: "plan";
   syncedPlanId?: string;
   cloudSynced?: boolean;
+  revision?: number;
+  completionOwnedPlanIds?: string[];
   segments?: { start: number; end: number }[];
   segmentOpen?: boolean;
   sync: "local" | "pending" | "synced";
@@ -126,7 +128,8 @@ export function returnFromReview(
 
 export function restoreSession(
   session: FocusSession | null
-): FocusSession | null {  if (!session || session.status === "saved") return null;
+): FocusSession | null {
+  if (!session || session.status === "saved") return null;
   if (
     !session.id ||
     !session.task?.id ||

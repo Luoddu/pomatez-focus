@@ -38,7 +38,11 @@ type CounterProps = {
   returnToTiming: () => void;
   markSynced: (
     id: string,
-    receipt?: { completedCount?: number; planId?: string }
+    receipt?: {
+      completedCount?: number;
+      planId?: string;
+      completionOwnedPlanIds?: string[];
+    }
   ) => void;
   startBreak: () => void;
   addManual: (record: FocusSession) => void;
@@ -305,7 +309,11 @@ const CounterProvider: React.FC = ({ children }) => {
   // 本地记录里用户确认的番茄数；只补记 syncedPlanId
   const markSynced = (
     id: string,
-    receipt?: { completedCount?: number; planId?: string }
+    receipt?: {
+      completedCount?: number;
+      planId?: string;
+      completionOwnedPlanIds?: string[];
+    }
   ) =>
     action(() =>
       publish({
@@ -315,6 +323,12 @@ const CounterProvider: React.FC = ({ children }) => {
             ? {
                 ...r,
                 sync: "synced" as const,
+                ...(receipt?.completionOwnedPlanIds
+                  ? {
+                      completionOwnedPlanIds:
+                        receipt.completionOwnedPlanIds,
+                    }
+                  : {}),
                 ...(receipt?.planId
                   ? { syncedPlanId: receipt.planId }
                   : {}),

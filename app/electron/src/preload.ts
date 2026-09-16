@@ -13,11 +13,14 @@ contextBridge.exposeInMainWorld("focusApi", {
   onUpdateState: (callback: (state: any) => void) => {
     const listener = (_event: any, state: any) => callback(state);
     ipcRenderer.on("focus:update-state", listener);
-    return () => ipcRenderer.removeListener("focus:update-state", listener);
+    return () =>
+      ipcRenderer.removeListener("focus:update-state", listener);
   },
   today: () => invoke("today"),
   generateToday: () => invoke("generateToday"),
   adjustToday: (value: any) => invoke("adjustToday", value),
+  createQuickTask: (value: any) => invoke("createQuickTask", value),
+  correctRecord: (value: any) => invoke("correctRecord", value),
   completeToday: (value: any) => invoke("completeToday", value),
   configure: (value: any) => invoke("configure", value),
   setup: () => invoke("setup"),
