@@ -30,6 +30,38 @@ export function mergeCloudRecords(
         old.task.sourceKey !== sourceKey
       )
         throw Error("相同记录 ID 属于不同飞书表，未合并");
+      const oldRevision = old.revision || 0,
+        incomingRevision = r.revision || 0;
+      if (!Number.isInteger(incomingRevision) || incomingRevision < 0)
+        throw Error("云端记录版本无效");
+      if (incomingRevision < oldRevision) continue;
+      if (incomingRevision > oldRevision) {
+        const matchesTask = (task: FocusSession["task"]) =>
+          [
+            "id",
+            "planId",
+            "taskId",
+            "title",
+            "source",
+            "sourceKey",
+            "quadrant",
+            "kind",
+          ].every((k) => (old.task as any)[k] === (task as any)[k]);
+        const moved =
+          Array.isArray(r.previousTasks) &&
+          r.previousTasks.length <= incomingRevision &&
+          r.previousTasks.every(
+            (t) => t.source === "feishu" && t.sourceKey === sourceKey
+          ) &&
+          r.previousTasks.some(matchesTask);
+        if (
+          old.task.source !== "feishu" ||
+          (!matchesTask(r.task) && !moved)
+        )
+          throw Error("修改记录的任务关联不符，未覆盖");
+        byId.set(r.id, r);
+        continue;
+      }
       for (const key of [
         "startedAt",
         "endedAt",

@@ -76,7 +76,9 @@ export const ledgerSeconds = (l: Ledger | null) =>
 function derived(l: Ledger) {
   return {
     实际分钟: ledgerSeconds(l) / 60,
-    专注日期: Math.max(...l.entries.map((e) => e.start)),
+    专注日期: l.entries.length
+      ? Math.max(...l.entries.map((e) => e.start))
+      : null,
     专注时间段: l.entries
       .map(
         (e) =>
@@ -90,15 +92,63 @@ function derived(l: Ledger) {
     [ledgerField]: JSON.stringify(l),
   };
 }
+// Explicit correction only: ordinary sync remains immutable and rejects conflicts.
+export function correctPlan(
+  fields: any,
+  before: any,
+  after: any,
+  completedField: string
+) {
+  const ledger = readLedger(fields);
+  if (!ledger || !fieldsAgree(fields, derived(ledger)))
+    throw Error("原表分钟或时间段已被修改，请先核对");
+  const entry = ledger.entries.find((e) => e.id === before.id);
+  if (!entry) throw Error("原表缺少本条专注明细");
+  const matches = (r: any) =>
+    entry.start === r.startedAt &&
+    entry.end === r.endedAt &&
+    entry.seconds === r.acceptedSeconds &&
+    entry.elapsed === r.elapsedSeconds;
+  if (!matches(before) && !matches(after))
+    throw Error("原专注已在其他位置修改，未覆盖");
+  entry.start = after.startedAt;
+  entry.end = after.endedAt;
+  entry.seconds = after.acceptedSeconds;
+  entry.elapsed = after.elapsedSeconds;
+  entry.spans = after.segments || [
+    { start: after.startedAt, end: after.endedAt },
+  ];
+  const patch: any = derived(ledger);
+  if (
+    ledgerSeconds(ledger) >= ledger.target ||
+    after.completedCount > 0
+  )
+    patch[completedField] = true;
+  else if (
+    entry.count === 1 &&
+    !ledger.entries.some((e) => e.id !== entry.id && e.count > 0)
+  )
+    patch[completedField] = false;
+  return patch;
+}
 export function fieldsAgree(actual: any, expected: any) {
   return Object.entries(expected).every(([k, v]) =>
-    typeof v === "number"
+    v == null
+      ? actual[k] == null
+      : typeof v === "number"
       ? Number.isFinite(Number(actual[k])) &&
         Math.abs(Number(actual[k]) - v) < 0.00001
       : typeof v === "boolean"
       ? (actual[k] === true) === v
       : textValue(actual[k]) === v
   );
+}
+export function removePlanRecord(fields: any, record: any) {
+  // Reuse correction validation, including manual edits to derived columns.
+  correctPlan(fields, record, record, "__unused_completion");
+  const ledger = readLedger(fields)!;
+  ledger.entries = ledger.entries.filter((e) => e.id !== record.id);
+  return derived(ledger);
 }
 export function mergePlan(
   fields: any,

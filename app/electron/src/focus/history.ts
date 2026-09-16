@@ -75,6 +75,38 @@ export function historyRecord(r: any, sourceKey: string): any {
     status: "saved",
     sync: "synced",
   };
+  if (r.revision != null) {
+    if (!Number.isInteger(r.revision) || r.revision < 0)
+      throw Error("专注修改版本无效");
+    result.revision = r.revision;
+  }
+  if (r.previousTasks != null) {
+    if (
+      !Array.isArray(r.previousTasks) ||
+      r.previousTasks.length > 100 ||
+      r.previousTasks.length > (r.revision || 0)
+    )
+      throw Error("任务修改来源无效");
+    result.previousTasks = r.previousTasks.map(
+      (task: any) =>
+        historyRecord(
+          { ...r, task, previousTasks: undefined },
+          sourceKey
+        ).task
+    );
+  }
+  if (r.completionOwnedPlanIds != null) {
+    if (
+      !Array.isArray(r.completionOwnedPlanIds) ||
+      r.completionOwnedPlanIds.length > 100 ||
+      r.completionOwnedPlanIds.some(
+        (x: any) =>
+          typeof x !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(x)
+      )
+    )
+      throw Error("完成行来源无效");
+    result.completionOwnedPlanIds = r.completionOwnedPlanIds;
+  }
   if (r.syncTarget === "plan") result.syncTarget = "plan";
   if (r.segments != null) {
     if (!Array.isArray(r.segments) || r.segments.length > 2000)

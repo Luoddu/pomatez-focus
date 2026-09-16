@@ -1,6 +1,8 @@
 // Adapted from Pomatez's CounterProvider: one elapsed-time loop owns focus and break timing.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mergeCloudRecords } from "focus/cloud";
+import { bindQuickSessions } from "focus/quickTasks";
+import type { QuickTask } from "focus/editQueue";
 import { playTimeUp, playRestEnd } from "focus/sound";
 import {
   FocusSession,
@@ -24,6 +26,7 @@ type CounterProps = {
   records: FocusSession[];
   mergeCloud: (records: FocusSession[], sourceKey: string) => void;
   getSnapshot: () => Data;
+  bindQuick: (q: QuickTask, rows: FocusTask[]) => void;
   notice: string;
   noticeSeq: number;
   error: string;
@@ -38,7 +41,11 @@ type CounterProps = {
   returnToTiming: () => void;
   markSynced: (
     id: string,
-    receipt?: { completedCount?: number; planId?: string }
+    receipt?: {
+      completedCount?: number;
+      planId?: string;
+      completionOwnedPlanIds?: string[];
+    }
   ) => void;
   startBreak: () => void;
   addManual: (record: FocusSession) => void;
@@ -305,7 +312,11 @@ const CounterProvider: React.FC = ({ children }) => {
   // 本地记录里用户确认的番茄数；只补记 syncedPlanId
   const markSynced = (
     id: string,
-    receipt?: { completedCount?: number; planId?: string }
+    receipt?: {
+      completedCount?: number;
+      planId?: string;
+      completionOwnedPlanIds?: string[];
+    }
   ) =>
     action(() =>
       publish({
@@ -315,6 +326,12 @@ const CounterProvider: React.FC = ({ children }) => {
             ? {
                 ...r,
                 sync: "synced" as const,
+                ...(receipt?.completionOwnedPlanIds
+                  ? {
+                      completionOwnedPlanIds:
+                        receipt.completionOwnedPlanIds,
+                    }
+                  : {}),
                 ...(receipt?.planId
                   ? { syncedPlanId: receipt.planId }
                   : {}),
@@ -406,6 +423,10 @@ const CounterProvider: React.FC = ({ children }) => {
         records: data.records,
         mergeCloud,
         getSnapshot: () => dataRef.current,
+        bindQuick: (q, rows) => {
+          if (fatal.current) throw Error("本机存储异常，未绑定任务");
+          publish(bindQuickSessions(dataRef.current, q, rows));
+        },
         notice: noticeText,
         noticeSeq,
         error,

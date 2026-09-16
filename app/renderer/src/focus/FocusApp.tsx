@@ -6,7 +6,24 @@ import React, {
   useState,
 } from "react";
 import { CounterContext } from "contexts/CounterContext";
-import { FocusSession, FocusTask, timeParts } from "./session";
+import {
+  FocusSession,
+  FocusTask,
+  FocusQuadrant,
+  timeParts,
+} from "./session";
+import { EditQueue, PendingEdit, QuickTask } from "./editQueue";
+import {
+  projectQuickTasks,
+  quickRows,
+  bindQuickTask,
+  validateQuickReceipt,
+} from "./quickTasks";
+import {
+  readTaskSnapshot,
+  writeTaskSnapshot,
+  taskDay,
+} from "./taskSnapshot";
 import QuadrantBoard from "./components/QuadrantBoard";
 import FocusTimer from "./components/FocusTimer";
 import ReviewPanel from "./components/ReviewPanel";
@@ -163,6 +180,9 @@ export default function FocusApp() {
     ),
     [selected, setSelected] = useState("");
   const [loadingTasks, setLoadingTasks] = useState(() => !!api());
+  const [connectionReady, setConnectionReady] = useState(() => !api());
+  const taskScope = useRef<string | null>(null);
+  const cacheWarningShown = useRef(false);
   const [minutes, setMinutes] = useState(25),
     [compact, setCompact] = useState(false),
     [pinned, setPinned] = useState(false);
@@ -211,10 +231,27 @@ export default function FocusApp() {
     (e) => e.sourceKey === sourceKey && e.state !== "done"
   );
   const queueFailed = queued.filter((e) => e.state === "failed");
-  const boardTasks = completionQueue.project(tasks, sourceKey);
   const refreshSequence = useRef(0);
   const syncing = useRef(false);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [editQueue] = useState(() => new EditQueue(localStorage));
+  const [editRevision, setEditRevision] = useState(0);
+  useEffect(
+    () => editQueue.subscribe(() => setEditRevision((n) => n + 1)),
+    [editQueue]
+  );
+  const outbox = editQueue.entries.filter(
+    (e) => e.sourceKey === sourceKey
+  );
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const boardTasks = completionQueue.project(
+    projectQuickTasks(tasks, outbox, sourceKey),
+    sourceKey
+  );
+  const editingIds = outbox
+    .filter((e) => e.kind === "edit")
+    .map((e) => (e.payload as PendingEdit).before.id);
   const [demoSeed] = useState(demoHistory);
   const active = timer.active,
     parts = active ? timeParts(active) : null;
@@ -307,24 +344,70 @@ export default function FocusApp() {
     setLoadingTasks(true);
     try {
       const status = await api().status();
+      if (sequence !== refreshSequence.current) return;
       setConnected(status.configured);
       setSourceKey(status.sourceKey || null);
+      setConnectionReady(true);
       if (status.configured) {
+        const day = taskDay();
+        const scope = `${status.sourceKey}|${day}`;
+        if (taskScope.current !== scope) {
+          taskScope.current = scope;
+          const cached = readTaskSnapshot(
+            localStorage,
+            status.sourceKey
+          );
+          setTasks(cached || []);
+          setTodayCount(cached?.length ?? null);
+          setSelected("");
+        }
         const rows: FocusTask[] = await api().today();
         if (sequence !== refreshSequence.current) return;
+        if (day !== taskDay()) {
+          setTasks([]);
+          setSelected("");
+          taskScope.current = null;
+          return;
+        }
+        // Persist before retiring acknowledged completion intents. A restart must
+        // never revive a completed chip from an older snapshot.
+        const cached = writeTaskSnapshot(
+          localStorage,
+          status.sourceKey,
+          rows
+        );
+        if (!cached && !cacheWarningShown.current) {
+          cacheWarningShown.current = true;
+          notify(
+            "任务已加载，但未能保存启动缓存；下次打开仍需联网读取。",
+            "error"
+          );
+        }
         setTasks(rows);
-        completionQueue.reconcile(status.sourceKey, rows);
+        if (cached) completionQueue.reconcile(status.sourceKey, rows);
         setTodayCount(rows.length);
         // 默认不预选；刷新只保留仍然存在的选中
         setSelected((previous) =>
-          rows.some((t) => t.id === previous) ? previous : ""
+          projectQuickTasks(
+            rows,
+            editQueue.entries,
+            status.sourceKey
+          ).some((t) => t.id === previous)
+            ? previous
+            : ""
         );
         // today() 完成四象限探测后重读 status，拿到命中结果
         const after = await api().status();
+        if (sequence !== refreshSequence.current) return;
         setQuadrantField(after.quadrantField ?? null);
       } else {
         // Demo tasks are only appropriate once local mode is confirmed.
-        setTasks((previous) => (previous.length ? previous : demo));
+        taskScope.current = null;
+        setTasks((previous) =>
+          previous.length && previous.every((t) => t.source === "local")
+            ? previous
+            : demo
+        );
       }
     } finally {
       if (sequence === refreshSequence.current) setLoadingTasks(false);
@@ -383,13 +466,19 @@ export default function FocusApp() {
       !sourceKey ||
       syncing.current ||
       !api() ||
-      timer.blocked
+      timer.blocked ||
+      editQueue.running ||
+      editQueue.entries.some(
+        (e) => e.sourceKey === sourceKey && e.state === "pending"
+      ) ||
+      completionQueue.running
     )
       return;
     syncing.current = true;
     setSyncBusy(true);
     try {
       const eligible = (r: FocusSession) =>
+        !r.task.quickTask &&
         !r.cloudSynced &&
         (r.task.source === "local" || r.task.sourceKey === sourceKey);
       if (timer.getSnapshot().records.some(eligible))
@@ -410,6 +499,12 @@ export default function FocusApp() {
               record = {
                 ...record,
                 sync: "synced",
+                ...(receipt?.completionOwnedPlanIds
+                  ? {
+                      completionOwnedPlanIds:
+                        receipt.completionOwnedPlanIds,
+                    }
+                  : {}),
                 ...(receipt?.planId
                   ? { syncedPlanId: receipt.planId }
                   : {}),
@@ -467,13 +562,199 @@ export default function FocusApp() {
         !r.cloudSynced &&
         (r.task.source === "local" || r.task.sourceKey === sourceKey)
     )
-    .map((r) => `${r.id}:${r.sync}`)
+    .map((r) => `${r.id}:${r.sync}:${r.task.planId || ""}`)
     .join(",");
   // A pending-set change permits one attempt; a failed attempt waits for explicit retry.
   useEffect(() => {
     if (connected && sourceKey) sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingIds, connected, sourceKey]);
+  }, [pendingIds, connected, sourceKey, editRevision]);
+  const addQuickTask = (
+    title: string,
+    quadrant: FocusQuadrant,
+    count: number
+  ) => {
+    if (!connected || !sourceKey || !api())
+      throw Error("请先在设置中连接飞书");
+    const id = crypto.randomUUID(),
+      now = new Date();
+    const payload: QuickTask = {
+      id,
+      sourceKey,
+      title,
+      quadrant,
+      count,
+      day: new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate()
+      ).getTime(),
+    };
+    editQueue.add({
+      id,
+      sourceKey,
+      kind: "task",
+      payload,
+      state: "pending",
+    });
+  };
+  const editRecord = (before: FocusSession, after: FocusSession) => {
+    if (!connected || !sourceKey || !api()) {
+      if (before.task.source !== "local" || before.cloudSynced)
+        throw Error("请连接原飞书表后修改");
+      timer.addManual({ ...after, cloudSynced: false, sync: "local" });
+      return;
+    }
+    if (
+      before.task.source === "feishu" &&
+      before.task.sourceKey !== sourceKey
+    )
+      throw Error("请连接这条记录所属的飞书表");
+    const id = crypto.randomUUID();
+    editQueue.add({
+      id,
+      sourceKey,
+      kind: "edit",
+      payload: { id, sourceKey, before, after },
+      state: "pending",
+    });
+    notify("修改已保存在本机，将在当前同步结束后更新飞书。");
+  };
+  const editReady = useRef(false);
+  editReady.current =
+    connected &&
+    !!sourceKey &&
+    !syncing.current &&
+    !syncBusy &&
+    !busy &&
+    !generating &&
+    !silentGenerating &&
+    !adjusting &&
+    !completionQueue.running &&
+    !timer.blocked;
+  useEffect(() => {
+    if (
+      !sourceKey ||
+      !api() ||
+      !editReady.current ||
+      syncing.current ||
+      editQueue.running ||
+      !outbox.some((e) => e.state === "pending")
+    )
+      return;
+    editQueue
+      .drain(
+        sourceKey,
+        async (item) => {
+          const currentStatus = await api().status();
+          if (currentStatus.sourceKey !== item.sourceKey)
+            throw Error("飞书连接已变化，待同步内容仍保留在原表队列");
+          if (item.kind === "task") {
+            const q = item.payload as QuickTask;
+            const rows: FocusTask[] =
+              item.taskRows || (await api().createQuickTask(q)).tasks;
+            validateQuickReceipt(q, rows);
+            editQueue.resolveTask(item.id, rows, (task) =>
+              bindQuickTask(task, q, rows)
+            );
+            timer.bindQuick(q, rows);
+            // Invalidate an older full refresh before applying the verified receipt.
+            ++refreshSequence.current;
+            setLoadingTasks(false);
+            const isToday = q.day === new Date().setHours(0, 0, 0, 0);
+            const fresh = isToday
+              ? [
+                  ...tasksRef.current.filter(
+                    (t) => t.taskId !== rows[0].taskId
+                  ),
+                  ...rows,
+                ]
+              : tasksRef.current;
+            if (!writeTaskSnapshot(localStorage, sourceKey, fresh))
+              throw Error(
+                "任务已同步，但启动缓存未保存，保留回执等待重试"
+              );
+            tasksRef.current = fresh;
+            setTasks(fresh);
+            setTodayCount(fresh.length);
+            setSelected((previous) => {
+              const i = quickRows(q).findIndex(
+                (t) => t.id === previous
+              );
+              return i < 0 ? previous : rows[i].id;
+            });
+          } else {
+            const edit = item.payload as PendingEdit;
+            let latest = timer
+              .getSnapshot()
+              .records.find((r) => r.id === edit.before.id);
+            if (!latest) throw Error("原记录不存在，修改未发送");
+            if (latest.task.quickTask || edit.after.task.quickTask)
+              throw Error(
+                "此任务尚未同步，请先重试新增任务，再重试记录修改"
+              );
+            // Finish any in-flight original write before submitting its explicit correction.
+            if (!latest.cloudSynced) {
+              if (latest.sync === "pending") {
+                const receipt = await api().sync(latest);
+                timer.markSynced(latest.id, receipt);
+                latest = timer
+                  .getSnapshot()
+                  .records.find((r) => r.id === edit.before.id)!;
+              }
+              const archived = await api().archiveHistory(latest);
+              timer.mergeCloud([archived], sourceKey);
+              latest = archived;
+            }
+            const before = {
+              ...edit.before,
+              task:
+                edit.before.task.source === "local"
+                  ? latest!.task
+                  : edit.before.task,
+              sync: "synced",
+              completionOwnedPlanIds:
+                edit.before.completionOwnedPlanIds ||
+                ((latest!.revision || 0) === (edit.before.revision || 0)
+                  ? latest!.completionOwnedPlanIds
+                  : undefined),
+            };
+            const after = {
+              ...before,
+              task:
+                edit.after.task.id === edit.before.task.id
+                  ? latest!.task
+                  : edit.after.task,
+              startedAt: edit.after.startedAt,
+              endedAt: edit.after.endedAt,
+              elapsedSeconds: edit.after.elapsedSeconds,
+              acceptedSeconds: edit.after.acceptedSeconds,
+              completedCount: edit.after.completedCount,
+              segments: edit.after.segments,
+              revision: (edit.before.revision || 0) + 1,
+            };
+            const result = await api().correctRecord({ before, after });
+            timer.mergeCloud([result.record], sourceKey);
+            if (result.warning) notify(result.warning, "error");
+            await refresh();
+          }
+        },
+        () => editReady.current && !syncing.current
+      )
+      .catch((e: any) => notify(e.message, "error"));
+    // Queue listeners cause the next readiness check after a completed operation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    editRevision,
+    sourceKey,
+    connected,
+    syncBusy,
+    busy,
+    generating,
+    silentGenerating,
+    adjusting,
+    queueRevision,
+  ]);
   const windowMode = async (small: boolean, pin: boolean) => {
     try {
       const state = api()
@@ -540,7 +821,10 @@ export default function FocusApp() {
           const notice = silentGenerateNotice(r);
           if (notice) notify(notice);
         } catch (e: any) {
-          notify(e.message || "后台更新今日番茄失败，请稍后重试", "error");
+          notify(
+            e.message || "后台更新今日番茄失败，请稍后重试",
+            "error"
+          );
         } finally {
           setSilentGenerating(false);
         }
@@ -581,8 +865,18 @@ export default function FocusApp() {
       notify("请先在设置中连接飞书，再调整番茄数。", "error");
       return;
     }
-    if (completionQueue.entries.some(e => e.sourceKey === sourceKey && e.task.taskId === taskId && e.state !== "done")) {
-      notify("该任务还有待同步的完成标记，请同步后再调整番茄数；其他番茄仍可继续标记。", "error");
+    if (
+      completionQueue.entries.some(
+        (e) =>
+          e.sourceKey === sourceKey &&
+          e.task.taskId === taskId &&
+          e.state !== "done"
+      )
+    ) {
+      notify(
+        "该任务还有待同步的完成标记，请同步后再调整番茄数；其他番茄仍可继续标记。",
+        "error"
+      );
       return;
     }
     const group = groupTasks(boardTasks).find((g) => g.key === taskId);
@@ -652,6 +946,8 @@ export default function FocusApp() {
     if (
       !sourceKey ||
       !queueReady.current ||
+      editQueue.running ||
+      syncing.current ||
       completionQueue.running ||
       !completionQueue.entries.some(
         (e) => e.sourceKey === sourceKey && e.state === "pending"
@@ -667,7 +963,8 @@ export default function FocusApp() {
             throw Error("飞书连接已改变，请切回原连接后重试。");
           await api().completeToday({ planId });
         },
-        () => queueReady.current
+        () =>
+          queueReady.current && !editQueue.running && !syncing.current
       )
       .then(() => {
         // One refresh per drained batch, never one full refresh per click.
@@ -682,6 +979,7 @@ export default function FocusApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     queueRevision,
+    editRevision,
     sourceKey,
     connected,
     adjusting,
@@ -952,7 +1250,7 @@ export default function FocusApp() {
                 );
               }}
               onBreak={timer.startBreak}
-              busy={busy || loadingTasks}
+              busy={!connectionReady}
               blocked={timer.blocked}
               canBreak={timer.records.length > 0}
               restSeconds={timer.restSeconds}
@@ -970,6 +1268,7 @@ export default function FocusApp() {
               }
               onComplete={completeChip}
               completing={""}
+              onAddTask={addQuickTask}
             />
           )}
           <HistoryPanel
@@ -977,10 +1276,15 @@ export default function FocusApp() {
             pendingCount={historyPending.length}
             canSync={connected && !!api()}
             syncBusy={syncBusy}
-            onSync={() => run(sync)}
+            onSync={() => {
+              if (sourceKey) editQueue.retry(sourceKey);
+              sync();
+            }}
             tasks={boardTasks}
             onExport={exportRecords}
             onAddManual={timer.addManual}
+            onEdit={editRecord}
+            editingIds={editingIds}
             onGenerate={generate}
             generating={generating}
             genStageText={genStageText}
@@ -993,6 +1297,32 @@ export default function FocusApp() {
             {...windowControls}
           />
         </main>
+      )}
+      {(outbox.length > 0 || editQueue.storageError) && (
+        <aside className="outbox-status" role="status">
+          <span>
+            {editQueue.storageError ||
+              `${outbox.length} 项待同步 · 可继续专注`}
+          </span>
+          {outbox.map((e) => (
+            <span key={e.id}>
+              {e.kind === "task"
+                ? (e.payload as QuickTask).title
+                : "记录修改"}
+              ：{e.state === "failed" ? e.error : "等待同步"}
+            </span>
+          ))}
+          {outbox.some((e) => e.state === "failed") && (
+            <button
+              className="btn-text"
+              onClick={() => {
+                if (sourceKey) editQueue.retry(sourceKey);
+              }}
+            >
+              重试修改与新增任务
+            </button>
+          )}
+        </aside>
       )}
       {(queued.length > 0 || completionQueue.storageError) && (
         <aside

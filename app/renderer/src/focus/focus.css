@@ -1910,3 +1910,11 @@ input:focus-visible {
 
 .completion-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 20px; color: #344054; background: #eef2ff; border-top: 1px solid #d0d5dd; font-size: 14px; }
 .completion-status button { border: 1px solid #5265db; background: white; color: #3448ba; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.quad-add { opacity: 0; pointer-events: none; margin-left: 8px; }
+.quad:hover .quad-add, .quad:focus-within .quad-add { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .quad-add { opacity: 1; pointer-events: auto; } }
+.quick-task-form { display: grid; gap: 10px; padding: 12px 0; }
+.quick-task-form > input { width: 100%; padding: 8px; border: 1px solid #dce1eb; border-radius: 8px; }
+.quick-task-form input[type=number] { width: 65px; }
+.record-edit { margin-left: auto; font-size: 12px; }
+.outbox-status { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 18px; font-size: 13px; }

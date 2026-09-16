@@ -123,6 +123,10 @@ else {
       handler("today", () => service.today());
       handler("generateToday", () => service.generateToday());
       handler("adjustToday", (value) => service.adjustToday(value));
+      handler("createQuickTask", (value) =>
+        service.createQuickTask(value)
+      );
+      handler("correctRecord", (value) => service.correctRecord(value));
       handler("completeToday", (value) => service.completeToday(value));
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
