@@ -50,5 +50,18 @@ Rollback to prior installer preserves all data because no schema/storage-key cha
 Learning-Review: none — existing real-lifecycle and stable-accounting guidance is
 applied; this bounded display extension establishes no new cross-task lesson.
 
-Release candidate: preview.36. Clean-source package and remote asset verification
-will be appended after publication. No independent review is claimed.
+## Published release
+
+`v0.1.0-preview.36` was built/packaged from clean source
+`0c8e3fc2d9ccc9ea09def52c902823a6ec979675`. The executable ASAR provenance equals
+the clean-build receipt. The source branch was pushed non-force using the guarded
+helper and verified remotely; published tag points to exactly that source SHA.
+
+[GitHub release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.36)
+is public (prerelease, not draft), release ID 390776412. All six uploaded assets'
+SHA-256 digests and sizes equal local outputs. Update feed setup SHA-512 also
+matches. Assets: setup EXE, portable EXE, setup blockmap, preview.yml,
+source-version.json and SHA256SUMS.txt. Local ignored receipt:
+artifacts/release36-verification.json. User can install through Settings / Check
+for updates; the personal running instance was not restarted. No independent
+review is claimed. This follow-up changes release documentation only.

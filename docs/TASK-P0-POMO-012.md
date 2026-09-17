@@ -1,6 +1,6 @@
 # P0-POMO-012 — task details on demand
 
-Status: REVIEW (implementation tested; publication pending, no separate reviewer).
+Status: REVIEW (implemented, tested and published; no separate reviewer assigned).
 Module implementer/context owner: /root.
 Baseline: 190a080cb1ce70c3b08a1c11e5b97611ecf5cab0 (public preview.35).
 Branch: task/p0-pomo-012-task-details. User authorizes this UI adaptation;
@@ -52,3 +52,10 @@ Rollback: previous installer/source; additive optional display metadata requires
 no table migration, existing records and accounting identities remain unchanged.
 Evidence: ACCEPTANCE-task-details.md. Learning judgment at checkpoint: reuse
 existing lifecycle guidance; no new reusable lesson established yet.
+
+## Release handoff
+
+preview.36 source/tag: 0c8e3fc2d9ccc9ea09def52c902823a6ec979675.
+Public source branch and six release assets verified; installation remains a user
+action through existing in-app update. No personal app interruption or live data
+mutation. See acceptance for published release and verification receipt details.
