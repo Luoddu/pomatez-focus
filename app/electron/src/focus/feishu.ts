@@ -1258,11 +1258,17 @@ export class Feishu {
         : "";
       return QUADRANT_LABELS[value];
     };
+    // Display metadata only; reuse already-fetched linked records, no extra calls.
+    const taskDescription = (refs: string[]) => {
+      const fields = linkedById.get(refs[0])?.fields;
+      return plain(fields?.["详细"] ?? fields?.["详情"]).trim();
+    };
     const result = selected.map((r) => {
       const link = r.fields[this.config.taskField],
         refs = linkedRecordIds(link, linkedTable);
       const title = taskTitle(refs, link);
       const quadrant = taskQuadrant(refs);
+      const description = taskDescription(refs);
       const ledger = readLedger(r.fields);
       const free = plain(r.fields["番茄"]) === FREE_TITLE;
       const h = harvest.get(harvestOf(r));
@@ -1274,6 +1280,7 @@ export class Feishu {
           ? FREE_TITLE
           : `${title} · 第 ${plain(r.fields["番茄"]) || "?"} 个番茄`,
         source: "feishu",
+        ...(description && !free ? { description } : {}),
         sourceKey: connectionKey(this.config),
         creditedSeconds: ledgerSeconds(ledger),
         appliedSessionIds: ledger?.entries.map((e) => e.id) || [],
@@ -1301,6 +1308,9 @@ export class Feishu {
         planId: "",
         taskId: key,
         title: taskTitle(refs, sample.fields[this.config.taskField]),
+        ...(taskDescription(refs)
+          ? { description: taskDescription(refs) }
+          : {}),
         source: "feishu",
         sourceKey: connectionKey(this.config),
         kind: "done",

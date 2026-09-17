@@ -15,6 +15,7 @@ const row = {
   planId: "p1",
   taskId: "t1",
   title: "Cached synthetic task · 第 1 个番茄",
+  description: "Cached task details\nAvailable offline",
   source: "feishu",
   sourceKey: "synthetic",
   quadrant: "iu",
@@ -134,6 +135,7 @@ app.whenReady().then(async () => {
       console.log(
         "PASS cold restart starts cached task with ALL remote reads held"
       );
+      assert.equal(await js("document.querySelector('.ct-description').textContent"), row.description);
       await discard();
       await reload();
       await until(chip);

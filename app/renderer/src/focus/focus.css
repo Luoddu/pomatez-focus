@@ -292,6 +292,38 @@ input:focus-visible {
 .task.complete .task-name {
   font-size: 15px;
 }
+.task-title-button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.task-title-button:hover { color: var(--primary); }
+.task-title-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.task-detail-popover {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(320px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 16px 18px;
+  border: 1px solid #e3e7ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #394150;
+  box-shadow: 0 8px 32px rgba(31, 35, 41, 0.16);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.task-detail-heading { font-weight: 600; margin-bottom: 8px; }
+.task-detail-text { white-space: pre-wrap; }
 .quad-empty {
   font-size: 13px;
   color: var(--muted);
@@ -969,6 +1001,17 @@ input:focus-visible {
   font-size: 14px;
   color: var(--muted);
   margin-top: 2px;
+}
+.current-task .ct-description {
+  margin: 6px 0;
+  max-width: 480px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #606b7b;
 }
 .ring {
   position: relative;

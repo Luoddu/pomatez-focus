@@ -2,6 +2,8 @@ export type FocusQuadrant = "iu" | "inu" | "uni" | "unu";
 export type FocusTask = {
   id: string;
   title: string;
+  // Optional display metadata, not part of cloud accounting identity.
+  description?: string;
   source: "local" | "feishu";
   planId?: string;
   taskId?: string;
