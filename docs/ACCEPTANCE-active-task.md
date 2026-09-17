@@ -75,3 +75,17 @@ public baseline unchanged at version reservation (live preview.36).
 
 Learning-Review: none — existing real-lifecycle and single timing-owner guidance
 applied; this UI correction adds no independently established cross-task lesson.
+
+## Published release
+
+Clean packaged source: `bea27df1772f30b3fc4d1a11f643b5a54decfdb0`.
+The rebuilt renderer's active-task desktop scenarios passed again. ASAR provenance
+matches the clean receipt. Source pushed non-force through the guarded helper.
+Live tag `v0.1.0-preview.37` points to exactly this SHA.
+
+[Release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.37)
+is public, prerelease, not draft; release ID 390827952. Six uploaded assets match
+local sizes and SHA-256 digests: setup EXE, portable EXE, setup blockmap,
+preview.yml, source-version.json and SHA256SUMS.txt. Feed setup SHA-512 verified.
+Ignored receipt: artifacts/release37-verification.json. No personal app restart.
+This follow-up records publication only; packaged source/tag remain unchanged.
