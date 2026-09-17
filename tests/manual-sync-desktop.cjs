@@ -151,7 +151,14 @@ app.whenReady().then(async () => {
       )
     );
     configured = false;
-    await click("刷新今日番茄");
+    // ⟳ 已并入生成按钮后没有独立手动刷新入口；用主进程重载触发启动刷新来更新连接态
+    // （renderer 内 location.reload() 在此应用不生效，必须用 webContents.reload()）
+    await win.webContents.reload();
+    await until(() =>
+      js(
+        "document.querySelector('[aria-label=\"手动同步\"]')&&document.querySelector('[aria-label=\"手动同步\"]').title==='请先连接飞书'"
+      )
+    );
     await wait(150);
     assert.equal(
       await js(

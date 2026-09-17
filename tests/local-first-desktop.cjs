@@ -96,7 +96,7 @@ app.whenReady().then(async () => {
     if (seed) {
       await until(() =>
         js(
-          "!document.querySelector('[aria-label=\"刷新今日番茄\"]').disabled"
+          "Boolean(document.querySelector('.gen-btn'))&&!document.querySelector('.gen-btn').disabled"
         )
       );
       await click("在重要不紧急新增任务");

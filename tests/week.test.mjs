@@ -5,6 +5,7 @@ import {
   PLANT_STAGES,
   beijingWeekStart,
   beijingHour,
+  harvestTier,
   weekTomatoes,
   weekHarvest,
 } from "../app/renderer/src/focus/week.ts";
@@ -143,4 +144,13 @@ test("quadrantToneList interleaves quadrant tones round-robin for a mixed look",
   // 五个象限键都有稳定色值，红=重要且紧急
   for (const k of QUADRANT_KEYS) assert.match(QUADRANT_TONES[k], /^#[0-9a-f]{6}$/);
   assert.equal(QUADRANT_TONES.iu, "#e57368");
+});
+
+test("harvestTier tiers the day-total achievement display", () => {
+  assert.equal(harvestTier(0), "");
+  assert.equal(harvestTier(4), "");
+  assert.equal(harvestTier(5), "mid");
+  assert.equal(harvestTier(9), "mid");
+  assert.equal(harvestTier(10), "high");
+  assert.equal(harvestTier(23), "high");
 });

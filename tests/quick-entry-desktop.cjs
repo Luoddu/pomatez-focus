@@ -45,6 +45,8 @@ FocusService.prototype.history = async () => ({
   records: shared,
   missing: 0,
 });
+// ⟳ 已并入生成按钮；桩成无写入的幂等生成，静默分支只重读。
+FocusService.prototype.generateToday = async () => ({ created: 0 });
 FocusService.prototype.sync = async () => {
   await new Promise((r) => {
     releaseSync = r;
@@ -286,7 +288,8 @@ app.whenReady().then(async () => {
       "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('放弃')).click()"
     );
     holdRefresh = true;
-    await click("刷新今日番茄");
+    // ⟳ 已并入生成按钮：今日已有番茄 → 静默合并刷新（同样被 holdRefresh 挂起）
+    await js("document.querySelector('.gen-btn').click()");
     await until(() => !!releaseRefresh);
     await js(
       "(()=>{const b=[...document.querySelectorAll('.chips .chip')].find(b=>b.textContent.trim()==='2');if(!b.classList.contains('selected'))b.click()})()"

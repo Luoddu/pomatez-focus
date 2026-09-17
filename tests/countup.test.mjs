@@ -55,8 +55,8 @@ test("goal progress ratio is clamped and zero-safe", () => {
 
 test("goal fill deepens from pale tomato to full red with the ratio", () => {
   const alphaOf = (s) => Number(s.match(/([\d.]+)\)$/)[1]);
-  assert.equal(goalFill(0), "rgba(194, 47, 31, 0.1)");
-  assert.equal(goalFill(1), "rgba(194, 47, 31, 0.4)");
+  assert.equal(goalFill(0), "rgba(194, 47, 31, 0.25)");
+  assert.equal(goalFill(1), "rgba(194, 47, 31, 0.9)");
   assert.ok(alphaOf(goalFill(0.8)) > alphaOf(goalFill(0.2)));
   assert.equal(goalFill(-1), goalFill(0));
   assert.equal(goalFill(7), goalFill(1));

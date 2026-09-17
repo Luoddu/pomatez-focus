@@ -122,9 +122,14 @@ app.whenReady().then(async () => {
     assert.equal(await js(`!document.querySelector('.gen-progress')`), true);
 
     // ── 场景 3：今日计划为空 = 首次生成，前台进度逻辑不变 ──
+    // ⟳ 按钮已并入生成按钮；清空今日计划改用整页重载（初始 refresh 拉空表）
     rows = [];
-    await js(`document.querySelector('.refresh-btn').click()`);
-    await until(async () => (await chipCount()) === 0);
+    await win.webContents.reload();
+    await until(() =>
+      js(
+        `Boolean(document.querySelector('.gen-btn'))&&!document.querySelector('.gen-btn').disabled&&document.querySelectorAll('.chip').length===0`
+      )
+    );
     genHold = true;
     genResult = { created: 2, eligibleTasks: 1, blocked: 0 };
     await clickGen();

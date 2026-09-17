@@ -106,6 +106,8 @@ FocusService.prototype.today = async () => {
 FocusService.prototype.sync = FocusService.prototype.setup = () => {
   throw Error("Writes forbidden in this test");
 };
+// ⟳ 已并入生成按钮；桩成无写入的幂等生成，静默分支只重读。
+FocusService.prototype.generateToday = async () => ({ created: 0 });
 require("../app/electron/build/main.js");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const deadline = setTimeout(() => app.exit(2), 20000);
@@ -135,7 +137,7 @@ app.whenReady().then(async () => {
       0
     );
     assert.ok(
-      await js("document.querySelector('[aria-label=\"刷新今日番茄\"]').disabled")
+      await js("document.querySelector('.gen-btn').disabled")
     );
     release();
     const expected = { classified: [1, 1, 1, 1], unknown: 0 };
@@ -144,16 +146,13 @@ app.whenReady().then(async () => {
       await wait(50);
     }
     assert.deepEqual(await counts(), expected);
-    await js(
-      `document.querySelector('[aria-label="刷新今日番茄"]').click()`
-    );
-    await wait(200);
+    // ⟳ 已并入生成按钮：今日已有 4 个番茄 → 静默合并刷新
+    await js(`document.querySelector('.gen-btn').click()`);
+    await wait(300);
     assert.deepEqual(await counts(), expected);
     offline = true;
-    await js(
-      `document.querySelector('[aria-label="刷新今日番茄"]').click()`
-    );
-    await wait(200);
+    await js(`document.querySelector('.gen-btn').click()`);
+    await wait(300);
     assert.deepEqual(await counts(), expected);
     assert.ok(
       await js(
@@ -165,9 +164,9 @@ app.whenReady().then(async () => {
       JSON.stringify({
         passed: 3,
         checks: [
-          "delayed startup disables refresh and never shows demo plans",
-          "rich links classify after load and refresh through real IPC",
-          "failed refresh preserves classified plans and shows error",
+          "delayed startup disables generate and never shows demo plans",
+          "rich links classify after load and silent regen through real IPC",
+          "failed silent regen preserves classified plans and shows error",
         ],
       })
     );

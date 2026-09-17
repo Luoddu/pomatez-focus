@@ -141,9 +141,9 @@ app
       ),
     });
     results.push({
-      check: "week goal chip carries a progress fill matching this week's ratio",
+      check: "week goal chip shows progress as a clean bottom bar",
       pass: await js(
-        `(()=>{const f=document.querySelector('.weekgoal-chip .wg-fill');if(!f)return false;const w=parseFloat(f.style.width);return w>0&&w<=100&&getComputedStyle(f).transition.includes('width')})()`
+        `(()=>{const f=document.querySelector('.weekgoal-chip .wg-fill');if(!f)return false;const w=parseFloat(f.style.width);const cs=getComputedStyle(f);return w>0&&w<=100&&cs.height==='3px'&&cs.bottom==='2px'&&cs.transition.includes('width')})()`
       ),
     });
     // 悬浮任务行浮现 ±；全完成组 − 置灰、＋ 可用
@@ -255,11 +255,11 @@ app
       pass: await js(`!document.querySelector('.ctx-menu')`),
     });
 
-    // 生成/刷新已移至概览标题行，左侧工具行整行删除；无象限任务归入 unu
+    // ⟳ 已并入「生成今日番茄」（静默分支含纯重读），工具行整行删除；无象限任务归入 unu
     results.push({
-      check: "generate and refresh moved to overview title row",
+      check: "generate stays in overview title row; separate refresh button removed",
       pass: await js(
-        `!document.querySelector('.board-toolbar')&&Boolean(document.querySelector('.side-title-actions .gen-btn'))&&Boolean(document.querySelector('.side-title-actions .refresh-btn'))`
+        `!document.querySelector('.board-toolbar')&&Boolean(document.querySelector('.side-title-actions .gen-btn'))&&!document.querySelector('.refresh-btn')`
       ),
     });
     results.push({
@@ -467,6 +467,27 @@ app
         `Boolean(document.querySelector('.hm-badge'))&&document.querySelectorAll('.hm-cell.hm-goal-met').length>0`
       ),
     });
+    // 月历周合计：有记录的周标注总数，无记录周不标，当前周（最右列）也标
+    results.push({
+      check: "heatmap labels week totals, skips empty weeks, includes current week",
+      pass: await js(
+        `(()=>{const slots=[...document.querySelectorAll('.hm-badge-slot')];const totals=[...document.querySelectorAll('.hm-week-total')];if(!slots.length||!totals.length)return false;if(totals.length>=slots.length)return false;if(!totals.every(t=>/^[1-9]\\d*$/.test(t.textContent)))return false;const last=slots[slots.length-1].querySelector('.hm-week-total');return Boolean(last)&&Number(last.textContent)>0})()`
+      ),
+    });
+    // 「共 N 个番茄」分级：demo 里 5-9 个的日期带 mid，今天（2 个）不带档
+    results.push({
+      check: "day total tiers: mid tone on 5-9 tomato days, none on a light today",
+      pass: await js(
+        `(()=>{const mid=[...document.querySelectorAll('.day-total.mid')];if(!mid.length||!mid.every(e=>{const n=Number(e.textContent.match(/共 (\\d+) 个番茄/)?.[1]);return n>=5&&n<=9}))return false;const today=document.querySelector('.record-day .day-total');return Boolean(today)&&!today.className.includes('mid')&&!today.className.includes('high')})()`
+      ),
+    });
+    results.push({
+      check: "export button is not rendered while add/manual-sync stay",
+      pass: await js(
+        `![...document.querySelectorAll('button')].some(b=>b.textContent==='导出')&&[...document.querySelectorAll('button')].some(b=>b.textContent==='补记')`
+      ),
+    });
+    await shotClip("board-heatmap-weektotals", ".heatmap");
     await shot("board-weekgoal-met");
     await js(
       `document.querySelector('.weekgoal').dispatchEvent(new MouseEvent('mouseout',{bubbles:true,relatedTarget:document.body}))`

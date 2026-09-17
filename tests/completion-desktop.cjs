@@ -28,7 +28,13 @@ FocusService.prototype.status = () => ({
 });
 let adjustCalls = 0;
 FocusService.prototype.adjustToday = () => { adjustCalls++; throw Error("should not adjust queued task"); };
-FocusService.prototype.today = () => client.today();
+// ⟳ 已并入生成按钮；静默分支只读合并，桩成无写入
+FocusService.prototype.generateToday = async () => ({ created: 0 });
+let todayCalls = 0;
+FocusService.prototype.today = () => {
+  todayCalls++;
+  return client.today();
+};
 FocusService.prototype.history = () => client.history();
 FocusService.prototype.archiveHistory = (v) => client.archiveHistory(v);
 let release,
@@ -110,14 +116,12 @@ app.whenReady().then(async () => {
       true
     );
     // Refresh returns all three still-pending remote rows: none may reappear.
-    await js(
-      `document.querySelector('[aria-label="刷新今日番茄"]').click()`
-    );
-    await until(() =>
-      js(
-        `!document.querySelector('[aria-label="刷新今日番茄"]').disabled`
-      )
-    );
+    // ⟳ 已并入生成按钮：当日已有计划时点击走静默分支（generateToday + refresh）；
+    // 静默期按钮不锁，用 today() 调用计数确认 refresh 已落地
+    const todayBeforeRefresh = todayCalls;
+    await js(`document.querySelector('.gen-btn').click()`);
+    await until(() => todayCalls > todayBeforeRefresh);
+    await wait(200);
     assert.equal(
       await js('document.querySelectorAll(".chip").length'),
       0
@@ -158,9 +162,8 @@ app.whenReady().then(async () => {
     // A marked next tomato must not be offered from the review screen while
     // the network write is still blocked.
     state.plans.forEach((p) => (p.fields["已完成"] = false));
-    await js(
-      `document.querySelector('[aria-label="刷新今日番茄"]').click()`
-    );
+    // ⟳ 已并入生成按钮（此处今日计划为空走前台分支，同样以 refresh 收尾）
+    await js(`document.querySelector('.gen-btn').click()`);
     await until(() =>
       js('document.querySelectorAll(".chip").length===3')
     );

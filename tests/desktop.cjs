@@ -349,17 +349,15 @@ app
       path.join(artifacts, "records.png"),
       (await win.capturePage()).toPNG()
     );
-    await click("导出");
-    await wait(500);
-    const exports = fs.readdirSync(downloads);
-    assert.equal(exports.length, 1);
+    // 「导出」按钮按需求隐藏（实现保留在 FocusApp.exportRecords）；
+    // 隐藏期间 UI 导出路径暂停覆盖，恢复按钮时同步恢复导出文件断言
     assert.equal(
-      JSON.parse(
-        fs.readFileSync(path.join(downloads, exports[0]), "utf8")
-      ).records.length,
-      2
+      await js(
+        `![...document.querySelectorAll('button')].some(b=>b.textContent==='导出')`
+      ),
+      true
     );
-    checks.push("JSON export saves records without a dialog");
+    checks.push("export button hidden while records UI stays intact");
     await click("开始专注");
     await wait(300);
     powerMonitor.emit("suspend");

@@ -22,6 +22,7 @@ const {
   isValidGoal,
   saveWeekGoal,
   goalMet,
+  weekTotals,
 } = await import("../app/renderer/src/focus/weekgoal.ts");
 
 // 2026-09-15 12:00 UTC = 北京 20:00 周二；所在周北京周一 = 2026-09-14
@@ -87,4 +88,17 @@ test("goalMet requires both harvest and reaching the goal", () => {
   assert.equal(goalMet(60, 60), true);
   assert.equal(goalMet(61, 60), true);
   assert.equal(goalMet(5, 2), true);
+});
+
+test("weekTotals aggregates per beijing week and skips empty weeks", () => {
+  const rec = (utc, completedCount) => ({ startedAt: utc, completedCount });
+  const totals = weekTotals([
+    rec(Date.UTC(2026, 8, 15, 4), 2), // 周二 → 09-14 周
+    rec(Date.UTC(2026, 8, 13, 16, 30), 1), // 北京周一凌晨 → 同周
+    rec(Date.UTC(2026, 8, 13, 15, 59), 3), // 北京周日深夜 → 09-07 周
+    rec(Date.UTC(2026, 8, 8, 4), 0), // 零收获不计
+    rec(Date.UTC(2026, 8, 9, 4)), // 缺 completedCount 不计
+  ]);
+  assert.deepEqual(totals, { "2026-09-14": 3, "2026-09-07": 3 });
+  assert.deepEqual(weekTotals([]), {});
 });

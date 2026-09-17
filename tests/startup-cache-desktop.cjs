@@ -33,6 +33,8 @@ FocusService.prototype.today = async () => {
 };
 // Hold history, too; no network-dependent boot operation can finish in restart phase.
 FocusService.prototype.history = () => new Promise(() => {});
+// ⟳ 已并入生成按钮；桩成无写入的幂等生成，静默分支只重读。
+FocusService.prototype.generateToday = async () => ({ created: 0 });
 require("../app/electron/build/main.js");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const timeout = setTimeout(() => app.exit(2), 40000);
@@ -149,7 +151,8 @@ app.whenReady().then(async () => {
       );
       console.log("PASS offline refresh keeps task snapshot usable");
       mode = "empty";
-      await click("刷新今日番茄");
+      // ⟳ 已并入生成按钮：今日已有 1 个番茄 → 静默合并刷新
+      await js("document.querySelector('.gen-btn').click()");
       await until(async () => !(await chip()));
       assert.deepEqual(
         await js(`JSON.parse(localStorage.getItem('${key}')).rows`),
