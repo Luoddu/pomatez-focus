@@ -5,6 +5,7 @@ import {
   WEEK_GOAL_DEFAULT,
   goalMet,
   weekKeyOf,
+  weekTotals,
 } from "../weekgoal";
 import { LogoIcon } from "./shared";
 
@@ -57,19 +58,17 @@ export default function HeatmapCalendar({
   const scrollRef = useRef<HTMLDivElement>(null);
   const { weeks, byDay, byWeek, todayTs } = useMemo(() => {
     const byDay = new Map<string, DayStat>();
-    const byWeek = new Map<string, number>();
     let earliest: number | null = null;
-    for (const r of records) {
-      if (r.status !== "saved") continue;
+    const saved = records.filter((r) => r.status === "saved");
+    // 周聚合用与农场相同的北京时间周口径，目标判定跨组件一致
+    const byWeek = new Map(Object.entries(weekTotals(saved)));
+    for (const r of saved) {
       const d = dayStart(new Date(r.startedAt));
       const key = dayKey(d);
       const stat = byDay.get(key) || { count: 0, seconds: 0 };
       stat.count += r.completedCount || 0;
       stat.seconds += r.acceptedSeconds || r.elapsedSeconds || 0;
       byDay.set(key, stat);
-      // 周聚合用与农场相同的北京时间周口径，目标判定跨组件一致
-      const wk = weekKeyOf(r.startedAt);
-      byWeek.set(wk, (byWeek.get(wk) || 0) + (r.completedCount || 0));
       if (earliest === null || d.getTime() < earliest)
         earliest = d.getTime();
     }
@@ -188,16 +187,19 @@ export default function HeatmapCalendar({
           <span className="hm-corner" />
           {weeks.map((week) => {
             const wk = weekKeyOf(week.days[0].getTime());
-            const met = goalMet(
-              byWeek.get(wk) || 0,
-              goals[wk] ?? WEEK_GOAL_DEFAULT
-            );
+            const total = byWeek.get(wk) || 0;
+            const met = goalMet(total, goals[wk] ?? WEEK_GOAL_DEFAULT);
             return (
               <span className="hm-badge-slot" key={`badge-${week.key}`}>
+                {total > 0 && (
+                  <span className="hm-week-total" title={`本周共 ${total} 个番茄`}>
+                    {total}
+                  </span>
+                )}
                 {met && (
                   <span
                     className="hm-badge"
-                    title={`本周目标已达成（${byWeek.get(wk)} 个）`}
+                    title={`本周目标已达成（${total} 个）`}
                   >
                     <LogoIcon size={12} tone={GOLD_TONE} />
                   </span>

@@ -1003,6 +1003,9 @@ export default function FocusApp() {
       notify(e.message, "error");
     }
   };
+  // 导出按钮已按用户要求隐藏（HistoryPanel 不再渲染）；实现保留备用。
+  // 恢复时：HistoryPanel 还原 onExport 按钮并接回此函数。
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const exportRecords = () => {
     const blob = new Blob(
       [
@@ -1281,14 +1284,12 @@ export default function FocusApp() {
               sync();
             }}
             tasks={boardTasks}
-            onExport={exportRecords}
             onAddManual={timer.addManual}
             onEdit={editRecord}
             editingIds={editingIds}
             onGenerate={generate}
             generating={generating}
             genStageText={genStageText}
-            onRefresh={() => run(refresh)}
             refreshBusy={busy || loadingTasks}
             onWeekGoalMet={(total, goal) => {
               notify(`本周目标达成 🍅（${total}/${goal}）`);

@@ -85,9 +85,24 @@ export function goalProgressRatio(total: number, goal: number): number {
   return Math.min(1, total / goal);
 }
 
-// 进度填充色：淡番茄红 → 饱满红（不透明度随比例加深，文字始终可读）
+// 底部进度条颜色：淡番茄红 → 饱满红（不透明度随比例加深）
 export function goalFill(ratio: number): string {
   const r = Math.min(1, Math.max(0, ratio));
-  const alpha = Math.round((0.1 + 0.3 * r) * 100) / 100;
+  const alpha = Math.round((0.25 + 0.65 * r) * 100) / 100;
   return `rgba(194, 47, 31, ${alpha})`;
+}
+
+// 按北京周聚合番茄总数（月历周合计标注用）；只含 saved 记录，
+// 零收获的周不产生键（无数据周不标注）
+export function weekTotals(
+  records: { startedAt: number; completedCount?: number }[]
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of records) {
+    const count = r.completedCount || 0;
+    if (count <= 0) continue;
+    const key = weekKeyOf(r.startedAt);
+    out[key] = (out[key] || 0) + count;
+  }
+  return out;
 }

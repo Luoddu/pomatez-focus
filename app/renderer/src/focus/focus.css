@@ -848,6 +848,27 @@ input:focus-visible {
   font-size: 12px;
   font-weight: 400;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition:
+    color 0.4s ease-out,
+    font-size 0.4s ease-out,
+    font-weight 0.4s ease-out;
+}
+/* 成就感分级：5–9 番茄红加粗，≥10 金色加大加粗 */
+.record-day h4 .day-total.mid {
+  color: var(--red);
+  font-weight: 700;
+  font-size: 13px;
+}
+.record-day h4 .day-total.high {
+  color: #a97708;
+  font-weight: 800;
+  font-size: 15px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-day h4 .day-total {
+    transition: none;
+  }
 }
 /* 今天还没有记录时的邀请语：虚线待耕地 */
 .record-invite {
@@ -1416,13 +1437,28 @@ input:focus-visible {
   background-image: linear-gradient(rgba(232, 169, 23, 0.22), rgba(232, 169, 23, 0.22));
   box-shadow: 0 0 4px 1px rgba(232, 169, 23, 0.4);
 }
+/* 徽章行同时承载周合计：槽位锁定格宽不外扩（数字可略微溢出居中显示），
+   达成徽章移到列右上角，月历卡高度不变 */
 .hm-badge-slot {
+  position: relative;
+  width: var(--hm-cell, 13px);
   height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
+}
+.hm-week-total {
+  font-size: 9px;
+  line-height: 1;
+  color: #9aa1ab;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .hm-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
   display: inline-flex;
   animation: hm-badge-grow 0.45s ease-out both;
   transform-origin: bottom center;
@@ -1448,7 +1484,7 @@ input:focus-visible {
   overflow: hidden;
   font-size: 12px;
   line-height: 1;
-  padding: 6px 10px;
+  padding: 5px 10px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: #f0f1f4;
@@ -1456,19 +1492,23 @@ input:focus-visible {
   cursor: default;
   white-space: nowrap;
 }
-/* 进度填充：从左向右铺开，宽度/颜色随本周已收比例平滑加深 */
+/* 进度条：贴 chip 底边的 3px 细条，宽度/颜色随本周已收比例平滑加深，
+   文字区保持干净底色，任何比例下文字可读 */
 .wg-fill {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  border-radius: inherit;
+  top: auto;
+  bottom: 2px;
+  left: 5px;
+  height: 3px;
+  max-width: calc(100% - 10px);
+  border-radius: 2px;
   transition:
     width 0.5s ease-out,
     background-color 0.5s ease-out;
   pointer-events: none;
 }
 .weekgoal-chip.met .wg-fill {
-  background: rgba(232, 169, 23, 0.3);
+  background: rgba(232, 169, 23, 0.85);
 }
 .wg-text {
   position: relative;

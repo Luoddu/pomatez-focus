@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask } from "../session";
-import { QUADRANT_TONES, weekTomatoes } from "../week";
+import { QUADRANT_TONES, harvestTier, weekTomatoes } from "../week";
 import {
   WEEK_GOAL_DEFAULT,
   goalFill,
@@ -81,14 +81,12 @@ export default function HistoryPanel({
   syncBusy,
   onSync,
   tasks,
-  onExport,
   onAddManual,
   onEdit,
   editingIds = [],
   onGenerate,
   generating,
   genStageText,
-  onRefresh,
   refreshBusy,
   pinned,
   settingsOpen,
@@ -103,14 +101,12 @@ export default function HistoryPanel({
   syncBusy: boolean;
   onSync: () => void;
   tasks: FocusTask[];
-  onExport: () => void;
   onAddManual: (record: FocusSession) => void;
   onEdit?: (before: FocusSession, after: FocusSession) => void;
   editingIds?: string[];
   onGenerate: () => void;
   generating: boolean;
   genStageText: string;
-  onRefresh: () => void;
   refreshBusy: boolean;
   pinned: boolean;
   settingsOpen: boolean;
@@ -199,6 +195,8 @@ export default function HistoryPanel({
         <div className="side-title">
           概览
           <span className="side-title-actions">
+            {/* ⟳ 刷新已并入生成按钮：当日首次=前台进度生成，
+                已生成过=后台静默合并刷新（语义覆盖纯重读） */}
             <button
               className={`btn-text gen-btn${generating ? " busy" : ""}`}
               disabled={refreshBusy || generating}
@@ -208,15 +206,6 @@ export default function HistoryPanel({
                 <span className="gen-spinner" aria-hidden="true" />
               )}
               {generating ? "生成中…" : "生成今日番茄"}
-            </button>
-            <button
-              className="ghost-btn refresh-btn"
-              title="刷新今日番茄"
-              aria-label="刷新今日番茄"
-              disabled={refreshBusy}
-              onClick={onRefresh}
-            >
-              ↻
             </button>
           </span>
           <WindowControls
@@ -351,9 +340,12 @@ export default function HistoryPanel({
                 ? "同步中…"
                 : `手动同步${pendingCount ? ` (${pendingCount})` : ""}`}
             </button>
+            {/* 「导出」按用户要求隐藏不渲染；导出实现（FocusApp.exportRecords）
+                保留，恢复时还原下方按钮即可
             <button className="btn-text" onClick={onExport}>
               导出
             </button>
+            */}
           </span>
         </div>
         {entryOpen && (
@@ -383,14 +375,20 @@ export default function HistoryPanel({
             <section className="record-day" key={group.date}>
               <h4>
                 {group.date}
-                <span className="day-total">
-                  共{" "}
-                  {group.records.reduce(
+                {(() => {
+                  const dayCount = group.records.reduce(
                     (total, r) => total + (r.completedCount || 0),
                     0
-                  )}{" "}
-                  个番茄
-                </span>
+                  );
+                  const tier = harvestTier(dayCount);
+                  return (
+                    <span
+                      className={`day-total${tier ? ` ${tier}` : ""}`}
+                    >
+                      共 {dayCount} 个番茄
+                    </span>
+                  );
+                })()}
               </h4>
               {group.records.length === 0 ? (
                 <p className="record-invite">{todayInvite()}</p>

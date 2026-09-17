@@ -158,3 +158,10 @@ export function quadrantToneList(
       }
   return list;
 }
+
+// 当日番茄数的成就感分级：<5 常规灰、5–9 番茄红加粗、≥10 金色加大
+export function harvestTier(count: number): "" | "mid" | "high" {
+  if (count >= 10) return "high";
+  if (count >= 5) return "mid";
+  return "";
+}
