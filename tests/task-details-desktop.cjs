@@ -84,6 +84,12 @@ app.whenReady().then(async () => {
           label
         )});if(!b)throw Error('Missing button');b.click()})()`
       );
+    const pointerClick = async (selector) => {
+      const point = await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});const r=e.getBoundingClientRect();return {x:Math.round(r.left+Math.min(30,r.width/2)),y:Math.round(r.top+r.height/2)}})()`);
+      win.webContents.sendInputEvent({type:"mouseDown",button:"left",clickCount:1,...point});
+      win.webContents.sendInputEvent({type:"mouseUp",button:"left",clickCount:1,...point});
+      await delay(150);
+    };
     const panel = () =>
       js("!!document.querySelector('.task-detail-popover')");
     const stored = () =>
@@ -96,7 +102,7 @@ app.whenReady().then(async () => {
       await js(
         "document.querySelectorAll('.task-title-button').length"
       ),
-      2
+      3
     );
     const layout = await js(
       "[...document.querySelectorAll('.task')].map(e=>{const r=e.getBoundingClientRect();return [r.x,r.y,r.width,r.height]})"
@@ -104,7 +110,7 @@ app.whenReady().then(async () => {
     const selected = await js(
       "document.querySelector('.chip.selected')?.title||''"
     );
-    await click(".task-title-button");
+    await pointerClick(".task-title-button");
     await until(panel);
     assert.equal(
       await js(
@@ -150,6 +156,10 @@ app.whenReady().then(async () => {
     console.log(
       "PASS switching title, inside click, Escape and outside dismissal"
     );
+    assert.equal(await js("document.querySelectorAll('.task-details-hint').length"), 2);
+    await click(".task-list > .task:nth-child(3) .task-title-button");
+    assert.match(await js("document.querySelector('.task-detail-text').textContent"), /暂无任务详情/);
+    await click(".quad-head");
     win.setMinimumSize(420, 420);
     win.setContentSize(520, 780);
     await delay(350);

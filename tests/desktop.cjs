@@ -321,7 +321,13 @@ app
     // Test the desktop layout at an explicit wide content size, independent of
     // the host monitor's work area and Windows display scaling.
     win.setContentSize(1100, 760);
-    await wait(150);
+    // The native resize completes before the renderer necessarily receives it.
+    // Wait for viewport delivery, then assert layout separately (never poll PASS).
+    for (let i = 0; i < 100; i++) {
+      if (await js('Math.abs(innerWidth-1100)<=2 && Math.abs(innerHeight-760)<=2')) break;
+      await wait(30);
+    }
+    assert.ok(await js('Math.abs(innerWidth-1100)<=2 && Math.abs(innerHeight-760)<=2'));
     const layout = await js(`(()=>{
       const a=document.querySelector('.left-col').getBoundingClientRect();
       const b=document.querySelector('.right-col').getBoundingClientRect();

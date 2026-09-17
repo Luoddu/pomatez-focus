@@ -303,6 +303,7 @@ input:focus-visible {
   cursor: pointer;
 }
 .task-title-button:hover { color: var(--primary); }
+.task-details-hint { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 400; color: #60709e; white-space: nowrap; }
 .task-title-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .task-detail-popover {
   position: fixed;
@@ -1013,6 +1014,12 @@ input:focus-visible {
   line-height: 1.6;
   color: #606b7b;
 }
+.change-task-button { margin-top: 5px; }
+.active-task-picker { margin-top: 8px; width: min(420px, 100%); }
+.active-task-picker label { display: block; font-size: 13px; margin-bottom: 4px; }
+.active-task-picker select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: white; font: inherit; font-size: 13px; }
+.active-task-picker p { margin: 4px 0; font-size: 12px; color: #606b7b; }
+.active-task-picker-actions { display: flex; gap: 16px; }
 .ring {
   position: relative;
   width: 300px;

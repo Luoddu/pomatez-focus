@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { FocusSession, timeParts } from "../session";
+import { FocusSession, FocusTask, timeParts } from "../session";
 import { Ring, durationText, parseTitle, quadrantMeta } from "./shared";
 
 export default function FocusTimer({
   active,
+  tasks,
+  onChangeTask,
+  blocked,
   restSeconds,
   shownTime,
   onPause,
@@ -11,6 +14,9 @@ export default function FocusTimer({
   onFinish,
 }: {
   active: FocusSession;
+  tasks: FocusTask[];
+  onChangeTask: (id: string) => boolean;
+  blocked: boolean;
   restSeconds: number;
   shownTime: string;
   onPause: () => void;
@@ -26,6 +32,12 @@ export default function FocusTimer({
   );
   // 「结束」二次确认防误触：第一次进入确认态，3 秒不点自动还原；再点才真结束
   const [confirming, setConfirming] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [choice, setChoice] = useState("");
+  const options = tasks.filter(
+    (t) =>
+      t.kind !== "done" && t.kind !== "pending" && t.kind !== "free"
+  );
   useEffect(() => setConfirming(false), [active.id]);
   useEffect(() => {
     if (!confirming) return;
@@ -59,6 +71,65 @@ export default function FocusTimer({
               第 {parsed.pomodoro} 个番茄 · 番茄时长 {plannedMinutes}{" "}
               分钟
             </div>
+            {!changing ? (
+              <button
+                className="btn-text change-task-button"
+                disabled={blocked}
+                onClick={() => {
+                  setChoice(
+                    active.task.kind === "free"
+                      ? "__free__"
+                      : active.task.id
+                  );
+                  setChanging(true);
+                }}
+              >
+                更换任务
+              </button>
+            ) : (
+              <div className="active-task-picker">
+                <label htmlFor="active-task-choice">本次专注任务</label>
+                <select
+                  id="active-task-choice"
+                  value={choice}
+                  onChange={(e) => setChoice(e.target.value)}
+                >
+                  <option value="__free__">自由番茄</option>
+                  {active.task.kind !== "free" &&
+                    !options.some((t) => t.id === active.task.id) && (
+                      <option value={active.task.id}>
+                        {active.task.title}（当前任务）
+                      </option>
+                    )}
+                  {options.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {quadrantMeta(t.quadrant)?.label
+                        ? `[${quadrantMeta(t.quadrant)!.label}] `
+                        : ""}
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+                <p>已计时长保留，整段专注记到更换后的任务。</p>
+                <div className="active-task-picker-actions">
+                  <button
+                    className="btn-text"
+                    disabled={blocked}
+                    onClick={() => {
+                      if (onChangeTask(choice)) setChanging(false);
+                    }}
+                  >
+                    确认更换
+                  </button>
+                  <button
+                    className="btn-text"
+                    onClick={() => setChanging(false)}
+                  >
+                    取消更换
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <Ring

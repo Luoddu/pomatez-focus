@@ -1054,7 +1054,7 @@ export default function FocusApp() {
     ...(sourceKey ? { sourceKey } : {}),
   });
   // 开始一个任务：把未同步的同一 planId 记录折算进 creditedSeconds 后再起计时
-  const beginTask = (task: FocusTask) => {
+  const withPendingCredit = (task: FocusTask): FocusTask => {
     const unsyncedSeconds = task.planId
       ? pending
           .filter(
@@ -1066,14 +1066,56 @@ export default function FocusApp() {
           )
           .reduce((n, r) => n + (r.acceptedSeconds || 0), 0)
       : 0;
-    timer.begin(
-      {
-        ...task,
-        creditedSeconds: (task.creditedSeconds || 0) + unsyncedSeconds,
-      },
-      minutes
-    );
+    return {
+      ...task,
+      creditedSeconds: (task.creditedSeconds || 0) + unsyncedSeconds,
+    };
   };
+  const beginTask = (task: FocusTask) =>
+    timer.begin(withPendingCredit(task), minutes);
+  const changeActiveTask = (id: string) => {
+    const current = timer.getSnapshot().active;
+    if (!current) return false;
+    if (id === current.task.id) return true;
+    const target: FocusTask | undefined =
+      id === "__free__"
+        ? {
+            id: crypto.randomUUID(),
+            title: "自由番茄",
+            kind: "free",
+            source: current.task.source,
+            ...(current.task.sourceKey
+              ? { sourceKey: current.task.sourceKey }
+              : {}),
+          }
+        : boardTasks.find(
+            (t) =>
+              t.id === id && t.kind !== "done" && t.kind !== "pending"
+          );
+    if (!target) {
+      notify("这个番茄已不可用，请重新选择。", "error");
+      return false;
+    }
+    return timer.changeTask(withPendingCredit(target));
+  };
+  // Refresh display metadata without mutating the timer's accounting snapshot.
+  const currentTaskMetadata =
+    active &&
+    boardTasks.find(
+      (t) =>
+        t.id === active.task.id && t.sourceKey === active.task.sourceKey
+    );
+  const activeDisplay = active
+    ? {
+        ...active,
+        task: {
+          ...active.task,
+          description: currentTaskMetadata
+            ? currentTaskMetadata.description
+            : active.task.description,
+        },
+      }
+    : null;
   // 同任务的下一个番茄（序号 +1），自由番茄没有“下一个”但总是可以再开一个
   const nextTask = (() => {
     if (!active || active.task.kind === "free") return null;
@@ -1228,7 +1270,14 @@ export default function FocusApp() {
             />
           ) : view === "timing" && active ? (
             <FocusTimer
-              active={active}
+              active={activeDisplay!}
+              tasks={boardTasks.filter(
+                (t) =>
+                  !active.task.sourceKey ||
+                  t.sourceKey === active.task.sourceKey
+              )}
+              onChangeTask={changeActiveTask}
+              blocked={timer.blocked}
               restSeconds={timer.restSeconds}
               shownTime={shownTime}
               onPause={timer.pause}

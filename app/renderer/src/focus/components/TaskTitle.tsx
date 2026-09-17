@@ -72,7 +72,6 @@ export default function TaskTitle({
       window.removeEventListener("resize", resize);
     };
   }, [open]);
-  if (!description) return <>{title}</>;
   return (
     <>
       <button
@@ -85,6 +84,7 @@ export default function TaskTitle({
         onClick={() => setOpen((value) => !value)}
       >
         {title}
+        {description && <span className="task-details-hint">详情</span>}
       </button>
       {open &&
         createPortal(
@@ -97,7 +97,10 @@ export default function TaskTitle({
             style={position}
           >
             <div className="task-detail-heading">{title}</div>
-            <div className="task-detail-text">{description}</div>
+            <div className="task-detail-text">
+              {description ||
+                "暂无任务详情。可在飞书任务表的「详细」列填写，再点击「生成今日番茄」刷新读取。"}
+            </div>
           </div>,
           document.body
         )}

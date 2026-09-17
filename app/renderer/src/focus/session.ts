@@ -42,6 +42,28 @@ export type FocusSession = {
   sync: "local" | "pending" | "synced";
 };
 
+// Attribution correction before confirmation: preserve the single timing owner.
+export function reassignActiveSession(
+  session: FocusSession,
+  task: FocusTask
+): FocusSession {
+  if (session.status !== "active" && session.status !== "paused")
+    throw Error("只能更换正在进行或已暂停的专注任务");
+  if (
+    !task?.id ||
+    !task.title?.trim() ||
+    task.kind === "done" ||
+    task.kind === "pending"
+  )
+    throw Error("请选择可用的任务番茄");
+  if (
+    session.task.sourceKey &&
+    session.task.sourceKey !== task.sourceKey
+  )
+    throw Error("不能将当前专注改到另一张飞书表");
+  return { ...session, task: { ...task } };
+}
+
 export function advanceSession(
   session: FocusSession,
   seconds: number,
