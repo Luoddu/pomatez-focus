@@ -176,6 +176,33 @@ test("today excludes yesterday/tomorrow/completed rows and resolves linked task 
   assert.equal(rows[0].title, "Synthetic task · 第 2 个番茄");
   assert.equal(state.writes.length, 0);
 });
+
+test("task details use linked text without writes, preserve lines and optional compatibility", async () => {
+  for (const [fields, expected] of [
+    [
+      { 详细: [{ text: "First line\n" }, { text: "<b>literal</b>" }] },
+      "First line\n<b>literal</b>",
+    ],
+    [{ 详情: "Fallback details" }, "Fallback details"],
+    [{ 详细: "Primary", 详情: "Fallback" }, "Primary"],
+    [{ 详细: "", 详情: "Do not revive cleared details" }, undefined],
+    [{}, undefined],
+  ]) {
+    const { client, state } = harness({
+      taskRecords: [
+        {
+          record_id: "task1",
+          fields: { 任务名称: "Synthetic", ...fields },
+        },
+      ],
+    });
+    const rows = await client.today(now);
+    assert.equal(rows[0].description, expected);
+    assert.equal(rows[0].taskId, "task1");
+    assert.equal(rows[0].title, "Synthetic · 第 2 个番茄");
+    assert.equal(state.writes.length, 0);
+  }
+});
 test("v1 record_ids link objects resolve task identity, title and quadrant", async () => {
   for (const taskLink of [
     [

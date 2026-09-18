@@ -7,6 +7,7 @@ import {
   restoreSession,
   returnFromReview,
   upsertRecord,
+  reassignActiveSession,
 } from "../app/renderer/src/focus/session.ts";
 
 const sample = () => ({
@@ -17,6 +18,32 @@ const sample = () => ({
   elapsedSeconds: 0,
   status: "active",
   sync: "local",
+});
+test("active task correction preserves timing, pauses and identity; only final attribution changes", () => {
+  const original = {...advanceSession(sample(), 720, 721000), status: "paused", segments: [{start: 1000, end: 721000}]};
+  const target = {id: "other-plan", title: "Other task", source: "feishu", sourceKey: "same", description: "Details"};
+  const changed = reassignActiveSession(original, target);
+  assert.deepEqual({...changed, task: original.task}, original);
+  assert.equal(original.task.id, "demo");
+  const free = reassignActiveSession(changed, {id: "free", title: "自由番茄", kind: "free", source: "feishu", sourceKey: "same"});
+  assert.equal(free.elapsedSeconds, 720);
+  assert.equal(free.status, "paused");
+  const resumed = advanceSession({...reassignActiveSession(free, target), status: "active", segmentOpen: false}, 780, 2000000);
+  const saved = confirmSession({...resumed, status: "review"}, 1500, 1);
+  assert.equal(saved.task.id, "other-plan");
+  assert.equal(saved.id, original.id);
+  assert.equal(saved.acceptedSeconds, 1500);
+  assert.equal(saved.sync, "pending");
+});
+test("correction rejects foreign sources, unavailable plans and finalized sessions without changing valid timers", () => {
+  const current = {...sample(), task: {...sample().task, sourceKey: "same"}};
+  const target = {id: "other", title: "Other", source: "feishu", sourceKey: "same"};
+  for (const kind of ["done", "pending"]) assert.throws(() => reassignActiveSession(current, {...target, kind}));
+  assert.throws(() => reassignActiveSession(current, {...target, sourceKey: "foreign"}));
+  assert.throws(() => reassignActiveSession({...current, status: "review"}, target));
+  assert.throws(() => reassignActiveSession({...current, status: "confirmed"}, target));
+  assert.equal(reassignActiveSession(current, target).status, "active");
+  assert.equal(current.task.id, "demo");
 });
 test("active spans exclude pauses and restart gaps; confirmed count is honored", () => {
   let s = {

@@ -37,6 +37,11 @@ function cleanRows(value: unknown, sourceKey: string): FocusTask[] {
       source: "feishu",
       sourceKey,
     };
+    if (
+      typeof v.description === "string" &&
+      v.description.length <= 100000
+    )
+      row.description = v.description;
     for (const key of ["planId", "taskId"] as const) {
       if (v[key] !== undefined) {
         if (typeof v[key] !== "string" || v[key].length > 500)

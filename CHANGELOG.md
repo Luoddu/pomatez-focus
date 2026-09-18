@@ -1,5 +1,12 @@
 # Changelog
 
+## 番茄农场 0.1.0-preview.36 (2026-09-17)
+
+- Read optional task details from the linked Feishu task table (`详细`, with `详情` fallback).
+- Click a board title to inspect details without changing selection or layout; click outside or press Escape to dismiss.
+- Show multiline details below the active focus title; preserve details in the task cache and current session across restart.
+- Retain existing timing, completion, history accounting and synchronization behavior.
+
 ## [1.11.0](https://github.com/zidoro/pomatez/compare/v1.10.0...v1.11.0) (2026-05-19)
 
 

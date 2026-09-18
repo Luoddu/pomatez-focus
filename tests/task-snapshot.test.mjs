@@ -19,6 +19,7 @@ const rows = [
     id: "p1",
     planId: "p1",
     title: "Synthetic task",
+    description: "First line\nSecond line <b>literal</b>",
     source: "feishu",
     sourceKey: "A",
     quadrant: "iu",

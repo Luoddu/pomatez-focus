@@ -10,6 +10,7 @@ import {
   advanceSession,
   confirmSession,
   restoreSession,
+  reassignActiveSession,
   returnFromReview,
   timeParts,
   upsertRecord,
@@ -33,6 +34,7 @@ type CounterProps = {
   blocked: boolean;
   restSeconds: number;
   begin: (task: FocusTask, minutes: number) => void;
+  changeTask: (task: FocusTask) => boolean;
   pause: () => void;
   resume: () => void;
   finish: () => void;
@@ -267,6 +269,21 @@ const CounterProvider: React.FC = ({ children }) => {
           active: { ...next.active, status: "paused" },
         });
     });
+  const changeTask = (task: FocusTask) => {
+    let changed = false;
+    action(() => {
+      const next = settle();
+      if (!next.active) throw Error("当前没有正在进行的专注");
+      publish({
+        ...next,
+        active: reassignActiveSession(next.active, task),
+      });
+      setNotice("任务已更换，已计时长保留；结束后整段专注记到新任务。");
+      setError("");
+      changed = true;
+    });
+    return changed;
+  };
   const resume = () =>
     action(() => {
       const next = dataRef.current;
@@ -433,6 +450,7 @@ const CounterProvider: React.FC = ({ children }) => {
         blocked: fatal.current,
         restSeconds,
         begin,
+        changeTask,
         pause,
         resume,
         finish,

@@ -4,6 +4,7 @@ import QuickTaskEntry from "./QuickTaskEntry";
 import { QuadrantKey } from "../week";
 import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import FarmField from "./FarmField";
+import TaskTitle from "./TaskTitle";
 
 // 已收格子的视觉上限：计划数很大时只画前 12 格，文字仍显示真实 x/y
 const HARVEST_CELLS_MAX = 12;
@@ -72,7 +73,13 @@ const GroupList = ({
           >
             <div className="task-main">
               <div className="task-name">
-                {group.name}
+                <TaskTitle
+                  taskKey={group.key}
+                  title={group.name}
+                  description={
+                    group.tasks.find((t) => t.description)?.description
+                  }
+                />
                 {group.tasks.some((t) => t.quickTask) && (
                   <small> · 待同步，可专注</small>
                 )}
