@@ -1,6 +1,7 @@
 # P0-POMO-014 — local-first additional tomatoes
 
-Status: REVIEW (implementation and local acceptance passed; release pending).
+Status: REVIEW (implementation/local acceptance passed; preview.40 published;
+independent-agent review not claimed).
 Role/context owner: isolated module implementer /root.
 Baseline: 02c86bae8caffe225dd894429a0e0c06888b77e1 (public preview.39).
 Branch: task/p0-pomo-014-plan-local-first. User requests usable local additions in

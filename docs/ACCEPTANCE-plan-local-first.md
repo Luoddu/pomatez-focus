@@ -72,4 +72,19 @@ the append payload. Storage keys and existing history remain unchanged.
 
 Learning-Review: none — existing UI-123-01 stable-intent and UI-129-01 real-lifecycle
 lessons apply directly; this fix does not establish an additional cross-task lesson.
-Release verification will be appended after packaging/publication.
+
+## Published release
+
+Packaged clean source: `fe5fc91076fe5a48dcc75bb202e97465b58cc223`.
+Post-commit full build/package passed; append cold-process desktop test passed
+again on that compiled renderer. ASAR source receipt matches the clean build.
+Guarded non-force push verified the same public source. Live
+`v0.1.0-preview.40` tag resolves to exactly this source SHA.
+
+[Release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.40)
+ID 391490621 is public, prerelease, not draft. All six uploaded assets match local
+byte sizes and SHA-256 digests: setup, portable, blockmap, preview.yml,
+source-version.json and SHA256SUMS.txt. Update feed setup SHA-512 verified.
+Ignored verification receipt: artifacts/release40-verification.json.
+Personal app unchanged; installation is available through the existing updater.
+This documentation follow-up does not change the packaged source/tag.
