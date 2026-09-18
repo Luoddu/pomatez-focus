@@ -1019,6 +1019,41 @@ app
     });
     await shot("board-overload-1080");
 
+    // ── chip 单行窗口：8 番茄任务只渲染前 6 个 + 「+2」指示，不换行 ──
+    await win.setContentSize(1280, 800);
+    await win.loadURL(
+      `${pathToFileURL(html).href}?demoTasks=iu:1x8,inu:2`
+    );
+    await wait(800);
+    results.push({
+      check: "eight-pomodoro task renders six chips plus a +2 hint on one row",
+      pass: await js(
+        `(()=>{const g=document.querySelector('.quad-iu .chips');const chips=[...g.querySelectorAll('.chip')];const more=g.querySelector('.chips-more');return chips.length===6&&chips.every(c=>c.offsetTop===chips[0].offsetTop)&&chips.map(c=>c.textContent).join()=='1,2,3,4,5,6'&&more&&more.textContent=='+2'&&more.title.includes('继续出现')})()`
+      ),
+    });
+    // 收掉前 3 个后：第 4-8 顶入窗口，无 +N 指示
+    await win.loadURL(
+      `${pathToFileURL(html).href}?demoTasks=iu:1x8d3,inu:2`
+    );
+    await wait(800);
+    results.push({
+      check: "finishing front pomodoros slides later ones into the window",
+      pass: await js(
+        `(()=>{const g=document.querySelector('.quad-iu .chips');const chips=[...g.querySelectorAll('.chip')];return chips.length===5&&chips.map(c=>c.textContent).join()=='4,5,6,7,8'&&!g.querySelector('.chips-more')})()`
+      ),
+    });
+    // 双列 spread 象限里 chip 同样单行不换行
+    await win.loadURL(`${pathToFileURL(html).href}?demoTasks=iu:2x8`);
+    await wait(800);
+    results.push({
+      check: "spread two-column quadrant also keeps chips on one row",
+      pass: await js(
+        `(()=>{const groups=[...document.querySelectorAll('.quad-iu.spread .chips')];return groups.length===2&&groups.every(g=>{const c=[...g.querySelectorAll('.chip')];return c.length===6&&c.every(x=>x.offsetTop===c[0].offsetTop)&&g.querySelector('.chips-more')})})()`
+      ),
+    });
+    await shotClip("task-chips-window", ".quad-iu .task");
+    await shot("board-chips-window");
+
     results.push({ check: "no renderer console errors", pass: !errors.length });
     if (errors.length) console.error("console errors:", errors);
     const failed = results.filter((r) => !r.pass);
