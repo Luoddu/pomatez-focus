@@ -117,6 +117,30 @@ function harness() {
     state,
   };
 }
+test("queued append uses original task/day/sequence; lost response retry neither adds a task nor repeats the plan", async () => {
+  const h=harness(), day=new Date().setHours(0,0,0,0)-86400000;
+  h.state.tasks.push({record_id:'existing',fields:{任务名称:'Synthetic'}});
+  h.state.plans.push({record_id:'p1',fields:{番茄:'1',任务:['existing'],计划日:day,已完成:true}});
+  const q={id:randomUUID(),sourceKey:h.key,title:'Synthetic',quadrant:'iu',count:1,day,append:{taskId:'existing',sequence:2,description:'Details'}};
+  h.state.lose='POST:plans';
+  await assert.rejects(h.client.createQuickTask(q),/response lost/);
+  const result=await h.client.createQuickTask(q);
+  await h.client.createQuickTask(q);
+  assert.equal(h.state.tasks.length,1); assert.equal(h.state.plans.length,2);
+  assert.equal(h.state.writes.length,1); assert.equal(h.state.plans[1].fields.计划日,day);
+  assert.equal(result.tasks[0].taskId,'existing'); assert.equal(result.tasks[0].quadrant,'iu');
+  assert.equal(result.tasks[0].description,'Details'); assert.match(result.tasks[0].title,/第 2 个/);
+  assert.equal(result.tasks[0].doneToday,1); assert.equal(result.tasks[0].plannedToday,2);
+  await assert.rejects(h.client.createQuickTask({...q,sourceKey:'other'}),/无效/);
+  await assert.rejects(h.client.createQuickTask({...q,append:{...q.append,sequence:51}}),/无效/);
+  await assert.rejects(h.client.createQuickTask({...q,append:{...q.append,taskId:'missing'}}),/不存在/);
+  h.state.plans[1].fields.已完成=true;
+  await assert.rejects(h.client.createQuickTask(q),/其他专注/);
+  h.state.plans[1].fields.已完成=false;
+  h.state.plans.push({...h.state.plans[1],record_id:'duplicate'});
+  await assert.rejects(h.client.createQuickTask(q),/序号重复/);
+  assert.equal(h.state.writes.length,1);
+});
 test("quick task writes correct quadrant/date/count and retries after lost task response without duplicates", async () => {
   const h = harness(),
     now = new Date();

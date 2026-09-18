@@ -924,6 +924,7 @@ export class Feishu {
     };
   }
   async createQuickTask(input: any) {
+    if (input?.append) return this.appendQueuedPlan(input);
     const labels: Record<string, string> = {
       iu: "重要且紧急",
       inu: "重要不紧急",
@@ -1096,6 +1097,122 @@ export class Feishu {
       };
     });
     return { taskId, created: true, tasks: taskRows };
+  }
+  // Reuse the durable quick-task outbox for a specified slot of an existing task.
+  // The slot/day stay fixed after ambiguous failures; never recompute max+1 on retry.
+  private async appendQueuedPlan(input: any) {
+    const a = input.append;
+    if (
+      input.sourceKey !== connectionKey(this.config) ||
+      !/^[0-9a-f-]{36}$/i.test(input.id || "") ||
+      input.count !== 1 ||
+      typeof input.title !== "string" ||
+      !input.title.trim() ||
+      input.title.length > 5000 ||
+      !Number.isInteger(a.sequence) ||
+      a.sequence < 1 ||
+      a.sequence > MAX_PER_TASK ||
+      !Number.isFinite(input.day) ||
+      input.day < 946684800000 ||
+      input.day > Date.now() + 86400000 ||
+      (input.quadrant != null &&
+        !["iu", "inu", "uni", "unu"].includes(input.quadrant)) ||
+      (a.description != null &&
+        (typeof a.description !== "string" ||
+          a.description.length > 100000))
+    )
+      throw Error("追加番茄参数或所属飞书表无效");
+    id(a.taskId);
+    const schema = await this.planSchema();
+    await this.guardRecordMoves(schema);
+    const linkedTable = schema.fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    if (
+      !linkedTable ||
+      schema.fields.filter(
+        (f) => f.field_name === "番茄" && f.type === 1
+      ).length !== 1
+    )
+      throw Error("原番茄表缺少任务关联或番茄文本字段");
+    const task = (
+      await this.call(
+        "GET",
+        `${this.root()}/tables/${id(linkedTable)}/records/${id(
+          a.taskId
+        )}`
+      )
+    ).data?.record;
+    if (task?.record_id !== a.taskId)
+      throw Error("原任务不存在，追加番茄仍保留本机");
+    const day = dayStart(new Date(input.day));
+    const mine = (r: any) =>
+      localDayOf(r.fields?.[this.config.dateField]) === day &&
+      JSON.stringify(
+        linkedRecordIds(r.fields?.[this.config.taskField], linkedTable)
+      ) === JSON.stringify([a.taskId]);
+    const read = async () =>
+      (await this.list(`${schema.path}/records`)).filter(mine);
+    let plans = await read();
+    const hits = () =>
+      plans.filter(
+        (r) =>
+          pomodoroSequence(textValue(r.fields?.番茄)) === a.sequence
+      );
+    if (hits().length > 1)
+      throw Error("追加番茄序号重复，请核对原表；本机记录保留");
+    if (!hits().length) {
+      await this.call(
+        "POST",
+        `${schema.path}/records?client_token=${clientToken(
+          `today-pomodoro-create|${this.config.appToken}|${
+            a.taskId
+          }|${dateKeyOf(day)}|${a.sequence}`
+        )}`,
+        {
+          fields: {
+            番茄: String(a.sequence),
+            [this.config.taskField]: [a.taskId],
+            [this.config.dateField]: day,
+          },
+        }
+      );
+      plans = await read();
+    }
+    if (hits().length !== 1)
+      throw Error("追加番茄回读未通过，保留本机等待重试");
+    const row = hits()[0],
+      ledger = readLedger(row.fields);
+    if (
+      row.fields?.[this.config.completedField] === true ||
+      ledgerSeconds(ledger) > 0
+    )
+      throw Error(
+        "该序号已被其他专注使用，本机专注保留；请刷新并更换记录的任务番茄"
+      );
+    return {
+      taskId: a.taskId,
+      created: true,
+      tasks: [
+        {
+          id: row.record_id,
+          planId: row.record_id,
+          taskId: a.taskId,
+          title: `${input.title} · 第 ${a.sequence} 个番茄`,
+          description: a.description,
+          source: "feishu",
+          sourceKey: input.sourceKey,
+          quadrant: input.quadrant,
+          doneToday: plans.filter(
+            (r) => r.fields?.[this.config.completedField] === true
+          ).length,
+          plannedToday: plans.length,
+          creditedSeconds: 0,
+          appliedSessionIds: [],
+          goalSeconds: ledger?.target,
+        },
+      ],
+    };
   }
   async today(now = new Date()) {
     const { path, fields } = await this.planSchema();

@@ -17,6 +17,7 @@ import {
   projectQuickTasks,
   quickRows,
   bindQuickTask,
+  mergeQuickRows,
   validateQuickReceipt,
 } from "./quickTasks";
 import {
@@ -700,12 +701,14 @@ export default function FocusApp() {
             setLoadingTasks(false);
             const isToday = q.day === new Date().setHours(0, 0, 0, 0);
             const fresh = isToday
-              ? [
-                  ...tasksRef.current.filter(
-                    (t) => t.taskId !== rows[0].taskId
-                  ),
-                  ...rows,
-                ]
+              ? q.append
+                ? mergeQuickRows(tasksRef.current, rows)
+                : [
+                    ...tasksRef.current.filter(
+                      (t) => t.taskId !== rows[0].taskId
+                    ),
+                    ...rows,
+                  ]
               : tasksRef.current;
             if (!writeTaskSnapshot(localStorage, sourceKey, fresh))
               throw Error(
@@ -896,10 +899,71 @@ export default function FocusApp() {
       }
     });
   };
-  // 悬浮 ± 临时调整：乐观更新 UI，写飞书失败按本地快照回滚并报错
+  // Plus is durable/local-first. Minus retains the existing guarded removal flow.
   const adjust = (taskId: string, delta: 1 | -1) => {
     if (!api() || !connected) {
       notify("请先在设置中连接飞书，再调整番茄数。", "error");
+      return;
+    }
+    // Read the durable queue now: successive clicks may share a render closure.
+    const currentBoard = completionQueue.project(
+      projectQuickTasks(tasksRef.current, editQueue.entries, sourceKey),
+      sourceKey
+    );
+    const group = groupTasks(currentBoard).find(
+      (g) => g.key === taskId
+    );
+    if (!group || !sourceKey || adjusting) return;
+    if (delta === 1) {
+      const info =
+        group.tasks.find((t) => t.plannedToday != null) ||
+        group.tasks[0];
+      const sequence =
+        Math.max(
+          info?.plannedToday || 0,
+          ...group.tasks.map((t) => parseTitle(t.title).pomodoro)
+        ) + 1;
+      if (sequence > 50) {
+        notify("单个任务每日最多 50 个番茄", "error");
+        return;
+      }
+      const id = crypto.randomUUID();
+      const payload: QuickTask = {
+        id,
+        sourceKey,
+        title: group.name,
+        quadrant: info.quadrant,
+        count: 1,
+        day: new Date().setHours(0, 0, 0, 0),
+        append: {
+          taskId,
+          sequence,
+          doneToday: info.doneToday || 0,
+          plannedToday:
+            Math.max(info.plannedToday || 0, group.tasks.length) + 1,
+          description: group.tasks.find((t) => t.description)
+            ?.description,
+        },
+      };
+      try {
+        editQueue.add({
+          id,
+          sourceKey,
+          kind: "task",
+          payload,
+          state: "pending",
+        });
+        setSelected(quickRows(payload)[0].id);
+      } catch (e: any) {
+        notify(e.message || "新增番茄未能保存在本机", "error");
+      }
+      return;
+    }
+    if (group.tasks.some((t) => t.quickTask)) {
+      notify(
+        "新增番茄尚未同步，暂不能减少；可以立即开始专注。",
+        "error"
+      );
       return;
     }
     if (
@@ -916,29 +980,8 @@ export default function FocusApp() {
       );
       return;
     }
-    const group = groupTasks(boardTasks).find((g) => g.key === taskId);
-    if (!group || adjusting) return;
     const rollback = tasks;
-    if (delta === 1) {
-      const info = group.tasks.find((t) => t.plannedToday != null);
-      const seq =
-        Math.max(
-          info?.plannedToday ?? 0,
-          ...group.tasks.map((t) => parseTitle(t.title).pomodoro)
-        ) + 1;
-      setTasks([
-        ...tasks,
-        {
-          id: `pending-${taskId}-${seq}`,
-          title: `${group.name} · 第 ${seq} 个番茄`,
-          source: "feishu",
-          taskId,
-          kind: "pending",
-          doneToday: info?.doneToday ?? 0,
-          plannedToday: (info?.plannedToday ?? group.tasks.length) + 1,
-        },
-      ]);
-    } else {
+    {
       const victims = group.tasks.filter(
         (t) =>
           t.kind !== "done" &&

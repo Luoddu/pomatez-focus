@@ -4,9 +4,17 @@ export type QuickTask = {
   id: string;
   sourceKey: string;
   title: string;
-  quadrant: FocusQuadrant;
+  quadrant?: FocusQuadrant;
   count: number;
   day: number;
+  // Additional slot for an existing task; stable across retries/restarts.
+  append?: {
+    taskId: string;
+    sequence: number;
+    doneToday: number;
+    plannedToday: number;
+    description?: string;
+  };
 };
 export type PendingEdit = {
   id: string;

@@ -4,14 +4,17 @@ import type { OutboxItem, QuickTask } from "./editQueue";
 export function quickRows(q: QuickTask): FocusTask[] {
   return Array.from({ length: q.count }, (_, i) => ({
     id: `quick-${q.id}-${i + 1}`,
-    taskId: `quick-${q.id}`,
-    title: `${q.title} · 第 ${i + 1} 个番茄`,
+    taskId: q.append?.taskId || `quick-${q.id}`,
+    title: `${q.title} · 第 ${q.append?.sequence || i + 1} 个番茄`,
+    ...(q.append?.description
+      ? { description: q.append.description }
+      : {}),
     source: "feishu",
     sourceKey: q.sourceKey,
     quadrant: q.quadrant,
     quickTask: { id: q.id, sequence: i + 1 },
-    doneToday: 0,
-    plannedToday: q.count,
+    doneToday: q.append?.doneToday || 0,
+    plannedToday: q.append?.plannedToday || q.count,
   }));
 }
 export function validateQuickReceipt(q: QuickTask, rows: FocusTask[]) {
@@ -28,7 +31,9 @@ export function validateQuickReceipt(q: QuickTask, rows: FocusTask[]) {
         r.quickTask ||
         r.source !== "feishu" ||
         r.sourceKey !== q.sourceKey ||
-        r.title !== `${q.title} · 第 ${i + 1} 个番茄` ||
+        (q.append && r.taskId !== q.append.taskId) ||
+        r.title !==
+          `${q.title} · 第 ${q.append?.sequence || i + 1} 个番茄` ||
         r.quadrant !== q.quadrant
     )
   )
@@ -83,5 +88,35 @@ export function projectQuickTasks(
     (e) => e.taskRows || quickRows(e.payload as QuickTask)
   );
   const ids = new Set(projected.map((r) => r.id));
-  return [...tasks.filter((r) => !ids.has(r.id)), ...projected];
+  return mergeQuickRows(
+    tasks.filter((r) => !ids.has(r.id)),
+    projected
+  );
+}
+
+// Keep sibling plans and normalize group totals before the server refresh arrives.
+export function mergeQuickRows(
+  tasks: FocusTask[],
+  rows: FocusTask[]
+): FocusTask[] {
+  const ids = new Set(rows.map((r) => r.id));
+  const groups = new Set(rows.map((r) => `${r.sourceKey}|${r.taskId}`));
+  const merged = [...tasks.filter((r) => !ids.has(r.id)), ...rows];
+  const totals = new Map<string, { planned: number; done: number }>();
+  for (const row of merged) {
+    if (!row.taskId || !groups.has(`${row.sourceKey}|${row.taskId}`))
+      continue;
+    const key = `${row.sourceKey}|${row.taskId}`;
+    const old = totals.get(key) || { planned: 0, done: 0 };
+    totals.set(key, {
+      planned: Math.max(old.planned, row.plannedToday || 0),
+      done: Math.max(old.done, row.doneToday || 0),
+    });
+  }
+  return merged.map((row) => {
+    const total = totals.get(`${row.sourceKey}|${row.taskId}`);
+    return total
+      ? { ...row, plannedToday: total.planned, doneToday: total.done }
+      : row;
+  });
 }

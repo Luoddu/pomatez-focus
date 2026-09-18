@@ -56,7 +56,8 @@ const GroupList = ({
         const canAdjust =
           !!onAdjust &&
           !!taskId &&
-          !group.tasks.some((t) => t.kind === "free" || t.quickTask);
+          !taskId.startsWith("quick-") &&
+          !group.tasks.some((t) => t.kind === "free");
         const busy = adjusting === group.key;
         // 计时中的任务不允许减：该行可能已有未同步的专注分钟
         const timing = !!activeTaskId && activeTaskId === taskId;
@@ -107,9 +108,11 @@ const GroupList = ({
                       {rows.slice(win.start, win.end).map((task) => (
                         <button
                           key={task.id}
-                          className={`chip tone-${task.quadrant || "unu"} ${
-                            task.id === selected ? "selected" : ""
-                          } ${task.kind === "pending" ? "pending" : ""}`}
+                          className={`chip tone-${
+                            task.quadrant || "unu"
+                          } ${task.id === selected ? "selected" : ""} ${
+                            task.kind === "pending" ? "pending" : ""
+                          }`}
                           title={
                             canComplete(task)
                               ? `${task.title}（右键可标记完成）`
@@ -121,7 +124,11 @@ const GroupList = ({
                             if (!canComplete(task)) return;
                             e.preventDefault();
                             e.stopPropagation();
-                            setMenu({ task, x: e.clientX, y: e.clientY });
+                            setMenu({
+                              task,
+                              x: e.clientX,
+                              y: e.clientY,
+                            });
                           }}
                         >
                           {parseTitle(task.title).pomodoro}
@@ -153,7 +160,12 @@ const GroupList = ({
                         ? "没有可减的待办番茄"
                         : "减去一个待办番茄"
                     }
-                    disabled={busy || pending === 0 || timing}
+                    disabled={
+                      busy ||
+                      pending === 0 ||
+                      timing ||
+                      rows.some((t) => t.quickTask)
+                    }
                     onClick={() => onAdjust!(taskId, -1)}
                   >
                     −
@@ -296,8 +308,7 @@ export default function QuadrantBoard({
           const rowLists = row.map((q) =>
             tasks.filter((t) => quadrantOf(t) === q.key)
           );
-          const borrowing =
-            !rowLists[0].length !== !rowLists[1].length;
+          const borrowing = !rowLists[0].length !== !rowLists[1].length;
           return (
             <div className="quad-row" key={row[0].key}>
               {row.map((q, i) => {
@@ -312,37 +323,41 @@ export default function QuadrantBoard({
                     key={q.key}
                     data-quadrant={q.key}
                   >
-              <div className="quad-head">
-                <span className={`pill ${q.pill}`}>{q.label}</span>
-                <span className="quad-count">{list.length} 个任务</span>
-                {onAddTask && (
-                  <button
-                    className="quad-add ghost-btn"
-                    aria-label={`在${q.label}新增任务`}
-                    title="新增任务"
-                    onClick={() => setAdding(q.key)}
-                  >
-                    ＋
-                  </button>
-                )}
-              </div>
-              {adding === q.key && onAddTask && (
-                <QuickTaskEntry
-                  quadrant={q.key}
-                  onAdd={onAddTask}
-                  onClose={() => setAdding(null)}
-                />
-              )}
-              <GroupList
-                tasks={list}
-                selected={selected}
-                onSelect={onSelect}
-                onAdjust={onAdjust}
-                adjusting={adjusting}
-                activeTaskId={activeTaskId}
-                onComplete={onComplete}
-                completing={completing}
-              />
+                    <div className="quad-head">
+                      <span className={`pill ${q.pill}`}>
+                        {q.label}
+                      </span>
+                      <span className="quad-count">
+                        {list.length} 个任务
+                      </span>
+                      {onAddTask && (
+                        <button
+                          className="quad-add ghost-btn"
+                          aria-label={`在${q.label}新增任务`}
+                          title="新增任务"
+                          onClick={() => setAdding(q.key)}
+                        >
+                          ＋
+                        </button>
+                      )}
+                    </div>
+                    {adding === q.key && onAddTask && (
+                      <QuickTaskEntry
+                        quadrant={q.key}
+                        onAdd={onAddTask}
+                        onClose={() => setAdding(null)}
+                      />
+                    )}
+                    <GroupList
+                      tasks={list}
+                      selected={selected}
+                      onSelect={onSelect}
+                      onAdjust={onAdjust}
+                      adjusting={adjusting}
+                      activeTaskId={activeTaskId}
+                      onComplete={onComplete}
+                      completing={completing}
+                    />
                   </div>
                 );
               })}
