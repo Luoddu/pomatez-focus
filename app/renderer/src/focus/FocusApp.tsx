@@ -125,6 +125,34 @@ const demo: FocusTask[] = [
     plannedToday: 1,
   },
 ];
+// ?demoTasks=iu:17,inu:0 仅供截图脚本构造象限分布场景（不连飞书时生效）；
+// 每 5 个任务掺一个长名字，验证双列下长任务名仍省略号截断
+const demoOverride = (): FocusTask[] | null => {
+  const spec = new URLSearchParams(window.location.search).get(
+    "demoTasks"
+  );
+  if (!spec) return null;
+  const out: FocusTask[] = [];
+  for (const part of spec.split(",")) {
+    const [quadrant, count] = part.split(":");
+    for (let i = 1; i <= Number(count); i++)
+      out.push({
+        id: `shot-${quadrant}-${i}`,
+        title: `${
+          i % 5 === 0
+            ? `截图任务 ${quadrant}-${i}：一个名字特别特别长需要在双列排布里仍然被省略号截断的示例任务`
+            : `截图任务 ${quadrant}-${i}`
+        } · 第 1 个番茄`,
+        source: "local",
+        taskId: `shot-${quadrant}-${i}`,
+        quadrant: quadrant as FocusTask["quadrant"],
+        doneToday: 0,
+        plannedToday: 1,
+      });
+  }
+  return out;
+};
+const demoTasks = demoOverride() || demo;
 // 演示历史记录（[几天前, 当日番茄数]）：仅内存态展示，不写 localStorage，
 // 让离线 demo 的月历有色阶、番茄地进入挂果阶段；连接飞书后完全不使用
 const demoHistory = (): FocusSession[] => {
@@ -176,7 +204,7 @@ const demoHistory = (): FocusSession[] => {
 export default function FocusApp() {
   const timer = useContext(CounterContext);
   const [tasks, setTasks] = useState<FocusTask[]>(() =>
-      api() ? [] : demo
+      api() ? [] : demoTasks
     ),
     [selected, setSelected] = useState("");
   const [loadingTasks, setLoadingTasks] = useState(() => !!api());
@@ -406,7 +434,7 @@ export default function FocusApp() {
         setTasks((previous) =>
           previous.length && previous.every((t) => t.source === "local")
             ? previous
-            : demo
+            : demoTasks
         );
       }
     } finally {

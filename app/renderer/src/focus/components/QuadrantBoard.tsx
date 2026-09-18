@@ -249,17 +249,32 @@ export default function QuadrantBoard({
   const selectedTask = selectedRow ? selectedRow.title : "";
   // 象限缺失或无法识别的任务全部归入“不紧急不重要”
   const quadrantOf = (t: FocusTask) => t.quadrant || "unu";
+  // 两行两列：同一行内一空一有时，空象限收成细条（slim），
+  // 有任务的象限横向占满剩余行宽（spread，任务双列排布）
+  const rows = [QUADRANTS.slice(0, 2), QUADRANTS.slice(2, 4)];
   return (
     <div className="left-col">
       <div className="quadrants">
-        {QUADRANTS.map((q) => {
-          const list = tasks.filter((t) => quadrantOf(t) === q.key);
+        {rows.map((row) => {
+          const rowLists = row.map((q) =>
+            tasks.filter((t) => quadrantOf(t) === q.key)
+          );
+          const borrowing =
+            !rowLists[0].length !== !rowLists[1].length;
           return (
-            <div
-              className={`card quad quad-${q.key}`}
-              key={q.key}
-              data-quadrant={q.key}
-            >
+            <div className="quad-row" key={row[0].key}>
+              {row.map((q, i) => {
+                const list = rowLists[i];
+                const slim = borrowing && !list.length;
+                const spread = borrowing && !!list.length;
+                return (
+                  <div
+                    className={`card quad quad-${q.key}${
+                      slim ? " slim" : ""
+                    }${spread ? " spread" : ""}`}
+                    key={q.key}
+                    data-quadrant={q.key}
+                  >
               <div className="quad-head">
                 <span className={`pill ${q.pill}`}>{q.label}</span>
                 <span className="quad-count">{list.length} 个任务</span>
@@ -291,6 +306,9 @@ export default function QuadrantBoard({
                 onComplete={onComplete}
                 completing={completing}
               />
+                  </div>
+                );
+              })}
             </div>
           );
         })}
