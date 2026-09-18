@@ -948,6 +948,76 @@ app
     });
     await shotClip("farm-night", ".farm-field");
 
+    // ── 象限空间自适应：?demoTasks= 注入合成分布（页面重载，不影响上面 demo 断言） ──
+    // 场景 A：Q1 十七个任务、Q2 空 → Q1 占满行宽双列、Q2 收成细条；下排两空维持均分
+    await win.setContentSize(1280, 800);
+    await win.loadURL(`${pathToFileURL(html).href}?demoTasks=iu:17`);
+    await wait(800);
+    results.push({
+      check: "borrow: full quadrant spreads, empty sibling shrinks to a slim strip",
+      pass: await js(
+        `(()=>{const q1=document.querySelector('.quad-iu'),q2=document.querySelector('.quad-inu');if(!q1.classList.contains('spread')||!q2.classList.contains('slim'))return false;const a=q1.getBoundingClientRect(),b=q2.getBoundingClientRect();const list=q1.querySelector('.task-list');return a.width>b.width*2&&b.width<280&&getComputedStyle(list).display==='grid'&&q2.textContent.includes('暂无任务')&&q2.textContent.includes('0 个任务')})()`
+      ),
+    });
+    results.push({
+      check: "borrow: spread quadrant lays tasks out in two columns",
+      pass: await js(
+        `(()=>{const t=[...document.querySelectorAll('.quad-iu .task')];if(t.length!==17)return false;const tops=t.map(x=>x.getBoundingClientRect().top);return Math.abs(tops[0]-tops[1])<2&&new Set(tops).size<=9})()`
+      ),
+    });
+    results.push({
+      check: "borrow: long task names still clamp with ellipsis in two columns",
+      pass: await js(
+        `[...document.querySelectorAll('.quad-iu .task-name')].some(e=>e.scrollHeight>e.clientHeight+1)`
+      ),
+    });
+    results.push({
+      check: "borrow: chips never overflow their task row while scrolling",
+      pass: await js(
+        `[...document.querySelectorAll('.quad-iu .task')].every(t=>{const r=t.getBoundingClientRect();const c=t.querySelector('.chips');return !c||c.getBoundingClientRect().bottom<=r.bottom+1})`
+      ),
+    });
+    results.push({
+      check: "borrow: both-empty row stays fifty fifty",
+      pass: await js(
+        `(()=>{const a=document.querySelector('.quad-uni').getBoundingClientRect(),b=document.querySelector('.quad-unu').getBoundingClientRect();return Math.abs(a.width-b.width)<24&&!document.querySelector('.quad-uni.slim')&&!document.querySelector('.quad-unu.slim')})()`
+      ),
+    });
+    await shotClip("board-quadrant-borrow", ".quadrants");
+    // 场景 B：同行两个都有任务 → 维持 50/50，无借用
+    await win.loadURL(`${pathToFileURL(html).href}?demoTasks=iu:3,inu:2`);
+    await wait(800);
+    results.push({
+      check: "no borrow when both quadrants in a row have tasks",
+      pass: await js(
+        `(()=>{const a=document.querySelector('.quad-iu').getBoundingClientRect(),b=document.querySelector('.quad-inu').getBoundingClientRect();return Math.abs(a.width-b.width)<24&&!document.querySelector('.quad.slim')&&!document.querySelector('.quad.spread')})()`
+      ),
+    });
+    // 场景 C：38 个任务超满载 → 任务列表内滚，农场与开始专注始终在视口内（800 高标准窗 + 1080p）
+    await win.loadURL(
+      `${pathToFileURL(html).href}?demoTasks=iu:22,inu:6,uni:6,unu:4`
+    );
+    await wait(800);
+    results.push({
+      check: "overload: task lists scroll internally at 1280x800",
+      pass: await js(
+        `[...document.querySelectorAll('.quad .task-list')].some(e=>e.scrollHeight>e.clientHeight+1)`
+      ),
+    });
+    const beginVisible = `(()=>{const r=document.querySelector('.btn-begin').getBoundingClientRect();const f=document.querySelector('.farm-field').getBoundingClientRect();return r.top>=0&&r.bottom<=window.innerHeight+1&&f.bottom<=window.innerHeight+1})()`;
+    results.push({
+      check: "overload: begin button and farm stay in viewport at 1280x800",
+      pass: await js(beginVisible),
+    });
+    await shot("board-overload-800");
+    await win.setContentSize(1920, 1080);
+    await wait(400);
+    results.push({
+      check: "overload: begin button and farm stay in viewport at 1920x1080",
+      pass: await js(beginVisible),
+    });
+    await shot("board-overload-1080");
+
     results.push({ check: "no renderer console errors", pass: !errors.length });
     if (errors.length) console.error("console errors:", errors);
     const failed = results.filter((r) => !r.pass);
