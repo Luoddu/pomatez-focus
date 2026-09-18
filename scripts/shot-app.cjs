@@ -968,7 +968,8 @@ app
     results.push({
       check: "borrow: long task names still clamp with ellipsis in two columns",
       pass: await js(
-        `[...document.querySelectorAll('.quad-iu .task-name')].some(e=>e.scrollHeight>e.clientHeight+1)`
+        // TaskTitle 按钮自带 line-clamp：截断证据在按钮的 scrollHeight 上
+        `[...document.querySelectorAll('.quad-iu .task-title-button')].some(e=>e.scrollHeight>e.clientHeight+1)`
       ),
     });
     results.push({
