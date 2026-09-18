@@ -3,6 +3,7 @@ import { FocusTask, FocusQuadrant } from "../session";
 import QuickTaskEntry from "./QuickTaskEntry";
 import { QuadrantKey } from "../week";
 import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
+import { chipWindow } from "../chipWindow";
 import FarmField from "./FarmField";
 import TaskTitle from "./TaskTitle";
 
@@ -85,29 +86,58 @@ const GroupList = ({
                 )}
               </div>
               <div className="chips">
-                {rows.map((task) => (
-                  <button
-                    key={task.id}
-                    className={`chip tone-${task.quadrant || "unu"} ${
-                      task.id === selected ? "selected" : ""
-                    } ${task.kind === "pending" ? "pending" : ""}`}
-                    title={
-                      canComplete(task)
-                        ? `${task.title}（右键可标记完成）`
-                        : task.title
-                    }
-                    disabled={task.kind === "pending"}
-                    onClick={() => onSelect(task.id)}
-                    onContextMenu={(e) => {
-                      if (!canComplete(task)) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setMenu({ task, x: e.clientX, y: e.clientY });
-                    }}
-                  >
-                    {parseTitle(task.title).pomodoro}
-                  </button>
-                ))}
+                {(() => {
+                  // chip 单行窗口：最多渲染前 6 个待办；选中序超出时窗口右滑
+                  const win = chipWindow(
+                    rows.length,
+                    rows.findIndex((t) => t.id === selected)
+                  );
+                  const hiddenBefore = win.start;
+                  const hiddenAfter = rows.length - win.end;
+                  return (
+                    <>
+                      {hiddenBefore > 0 && (
+                        <span
+                          className="chips-more"
+                          title={`前面还有 ${hiddenBefore} 个番茄`}
+                        >
+                          +{hiddenBefore}
+                        </span>
+                      )}
+                      {rows.slice(win.start, win.end).map((task) => (
+                        <button
+                          key={task.id}
+                          className={`chip tone-${task.quadrant || "unu"} ${
+                            task.id === selected ? "selected" : ""
+                          } ${task.kind === "pending" ? "pending" : ""}`}
+                          title={
+                            canComplete(task)
+                              ? `${task.title}（右键可标记完成）`
+                              : task.title
+                          }
+                          disabled={task.kind === "pending"}
+                          onClick={() => onSelect(task.id)}
+                          onContextMenu={(e) => {
+                            if (!canComplete(task)) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMenu({ task, x: e.clientX, y: e.clientY });
+                          }}
+                        >
+                          {parseTitle(task.title).pomodoro}
+                        </button>
+                      ))}
+                      {hiddenAfter > 0 && (
+                        <span
+                          className="chips-more"
+                          title={`还有 ${hiddenAfter} 个番茄，收完前面的番茄后会继续出现`}
+                        >
+                          +{hiddenAfter}
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
             <div className="task-side">

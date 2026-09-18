@@ -354,7 +354,18 @@ input:focus-visible {
   display: flex;
   gap: 6px;
   margin-top: 4px;
-  flex-wrap: wrap;
+  /* chip 永不换行：超出 6 个的部分由窗口逻辑隐藏，靠 +N 指示存在感 */
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.chips-more {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  padding: 0 2px;
+  cursor: default;
 }
 .chip {
   min-width: 34px;

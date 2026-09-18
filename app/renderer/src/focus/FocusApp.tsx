@@ -125,8 +125,9 @@ const demo: FocusTask[] = [
     plannedToday: 1,
   },
 ];
-// ?demoTasks=iu:17,inu:0 仅供截图脚本构造象限分布场景（不连飞书时生效）；
-// 每 5 个任务掺一个长名字，验证双列下长任务名仍省略号截断
+// ?demoTasks=iu:17,inu:2x8,unu:1x8d3 仅供截图脚本构造象限分布场景（不连飞书时生效）。
+// 语法 quadrant:任务数[x每任务番茄数[d已完成数]]；每 5 个任务掺一个长名字，
+// 验证双列下长任务名仍省略号截断
 const demoOverride = (): FocusTask[] | null => {
   const spec = new URLSearchParams(window.location.search).get(
     "demoTasks"
@@ -134,21 +135,29 @@ const demoOverride = (): FocusTask[] | null => {
   if (!spec) return null;
   const out: FocusTask[] = [];
   for (const part of spec.split(",")) {
-    const [quadrant, count] = part.split(":");
-    for (let i = 1; i <= Number(count); i++)
-      out.push({
-        id: `shot-${quadrant}-${i}`,
-        title: `${
-          i % 5 === 0
-            ? `截图任务 ${quadrant}-${i}：一个名字特别特别长需要在双列排布里仍然被省略号截断的示例任务`
-            : `截图任务 ${quadrant}-${i}`
-        } · 第 1 个番茄`,
-        source: "local",
-        taskId: `shot-${quadrant}-${i}`,
-        quadrant: quadrant as FocusTask["quadrant"],
-        doneToday: 0,
-        plannedToday: 1,
-      });
+    const match = part.match(/^(\w+):(\d+)(?:x(\d+)(?:d(\d+))?)?$/);
+    if (!match) continue;
+    const quadrant = match[1] as FocusTask["quadrant"];
+    const taskCount = Number(match[2]);
+    const plannedEach = Number(match[3] || 1);
+    const doneEach = Number(match[4] || 0);
+    for (let i = 1; i <= taskCount; i++) {
+      const name =
+        i % 5 === 0
+          ? `截图任务 ${quadrant}-${i}：一个名字特别特别长需要在双列排布里仍然被省略号截断的示例任务`
+          : `截图任务 ${quadrant}-${i}`;
+      for (let p = 1; p <= plannedEach; p++)
+        out.push({
+          id: `shot-${quadrant}-${i}-${p}`,
+          title: `${name} · 第 ${p} 个番茄`,
+          source: "local",
+          taskId: `shot-${quadrant}-${i}`,
+          quadrant,
+          kind: p <= doneEach ? "done" : undefined,
+          doneToday: doneEach,
+          plannedToday: plannedEach,
+        });
+    }
   }
   return out;
 };
