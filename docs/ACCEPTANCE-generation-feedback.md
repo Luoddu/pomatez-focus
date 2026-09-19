@@ -56,3 +56,17 @@ can be restored without data migration.
 
 Learning-Review: none — real-owner lifecycle verification is already covered by
 UI-129-01; this app display change adds no new cross-task engineering lesson.
+
+## Publication
+
+Clean packaged source: `1c06b9f9f1e9541d8acc5e5c0ab4f366698b2eb8`.
+Full clean build/package and post-build generation lifecycle smoke test passed.
+ASAR provenance matches the clean build receipt. Guarded push verified source;
+live `v0.1.0-preview.41` tag resolves to exactly that packaged commit.
+
+[Release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.41)
+ID 392026297 is public, prerelease, not draft. Six uploaded assets match local
+sizes and SHA-256: setup, portable, blockmap, preview.yml, source-version.json,
+SHA256SUMS.txt. Feed setup SHA-512 also checked. Verification receipt is ignored
+artifacts/release41-verification.json. User app was not restarted or installed over.
+This documentation follow-up leaves the packaged tag/source unchanged.

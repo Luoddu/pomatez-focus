@@ -1,6 +1,7 @@
 # P0-POMO-015 — visible background generation progress
 
-Status: REVIEW (local validation passed; publication pending).
+Status: REVIEW (local validation passed; preview.41 published;
+independent-agent review not claimed).
 Role/context owner: isolated module implementer /root.
 Baseline: 73f93a474690cc79205933ff1f7c5b7dca84ba56 (preview.40).
 Branch: task/p0-pomo-015-generation-feedback. State source: this module card.
