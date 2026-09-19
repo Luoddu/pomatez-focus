@@ -1,178 +1,232 @@
-// Real hidden Electron main/preload/renderer; synthetic service, no external writes.
-// 覆盖「生成今日番茄」分流：当天已有计划 → 后台静默（无进度 UI、界面可操作、
-// 有变化轻提示 / 无变化不打扰）；今日计划为空 → 前台进度（逻辑不变）。
+// Real hidden main/preload/renderer, synthetic Feishu; no user data or writes.
 const { app, BrowserWindow } = require("electron");
 const assert = require("node:assert/strict"),
   path = require("node:path"),
   fs = require("node:fs");
-const { randomUUID } = require("node:crypto");
-const { FocusService } = require("../app/electron/build/focus/service.js");
+const {
+  FocusService,
+} = require("../app/electron/build/focus/service.js");
 process.env.POMATEZ_HEADLESS = "1";
 process.env.POMATEZ_PROFILE = path.join(
   __dirname,
   "../artifacts/test-profiles",
-  randomUUID()
+  require("node:crypto").randomUUID()
 );
-const planRow = (n) => ({
+const row = (n) => ({
   id: `p${n}`,
   planId: `p${n}`,
   taskId: "t1",
-  title: `合成任务 · 第 ${n} 个番茄`,
+  title: `Synthetic task · 第 ${n} 个番茄`,
   source: "feishu",
   sourceKey: "synthetic",
   quadrant: "iu",
 });
-let rows = [planRow(1), planRow(2)];
-let genResult = { created: 0, eligibleTasks: 1, blocked: 0 };
-let genCalls = 0,
-  todayCalls = 0;
-let genHold = false,
-  genResume;
+let rows = [row(1), row(2)],
+  result = { created: 1, eligibleTasks: 1, blocked: 0 };
+let calls = 0,
+  resume,
+  emit,
+  fail = false,
+  holdRefresh = false,
+  refreshResume;
 FocusService.prototype.status = () => ({
   configured: true,
   sourceKey: "synthetic",
 });
+FocusService.prototype.history = async () => ({
+  sourceKey: "synthetic",
+  records: [],
+  missing: 0,
+});
 FocusService.prototype.today = async () => {
-  todayCalls++;
+  if (holdRefresh) await new Promise((r) => (refreshResume = r));
   return rows;
 };
 FocusService.prototype.generateToday = async function () {
-  genCalls++;
-  this.onGenerateProgress?.({ stage: "connect" });
-  this.onGenerateProgress?.({ stage: "plan" });
-  if (genHold) await new Promise((resolve) => (genResume = resolve));
-  return genResult;
+  calls++;
+  emit = (p) => this.onGenerateProgress?.(p);
+  emit({ stage: "tasks" });
+  await new Promise((r) => (resume = r));
+  if (fail) throw Error("Synthetic generation failure");
+  return result;
 };
 require("../app/electron/build/main.js");
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const deadline = setTimeout(() => app.exit(2), 30000);
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+const timeout = setTimeout(() => app.exit(2), 35000);
 app.whenReady().then(async () => {
   try {
     let win;
-    for (let n = 0; n < 150; n++) {
+    const until = async (f) => {
+      for (let i = 0; i < 200; i++) {
+        if (await f()) return;
+        await delay(25);
+      }
+      throw Error("Timeout " + f);
+    };
+    await until(() => {
       win = BrowserWindow.getAllWindows()[0];
-      if (
+      return (
         win &&
         !win.webContents.isLoadingMainFrame() &&
         win.webContents.getURL().startsWith("file:")
-      )
-        break;
-      await wait(50);
-    }
-    assert.ok(win);
-    const js = (s) => win.webContents.executeJavaScript(s, true);
-    const until = async (f) => {
-      for (let i = 0; i < 150; i++) {
-        if (await f()) return;
-        await wait(30);
-      }
-      throw Error("Timed out");
-    };
-    const chipCount = () => js(`document.querySelectorAll('.chip').length`);
-    const clickGen = () =>
-      js(
-        `(()=>{const b=document.querySelector('.gen-btn');if(!b)throw Error('no gen button');if(b.disabled)throw Error('gen button disabled');b.click()})()`
       );
-
-    // ── 场景 1：当日重复生成 = 后台静默，有变化 → 轻提示并合并 ──
-    await until(async () => (await chipCount()) === 2);
-    genHold = true;
-    genResult = { created: 1, eligibleTasks: 1, blocked: 0 };
-    rows = [planRow(1), planRow(2), planRow(3)];
-    const todayBeforeGen = todayCalls;
-    await clickGen();
-    await wait(300);
-    // 静默期间：无进度条、无 spinner、按钮仍可点、看板可交互
-    assert.equal(await js(`!document.querySelector('.gen-progress')`), true);
-    assert.equal(await js(`!document.querySelector('.gen-spinner')`), true);
-    assert.equal(
-      await js(`document.querySelector('.gen-btn').textContent`),
-      "生成今日番茄"
-    );
-    assert.equal(
-      await js(`document.querySelector('.gen-btn').disabled`),
-      false
-    );
-    await js(`document.querySelectorAll('.chip')[1].click()`);
-    assert.equal(
-      await js(`document.querySelectorAll('.chip.selected').length`),
-      1
-    );
-    genResume();
-    genHold = false;
-    await until(async () => (await chipCount()) === 3);
-    await until(() =>
-      js(`document.querySelector('.toast')?.textContent.includes('今日番茄已更新')`)
-    );
-    assert.ok(todayCalls > todayBeforeGen);
-    assert.equal(await js(`!document.querySelector('.gen-progress')`), true);
-
-    // ── 场景 2：当日重复生成 = 后台静默，无变化 → 不打扰 ──
-    await js(`document.querySelector('.toast-close')?.click()`);
-    // 信息 toast 约 3 秒自动消失；先等场景 1 的提示彻底离场
-    await until(() => js(`!document.querySelector('.toast')`));
-    genResult = { created: 0, eligibleTasks: 1, blocked: 0 };
-    const todayBeforeQuiet = todayCalls;
-    const callsBeforeQuiet = genCalls;
-    await clickGen();
-    await until(() => genCalls === callsBeforeQuiet + 1);
-    await until(() => todayCalls > todayBeforeQuiet);
-    await wait(300);
-    assert.equal(await js(`!document.querySelector('.toast')`), true);
-    assert.equal(await js(`!document.querySelector('.gen-progress')`), true);
-
-    // ── 场景 3：今日计划为空 = 首次生成，前台进度逻辑不变 ──
-    // ⟳ 按钮已并入生成按钮；清空今日计划改用整页重载（初始 refresh 拉空表）
-    rows = [];
-    await win.webContents.reload();
+    });
+    const js = async (s) => {
+      try {
+        return await win.webContents.executeJavaScript(s, true);
+      } catch (e) {
+        throw Error(s + ": " + e.message);
+      }
+    };
+    const click = (name) =>
+      js(
+        `(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===${JSON.stringify(
+          name
+        )}||b.textContent.trim()===${JSON.stringify(
+          name
+        )});if(!b||b.disabled)throw Error('unavailable '+${JSON.stringify(
+          name
+        )});b.click()})()`
+      );
+    const pct = () =>
+      js(
+        "Number(document.querySelector('.gen-track')?.getAttribute('aria-valuenow'))"
+      );
+    const gen = () => click("生成今日番茄");
     await until(() =>
       js(
-        `Boolean(document.querySelector('.gen-btn'))&&!document.querySelector('.gen-btn').disabled&&document.querySelectorAll('.chip').length===0`
+        "document.querySelectorAll('.chip').length===2&&!document.querySelector('.gen-btn').disabled"
       )
     );
-    genHold = true;
-    genResult = { created: 2, eligibleTasks: 1, blocked: 0 };
-    await clickGen();
-    await until(() =>
-      js(`Boolean(document.querySelector('.gen-progress'))`)
+    const before = await js(
+      "document.querySelector('.stat-grid').getBoundingClientRect().top"
     );
-    assert.equal(await js(`Boolean(document.querySelector('.gen-spinner'))`), true);
-    assert.equal(
-      await js(`document.querySelector('.gen-btn').textContent`),
-      "生成中…"
+    await gen();
+    assert.ok(
+      await js("!!document.querySelector('[role=progressbar]')")
     );
+    await until(() => calls === 1);
+    assert.equal(await pct(), 22);
     assert.equal(
-      await js(`document.querySelector('.gen-btn').disabled`),
+      await js("document.querySelector('.gen-btn').disabled"),
       true
     );
-    rows = [planRow(1), planRow(2)];
-    genResume();
-    genHold = false;
-    await until(async () => (await chipCount()) === 2);
-    await until(() =>
-      js(`document.querySelector('.toast')?.textContent.includes('已生成 2 个今日番茄')`)
+    await js("document.querySelector('.gen-btn').click()");
+    assert.equal(calls, 1);
+    assert.equal(
+      await js(
+        "document.querySelector('.stat-grid').getBoundingClientRect().top"
+      ),
+      before
     );
-    assert.equal(await js(`!document.querySelector('.gen-progress')`), true);
-
-    assert.equal(win.isVisible(), false);
-    const result = {
-      passed: 3,
-      checks: [
-        "repeat generate runs silently: no progress UI, board stays interactive, change merges with light notice",
-        "repeat generate without changes stays quiet",
-        "first generation of the day keeps the foreground progress flow",
-      ],
-    };
+    await js("document.querySelector('.chip').click()");
+    await click("开始专注");
+    assert.equal(
+      await js(
+        "JSON.parse(localStorage.getItem('pomatez-focus-v1')).active.status"
+      ),
+      "active"
+    );
+    emit({ stage: "write", done: 1, total: 2 });
+    await until(async () => (await pct()) === 70);
+    emit({ stage: "verify" });
+    await until(async () => (await pct()) === 90);
+    holdRefresh = true;
+    rows = [row(1), row(2), row(3)];
+    resume();
+    await until(() => !!refreshResume);
+    await until(async () => (await pct()) === 96);
+    await delay(200);
+    assert.equal(await pct(), 96);
+    const shot = await win.webContents.executeJavaScript(
+      "(()=>{const r=document.querySelector('.side-title').getBoundingClientRect();return {x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height)}})()"
+    );
     fs.writeFileSync(
-      path.join(__dirname, "../artifacts/silent-generate-test.json"),
-      JSON.stringify(result, null, 2)
+      path.join(__dirname, "../artifacts/generation-feedback.png"),
+      (await win.webContents.capturePage(shot)).toPNG()
     );
-    console.log(JSON.stringify(result));
-    clearTimeout(deadline);
+    holdRefresh = false;
+    refreshResume();
+    await until(async () => (await pct()) === 100);
+    assert.equal(
+      await js("document.querySelector('.gen-label').textContent"),
+      "已更新"
+    );
+    assert.equal(
+      await js("document.querySelector('.gen-btn').disabled"),
+      false
+    );
+    await click("结束");
+    await click("确认结束");
+    await click("放弃本次");
+    result = { created: 0, eligibleTasks: 1, blocked: 0 };
+    await gen();
+    await until(() => calls === 2);
+    resume();
+    await until(() =>
+      js(
+        "document.querySelector('.gen-label').textContent==='已是最新'"
+      )
+    );
+    fail = true;
+    await gen();
+    await until(() => calls === 3);
+    resume();
+    await until(() =>
+      js(
+        "document.querySelector('.gen-btn').classList.contains('failed')"
+      )
+    );
+    assert.equal(await pct(), 0);
+    assert.equal(
+      await js("document.querySelector('.gen-btn').disabled"),
+      false
+    );
+    fail = false;
+    await gen();
+    await until(() => calls === 4);
+    resume();
+    await until(async () => (await pct()) === 100);
+    await until(() => js("!document.querySelector('.gen-track')"));
+    assert.equal(
+      await js("document.querySelector('.gen-label').textContent"),
+      "生成今日番茄"
+    );
+    rows = [];
+    win.webContents.reload();
+    await until(() =>
+      js(
+        "!!document.querySelector('.gen-btn')&&!document.querySelector('.gen-btn').disabled&&document.querySelectorAll('.chip').length===0"
+      )
+    );
+    await gen();
+    await until(() => calls === 5);
+    assert.equal(await pct(), 22);
+    rows = [row(1)];
+    result = { created: 1, eligibleTasks: 1, blocked: 0 };
+    resume();
+    await until(async () => (await pct()) === 100);
+    win.setContentSize(760, 780);
+    await until(() => js("Math.abs(innerWidth-760)<=2"));
+    assert.equal(
+      await js("document.documentElement.scrollWidth<=innerWidth"),
+      true
+    );
+    assert.equal(
+      await js(
+        "(()=>{const r=document.querySelector('.gen-btn').getBoundingClientRect();const w=document.querySelector('.win-controls').getBoundingClientRect();return r.right<=w.left+1&&w.right<=innerWidth})()"
+      ),
+      true
+    );
+    assert.equal(win.isVisible(), false);
+    console.log(
+      "PASS immediate feedback, real stages/write counts, no duplicate click, background focus, refresh gate, success/no-change, failure/retry, reset, first generation, narrow layout"
+    );
+    clearTimeout(timeout);
     app.exit(0);
   } catch (e) {
     console.error(e.stack);
-    clearTimeout(deadline);
+    clearTimeout(timeout);
     app.exit(1);
   }
 });

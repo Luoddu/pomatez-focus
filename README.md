@@ -8,7 +8,7 @@
 
 [功能](#功能) · [开始使用](#开始使用) · [飞书联动](#飞书联动) · [本地开发](#本地开发) · [许可证](#许可证)
 
-> **版本状态（2026-09-18）**：`0.1.0-preview.40` 让任务旁“＋”追加的番茄立即留在原象限并可开始专注，随后后台同步飞书；断网和重启保留新增项。保留专注中更换任务、任务详情、四象限空间利用、番茄分页、周目标和跨机成果同步。[下载安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.40/Pomatez-Focus-v0.1.0-preview.40-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.40)。当前仅验证 Windows x64，不标记为稳定版。
+> **版本状态（2026-09-19）**：`0.1.0-preview.41` 为“生成今日番茄”加入按钮内步骤进度条，后台刷新也有即时反馈，完成显示“已更新／已是最新”，失败可重试；保留本地优先追加、任务详情和跨机成果同步。[下载安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.41/Pomatez-Focus-v0.1.0-preview.41-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.41)。当前仅验证 Windows x64，不标记为稳定版。
 
 ![番茄农场：四象限任务、收获农场、番茄月历和专注记录](docs/images/desktop.png)
 

@@ -839,29 +839,86 @@ input:focus-visible {
 .side-title-actions .gen-btn {
   font-size: 13px;
 }
-/* 生成进度：按钮内 spinner + 概览行下方阶段文字（低调、无弹窗无遮罩） */
+/* Fixed-width header control: step progress mirrors the weekly-goal track. */
 .gen-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  position: relative;
+  width: 144px;
+  padding: 7px 5px;
+  border-radius: 12px;
+  overflow: hidden;
 }
-.gen-spinner {
-  width: 11px;
-  height: 11px;
-  border: 2px solid #d3d9e4;
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: gen-spin 0.8s linear infinite;
+.gen-btn.busy {
+  opacity: 1;
+  color: var(--primary);
+  background: #eef1ff;
 }
-@keyframes gen-spin {
+.gen-btn.complete {
+  color: #328754;
+  background: #edf7ef;
+}
+.gen-btn.failed {
+  color: #bb4343;
+  background: #fff0ef;
+}
+.gen-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gen-track {
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  height: 3px;
+  background: #e4e8f2;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gen-fill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: inherit;
+  transition: width 0.35s ease;
+}
+.complete .gen-fill {
+  background: #52a66c;
+}
+.failed .gen-fill {
+  background: #d86b6b;
+}
+.gen-btn.busy .gen-fill::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 36px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #ffffffa0,
+    transparent
+  );
+  animation: gen-sweep 1.3s ease-in-out infinite;
+}
+@keyframes gen-sweep {
+  from {
+    transform: translateX(-36px);
+  }
   to {
-    transform: rotate(360deg);
+    transform: translateX(144px);
   }
 }
-.gen-progress {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 2px 0 8px;
+@media (prefers-reduced-motion: reduce) {
+  .gen-btn.busy .gen-fill::after {
+    animation: none;
+  }
+  .gen-fill {
+    transition: none;
+  }
 }
 /* 概览标题行：动作按钮与窗口控制成组靠右，避免两个 auto 边距把按钮挤到中间 */
 .side-title-actions + .win-controls {

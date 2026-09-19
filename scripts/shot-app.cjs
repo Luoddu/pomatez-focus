@@ -862,9 +862,9 @@ app
     await click("生成今日番茄");
     await wait(300);
     results.push({
-      check: "generate click shows spinner, stage text and locks the button",
+      check: "generate click shows inline step track and locks only its button",
       pass: await js(
-        `(()=>{const b=document.querySelector('.gen-btn');const p=document.querySelector('.gen-progress');return Boolean(b&&b.disabled&&b.querySelector('.gen-spinner'))&&Boolean(p&&p.textContent.includes('正在'))})()`
+        `(()=>{const b=document.querySelector('.gen-btn');const p=document.querySelector('.gen-track');return Boolean(b&&b.disabled&&b.textContent.includes('正在'))&&Boolean(p&&Number(p.getAttribute('aria-valuenow'))>0)})()`
       ),
     });
     // 防重入：进行中按钮 disabled，再点是 no-op（不重启阶段序列）
@@ -874,14 +874,14 @@ app
     results.push({
       check: "stage text advances to write progress x/y",
       pass: await js(
-        `(()=>{const p=document.querySelector('.gen-progress');return Boolean(p)&&/正在写入 \\d+\\/8…/.test(p.textContent)})()`
+        `(()=>{const p=document.querySelector('.gen-label');return Boolean(p)&&/正在写入 \\d+\\/8…/.test(p.textContent)})()`
       ),
     });
     await wait(2600);
     results.push({
-      check: "generate mock finishes with toast and cleared stage text",
+      check: "generate mock finishes with toast and complete step track",
       pass: await js(
-        `(()=>{const b=document.querySelector('.gen-btn');return Boolean(b)&&!b.disabled&&!document.querySelector('.gen-progress')&&document.body.textContent.includes('模拟生成完成')})()`
+        `(()=>{const b=document.querySelector('.gen-btn');return Boolean(b)&&!b.disabled&&document.querySelector('.gen-track')?.getAttribute('aria-valuenow')==='100'&&document.body.textContent.includes('模拟生成完成')})()`
       ),
     });
     const atBeijing = (hour) => {

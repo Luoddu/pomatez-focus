@@ -87,6 +87,8 @@ export default function HistoryPanel({
   onGenerate,
   generating,
   genStageText,
+  genPercent,
+  genFailed,
   refreshBusy,
   pinned,
   settingsOpen,
@@ -107,6 +109,8 @@ export default function HistoryPanel({
   onGenerate: () => void;
   generating: boolean;
   genStageText: string;
+  genPercent: number;
+  genFailed: boolean;
   refreshBusy: boolean;
   pinned: boolean;
   settingsOpen: boolean;
@@ -195,17 +199,49 @@ export default function HistoryPanel({
         <div className="side-title">
           概览
           <span className="side-title-actions">
-            {/* ⟳ 刷新已并入生成按钮：当日首次=前台进度生成，
-                已生成过=后台静默合并刷新（语义覆盖纯重读） */}
+            {/* Same compact feedback for both foreground and background work. */}
             <button
-              className={`btn-text gen-btn${generating ? " busy" : ""}`}
+              className={`btn-text gen-btn${generating ? " busy" : ""}${
+                genFailed ? " failed" : ""
+              }${genPercent === 100 ? " complete" : ""}`}
+              aria-label="生成今日番茄"
+              title={
+                genStageText
+                  ? `${genStageText}${
+                      generating
+                        ? "（按步骤估算进度，非耗时百分比）"
+                        : ""
+                    }`
+                  : "生成今日番茄并刷新任务"
+              }
               disabled={refreshBusy || generating}
               onClick={onGenerate}
             >
-              {generating && (
-                <span className="gen-spinner" aria-hidden="true" />
+              <span
+                className="gen-label"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {genStageText || "生成今日番茄"}
+              </span>
+              {genStageText && (
+                <span
+                  className="gen-track"
+                  role={generating ? "progressbar" : undefined}
+                  aria-label="今日番茄步骤进度"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={genPercent}
+                  aria-valuetext={`${genStageText}，步骤估算 ${genPercent}%`}
+                >
+                  <span
+                    className="gen-fill"
+                    style={{
+                      width: `${genFailed ? 100 : genPercent}%`,
+                    }}
+                  />
+                </span>
               )}
-              {generating ? "生成中…" : "生成今日番茄"}
             </button>
           </span>
           <WindowControls
@@ -216,11 +252,6 @@ export default function HistoryPanel({
             onTogglePin={onTogglePin}
           />
         </div>
-        {generating && genStageText && (
-          <div className="gen-progress" role="status">
-            {genStageText}
-          </div>
-        )}
         <div className="stat-grid">
           {stats.map(([label, value]) => (
             <div className="card stat" key={label} data-stat={label}>
@@ -256,7 +287,11 @@ export default function HistoryPanel({
                 className="wg-fill"
                 aria-hidden="true"
                 style={{
-                  width: `${Math.round(goalProgressRatio(weekTotal, currentGoal) * 1000) / 10}%`,
+                  width: `${
+                    Math.round(
+                      goalProgressRatio(weekTotal, currentGoal) * 1000
+                    ) / 10
+                  }%`,
                   ...(weekMet
                     ? {}
                     : {

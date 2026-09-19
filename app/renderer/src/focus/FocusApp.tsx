@@ -332,23 +332,63 @@ export default function FocusApp() {
     stage: string;
     done?: number;
     total?: number;
+    text?: string;
   } | null>(null);
+  const genActive = useRef(false);
   useEffect(() => {
     if (!api() || !api().onGenerateProgress) return;
-    return api().onGenerateProgress((p: any) => setGenStage(p));
+    return api().onGenerateProgress((p: any) => {
+      if (genActive.current) setGenStage(p);
+    });
   }, []);
+  useEffect(() => {
+    if (!genStage || !["done", "error"].includes(genStage.stage))
+      return;
+    const timeout = setTimeout(() => setGenStage(null), 3000);
+    return () => clearTimeout(timeout);
+  }, [genStage]);
   const GEN_STAGE_TEXT: Record<string, string> = {
     connect: "正在连接飞书…",
     tasks: "正在读取任务…",
     records: "正在读取专注记录…",
     plan: "正在规划今日番茄…",
     verify: "正在回读校验…",
+    refresh: "正在刷新看板…",
+    error: "更新失败，点击重试",
   };
   const genStageText = genStage
-    ? genStage.stage === "write"
-      ? `正在写入 ${genStage.done}/${genStage.total}…`
-      : GEN_STAGE_TEXT[genStage.stage] || "正在生成…"
+    ? genStage.text ||
+      (genStage.stage === "write"
+        ? `正在写入 ${genStage.done}/${genStage.total}…`
+        : GEN_STAGE_TEXT[genStage.stage] || "正在生成…")
     : "";
+  // Stage-weight estimate, not elapsed time. Never finish before refresh resolves.
+  const genPercent = !genStage
+    ? 0
+    : genStage.stage === "write"
+    ? 55 +
+      Math.round(
+        30 *
+          Math.min(
+            1,
+            Math.max(
+              0,
+              (genStage.done || 0) / Math.max(1, genStage.total || 1)
+            )
+          )
+      )
+    : (
+        {
+          connect: 8,
+          tasks: 22,
+          records: 38,
+          plan: 52,
+          verify: 90,
+          refresh: 96,
+          done: 100,
+          error: 0,
+        } as Record<string, number>
+      )[genStage.stage] ?? 8;
   const weeklyTomatoes = useMemo(
     () => weekTomatoes(shownRecords, farmNow ?? Date.now()),
     [shownRecords, farmNow]
@@ -812,7 +852,7 @@ export default function FocusApp() {
   // 点击后立即进入「连接飞书」阶段文字（乐观首帧），随后由主进程
   // 真实阶段事件推进；generating 锁 + 按钮 disabled 双重防重入
   const generate = () => {
-    if (generating || silentGenerating) return;
+    if (genActive.current || generating || silentGenerating) return;
     if (genMock) {
       // 截图/设计稿 mock：按真实阶段顺序本地推进（无网络、不写任何数据）
       const seq: {
@@ -830,6 +870,7 @@ export default function FocusApp() {
         { stage: "verify", wait: 600 },
       ];
       setGenerating(true);
+      genActive.current = true;
       setGenStage({ stage: "connect" });
       let elapsed = 0;
       const timers = seq.map((s) => {
@@ -840,7 +881,8 @@ export default function FocusApp() {
       timers.push(
         setTimeout(() => {
           setGenerating(false);
-          setGenStage(null);
+          genActive.current = false;
+          setGenStage({ stage: "done", text: "模拟完成" });
           notify("模拟生成完成（截图 mock，未连接飞书）。");
         }, elapsed)
       );
@@ -850,22 +892,39 @@ export default function FocusApp() {
       notify("请先在设置中连接飞书，再生成今日番茄。", "error");
       return;
     }
-    // 当天已生成过（今日计划行非空）：后台静默重跑——不弹进度、不锁界面，
-    // 安静合并飞书变化；仅真实新增时轻提示，无变化不打扰。
+    genActive.current = true;
+    setGenStage({ stage: "connect" });
+    const completeGeneration = (r: any) =>
+      setGenStage({
+        stage: "done",
+        text:
+          r.blocked > 0
+            ? "已完成，有跳过"
+            : r.created > 0
+            ? "已更新"
+            : r.eligibleTasks === 0
+            ? "无可生成任务"
+            : "已是最新",
+      });
+    // Background work keeps the board interactive; explicit clicks still get feedback.
     if (shouldGenerateSilently(todayCount)) {
       setSilentGenerating(true);
       (async () => {
         try {
           const r = await api().generateToday();
+          setGenStage({ stage: "refresh" });
           await refresh();
+          completeGeneration(r);
           const notice = silentGenerateNotice(r);
           if (notice) notify(notice);
         } catch (e: any) {
+          setGenStage({ stage: "error" });
           notify(
             e.message || "后台更新今日番茄失败，请稍后重试",
             "error"
           );
         } finally {
+          genActive.current = false;
           setSilentGenerating(false);
         }
       })();
@@ -891,11 +950,16 @@ export default function FocusApp() {
           parts.push(`${r.blocked} 个任务数据不完整，已跳过`);
         if (r.capacityExceeded)
           parts.push(`超出建议日容量 ${r.capacityOverage} 个`);
-        notify(parts.join("；") + "。");
+        setGenStage({ stage: "refresh" });
         await refresh();
+        completeGeneration(r);
+        notify(parts.join("；") + "。");
+      } catch (e) {
+        setGenStage({ stage: "error" });
+        throw e;
       } finally {
+        genActive.current = false;
         setGenerating(false);
-        setGenStage(null);
       }
     });
   };
@@ -1417,8 +1481,10 @@ export default function FocusApp() {
             onEdit={editRecord}
             editingIds={editingIds}
             onGenerate={generate}
-            generating={generating}
+            generating={generating || silentGenerating}
             genStageText={genStageText}
+            genPercent={genPercent}
+            genFailed={genStage?.stage === "error"}
             refreshBusy={busy || loadingTasks}
             onWeekGoalMet={(total, goal) => {
               notify(`本周目标达成 🍅（${total}/${goal}）`);
