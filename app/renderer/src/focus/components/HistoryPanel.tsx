@@ -130,6 +130,7 @@ export default function HistoryPanel({
   onToggleCompact,
   onTogglePin,
   onWeekGoalMet,
+  onOpenStats,
 }: {
   records: FocusSession[];
   pendingCount: number;
@@ -152,6 +153,7 @@ export default function HistoryPanel({
   onToggleCompact: () => void;
   onTogglePin: () => void;
   onWeekGoalMet?: (total: number, goal: number) => void;
+  onOpenStats?: () => void;
 }) {
   const [entryOpen, setEntryOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<FocusSession | null>(
@@ -206,7 +208,8 @@ export default function HistoryPanel({
   const shownWeekTotal = useCountUp(weekTotal);
   const totalTomatoes = sum(records, (r) => r.completedCount || 0);
   const todayTier = harvestTier(shownTodayTomatoes);
-  // 总番茄的成就刻度：下一档进度条 + 已达成档徽标（农场的里程碑同源）
+  // 总番茄的成就刻度：独立通栏里程碑条（放在四张数字卡下方），
+  // 不再塞进「总番茄」卡内——避免左卡多出两行、右卡留空行
   const totalMs = totalMilestone(totalTomatoes);
   const totalDone = totalMs.reached >= TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
   const totalProgress = totalDone
@@ -219,19 +222,12 @@ export default function HistoryPanel({
     label: string;
     value: string;
     tier?: string;
-    milestone?: { reached: number; next: number; progress: number; done: boolean };
   }[] = [
     { label: "今日番茄", value: String(shownTodayTomatoes), tier: todayTier },
     { label: "今日专注时长", value: durationText(shownTodaySeconds) },
     { label: "总番茄", value: String(totalTomatoes) },
     { label: "总专注时长", value: durationText(sum(records, (r) => r.acceptedSeconds || 0)) },
   ];
-  stats[2].milestone = {
-    reached: totalMs.reached,
-    next: totalMs.next,
-    progress: totalProgress,
-    done: totalDone,
-  };
   const groups = records
     .slice()
     .sort((a, b) => b.startedAt - a.startedAt)
@@ -252,6 +248,16 @@ export default function HistoryPanel({
         <div className="side-title">
           概览
           <span className="side-title-actions">
+            {onOpenStats && (
+              <button
+                className="btn-text"
+                aria-label="专注统计"
+                title="周 / 月 / 季 / 年统计与时段热力"
+                onClick={onOpenStats}
+              >
+                统计
+              </button>
+            )}
             {/* Same compact feedback for both foreground and background work. */}
             <button
               className={`btn-text gen-btn${generating ? " busy" : ""}${
@@ -306,7 +312,7 @@ export default function HistoryPanel({
           />
         </div>
         <div className="stat-grid">
-          {stats.map(({ label, value, tier, milestone }) => (
+          {stats.map(({ label, value, tier }) => (
             <div className="card stat" key={label} data-stat={label}>
               <strong
                 key={tier || "base"}
@@ -316,26 +322,32 @@ export default function HistoryPanel({
                 {value}
               </strong>
               <span>{label}</span>
-              {milestone && (
-                <div className="stat-milestone">
-                  <div className="stat-milestone-track">
-                    <i
-                      style={{
-                        width: `${milestone.progress}%`,
-                      }}
-                    />
-                  </div>
-                  <em>
-                    {milestone.done
-                      ? `🏆 已达成 ${milestone.reached} 丰收传奇`
-                      : milestone.reached
-                      ? `已达成 ${milestone.reached} · 距 ${milestone.next} 还差 ${milestone.next - Number(value)}`
-                      : `距 ${milestone.next} 还差 ${milestone.next - Number(value)}`}
-                  </em>
-                </div>
-              )}
             </div>
           ))}
+        </div>
+        {/* 累计里程碑通栏：进度条 + 文案一整行，四张数字卡保持等高 */}
+        <div
+          className="card stat-totalbar"
+          title={`总番茄 ${totalTomatoes} 个的成就进度`}
+        >
+          <span className="stb-from">{totalMs.reached || 0}</span>
+          <div className="stb-main">
+            <div className="stb-track" aria-hidden="true">
+              <i style={{ width: `${totalProgress}%` }} />
+            </div>
+            <em>
+              {totalDone
+                ? `🏆 已达成 ${totalMs.reached} 丰收传奇`
+                : totalMs.reached
+                ? `已达成 ${totalMs.reached} · 距 ${totalMs.next} 还差 ${
+                    totalMs.next - totalTomatoes
+                  }`
+                : `距第一个里程碑 ${totalMs.next} 还差 ${
+                    totalMs.next - totalTomatoes
+                  }`}
+            </em>
+          </div>
+          <span className="stb-to">🚩 {totalMs.next}</span>
         </div>
       </div>
       <div className="side-section">

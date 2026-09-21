@@ -1091,16 +1091,28 @@ input:focus-visible {
   color: var(--muted);
   margin-top: 2px;
 }
+/* 任务描述默认折叠 3 行：长备注不再把计时器挤出首屏；展开后限高内滚 */
 .current-task .ct-description {
   margin: 6px 0;
   max-width: 480px;
-  max-height: 140px;
-  overflow: auto;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 13px;
   line-height: 1.6;
   color: #606b7b;
+}
+.current-task .ct-description.expanded {
+  -webkit-line-clamp: unset;
+  max-height: 140px;
+  overflow: auto;
+}
+.ct-expand {
+  font-size: 12px;
+  margin-top: 1px;
 }
 .change-task-button { margin-top: 5px; }
 .active-task-picker { margin-top: 8px; width: min(420px, 100%); }
@@ -2155,23 +2167,38 @@ input:focus-visible {
     transform: scale(1);
   }
 }
-.stat-milestone {
-  margin-top: 6px;
+/* ── 累计里程碑通栏：四张数字卡下方的整行进度条 ── */
+.stat-totalbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
 }
-.stat-milestone-track {
-  height: 4px;
-  border-radius: 2px;
+.stb-from,
+.stb-to {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.stb-main {
+  flex: 1;
+  min-width: 0;
+}
+.stb-track {
+  height: 5px;
+  border-radius: 3px;
   background: #eef1f5;
   overflow: hidden;
 }
-.stat-milestone-track i {
+.stb-track i {
   display: block;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 3px;
   background: linear-gradient(90deg, #f2cd73, #f2b544);
   transition: width 0.6s ease-out;
 }
-.stat-milestone em {
+.stb-main em {
   display: block;
   margin-top: 3px;
   font-size: 11px;
@@ -2278,5 +2305,347 @@ input:focus-visible {
   .farm-dragonfly,
   .stat strong[data-tier="high"] {
     animation: none;
+  }
+}
+
+/* ── 节气 pill：农场标题行的当前节气徽标 ── */
+.farm-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.term-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #fdf3d7;
+  border: 1px solid #ecd28a;
+  color: #8a6107;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* ── 节气点景：细雨斜落、露珠闪烁（克制不打扰专注） ── */
+.farm-rain {
+  stroke: #8fb8d8;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: farm-rain-fall 2.8s linear infinite;
+}
+@keyframes farm-rain-fall {
+  0% {
+    transform: translate(0, -12px);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate(-8px, 46px);
+    opacity: 0;
+  }
+}
+.farm-dew {
+  fill: #dff2fb;
+  stroke: #ffffff;
+  stroke-width: 0.6;
+  animation: farm-dew-glow 3.2s ease-in-out infinite alternate;
+}
+@keyframes farm-dew-glow {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .farm-rain {
+    animation: none;
+    opacity: 0.4;
+  }
+  .farm-dew {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* ── 正在专注：象限色进度弧、环内已计时、提示 chip 行 ── */
+.ring.is-paused .ring-progress {
+  opacity: 0.45;
+}
+.ring-elapsed {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.timing-chips {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 26px;
+}
+.chip-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--gray-soft);
+  color: #6b7280;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.chip-item.tomato {
+  background: var(--red-soft);
+  color: #b32b1b;
+}
+.chip-item.amber {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* ── 专注统计页：区间 tab + 汇总条 + 图表网格 ── */
+.stats-page {
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+.stats-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 16px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #eceef2;
+}
+.stats-tab {
+  padding: 4px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.stats-tab.selected {
+  background: var(--card);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.1);
+}
+.stats-range-label {
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.stats-summary .stat {
+  text-align: center;
+}
+.stats-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+  padding-bottom: 8px;
+}
+.stats-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+}
+.stats-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+/* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边、最高柱金色 */
+.bars {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-height: 150px;
+}
+.bars.dense {
+  gap: 2px;
+}
+.bar-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+.bar {
+  width: 100%;
+  max-width: 26px;
+  min-height: 0;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #f38b82, #e57368);
+}
+.bar.max {
+  background: linear-gradient(180deg, #f2cd73, #e8a917);
+}
+.bar.today {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.bar-val {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.bar-label {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* 半小时热力：行=周一..周日，列=00:00–24:00（每 12 格标一个整点） */
+.sh-grid {
+  display: grid;
+  grid-template-columns: 22px repeat(48, 1fr);
+  gap: 2px;
+  align-items: center;
+}
+.sh-hour {
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sh-dow {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1;
+}
+.sh-cell {
+  display: block;
+  height: 13px;
+  border-radius: 2px;
+}
+.sh-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.sh-legend .sh-cell {
+  width: 12px;
+}
+.sh-legend em {
+  margin-left: auto;
+  font-style: normal;
+}
+/* 任务排行 */
+.top-list {
+  list-style: none;
+  flex: 1;
+}
+.top-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+.top-list li + li {
+  border-top: 1px solid #f2f4f7;
+}
+.top-rank {
+  width: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.top-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.top-name {
+  font-size: 14px;
+  max-width: 38%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.top-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: #f1f2f4;
+  overflow: hidden;
+}
+.top-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f9bcb8, #e57368);
+}
+.top-count {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* 高光时刻 */
+.glory-list {
+  list-style: none;
+  flex: 1;
+}
+.glory-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+}
+.glory-list li + li {
+  border-top: 1px solid #f2f4f7;
+}
+.glory-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+.glory-list strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+/* 窄窗/竖屏：统计页单栏 */
+@media (max-width: 900px), (orientation: portrait) {
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .side-title .stats-tabs {
+    margin-left: 0;
+    order: 3;
+  }
+  .stats-range-label {
+    order: 4;
+    margin-left: 4px;
   }
 }

@@ -332,6 +332,13 @@ app
         `(()=>{const f=document.querySelector('.farm-field');if(!f)return false;const t=f.textContent;return t.includes('本周已收')&&t.includes('累计收获')&&t.includes('周日翻篇')&&Boolean(f.querySelector('.farm-pile'))&&f.querySelector('.farm-pile-text').textContent.includes('累计收获')})()`
       ),
     });
+    // 节气 pill：农场标题行展示当前节气与第几天，场景 data-term 同步
+    results.push({
+      check: "farm caption carries a solar-term pill",
+      pass: await js(
+        `(()=>{const p=document.querySelector('.term-pill');const s=document.querySelector('.farm-scene');if(!p||!s||!s.dataset.term)return false;return p.textContent.includes(s.dataset.term)&&p.textContent.includes('第')&&p.title.includes('天后交')})()`
+      ),
+    });
     // 象限着色：果筐堆按累计象限分布混色（红/黄/青渐变里至少看到黄和青）
     results.push({
       check: "harvest pile mixes quadrant gradient tones from cumulative records",
@@ -505,6 +512,13 @@ app
       check: "timing view with ring and current task card",
       pass: await js(
         `Boolean(document.querySelector('.ring'))&&Boolean(document.querySelector('.current-task'))`
+      ),
+    });
+    // 进行中专注：环内已计时 + 提示 chip 行（本轮分钟）
+    results.push({
+      check: "timing view shows elapsed line and info chips",
+      pass: await js(
+        `(()=>{const e=document.querySelector('.ring-elapsed');const c=document.querySelector('.timing-chips');return Boolean(e&&/已专注 \\d{2}:\\d{2}/.test(e.textContent))&&Boolean(c&&c.textContent.includes('本轮'))})()`
       ),
     });
     await shot("timing");
@@ -725,6 +739,55 @@ app
     });
     await shotClip("heatmap-closeup", ".heatmap");
     await shot("board-manual");
+
+    // ── 专注统计页：tab 切换、汇总卡、柱状图分桶、半小时热力格 ──
+    await js(
+      `(()=>{const b=[...document.querySelectorAll('button')].find(x=>x.getAttribute('aria-label')==='专注统计');if(!b)throw Error('no stats button');b.click()})()`
+    );
+    await wait(400);
+    results.push({
+      check: "stats page opens with four range tabs and five summary cards",
+      pass: await js(
+        `document.querySelectorAll('.stats-tab').length===4&&document.querySelectorAll('.stats-summary .stat').length===5`
+      ),
+    });
+    results.push({
+      check: "week stats: 7 bars and a 7x48 half-hour heat grid",
+      pass: await js(
+        `document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length>=7*48&&document.querySelectorAll('.top-list li').length>0`
+      ),
+    });
+    await shot("stats-week");
+    await js(
+      `(()=>{[...document.querySelectorAll('.stats-tab')].find(b=>b.textContent==='月').click()})()`
+    );
+    await wait(250);
+    results.push({
+      check: "month stats: one bar per day of the month",
+      pass: await js(
+        `(()=>{const n=document.querySelectorAll('.bars .bar-col').length;return n>=28&&n<=31&&document.querySelector('.bars').classList.contains('dense')})()`
+      ),
+    });
+    await shot("stats-month");
+    await js(
+      `(()=>{[...document.querySelectorAll('.stats-tab')].find(b=>b.textContent==='年').click()})()`
+    );
+    await wait(250);
+    results.push({
+      check: "year stats: 12 monthly bars and golden-slot highlight",
+      pass: await js(
+        `document.querySelectorAll('.bars .bar-col').length===12&&document.querySelectorAll('.glory-list li').length===4`
+      ),
+    });
+    await shot("stats-year");
+    await js(
+      `(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='返回').click()})()`
+    );
+    await wait(300);
+    results.push({
+      check: "stats page closes back to the board",
+      pass: await js(`!document.querySelector('.stats-page')&&Boolean(document.querySelector('.quadrants'))`),
+    });
     // 等补记的信息 toast 自动消失后再进大视口复查
     await wait(3200);
 
@@ -947,6 +1010,30 @@ app
       ),
     });
     await shotClip("farm-night", ".farm-field");
+    // 节气点景：雨水第 3 天（2026-02-20 12:00 北京，避开交节时刻）落细雨，节气 pill 同步换字
+    await win.loadURL(
+      `${pathToFileURL(html).href}?farmNow=${Date.UTC(2026, 1, 20, 4)}`
+    );
+    await wait(800);
+    results.push({
+      check: "Yushui term shows drizzle overlay and term pill",
+      pass: await js(
+        `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='雨水'&&document.querySelectorAll('.farm-rain').length>=5&&document.querySelector('.term-pill').textContent.includes('雨水')&&document.querySelectorAll('.farm-petal, .farm-season-item').length>=0})()`
+      ),
+    });
+    await shotClip("farm-term-yushui", ".farm-field");
+    // 霜降第 3 天（2026-10-25 12:00 北京）：土壤带覆薄霜
+    await win.loadURL(
+      `${pathToFileURL(html).href}?farmNow=${Date.UTC(2026, 9, 25, 4)}`
+    );
+    await wait(800);
+    results.push({
+      check: "Shuangjiang term shows frost on the soil band",
+      pass: await js(
+        `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='霜降'&&[...s.querySelectorAll('path')].some(p=>p.getAttribute('fill')==='#f4fafd')})()`
+      ),
+    });
+    await shotClip("farm-term-shuangjiang", ".farm-field");
 
     // ── 象限空间自适应：?demoTasks= 注入合成分布（页面重载，不影响上面 demo 断言） ──
     // 场景 A：Q1 十七个任务、Q2 空 → Q1 占满行宽双列、Q2 收成细条；下排两空维持均分

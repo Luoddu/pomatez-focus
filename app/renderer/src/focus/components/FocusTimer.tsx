@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask, timeParts } from "../session";
-import { Ring, durationText, parseTitle, quadrantMeta } from "./shared";
+import { QUADRANT_TONES } from "../week";
+import { Ring, clock, durationText, parseTitle, quadrantMeta } from "./shared";
 
 export default function FocusTimer({
   active,
@@ -44,6 +45,17 @@ export default function FocusTimer({
     const timer = setTimeout(() => setConfirming(false), 3000);
     return () => clearTimeout(timer);
   }, [confirming]);
+  // 任务描述默认折叠为 3 行（长备注不再把计时器挤到屏幕外），
+  // 需要通读时一键展开；只有内容真的溢出才出现开关
+  const [expanded, setExpanded] = useState(false);
+  const descRef = useRef<HTMLDivElement>(null);
+  const [descOverflow, setDescOverflow] = useState(false);
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    setDescOverflow(el.scrollHeight > el.clientHeight + 2);
+  }, [active.task.description, expanded]);
+  useEffect(() => setExpanded(false), [active.id]);
   const note = restSeconds
     ? "休息中"
     : active.status === "paused"
@@ -51,6 +63,10 @@ export default function FocusTimer({
     : parts.overtime
     ? "额外时间 · 等待你确认"
     : "专注于当下";
+  // 进度弧随任务象限着色（与番茄园/记录列表同一取色口径），无象限保持主题蓝
+  const ringTone = active.task.quadrant
+    ? QUADRANT_TONES[active.task.quadrant]
+    : "#4c6fff";
   return (
     <div className="left-col timing-left">
       <div className="timing-center">
@@ -63,9 +79,22 @@ export default function FocusTimer({
           <div className="ct-main">
             <div className="ct-name">{parsed.name}</div>
             {active.task.description && (
-              <div className="ct-description">
-                {active.task.description}
-              </div>
+              <>
+                <div
+                  ref={descRef}
+                  className={`ct-description${expanded ? " expanded" : ""}`}
+                >
+                  {active.task.description}
+                </div>
+                {descOverflow && (
+                  <button
+                    className="btn-text ct-expand"
+                    onClick={() => setExpanded((open) => !open)}
+                  >
+                    {expanded ? "收起备注" : "展开备注"}
+                  </button>
+                )}
+              </>
             )}
             <div className="ct-sub">
               第 {parsed.pomodoro} 个番茄 · 番茄时长 {plannedMinutes}{" "}
@@ -135,23 +164,30 @@ export default function FocusTimer({
         <Ring
           size={300}
           stroke={16}
+          tone={ringTone}
           progress={active.elapsedSeconds / active.plannedSeconds}
+          className={active.status === "paused" ? "is-paused" : ""}
         >
           <div className="ring-time" data-testid="time">
             {shownTime}
           </div>
           <div className="ring-note">{note}</div>
+          <div className="ring-elapsed">
+            已专注 {clock(active.elapsedSeconds)}
+          </div>
         </Ring>
-        <div className="timing-hints">
+        <div className="timing-chips">
+          <span className="chip-item">
+            本轮 {plannedMinutes} 分钟
+          </span>
           {gathered >= 1 && (
-            <span className="gather-note">
-              已积累 {gathered} 个番茄
+            <span className="chip-item tomato">
+              🍅 已积累 {gathered} 个
             </span>
           )}
           {parts.overtime > 0 && (
-            <span className="amber-note">
-              本轮 {plannedMinutes} 分钟已到 · 已多计时{" "}
-              {durationText(parts.overtime)}，结束时确认
+            <span className="chip-item amber">
+              多计时 {durationText(parts.overtime)} · 结束时确认
             </span>
           )}
         </div>

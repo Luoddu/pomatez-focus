@@ -105,12 +105,14 @@ export const Ring = ({
   size,
   stroke,
   progress,
+  tone = "#4c6fff",
   className = "",
   children,
 }: {
   size: number;
   stroke: number;
   progress: number;
+  tone?: string; // 进度弧颜色：番茄园语境下随任务象限着色
   className?: string;
   children?: React.ReactNode;
 }) => {
@@ -134,7 +136,7 @@ export const Ring = ({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="#4c6fff"
+          stroke={tone}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={`${(c * shown).toFixed(1)} ${c.toFixed(1)}`}

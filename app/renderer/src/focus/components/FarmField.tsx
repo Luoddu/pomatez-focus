@@ -5,12 +5,16 @@ import {
   QuadrantKey,
   Season,
   beijingHour,
-  beijingMonth,
   mixColor,
-  seasonOfMonth,
   totalMilestone,
   weekHarvest,
 } from "../week";
+import {
+  TermOverlay,
+  seasonOfTerm,
+  termInfo,
+  termOverlay,
+} from "../solarTerms";
 
 // 布局：土壤带集中在地面层中央（100..680），株位在带内；
 // 收获果筐在左侧空白区（不压土壤带），稻草人守右侧带缘
@@ -479,6 +483,64 @@ const SeasonLayer = ({ season }: { season: Season }) => {
   );
 };
 
+// ── 节气点景层：在四季层之上叠加节气特有的小装饰 ──
+// 雨水/清明/谷雨 细雨、白露/寒露 叶尖露珠、霜降 土壤薄霜（霜的地面覆白在
+// 组件调用处与雪地同位渲染）
+const RAIN_DROPS: [number, number][] = [
+  [150, 30],
+  [230, 55],
+  [320, 36],
+  [410, 60],
+  [500, 34],
+  [590, 58],
+  [665, 40],
+];
+const DEW_DROPS: [number, number][] = [
+  [228, 104],
+  [300, 110],
+  [388, 102],
+  [452, 112],
+  [530, 105],
+  [612, 110],
+];
+const TermOverlayLayer = ({ overlay }: { overlay: TermOverlay }) => {
+  if (overlay === "rain")
+    return (
+      <>
+        {RAIN_DROPS.map(([rx, ry], i) => (
+          <line
+            key={`${rx}-${ry}`}
+            className="farm-rain"
+            x1={rx}
+            y1={ry}
+            x2={rx - 3}
+            y2={ry + 7}
+            style={{
+              animationDelay: `${-i * 0.9}s`,
+              animationDuration: `${2.6 + (i % 3) * 0.5}s`,
+            }}
+          />
+        ))}
+      </>
+    );
+  if (overlay === "dew")
+    return (
+      <>
+        {DEW_DROPS.map(([dx, dy], i) => (
+          <circle
+            key={`${dx}-${dy}`}
+            className="farm-dew"
+            cx={dx}
+            cy={dy}
+            r="1.6"
+            style={{ animationDelay: `${i * 0.7}s` }}
+          />
+        ))}
+      </>
+    );
+  return null;
+};
+
 // 一株番茄的某个生长阶段（局部原点在株基）。形态参考真实番茄生长过程。
 // 坐果的果实是青绿的（未熟）；转色开始染象限色；红熟整果按本周收获
 // 的象限分布着色——一眼看出这周红番茄多还是灰番茄多
@@ -722,7 +784,11 @@ export default function FarmField({
   }, [now]);
   const at = now ?? liveNow;
   const bh = beijingHour(at);
-  const season = seasonOfMonth(beijingMonth(at)); // 时令随实际月份翻篇
+  // 节气驱动：季节从「月份估算」升级为真实节气（立春–谷雨=春…），
+  // 并叠加节气点景（细雨/露珠/薄霜）；pill 展示当前节气与下一节气倒计时
+  const term = termInfo(at);
+  const season = seasonOfTerm(term.index);
+  const overlay = termOverlay(term.index);
   const butterfliesOut = bh >= 8 && bh < 17; // 蝴蝶白天
   const firefliesOut = bh >= 19.5 || bh < 6; // 萤火虫夜晚
   const harvest = weekHarvest(week);
@@ -743,15 +809,28 @@ export default function FarmField({
       : 0;
   return (
     <div className="card farm-field">
-      <div className="farm-caption">{caption}</div>
+      <div className="farm-caption">
+        <span
+          className="term-pill"
+          title={`${term.name} · 第 ${term.dayOfTerm} 天 · ${
+            term.daysToNext === 0
+              ? `今天交 ${term.nextName}`
+              : `${term.daysToNext} 天后交 ${term.nextName}`
+          }`}
+        >
+          {term.emoji} {term.name} · 第 {term.dayOfTerm} 天
+        </span>
+        {caption}
+      </div>
       {/* 分层场景：天空层随卡片高度舒展，地面层保持 720:150 比例锚底，
           窗口拉高时空白被天空有机吃掉而不拉伸变形 */}
       <div
         className="farm-scene"
         role="img"
-        aria-label={`番茄园：${caption}`}
+        aria-label={`番茄园：${term.name}，${caption}`}
         data-sky={now === undefined ? "live" : "mock"}
         data-sky-hour={bh.toFixed(2)}
+        data-term={term.name}
       >
         <Sky now={at} />
         {/* 内联原创 SVG 素材：渲染进程 CSP 禁网且规避外部素材许可证风险 */}
@@ -786,12 +865,19 @@ export default function FarmField({
             fill="#b07840"
             opacity=".45"
           />
-          {/* 冬天：土壤带覆一层薄雪 */}
+          {/* 冬天：土壤带覆一层薄雪；霜降：更薄的一层霜 */}
           {season === "winter" && (
             <path
               d="M100 121 Q200 107 320 117 T560 115 T680 119 L680 131 Q560 125 420 129 T100 133 Z"
               fill="#ffffff"
               opacity=".75"
+            />
+          )}
+          {overlay === "frost" && season !== "winter" && (
+            <path
+              d="M100 121 Q200 107 320 117 T560 115 T680 119 L680 131 Q560 125 420 129 T100 133 Z"
+              fill="#f4fafd"
+              opacity=".45"
             />
           )}
           {/* 小栅栏：土壤带左缘 */}
@@ -885,8 +971,10 @@ export default function FarmField({
               }}
             />
           ))}
-          {/* 时令装饰：花瓣 / 蜻蜓 / 落叶 / 雪花，按北京时间月份换景 */}
+          {/* 时令装饰：花瓣 / 蜻蜓 / 落叶 / 雪花，按真实节气换景；
+              其上再叠节气点景（细雨 / 露珠） */}
           <SeasonLayer season={season} />
+          <TermOverlayLayer overlay={overlay} />
           <Pile total={total} toneAt={pileTone} />
         </svg>
       </div>

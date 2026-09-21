@@ -31,6 +31,7 @@ import ReviewPanel from "./components/ReviewPanel";
 import SettingsPanel, { FocusConfig } from "./components/SettingsPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import MiniView from "./components/MiniView";
+import StatsPanel from "./components/StatsPanel";
 import {
   api,
   clock,
@@ -225,6 +226,7 @@ export default function FocusApp() {
     [compact, setCompact] = useState(false),
     [pinned, setPinned] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false),
+    [statsOpen, setStatsOpen] = useState(false),
     [connected, setConnected] = useState(false),
     [sourceKey, setSourceKey] = useState<string | null>(null),
     [todayCount, setTodayCount] = useState<number | null>(null),
@@ -1372,6 +1374,12 @@ export default function FocusApp() {
           onAddLocal={addLocal}
           {...windowControls}
         />
+      ) : statsOpen ? (
+        <StatsPanel
+          records={shownRecords}
+          onClose={() => setStatsOpen(false)}
+          {...windowControls}
+        />
       ) : (
         <main className={`content view-${view}`}>
           {view === "review" && active ? (
@@ -1490,6 +1498,7 @@ export default function FocusApp() {
               notify(`本周目标达成 🍅（${total}/${goal}）`);
               playTimeUp();
             }}
+            onOpenStats={() => setStatsOpen(true)}
             {...windowControls}
           />
         </main>
