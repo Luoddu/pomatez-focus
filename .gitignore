@@ -28,3 +28,4 @@ yarn-error.log*
 *.enc
 focus-records-*.json
 feishu-credentials*
+dist-preview44/
