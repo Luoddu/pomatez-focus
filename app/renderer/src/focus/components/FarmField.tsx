@@ -3,8 +3,12 @@ import {
   PLANT_STAGES,
   QUADRANT_TONES,
   QuadrantKey,
+  Season,
   beijingHour,
+  beijingMonth,
   mixColor,
+  seasonOfMonth,
+  totalMilestone,
   weekHarvest,
 } from "../week";
 
@@ -35,7 +39,9 @@ const rand = (i: number, salt: number) => {
   return x - Math.floor(x);
 };
 
-// 果体哑光渐变：中心主色 → 边缘略深（14% 黑），无白色高光 stop；坐果青绿也有一只
+// 果体哑光径向渐变：中心主色 → 边缘略深（16% 黑）；坐果青绿也有一只。
+// 仓库验收要求哑光无白色高光点（scripts/shot-app.cjs），立体感靠
+// 渐变压深 + 每颗果实的确定性形态微差（大小/椭圆比/倾角/萼片）呈现
 const TOMATO_GRADS: [string, string][] = [
   ...(Object.entries(QUADRANT_TONES) as [string, string][]),
   ["unripe", "#7fbf6b"],
@@ -46,10 +52,10 @@ const GRAD_BY_TONE: Record<string, string> = Object.fromEntries(
 const TomatoDefs = () => (
   <defs>
     {TOMATO_GRADS.map(([k, tone]) => (
-      <radialGradient key={k} id={`farm-tomato-${k}`} cx="45%" cy="36%" r="75%">
+      <radialGradient key={k} id={`farm-tomato-${k}`} cx="42%" cy="32%" r="78%">
         <stop offset="0%" stopColor={tone} />
         <stop offset="55%" stopColor={tone} />
-        <stop offset="100%" stopColor={mixColor(tone, "#000000", 0.14)} />
+        <stop offset="100%" stopColor={mixColor(tone, "#000000", 0.16)} />
       </radialGradient>
     ))}
   </defs>
@@ -64,12 +70,14 @@ const Tomato = ({
   r = 6,
   tone,
   seed = 0,
+  pop = false,
 }: {
   x: number;
   y: number;
   r?: number;
   tone: string;
   seed?: number;
+  pop?: boolean; // 新入筐时播放一次弹跳（靠 key 重挂载触发）
 }) => {
   const rr = r * (0.87 + rand(seed, 1) * 0.28);
   const ratio = 0.92 + rand(seed, 2) * 0.16;
@@ -96,6 +104,7 @@ const Tomato = ({
         strokeLinecap="round"
       />
       <ellipse
+        className={pop ? "farm-tomato-pop" : undefined}
         cx={x}
         cy={y}
         rx={rx.toFixed(2)}
@@ -307,13 +316,19 @@ const Sky = ({ now }: { now: number }) => {
   );
 };
 
-// 稻草人：立在土壤带右缘的可爱看守，local 原点在杆底
-const Scarecrow = ({ x }: { x: number }) => (
+// 稻草人：立在土壤带右缘的可爱看守，local 原点在杆底；冬天戴红围巾
+const Scarecrow = ({ x, scarf = false }: { x: number; scarf?: boolean }) => (
   <g
     className="farm-scarecrow"
     transform={`translate(${x} 18) scale(.85)`}
   >
     <rect x="-2.5" y="86" width="5" height="34" rx="2" fill="#a9763f" />
+    {scarf && (
+      <>
+        <path d="M-9 70.5 Q0 75.5 9 70.5 L8 78 L2 75.5 L-7 79 Z" fill="#d9564a" />
+        <path d="M2 75.5 l5 13 l4 -1.5 l-4.5 -12.5 Z" fill="#c94337" />
+      </>
+    )}
     <path
       d="M-22 76 L22 76"
       stroke="#a9763f"
@@ -356,6 +371,113 @@ const Scarecrow = ({ x }: { x: number }) => (
     <path d="M-7 55.5 Q0 41 7 55.5 Z" fill="#e8a13d" />
   </g>
 );
+
+// ── 季节时令层：按北京时间月份叠克制的小装饰，有变化但不打扰专注 ──
+// 春(3–5)飘花瓣、夏(6–8)蜻蜓点水、秋(9–11)落叶、冬(12–2)落雪 + 雪地
+const PETALS: [number, number][] = [
+  [175, 62],
+  [295, 44],
+  [425, 74],
+  [555, 52],
+  [640, 84],
+];
+const LEAVES: [number, number][] = [
+  [160, 58],
+  [285, 78],
+  [410, 48],
+  [545, 72],
+  [655, 56],
+];
+const SNOWFLAKES: [number, number][] = [
+  [140, 40],
+  [255, 66],
+  [370, 36],
+  [490, 70],
+  [605, 44],
+  [680, 78],
+];
+const Dragonfly = () => (
+  <g className="farm-dragonfly" transform="translate(520 66)">
+    <line x1="0" y1="0" x2="0" y2="12" stroke="#5b7f99" strokeWidth="1.6" strokeLinecap="round" />
+    <ellipse className="farm-wing" cx="-4" cy="-2" rx="5" ry="1.8" fill="#bcd8ec" opacity=".85" />
+    <ellipse className="farm-wing right" cx="4" cy="-2" rx="5" ry="1.8" fill="#bcd8ec" opacity=".85" />
+    <circle cx="0" cy="-3" r="1.6" fill="#5b7f99" />
+  </g>
+);
+const SeasonLayer = ({ season }: { season: Season }) => {
+  if (season === "spring")
+    return (
+      <>
+        {PETALS.map(([px, py], i) => (
+          <g key={`${px}-${py}`} transform={`translate(${px} ${py})`}>
+            <g
+              className="farm-season-item"
+              style={{
+                animationDelay: `${-i * 1.7}s`,
+                animationDuration: `${6.5 + (i % 3)}s`,
+              }}
+            >
+              <ellipse
+                cx="0"
+                cy="0"
+                rx="3.2"
+                ry="1.9"
+                fill="#f5c9d4"
+                transform={`rotate(${30 + i * 40})`}
+              />
+            </g>
+          </g>
+        ))}
+      </>
+    );
+  if (season === "summer") return <Dragonfly />;
+  if (season === "autumn")
+    return (
+      <>
+        {LEAVES.map(([lx, ly], i) => (
+          <g key={`${lx}-${ly}`} transform={`translate(${lx} ${ly})`}>
+            <g
+              className="farm-season-item"
+              style={{
+                animationDelay: `${-i * 1.3}s`,
+                animationDuration: `${7.5 + (i % 3)}s`,
+              }}
+            >
+              <path
+                d="M0 0 Q3.4 -4.5 0 -9 Q-3.4 -4.5 0 0 Z"
+                fill={i % 2 ? "#e8a13d" : "#d96b4a"}
+                transform={`rotate(${-20 + i * 25})`}
+              />
+            </g>
+          </g>
+        ))}
+      </>
+    );
+  // winter：雪花落在土壤带上（在组件调用处叠加雪地）
+  return (
+    <>
+      {SNOWFLAKES.map(([sx, sy], i) => (
+        <g key={`${sx}-${sy}`} transform={`translate(${sx} ${sy})`}>
+          <g
+            className="farm-season-item snow"
+            style={{
+              animationDelay: `${-i * 1.1}s`,
+              animationDuration: `${8 + (i % 3)}s`,
+            }}
+          >
+            <circle cx="0" cy="0" r="2.1" fill="#ffffff" opacity=".95" />
+            <path
+              d="M-3.4 0 L3.4 0 M0 -3.4 L0 3.4"
+              stroke="#ffffff"
+              strokeWidth=".9"
+              opacity=".8"
+            />
+          </g>
+        </g>
+      ))}
+    </>
+  );
+};
 
 // 一株番茄的某个生长阶段（局部原点在株基）。形态参考真实番茄生长过程。
 // 坐果的果实是青绿的（未熟）；转色开始染象限色；红熟整果按本周收获
@@ -474,9 +596,53 @@ const Plant = ({
   );
 };
 
-// 收获堆：卡片左侧空白区（不压土壤带），展示累计总番茄；视觉封顶
-// 10 个，超出加一只小筐示意；颜色按累计记录的象限分布混色（近似比例），
-// 准确数量以「累计收获 N」文字为准
+// 收获筐：卡片左侧空白区（不压土壤带）。筐里果堆随累计收获逐层长高
+// （最多 21 颗六层堆尖），每收一颗新番茄从顶部弹跳入筐（key 重挂载触发
+// 一次性动画，老番茄不重播）；30/100 颗时两侧各多出一只小筐，堆尖之上挂
+// 金星级程碑旗（50/100/200/…）。准确数量以「累计收获 N」文字为准
+const PILE_CAP = 21;
+const pileSlots = (): [number, number][] => {
+  const slots: [number, number][] = [];
+  for (let row = 0; row < 6; row++) {
+    const count = 6 - row;
+    const y = -18 - row * 7.6;
+    for (let k = 0; k < count; k++)
+      slots.push([(k - (count - 1) / 2) * 11.4, y]);
+  }
+  return slots;
+};
+const PILE_SLOTS = pileSlots();
+
+const MiniBasket = ({
+  x,
+  toneAt,
+  seed,
+}: {
+  x: number;
+  toneAt: (k: number) => string;
+  seed: number;
+}) => (
+  <g transform={`translate(${x} -2) scale(.52)`}>
+    <path d="M-24 -12 L24 -12 L19 6 L-19 6 Z" fill="#b07840" />
+    <rect x="-27" y="-16" width="54" height="7" rx="3.5" fill="#a9763f" />
+    <Tomato x={-9} y={-20} r={6} tone={toneAt(seed)} seed={seed * 7} />
+    <Tomato x={4} y={-22} r={6} tone={toneAt(seed + 1)} seed={seed * 7 + 1} />
+    <Tomato x={-2} y={-29} r={6} tone={toneAt(seed + 2)} seed={seed * 7 + 2} />
+  </g>
+);
+
+// 里程碑金星旗：堆尖上方的小旗帜，旗面数字为已达成的最大档
+const MilestoneFlag = ({ reached }: { reached: number }) =>
+  reached >= 50 ? (
+    <g transform="translate(0 -72)">
+      <line x1="0" y1="10" x2="0" y2="-2" stroke="#a9763f" strokeWidth="1.8" />
+      <path d="M0 -2 L15 -2 L12.5 3 L15 8 L0 8 Z" fill="#f2b544" />
+      <text className="farm-flag-text" x="5.5" y="5.4" textAnchor="middle">
+        {reached}
+      </text>
+    </g>
+  ) : null;
+
 const Pile = ({
   total,
   toneAt,
@@ -484,39 +650,43 @@ const Pile = ({
   total: number;
   toneAt: (k: number) => string;
 }) => {
-  const shown = Math.min(Math.max(total, 0), 10);
-  const slots: [number, number][] = [
-    [-20, -22],
-    [-7, -24],
-    [7, -24],
-    [20, -22],
-    [-13, -31],
-    [0, -33],
-    [13, -31],
-    [-6, -40],
-    [6, -40],
-    [0, -47],
-  ];
+  const n = Math.max(0, Math.floor(total));
+  const shown = Math.min(n, PILE_CAP);
+  const milestone = totalMilestone(n);
+  const sideBaskets = n >= 100 ? 2 : n >= 30 ? 1 : 0;
   return (
     <g className="farm-pile" transform="translate(44 118)">
       {/* 立在卡片留白上的淡淡地影，不接地壤带 */}
-      <ellipse cx="6" cy="5" rx="42" ry="5" fill="#7a4f21" opacity=".08" />
-      {total > 10 && (
-        <g transform="translate(38 -2) scale(.55)">
-          <path d="M-24 -12 L24 -12 L19 6 L-19 6 Z" fill="#b07840" />
-          <rect x="-27" y="-16" width="54" height="7" rx="3.5" fill="#a9763f" />
-          <Tomato x={-9} y={-20} r={6} tone={toneAt(10)} seed={230} />
-          <Tomato x={4} y={-22} r={6} tone={toneAt(11)} seed={231} />
-          <Tomato x={-2} y={-29} r={6} tone={toneAt(12)} seed={232} />
+      <ellipse cx="6" cy="5" rx="46" ry="5" fill="#7a4f21" opacity=".08" />
+      {sideBaskets > 0 && <MiniBasket x={-32} toneAt={toneAt} seed={30} />}
+      {sideBaskets > 1 && <MiniBasket x={46} toneAt={toneAt} seed={33} />}
+      {/* 编织筐：筐身 + 两道织纹 + 提手 */}
+      <path d="M-32 -14 L32 -14 L25 5 L-25 5 Z" fill="#b07840" />
+      <path d="M-29.5 -8 L29.5 -8" stroke="#9c6733" strokeWidth="1.6" opacity=".7" />
+      <path d="M-27 -2 L27 -2" stroke="#9c6733" strokeWidth="1.6" opacity=".7" />
+      <rect x="-35" y="-18" width="70" height="7" rx="3.5" fill="#a9763f" />
+      <path
+        d="M-20 -18 Q0 -34 20 -18"
+        stroke="#a9763f"
+        strokeWidth="3"
+        fill="none"
+        strokeLinecap="round"
+      />
+      {PILE_SLOTS.slice(0, shown).map(([sx, sy], k) => (
+        // key=k：堆高时新番茄挂载触发弹跳，既有番茄不重播
+        <Tomato key={k} x={sx} y={sy} r={5.4} tone={toneAt(k)} seed={200 + k} pop />
+      ))}
+      {n > PILE_CAP && (
+        <g transform="translate(30 -52)">
+          <rect x="-14" y="-9" width="30" height="15" rx="7.5" fill="#f2b544" />
+          <text className="farm-flag-text" x="1" y="2.4" textAnchor="middle">
+            +{n - PILE_CAP}
+          </text>
         </g>
       )}
-      <path d="M-30 -14 L30 -14 L24 4 L-24 4 Z" fill="#b07840" />
-      <rect x="-33" y="-18" width="66" height="7" rx="3.5" fill="#a9763f" />
-      {slots.slice(0, shown).map(([sx, sy], k) => (
-        <Tomato key={k} x={sx} y={sy} r={6} tone={toneAt(k)} seed={200 + k} />
-      ))}
-      <text className="farm-pile-text" x="6" y="17" textAnchor="middle">
-        累计收获 {total}
+      <MilestoneFlag reached={milestone.reached} />
+      <text className="farm-pile-text" x="6" y="18" textAnchor="middle">
+        累计收获 {n}
       </text>
     </g>
   );
@@ -552,6 +722,7 @@ export default function FarmField({
   }, [now]);
   const at = now ?? liveNow;
   const bh = beijingHour(at);
+  const season = seasonOfMonth(beijingMonth(at)); // 时令随实际月份翻篇
   const butterfliesOut = bh >= 8 && bh < 17; // 蝴蝶白天
   const firefliesOut = bh >= 19.5 || bh < 6; // 萤火虫夜晚
   const harvest = weekHarvest(week);
@@ -615,6 +786,14 @@ export default function FarmField({
             fill="#b07840"
             opacity=".45"
           />
+          {/* 冬天：土壤带覆一层薄雪 */}
+          {season === "winter" && (
+            <path
+              d="M100 121 Q200 107 320 117 T560 115 T680 119 L680 131 Q560 125 420 129 T100 133 Z"
+              fill="#ffffff"
+              opacity=".75"
+            />
+          )}
           {/* 小栅栏：土壤带左缘 */}
           <g className="farm-fence">
             <rect x="114" y="106" width="4" height="16" rx="1.5" fill="#c68b59" />
@@ -623,8 +802,8 @@ export default function FarmField({
             <rect x="110" y="110" width="52" height="3" rx="1.5" fill="#d9a066" />
             <rect x="110" y="117" width="52" height="3" rx="1.5" fill="#d9a066" />
           </g>
-          {/* 稻草人守在土壤带右缘 */}
-          <Scarecrow x={648} />
+          {/* 稻草人守在土壤带右缘；入冬戴上红围巾 */}
+          <Scarecrow x={648} scarf={season === "winter"} />
           {Array.from({ length: harvest.plants }, (_, i) => {
             const scale = 0.85 + rand(i, 1) * 0.35;
             const tilt = (rand(i, 2) - 0.5) * 6;
@@ -706,6 +885,8 @@ export default function FarmField({
               }}
             />
           ))}
+          {/* 时令装饰：花瓣 / 蜻蜓 / 落叶 / 雪花，按北京时间月份换景 */}
+          <SeasonLayer season={season} />
           <Pile total={total} toneAt={pileTone} />
         </svg>
       </div>

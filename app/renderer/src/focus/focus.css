@@ -2102,5 +2102,181 @@ input:focus-visible {
 .quick-task-form { display: grid; gap: 10px; padding: 12px 0; }
 .quick-task-form > input { width: 100%; padding: 8px; border: 1px solid #dce1eb; border-radius: 8px; }
 .quick-task-form input[type=number] { width: 65px; }
-.record-edit { margin-left: auto; font-size: 12px; }
+.record-edit {
+  margin-left: auto;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  /* 默认收起，悬浮该行时滑出：列表更干净，需要时随手可得 */
+  opacity: 0;
+  transform: translateX(4px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+.record:hover .record-edit,
+.record:focus-within .record-edit,
+.record-edit:disabled {
+  opacity: 1;
+  transform: none;
+}
+.record-edit:disabled {
+  cursor: default;
+}
+@media (hover: none) {
+  .record-edit {
+    opacity: 1;
+    transform: none;
+  }
+}
 .outbox-status { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 18px; font-size: 13px; }
+
+/* ── 概览统计卡：今日番茄分级变色 + 总番茄里程碑进度 ── */
+.stat strong {
+  transform-origin: left center;
+}
+.stat strong[data-tier="mid"] {
+  color: var(--red);
+}
+.stat strong[data-tier="high"] {
+  color: #a97708;
+  text-shadow: 0 0 12px rgba(242, 181, 68, 0.35);
+  animation: stat-tier-pop 0.5s ease-out;
+}
+@keyframes stat-tier-pop {
+  0% {
+    transform: scale(0.86);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.stat-milestone {
+  margin-top: 6px;
+}
+.stat-milestone-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #eef1f5;
+  overflow: hidden;
+}
+.stat-milestone-track i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f2cd73, #f2b544);
+  transition: width 0.6s ease-out;
+}
+.stat-milestone em {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── 专注记录：同步状态圆点徽标 ── */
+.r-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.r-sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.r-sync.is-synced .r-sync-dot {
+  background: #3fae5a;
+  box-shadow: 0 0 0 2.5px rgba(63, 174, 90, 0.16);
+}
+.r-sync.is-pending .r-sync-dot {
+  background: #f2a03d;
+  box-shadow: 0 0 0 2.5px rgba(242, 160, 61, 0.16);
+}
+.r-sync.is-local .r-sync-dot {
+  background: #c3cad4;
+}
+
+/* ── 农场：丰收筐弹跳、里程碑旗、季节时令动画 ── */
+.farm-tomato-pop {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: farm-tomato-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes farm-tomato-pop {
+  0% {
+    transform: translateY(-14px) scale(0.4);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+.farm-flag-text {
+  font-size: 8px;
+  font-weight: 700;
+  fill: #6b4a26;
+}
+.farm-season-item {
+  animation: farm-season-fall 7s linear infinite;
+}
+@keyframes farm-season-fall {
+  0% {
+    transform: translate(0, -6px) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(10px, 52px) rotate(160deg);
+    opacity: 0;
+  }
+}
+.farm-season-item.snow {
+  animation-name: farm-snow-fall;
+}
+@keyframes farm-snow-fall {
+  0% {
+    transform: translate(0, -6px);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-6px, 54px);
+    opacity: 0.1;
+  }
+}
+.farm-dragonfly {
+  animation: farm-dragonfly-bob 5s ease-in-out infinite alternate;
+}
+@keyframes farm-dragonfly-bob {
+  from {
+    transform: translate(520px, 66px);
+  }
+  to {
+    transform: translate(510px, 57px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .farm-tomato-pop,
+  .farm-season-item,
+  .farm-dragonfly,
+  .stat strong[data-tier="high"] {
+    animation: none;
+  }
+}

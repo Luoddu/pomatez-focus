@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask } from "../session";
-import { QUADRANT_TONES, harvestTier, weekTomatoes } from "../week";
+import { QUADRANT_TONES, harvestTier, totalMilestone, TOTAL_MILESTONES, weekTomatoes } from "../week";
 import {
   WEEK_GOAL_DEFAULT,
   goalFill,
@@ -63,16 +63,50 @@ const todayInvite = () => {
     (now.getFullYear() * 400 + dayOfYear) % TODAY_INVITES.length
   ];
 };
-const syncText = (record: FocusSession) =>
-  record.cloudSynced
-    ? "已共享到飞书"
-    : record.sync === "synced"
-    ? record.syncTarget === "plan"
-      ? "已记账 · 待共享成果"
-      : "旧会话已记账 · 待共享成果"
-    : record.sync === "pending"
-    ? "待同步飞书"
-    : "本地记录";
+// 同步状态 → 圆点 + 文案：绿=已上云、橙=待同步、灰=本地。颜色弱依赖，
+// 文案始终完整，色点只是快速扫读锚点
+const syncInfo = (record: FocusSession): { cls: string; text: string } => {
+  if (record.cloudSynced) return { cls: "is-synced", text: "已共享到飞书" };
+  if (record.sync === "synced")
+    return {
+      cls: "is-pending",
+      text:
+        record.syncTarget === "plan"
+          ? "已记账 · 待共享成果"
+          : "旧会话已记账 · 待共享成果",
+    };
+  if (record.sync === "pending")
+    return { cls: "is-pending", text: "待同步飞书" };
+  return { cls: "is-local", text: "本地记录" };
+};
+
+const SyncBadge = ({ record }: { record: FocusSession }) => {
+  const { cls, text } = syncInfo(record);
+  return (
+    <span className={`r-sync ${cls}`}>
+      <i className="r-sync-dot" aria-hidden="true" />
+      {text}
+    </span>
+  );
+};
+
+// 铅笔小图标：记录行的「修改」入口，悬浮行时浮现
+const PencilIcon = () => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 16 16"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M11.2 2.3a1.4 1.4 0 0 1 2 0l.5.5a1.4 1.4 0 0 1 0 2L6 12.5l-2.9.7.7-2.9L11.2 2.3Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 export default function HistoryPanel({
   records,
@@ -170,15 +204,34 @@ export default function HistoryPanel({
     sum(todayRecords, (r) => r.acceptedSeconds || 0)
   );
   const shownWeekTotal = useCountUp(weekTotal);
-  const stats: [string, string][] = [
-    ["今日番茄", String(shownTodayTomatoes)],
-    ["今日专注时长", durationText(shownTodaySeconds)],
-    ["总番茄", String(sum(records, (r) => r.completedCount || 0))],
-    [
-      "总专注时长",
-      durationText(sum(records, (r) => r.acceptedSeconds || 0)),
-    ],
+  const totalTomatoes = sum(records, (r) => r.completedCount || 0);
+  const todayTier = harvestTier(shownTodayTomatoes);
+  // 总番茄的成就刻度：下一档进度条 + 已达成档徽标（农场的里程碑同源）
+  const totalMs = totalMilestone(totalTomatoes);
+  const totalDone = totalMs.reached >= TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
+  const totalProgress = totalDone
+    ? 100
+    : Math.round(
+        ((totalTomatoes - totalMs.reached) / (totalMs.next - totalMs.reached)) *
+          1000
+      ) / 10;
+  const stats: {
+    label: string;
+    value: string;
+    tier?: string;
+    milestone?: { reached: number; next: number; progress: number; done: boolean };
+  }[] = [
+    { label: "今日番茄", value: String(shownTodayTomatoes), tier: todayTier },
+    { label: "今日专注时长", value: durationText(shownTodaySeconds) },
+    { label: "总番茄", value: String(totalTomatoes) },
+    { label: "总专注时长", value: durationText(sum(records, (r) => r.acceptedSeconds || 0)) },
   ];
+  stats[2].milestone = {
+    reached: totalMs.reached,
+    next: totalMs.next,
+    progress: totalProgress,
+    done: totalDone,
+  };
   const groups = records
     .slice()
     .sort((a, b) => b.startedAt - a.startedAt)
@@ -253,12 +306,34 @@ export default function HistoryPanel({
           />
         </div>
         <div className="stat-grid">
-          {stats.map(([label, value]) => (
+          {stats.map(({ label, value, tier, milestone }) => (
             <div className="card stat" key={label} data-stat={label}>
-              <strong className={value.length > 6 ? "long" : ""}>
+              <strong
+                key={tier || "base"}
+                className={value.length > 6 ? "long" : ""}
+                data-tier={tier || undefined}
+              >
                 {value}
               </strong>
               <span>{label}</span>
+              {milestone && (
+                <div className="stat-milestone">
+                  <div className="stat-milestone-track">
+                    <i
+                      style={{
+                        width: `${milestone.progress}%`,
+                      }}
+                    />
+                  </div>
+                  <em>
+                    {milestone.done
+                      ? `🏆 已达成 ${milestone.reached} 丰收传奇`
+                      : milestone.reached
+                      ? `已达成 ${milestone.reached} · 距 ${milestone.next} 还差 ${milestone.next - Number(value)}`
+                      : `距 ${milestone.next} 还差 ${milestone.next - Number(value)}`}
+                  </em>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -461,17 +536,19 @@ export default function HistoryPanel({
                             </span>
                           </div>
                           <div className="r-sub">
-                            完成 {r.completedCount} 个 · {syncText(r)}
+                            完成 {r.completedCount} 个 · <SyncBadge record={r} />
                             {onEdit && (
                               <button
                                 className="btn-text record-edit"
                                 aria-label={`修改记录 ${r.id}`}
+                                title="修改这条记录"
                                 disabled={editingIds.includes(r.id)}
                                 onClick={() => {
                                   setEntryOpen(false);
                                   setEditRecord(r);
                                 }}
                               >
+                                <PencilIcon />
                                 {editingIds.includes(r.id)
                                   ? "修改待同步"
                                   : "修改"}

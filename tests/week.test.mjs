@@ -154,3 +154,46 @@ test("harvestTier tiers the day-total achievement display", () => {
   assert.equal(harvestTier(10), "high");
   assert.equal(harvestTier(23), "high");
 });
+
+test("seasonOfMonth maps Beijing calendar months to farm seasons", async () => {
+  const { seasonOfMonth, beijingMonth, totalMilestone, TOTAL_MILESTONES } =
+    await import("../app/renderer/src/focus/week.ts");
+  // 春 3–5 月（month 2..4）、夏 6–8（5..7）、秋 9–11（8..10）、冬 12–2（11,0,1）
+  assert.equal(seasonOfMonth(2), "spring");
+  assert.equal(seasonOfMonth(4), "spring");
+  assert.equal(seasonOfMonth(5), "summer");
+  assert.equal(seasonOfMonth(7), "summer");
+  assert.equal(seasonOfMonth(8), "autumn");
+  assert.equal(seasonOfMonth(10), "autumn");
+  assert.equal(seasonOfMonth(11), "winter");
+  assert.equal(seasonOfMonth(0), "winter");
+  assert.equal(seasonOfMonth(1), "winter");
+  // 越界输入收敛到合法季节，不抛错（12 回绕到 1 月=冬）
+  assert.equal(seasonOfMonth(12), "winter");
+  assert.equal(seasonOfMonth(-1), "winter");
+});
+
+test("beijingMonth reads the UTC+8 calendar month regardless of machine timezone", async () => {
+  const { beijingMonth } = await import("../app/renderer/src/focus/week.ts");
+  // 北京时间 2026-03-01 00:30 = UTC 2026-02-28 16:30：UTC 月还是 2 月，北京已 3 月
+  assert.equal(beijingMonth(Date.UTC(2026, 1, 28, 16, 30, 0)), 2);
+  // 北京时间 2026-01-31 20:00 = UTC 2026-01-31 12:00
+  assert.equal(beijingMonth(Date.UTC(2026, 0, 31, 12, 0, 0)), 0);
+});
+
+test("totalMilestone steps through achievement tiers and clamps", async () => {
+  const { totalMilestone, TOTAL_MILESTONES } = await import(
+    "../app/renderer/src/focus/week.ts"
+  );
+  assert.deepEqual(totalMilestone(0), { reached: 0, next: 10 });
+  assert.deepEqual(totalMilestone(9), { reached: 0, next: 10 });
+  assert.deepEqual(totalMilestone(10), { reached: 10, next: 25 });
+  assert.deepEqual(totalMilestone(49), { reached: 25, next: 50 });
+  assert.deepEqual(totalMilestone(50), { reached: 50, next: 100 });
+  assert.deepEqual(totalMilestone(109), { reached: 100, next: 200 });
+  // 超过最高档后不再上涨，进度条按满格处理
+  const last = TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
+  assert.deepEqual(totalMilestone(last + 500), { reached: last, next: last });
+  // 非法输入按 0 处理
+  assert.deepEqual(totalMilestone(NaN), { reached: 0, next: 10 });
+});

@@ -165,3 +165,31 @@ export function harvestTier(count: number): "" | "mid" | "high" {
   if (count >= 5) return "mid";
   return "";
 }
+
+// ── 季节时令（按北京时间月份）：给农场场景叠加轻量装饰 ──
+// 春 3–5 月落樱、夏 6–8 月蜻蜓、秋 9–11 月落叶、冬 12–2 月飘雪；
+// 只做克制的点景，不打断专注
+export type Season = "spring" | "summer" | "autumn" | "winter";
+export function seasonOfMonth(month: number): Season {
+  const m = ((Math.floor(month) % 12) + 12) % 12; // 0=一月 … 11=十二月
+  if (m >= 2 && m <= 4) return "spring";
+  if (m >= 5 && m <= 7) return "summer";
+  if (m >= 8 && m <= 10) return "autumn";
+  return "winter";
+}
+export function beijingMonth(now: number): number {
+  return new Date(now + BEIJING_OFFSET_MS).getUTCMonth();
+}
+
+// 累计收获的里程碑（总番茄的成就刻度）：返回已达成的最大里程碑与下一档
+export const TOTAL_MILESTONES = [10, 25, 50, 100, 200, 300, 500, 1000] as const;
+export function totalMilestone(total: number): {
+  reached: number; // 已达成档（0 = 还没到 10）
+  next: number; // 下一档（全部达成后仍返回最后一档）
+} {
+  const n = Math.max(0, Math.floor(Number.isFinite(total) ? total : 0));
+  let reached = 0;
+  for (const m of TOTAL_MILESTONES) if (n >= m) reached = m;
+  const idx = TOTAL_MILESTONES.findIndex((m) => m > n);
+  return { reached, next: idx === -1 ? TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1] : TOTAL_MILESTONES[idx] };
+}
