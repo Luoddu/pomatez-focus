@@ -7,15 +7,16 @@ import {
   currentStreak,
   halfHourMatrix,
   inRange,
+  isCurrentRange,
   rangeOf,
+  shiftRange,
   summarize,
   topTasks,
 } from "../stats";
-import { QUADRANT_TONES, QuadrantKey } from "../week";
+import { QUADRANT_TONES, QuadrantKey, harvestTier } from "../week";
 import { WindowControls, durationText } from "./shared";
 
 const WEEK_CHARS = "一二三四五六日";
-const HOUR_MARKS = [0, 6, 12, 18, 24];
 
 // 热力格分档（番茄数，半小时内可能因跨格分摊出小数）：
 // 0 / <0.5 / <1 / <2 / <4 / ≥4，与月历同一番茄红色系
@@ -51,15 +52,15 @@ export default function StatsPanel({
   onTogglePin: () => void;
 }) {
   const [rangeKey, setRangeKey] = useState<RangeKey>("week");
-  const [now, setNow] = useState(() => Date.now());
-  const range = useMemo(() => rangeOf(rangeKey, now), [rangeKey, now]);
+  // anchor：区间内的任意一天；翻页只动 anchor，tab 切换重置回今天
+  const [anchor, setAnchor] = useState(() => Date.now());
+  const now = Date.now();
+  const range = useMemo(() => rangeOf(rangeKey, anchor), [rangeKey, anchor]);
+  const current = isCurrentRange(range, now);
   const scoped = useMemo(() => inRange(records, range), [records, range]);
   const summary = useMemo(() => summarize(scoped), [scoped]);
   // 连续天数是全历史口径（不只是当前区间），切换区间不跳动
-  const streak = useMemo(
-    () => currentStreak(records, now),
-    [records, now]
-  );
+  const streak = useMemo(() => currentStreak(records, now), [records, now]);
   const buckets = useMemo(
     () => barBuckets(scoped, range, now),
     [scoped, range, now]
@@ -80,9 +81,18 @@ export default function StatsPanel({
     return best as { row: number; col: number; value: number } | null;
   }, [heat]);
   const switchRange = (key: RangeKey) => {
-    setNow(Date.now());
+    setAnchor(Date.now());
     setRangeKey(key);
   };
+  // 「现在」标记：仅当前周视图，在今天这列的当前半小时格上描边
+  const nowSlot = (() => {
+    if (!current || range.key !== "week") return null;
+    const d = new Date(now);
+    return {
+      row: (d.getDay() + 6) % 7,
+      col: Math.min(47, d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0)),
+    };
+  })();
   return (
     <main className="content stats-page">
       <div className="side-title">
@@ -100,7 +110,33 @@ export default function StatsPanel({
             </button>
           ))}
         </div>
-        <span className="stats-range-label">{range.label}</span>
+        <span className="stats-pager">
+          <button
+            className="ghost-btn stats-nav"
+            aria-label="上一区间"
+            title={`上一${RANGE_LABELS[rangeKey]}`}
+            onClick={() => setAnchor(shiftRange(range, -1).start + 1)}
+          >
+            ‹
+          </button>
+          <button
+            className="stats-range-label"
+            title={current ? "当前区间" : "点击回到当前区间"}
+            onClick={() => setAnchor(Date.now())}
+          >
+            {range.label}
+            {!current && <em>回到本{RANGE_LABELS[rangeKey]}</em>}
+          </button>
+          <button
+            className="ghost-btn stats-nav"
+            aria-label="下一区间"
+            title={`下一${RANGE_LABELS[rangeKey]}`}
+            disabled={current}
+            onClick={() => setAnchor(shiftRange(range, 1).start + 1)}
+          >
+            ›
+          </button>
+        </span>
         <span className="side-title-actions">
           <button className="btn-text" onClick={onClose}>
             返回
@@ -158,7 +194,7 @@ export default function StatsPanel({
                   )}
                   <div
                     className={`bar${b.isToday ? " today" : ""}${
-                      b.count === barMax && b.count > 0 ? " max" : ""
+                      harvestTier(b.count) ? ` ${harvestTier(b.count)}` : ""
                     }`}
                     style={{
                       height: `${(b.count / barMax) * 100}%`,
@@ -171,34 +207,58 @@ export default function StatsPanel({
                 </div>
               ))}
             </div>
+            <div className="bars-legend">
+              <span>
+                <i className="bars-swatch plain" /> 1–4
+              </span>
+              <span>
+                <i className="bars-swatch mid" /> 5–9 小丰收
+              </span>
+              <span>
+                <i className="bars-swatch high" /> ≥10 大丰收
+              </span>
+            </div>
           </section>
           <section className="card stats-card">
             <h3>⏰ 时段热力 · 每半小时</h3>
             <div className="sh-grid">
-              <span className="sh-dow" />
-              {Array.from({ length: 48 }, (_, col) => (
-                <span className="sh-hour" key={col}>
-                  {col % 12 === 0 ? col / 2 : ""}
+              <span className="sh-corner" />
+              {WEEK_CHARS.split("").map((w, row) => (
+                <span className="sh-weekday" key={w}>
+                  {w}
                 </span>
               ))}
-              {heat.rows.map((cols, row) => (
-                <React.Fragment key={row}>
-                  <span className="sh-dow">{WEEK_CHARS[row]}</span>
-                  {cols.map((value, col) => (
-                    <span
-                      key={col}
-                      className={`sh-cell hm-t${heatTier(value)}`}
-                      title={
-                        value > 0
-                          ? `周${WEEK_CHARS[row]} ${slotLabel(col)}–${slotLabel(
-                              col + 1
-                            )} · ${countText(value)} 个番茄`
-                          : `周${WEEK_CHARS[row]} ${slotLabel(col)}–${slotLabel(
-                              col + 1
-                            )} · 暂无收获`
+              {Array.from({ length: 48 }, (_, col) => (
+                <React.Fragment key={col}>
+                  {col % 4 === 0 ? (
+                    <span className="sh-hour">{col / 2}</span>
+                  ) : (
+                    <span className="sh-hour" />
+                  )}
+                  {heat.rows.map((cols, row) => {
+                    const value = cols[col];
+                    return (
+                      <span
+                        key={row}
+                        className={`sh-cell hm-t${heatTier(value)}${
+                          nowSlot && nowSlot.row === row && nowSlot.col === col
+                            ? " now"
+                            : ""
+                        }`}
+                        title={
+                          value > 0
+                            ? `周${WEEK_CHARS[row]} ${slotLabel(
+                                col
+                              )}–${slotLabel(col + 1)} · ${countText(
+                                value
+                              )} 个番茄`
+                            : `周${WEEK_CHARS[row]} ${slotLabel(
+                                col
+                              )}–${slotLabel(col + 1)} · 暂无收获`
                         }
                       />
-                  ))}
+                    );
+                  })}
                 </React.Fragment>
               ))}
             </div>
@@ -208,7 +268,7 @@ export default function StatsPanel({
                 <i key={t} className={`sh-cell hm-t${t}`} />
               ))}
               <span>多</span>
-              <em>横轴 0–24 点，每格半小时</em>
+              <em>纵轴 0–24 点，每格半小时</em>
             </div>
           </section>
           <section className="card stats-card">

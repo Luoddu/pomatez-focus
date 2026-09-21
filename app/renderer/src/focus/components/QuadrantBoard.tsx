@@ -86,6 +86,25 @@ const GroupList = ({
                   <small> · 待同步，可专注</small>
                 )}
               </div>
+              {/* 已收进度紧贴任务名、压在番茄 chips 上方：先看到进度再看到筹码 */}
+              <span
+                className={`harvest-mini ${complete ? "done" : ""}`}
+                title={`今日已收 ${done} 个，共计划 ${planned} 个`}
+              >
+                已收 {done}/{planned}
+                {complete ? " ✓" : ""}
+                <span className="cells">
+                  {Array.from(
+                    { length: Math.min(planned, HARVEST_CELLS_MAX) },
+                    (_, i) => (
+                      <span
+                        key={i}
+                        className={`cell ${i < done ? "on" : ""}`}
+                      />
+                    )
+                  )}
+                </span>
+              </span>
               <div className="chips">
                 {(() => {
                   // chip 单行窗口：最多渲染前 6 个待办；选中序超出时窗口右滑
@@ -181,24 +200,6 @@ const GroupList = ({
                   </button>
                 </span>
               )}
-              <span
-                className={`harvest-mini ${complete ? "done" : ""}`}
-                title={`今日已收 ${done} 个，共计划 ${planned} 个`}
-              >
-                已收 {done}/{planned}
-                {complete ? " ✓" : ""}
-                <span className="cells">
-                  {Array.from(
-                    { length: Math.min(planned, HARVEST_CELLS_MAX) },
-                    (_, i) => (
-                      <span
-                        key={i}
-                        className={`cell ${i < done ? "on" : ""}`}
-                      />
-                    )
-                  )}
-                </span>
-              </span>
             </div>
           </div>
         );

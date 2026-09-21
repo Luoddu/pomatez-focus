@@ -752,12 +752,32 @@ app
       ),
     });
     results.push({
-      check: "week stats: 7 bars and a 7x48 half-hour heat grid",
+      check: "week stats: 7 bars and a vertical 7x48 half-hour heat grid",
       pass: await js(
-        `document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length>=7*48&&document.querySelectorAll('.top-list li').length>0`
+        `document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length>=7*48&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.top-list li').length>0`
       ),
     });
     await shot("stats-week");
+    // 区间翻页：‹ 翻到上一周（出现「回到本周」提示），点区间标签回到当前周
+    await js(
+      `(()=>{[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='上一区间').click()})()`
+    );
+    await wait(250);
+    results.push({
+      check: "stats pager steps to previous week with a back-to-current hint",
+      pass: await js(
+        `(()=>{const l=document.querySelector('.stats-range-label');return Boolean(l&&l.querySelector('em')&&l.querySelector('em').textContent.includes('回到本周'))&&document.querySelectorAll('.bars .bar-col').length===7&&!document.querySelector('button[aria-label="下一区间"]').disabled})()`
+      ),
+    });
+    await shot("stats-week-prev");
+    await js(`(()=>{document.querySelector('.stats-range-label').click()})()`);
+    await wait(250);
+    results.push({
+      check: "range label click returns to the current week and disables next",
+      pass: await js(
+        `(()=>{const l=document.querySelector('.stats-range-label');return Boolean(l)&&!l.querySelector('em')&&document.querySelector('button[aria-label="下一区间"]').disabled})()`
+      ),
+    });
     await js(
       `(()=>{[...document.querySelectorAll('.stats-tab')].find(b=>b.textContent==='月').click()})()`
     );
@@ -1004,9 +1024,9 @@ app
     );
     await wait(800);
     results.push({
-      check: "farm shows moon and stars on a Beijing night",
+      check: "farm shows moon, stars and the night-watch owl on a Beijing night",
       pass: await js(
-        `Boolean(document.querySelector('.farm-moon'))&&!document.querySelector('.farm-sun')&&document.querySelectorAll('.farm-star').length>0`
+        `Boolean(document.querySelector('.farm-moon'))&&!document.querySelector('.farm-sun')&&document.querySelectorAll('.farm-star').length>0&&Boolean(document.querySelector('.farm-owl'))`
       ),
     });
     await shotClip("farm-night", ".farm-field");
@@ -1016,9 +1036,9 @@ app
     );
     await wait(800);
     results.push({
-      check: "Yushui term shows drizzle overlay and term pill",
+      check: "Yushui term shows drizzle overlay, term pill and northbound geese",
       pass: await js(
-        `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='雨水'&&document.querySelectorAll('.farm-rain').length>=5&&document.querySelector('.term-pill').textContent.includes('雨水')&&document.querySelectorAll('.farm-petal, .farm-season-item').length>=0})()`
+        `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='雨水'&&document.querySelectorAll('.farm-rain').length>=5&&document.querySelector('.term-pill').textContent.includes('雨水')&&Boolean(document.querySelector('.farm-geese.north'))})()`
       ),
     });
     await shotClip("farm-term-yushui", ".farm-field");
@@ -1028,9 +1048,9 @@ app
     );
     await wait(800);
     results.push({
-      check: "Shuangjiang term shows frost on the soil band",
+      check: "Shuangjiang term shows frost on the soil band and southbound geese",
       pass: await js(
-        `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='霜降'&&[...s.querySelectorAll('path')].some(p=>p.getAttribute('fill')==='#f4fafd')})()`
+        `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='霜降'&&[...s.querySelectorAll('path')].some(p=>p.getAttribute('fill')==='#f4fafd')&&Boolean(document.querySelector('.farm-geese:not(.north)'))})()`
       ),
     });
     await shotClip("farm-term-shuangjiang", ".farm-field");

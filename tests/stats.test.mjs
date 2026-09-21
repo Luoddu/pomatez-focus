@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   rangeOf,
+  shiftRange,
+  isCurrentRange,
   inRange,
   summarize,
   currentStreak,
@@ -122,4 +124,24 @@ test("topTasks：按任务名聚合去序号，按番茄数排序截断", () => 
   assert.equal(top[0].quadrant, "inu");
   assert.equal(top[1].name, "写报告");
   assert.equal(top[1].count, 3);
+});
+
+test("shiftRange：周/月/季/年双向翻页，月界不错档", () => {
+  const now = at(2026, 9, 21, 15); // 周一
+  const week = rangeOf("week", now);
+  const prevWeek = shiftRange(week, -1);
+  assert.equal(prevWeek.label, "9.14 – 9.20");
+  assert.equal(shiftRange(prevWeek, 1).start, week.start);
+  // 从 1 月向前翻 → 上一年 12 月；3 月 31 日所在月向前翻 → 2 月（不跨到 3 月）
+  const jan = rangeOf("month", at(2026, 1, 10));
+  assert.equal(shiftRange(jan, -1).label, "2025 年 12 月");
+  const mar = rangeOf("month", at(2026, 3, 31));
+  assert.equal(shiftRange(mar, -1).label, "2026 年 2 月");
+  const q3 = rangeOf("quarter", now);
+  assert.equal(shiftRange(q3, -1).label, "2026 年 Q2");
+  const y = rangeOf("year", now);
+  assert.equal(shiftRange(y, 1).label, "2027 年");
+  // isCurrentRange：当前区间含 now，翻走后再翻回来仍识别
+  assert.equal(isCurrentRange(week, now), true);
+  assert.equal(isCurrentRange(prevWeek, now), false);
 });

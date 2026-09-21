@@ -54,6 +54,23 @@ export function rangeOf(key: RangeKey, now: number): RangeInfo {
   return { key, start, end, label: `${y} 年` };
 }
 
+// 区间平移：在当前区间基础上向过去/未来翻一页（周 ±7 天、月/季/年 ±N 个月）。
+// 用区间中点做锚再归一到区间起点，避免月末（31 日）平移跨档
+export function shiftRange(range: RangeInfo, delta: -1 | 1): RangeInfo {
+  const mid = range.start + (range.end - range.start) / 2;
+  const d = new Date(mid);
+  if (range.key === "week") return rangeOf("week", mid + delta * 7 * DAY);
+  const months = range.key === "month" ? 1 : range.key === "quarter" ? 3 : 12;
+  return rangeOf(
+    range.key,
+    new Date(d.getFullYear(), d.getMonth() + delta * months, 1).getTime()
+  );
+}
+
+// 该区间是否为「当前」区间（含 now）：翻页后用于禁用「下一页」与显示回到本期
+export const isCurrentRange = (range: RangeInfo, now: number) =>
+  now >= range.start && now < range.end;
+
 export const inRange = (
   records: FocusSession[],
   range: { start: number; end: number }

@@ -541,6 +541,72 @@ const TermOverlayLayer = ({ overlay }: { overlay: TermOverlay }) => {
   return null;
 };
 
+// ── 节气动物：猫头鹰夜间守田（眨眼），大雁秋南飞/春北归（人字雁阵横越天空） ──
+const Owl = ({ x, y }: { x: number; y: number }) => (
+  <g className="farm-owl" transform={`translate(${x} ${y})`}>
+    {/* 耳羽 */}
+    <path d="M-5 -12 L-7.5 -18 L-2.5 -13.5 Z" fill="#8a6d4f" />
+    <path d="M5 -12 L7.5 -18 L2.5 -13.5 Z" fill="#8a6d4f" />
+    {/* 身体与肚皮 */}
+    <ellipse cx="0" cy="0" rx="8" ry="10" fill="#a08059" />
+    <ellipse cx="0" cy="3" rx="5" ry="6.5" fill="#d9c39a" />
+    {/* 翅膀 */}
+    <path
+      d="M-7 -2 Q-9 4 -5 8"
+      stroke="#8a6d4f"
+      strokeWidth="1.4"
+      fill="none"
+      strokeLinecap="round"
+    />
+    <path
+      d="M7 -2 Q9 4 5 8"
+      stroke="#8a6d4f"
+      strokeWidth="1.4"
+      fill="none"
+      strokeLinecap="round"
+    />
+    {/* 眼睛整体周期性眨动 */}
+    <g className="farm-owl-eyes">
+      <circle cx="-3.2" cy="-4" r="3" fill="#fdf6dd" />
+      <circle cx="3.2" cy="-4" r="3" fill="#fdf6dd" />
+      <circle cx="-3.2" cy="-4" r="1.5" fill="#2b2b33" />
+      <circle cx="3.2" cy="-4" r="1.5" fill="#2b2b33" />
+    </g>
+    {/* 喙与爪子 */}
+    <path d="M-1.3 -1 L1.3 -1 L0 1.2 Z" fill="#e8a13d" />
+    <path
+      d="M-3 10 l0 2.5 M3 10 l0 2.5"
+      stroke="#e8a13d"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </g>
+);
+
+// 人字雁阵：头雁在前，两翼依次排开；south=南飞（秋），北归（春）由 CSS 反向播放
+const GEESE_FORMATION: [number, number][] = [
+  [0, 0],
+  [-16, -9],
+  [-32, -18],
+  [16, -9],
+  [32, -18],
+];
+const Geese = ({ south }: { south: boolean }) => (
+  <g className={`farm-geese${south ? "" : " north"}`}>
+    {GEESE_FORMATION.map(([gx, gy], i) => (
+      <g key={i} transform={`translate(${gx} ${gy}) scale(.85)`}>
+        <path
+          d="M0 0 q4 -4.5 8 0 q4 -4.5 8 0"
+          stroke="#5f6b76"
+          strokeWidth="1.7"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </g>
+    ))}
+  </g>
+);
+
 // 一株番茄的某个生长阶段（局部原点在株基）。形态参考真实番茄生长过程。
 // 坐果的果实是青绿的（未熟）；转色开始染象限色；红熟整果按本周收获
 // 的象限分布着色——一眼看出这周红番茄多还是灰番茄多
@@ -789,8 +855,18 @@ export default function FarmField({
   const term = termInfo(at);
   const season = seasonOfTerm(term.index);
   const overlay = termOverlay(term.index);
-  const butterfliesOut = bh >= 8 && bh < 17; // 蝴蝶白天
-  const firefliesOut = bh >= 19.5 || bh < 6; // 萤火虫夜晚
+  // 节气动物出没表（按北半球中原物候，与 24 节气同源）：
+  // 蝶恋春秋（夏冬蛰伏）、萤火虫只点夏夜、猫头鹰通宵守田、
+  // 大雁白露后南飞 / 雨水「鸿雁来」北归，白天迁徙
+  const butterfliesOut =
+    (season === "spring" || season === "autumn") && bh >= 8 && bh < 17;
+  const firefliesOut = season === "summer" && (bh >= 19.5 || bh < 6);
+  const owlOut = bh >= 19.5 || bh < 5.5;
+  const geeseSouth = season === "autumn";
+  const geeseOut =
+    (geeseSouth || (season === "spring" && term.index >= 3)) &&
+    bh >= 6 &&
+    bh < 19;
   const harvest = weekHarvest(week);
   const caption =
     harvest.plants === 0
@@ -833,6 +909,17 @@ export default function FarmField({
         data-term={term.name}
       >
         <Sky now={at} />
+        {/* 大雁迁徙走天空层：秋南飞 / 春北归（CSS 反向播放），白天可见 */}
+        {geeseOut && (
+          <svg
+            className="farm-geese-sky"
+            viewBox="0 0 720 90"
+            preserveAspectRatio="xMidYMin meet"
+            aria-hidden="true"
+          >
+            <Geese south={geeseSouth} />
+          </svg>
+        )}
         {/* 内联原创 SVG 素材：渲染进程 CSP 禁网且规避外部素材许可证风险 */}
         <svg
           className="farm-land"
@@ -888,6 +975,8 @@ export default function FarmField({
             <rect x="110" y="110" width="52" height="3" rx="1.5" fill="#d9a066" />
             <rect x="110" y="117" width="52" height="3" rx="1.5" fill="#d9a066" />
           </g>
+          {/* 猫头鹰夜晚上栅栏守田（会眨眼），白天飞走 */}
+          {owlOut && <Owl x={136} y={97} />}
           {/* 稻草人守在土壤带右缘；入冬戴上红围巾 */}
           <Scarecrow x={648} scarf={season === "winter"} />
           {Array.from({ length: harvest.plants }, (_, i) => {

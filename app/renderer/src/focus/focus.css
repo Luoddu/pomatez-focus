@@ -475,6 +475,8 @@ input:focus-visible {
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
+  /* 行内进度条：贴在任务名与番茄 chips 之间 */
+  margin: 3px 0 1px;
 }
 .harvest-mini .cells {
   display: inline-flex;
@@ -1845,6 +1847,45 @@ input:focus-visible {
   height: 60px;
   pointer-events: none;
 }
+/* 大雁人字阵：60s 横越天空；north=春北归（反向播放），默认秋南飞 */
+.farm-geese-sky {
+  position: absolute;
+  left: 0;
+  top: 9%;
+  width: 100%;
+  height: 80px;
+  pointer-events: none;
+}
+.farm-geese {
+  animation: farm-geese-fly 60s linear infinite;
+}
+.farm-geese.north {
+  animation-direction: reverse;
+}
+@keyframes farm-geese-fly {
+  from {
+    transform: translate(-90px, 26px);
+  }
+  to {
+    transform: translate(760px, 40px);
+  }
+}
+/* 猫头鹰眨眼：大部分时间圆睁，瞬间闭合 */
+.farm-owl-eyes {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: farm-owl-blink 5.2s ease-in-out infinite;
+}
+@keyframes farm-owl-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.08);
+  }
+}
 .farm-land {
   position: absolute;
   bottom: 0;
@@ -1931,7 +1972,9 @@ input:focus-visible {
   .farm-butterfly,
   .farm-wing,
   .farm-firefly,
-  .farm-cloud {
+  .farm-cloud,
+  .farm-owl-eyes,
+  .farm-geese {
     animation: none;
   }
   .farm-firefly {
@@ -2443,6 +2486,35 @@ input:focus-visible {
   font-weight: 400;
   color: var(--muted);
 }
+/* 区间翻页器：‹ 区间标签 ›，翻走后标签内出现「回到本X」 */
+.stats-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+}
+.stats-nav {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
+  line-height: 1;
+  color: #6b7280;
+}
+.stats-pager .stats-range-label {
+  margin-left: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+button.stats-range-label:hover {
+  background: #eceef2;
+}
+.stats-range-label em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--primary);
+}
 .stats-summary {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -2494,6 +2566,9 @@ input:focus-visible {
   justify-content: flex-end;
   gap: 3px;
 }
+/* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边。
+   成就分级（与记录页日合计同口径）：1–4 常规番茄红、5–9 小丰收深红、
+   ≥10 大丰收金色——每一天达标都能拿到，不搞「只有最高柱是金色」 */
 .bar {
   width: 100%;
   max-width: 26px;
@@ -2501,8 +2576,12 @@ input:focus-visible {
   border-radius: 4px 4px 2px 2px;
   background: linear-gradient(180deg, #f38b82, #e57368);
 }
-.bar.max {
+.bar.mid {
+  background: linear-gradient(180deg, #e5533f, #c22f1f);
+}
+.bar.high {
   background: linear-gradient(180deg, #f2cd73, #e8a917);
+  box-shadow: 0 0 8px rgba(232, 169, 23, 0.35);
 }
 .bar.today {
   outline: 2px solid var(--primary);
@@ -2518,28 +2597,67 @@ input:focus-visible {
   color: var(--muted);
   white-space: nowrap;
 }
-/* 半小时热力：行=周一..周日，列=00:00–24:00（每 12 格标一个整点） */
+.bars-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.bars-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bars-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.bars-swatch.plain {
+  background: linear-gradient(180deg, #f38b82, #e57368);
+}
+.bars-swatch.mid {
+  background: linear-gradient(180deg, #e5533f, #c22f1f);
+}
+.bars-swatch.high {
+  background: linear-gradient(180deg, #f2cd73, #e8a917);
+}
+/* 半小时热力（周历式）：列=周一..周日，行=0–24 点每半小时一格，
+   时间自上而下流动，符合日历阅读直觉 */
 .sh-grid {
   display: grid;
-  grid-template-columns: 22px repeat(48, 1fr);
-  gap: 2px;
-  align-items: center;
+  grid-template-columns: 26px repeat(7, 1fr);
+  grid-template-rows: 17px;
+  grid-auto-rows: 8px;
+  gap: 1px 3px;
+  align-items: stretch;
+}
+.sh-corner {
+  width: 26px;
+}
+.sh-weekday {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+  text-align: center;
 }
 .sh-hour {
   font-size: 9px;
-  line-height: 12px;
+  line-height: 8px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-}
-.sh-dow {
-  font-size: 10px;
-  color: var(--muted);
-  line-height: 1;
+  text-align: right;
+  padding-right: 4px;
 }
 .sh-cell {
   display: block;
-  height: 13px;
   border-radius: 2px;
+}
+.sh-cell.now {
+  outline: 1.5px solid var(--primary);
+  outline-offset: 0;
 }
 .sh-legend {
   display: flex;
@@ -2551,6 +2669,7 @@ input:focus-visible {
 }
 .sh-legend .sh-cell {
   width: 12px;
+  height: 10px;
 }
 .sh-legend em {
   margin-left: auto;
