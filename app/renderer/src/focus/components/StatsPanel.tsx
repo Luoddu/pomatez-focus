@@ -21,6 +21,7 @@ import {
   barTone,
   quadrantCounts,
 } from "../week";
+import { renderShareCardPng, shareCardModel } from "../shareCard";
 import { WindowControls, durationText } from "./shared";
 
 const WEEK_CHARS = "一二三四五六日";
@@ -109,6 +110,20 @@ export default function StatsPanel({
     setAnchor(Date.now());
     setRangeKey(key);
   };
+  // 分享卡片：离屏渲染当前区间的成就图 PNG 并导出；
+  // 测试钩子 __SHARE_CARD_HOOK__ 置位时只记录 dataURL 长度，不触发下载
+  const onShare = () => {
+    const model = shareCardModel(records, range, now);
+    const dataUrl = renderShareCardPng(model);
+    if ((window as any).__SHARE_CARD_HOOK__) {
+      (window as any).__shareCardPng = dataUrl;
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `番茄农场-${RANGE_LABELS[rangeKey]}-${range.label.replace(/[\\/:*?"<>|]/g, "")}.png`;
+    a.click();
+  };
   // 「现在」标记：仅当前周视图，在今天这列的当前小时格上描边
   const nowSlot = (() => {
     if (!current || range.key !== "week") return null;
@@ -160,6 +175,13 @@ export default function StatsPanel({
           </button>
         </span>
         <span className="side-title-actions">
+          <button
+            className="btn-text share-btn"
+            title="导出当前区间的成就图（不含任何任务名）"
+            onClick={onShare}
+          >
+            📸 分享
+          </button>
           <button className="btn-text" onClick={onClose}>
             返回
           </button>

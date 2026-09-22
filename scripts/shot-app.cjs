@@ -800,6 +800,24 @@ app
       ),
     });
     await shot("stats-year");
+    // ── 分享卡片：钩子模式下渲染 PNG 并落盘供人工检查 ──
+    await js(`(()=>{window.__SHARE_CARD_HOOK__=1})()`);
+    await js(
+      `(()=>{[...document.querySelectorAll('button')].find(b=>b.classList.contains('share-btn')).click()})()`
+    );
+    await wait(400);
+    {
+      const dataUrl = await js(`window.__shareCardPng||''`);
+      const ok = typeof dataUrl === "string" && dataUrl.startsWith("data:image/png") && dataUrl.length > 20000;
+      if (ok) {
+        const out = path.join(outDir, "share-card.png");
+        fs.writeFileSync(out, Buffer.from(dataUrl.split(",")[1], "base64"));
+      }
+      results.push({
+        check: "share button renders a share-card PNG via canvas hook",
+        pass: ok,
+      });
+    }
     await js(
       `(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='返回').click()})()`
     );
