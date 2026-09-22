@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { FocusSession } from "../session";
+import { FocusSession, isSpikyMood } from "../session";
 import {
   RANGE_LABELS,
   RangeKey,
@@ -7,7 +7,6 @@ import {
   currentStreak,
   daypartSplit,
   halfHourMatrix,
-  hourlyRows,
   inRange,
   isCurrentRange,
   rangeOf,
@@ -83,9 +82,16 @@ export default function StatsPanel({
     [scoped, range, now]
   );
   const heat = useMemo(() => halfHourMatrix(scoped, range), [scoped, range]);
-  // 展示层按小时合并（格子更方正）；时段偏好复用同一矩阵汇总
-  const hours = useMemo(() => hourlyRows(heat), [heat]);
   const dayparts = useMemo(() => daypartSplit(heat), [heat]);
+  // 带刺番茄：本期感受为难受/很痛苦的收获番茄数
+  const spikyCount = useMemo(
+    () =>
+      scoped.reduce(
+        (n, r) => n + (isSpikyMood(r.mood) ? r.completedCount || 0 : 0),
+        0
+      ),
+    [scoped]
+  );
   // 象限分布：只统计投入番茄数，不出现任务名
   const quads = useMemo(() => quadrantCounts(scoped), [scoped]);
   const quadTotal = Math.max(
@@ -124,11 +130,14 @@ export default function StatsPanel({
     a.download = `番茄农场-${RANGE_LABELS[rangeKey]}-${range.label.replace(/[\\/:*?"<>|]/g, "")}.png`;
     a.click();
   };
-  // 「现在」标记：仅当前周视图，在今天这列的当前小时格上描边
+  // 「现在」标记：仅当前周视图，在今天这列的当前半小时格上描边
   const nowSlot = (() => {
     if (!current || range.key !== "week") return null;
     const d = new Date(now);
-    return { row: (d.getDay() + 6) % 7, col: Math.min(23, d.getHours()) };
+    return {
+      row: (d.getDay() + 6) % 7,
+      col: Math.min(47, d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0)),
+    };
   })();
   return (
     <main className="content stats-page">
@@ -194,38 +203,42 @@ export default function StatsPanel({
           onTogglePin={onTogglePin}
         />
       </div>
-      <div className="stats-summary">
-        <div className="card stat">
-          <strong>{summary.count}</strong>
-          <span>番茄</span>
-        </div>
-        <div className="card stat">
-          <strong className="long">{durationText(summary.seconds)}</strong>
-          <span>专注时长</span>
-        </div>
-        <div className="card stat">
-          <strong>{summary.activeDays}</strong>
-          <span>活跃天数</span>
-        </div>
-        <div className="card stat">
-          <strong>{summary.avgCount}</strong>
-          <span>日均番茄</span>
-        </div>
-        <div className="card stat">
-          <strong data-tier={streak >= 7 ? "mid" : undefined}>
-            {streak} 天
-          </strong>
-          <span>🔥 连续收获</span>
-        </div>
-      </div>
       {summary.count === 0 ? (
         <div className="card stats-empty">
           这个区间还没有收获 · 种一颗 25 分钟的番茄，下周再来看 🍅
         </div>
       ) : (
         <div className="stats-grid">
-          <section className="card stats-card">
-            <h3>🍅 {BAR_TITLE[rangeKey]}</h3>
+          <div className="stats-col">
+            <section className="card stats-card stats-summary">
+              <h3>🌾 区间合计</h3>
+              <div className="st-row">
+                <span>番茄</span>
+                <strong>{summary.count}</strong>
+              </div>
+              <div className="st-row">
+                <span>专注时长</span>
+                <strong className="long">
+                  {durationText(summary.seconds)}
+                </strong>
+              </div>
+              <div className="st-row">
+                <span>活跃天数</span>
+                <strong>{summary.activeDays}</strong>
+              </div>
+              <div className="st-row">
+                <span>日均番茄</span>
+                <strong>{summary.avgCount}</strong>
+              </div>
+              <div className="st-row streak">
+                <span>🔥 连续收获</span>
+                <strong data-tier={streak >= 7 ? "mid" : undefined}>
+                  {streak} 天
+                </strong>
+              </div>
+            </section>
+            <section className="card stats-card stats-bars">
+              <h3>🍅 {BAR_TITLE[rangeKey]}</h3>
             <div
               className={`bars${buckets.length > 14 ? " dense" : ""}`}
               role="img"
@@ -254,8 +267,9 @@ export default function StatsPanel({
                 );
               })}
             </div>
-          </section>
-          <section className="card stats-card">
+            </section>
+          </div>
+          <section className="card stats-card stats-heat">
             <h3>⏰ 时段热力</h3>
             <div className="sh-grid">
               <span className="sh-corner" />
@@ -264,15 +278,18 @@ export default function StatsPanel({
                   {w}
                 </span>
               ))}
-              {Array.from({ length: 24 }, (_, col) => (
+              {Array.from({ length: 48 }, (_, col) => (
                 <React.Fragment key={col}>
-                  {col % 2 === 0 ? (
-                    <span className="sh-hour">{col}</span>
+                  {col % 4 === 0 ? (
+                    <span className="sh-hour">{col / 2}</span>
                   ) : (
                     <span className="sh-hour" />
                   )}
-                  {hours.map((cols, row) => {
+                  {heat.rows.map((cols, row) => {
                     const value = cols[col];
+                    const tip = `周${WEEK_CHARS[row]} ${slotLabel(
+                      col
+                    )}–${slotLabel(col + 1)}`;
                     return (
                       <span
                         key={row}
@@ -283,17 +300,8 @@ export default function StatsPanel({
                         }`}
                         title={
                           value > 0
-                            ? `周${WEEK_CHARS[row]} ${String(col).padStart(
-                                2,
-                                "0"
-                              )}:00–${String(col + 1).padStart(
-                                2,
-                                "0"
-                              )}:00 · ${countText(value)} 个番茄`
-                            : `周${WEEK_CHARS[row]} ${String(col).padStart(
-                                2,
-                                "0"
-                              )}:00–${String(col + 1).padStart(2, "0")}:00 · 暂无收获`
+                            ? `${tip} · ${countText(value)} 个番茄`
+                            : `${tip} · 暂无收获`
                         }
                       />
                     );
@@ -307,7 +315,7 @@ export default function StatsPanel({
                 <i key={t} className={`sh-cell hm-t${t}`} />
               ))}
               <span>多</span>
-              <em>纵轴 0–24 点 · 每格 1 小时</em>
+              <em>纵轴 0–24 点 · 每格 30 分钟</em>
             </div>
           </section>
           <div className="stats-trio">
@@ -336,6 +344,14 @@ export default function StatsPanel({
                   </li>
                 ))}
               </ul>
+              {spikyCount > 0 && (
+                <div
+                  className="dist-foot"
+                  title="感受评为难受或很痛苦的收获番茄"
+                >
+                  🌵 带刺番茄 {spikyCount} 个 · 辛苦了，抱抱自己
+                </div>
+              )}
             </section>
             <section className="card stats-card">
               <h3>🕰️ 时段偏好</h3>

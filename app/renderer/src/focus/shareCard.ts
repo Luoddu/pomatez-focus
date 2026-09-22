@@ -6,7 +6,6 @@ import {
   currentStreak,
   daypartSplit,
   halfHourMatrix,
-  hourlyRows,
   inRange,
   summarize,
 } from "./stats";
@@ -62,7 +61,7 @@ export type ShareCardModel = {
   bestDayLabel: string | null; // 「9.20 · 12 个」
   goldenLabel: string | null; // 「周三 14:30」
   buckets: { label: string; count: number }[];
-  hours: number[][]; // 7 × 24
+  heat: number[][]; // 7 × 48（行=周一..周日，列=0–24 点每半小时一格）
   dayparts: { label: string; icon: string; count: number }[];
   quads: { key: string; tone: string; count: number }[];
   totalAll: number;
@@ -83,7 +82,6 @@ export function shareCardModel(
     count: b.count,
   }));
   const heat = halfHourMatrix(scoped, range);
-  const hours = hourlyRows(heat);
   const dayparts = daypartSplit(heat).map((d) => ({
     label: d.label,
     icon: d.icon,
@@ -129,7 +127,7 @@ export function shareCardModel(
       : null,
     goldenLabel,
     buckets,
-    hours,
+    heat: heat.rows,
     dayparts,
     quads,
     totalAll: total.count,
@@ -291,22 +289,23 @@ export function drawShareCard(
     y += plotH + 52;
   }
 
-  // ── 时段热力（7 行 × 24 列，纵轴星期、横轴 0–24 点）──
+  // ── 时段热力（7 行星期 × 48 列半小时，纵轴星期、横轴 0–24 点）──
   const hmCardH = 380;
   card(hmCardH, "⏰ 时段热力");
   {
     const labelW = 46;
     const plotW = CW - 80 - labelW;
-    const cell = Math.floor((plotW - 23 * 5) / 24);
-    const stepX = cell + 5;
-    const stepY = cell + 6;
+    const cell = Math.floor((plotW - 47 * 3) / 48);
+    const stepX = cell + 3;
+    const stepY = Math.floor((hmCardH - 92 - 52 - 6 * 4) / 7) - 4;
+    const cellH = stepY - 4;
     const baseY = y; // 循环闭包固化当前 y（no-loop-func）
-    model.hours.forEach((cols, row) => {
+    model.heat.forEach((cols, row) => {
       const cy = baseY + row * stepY;
       g.fillStyle = "#b3a898";
       g.font = `400 22px ${FONT}`;
       g.textAlign = "center";
-      g.fillText(WEEK_CHARS[row], M + 40 + labelW / 2, cy + cell - 6);
+      g.fillText(WEEK_CHARS[row], M + 40 + labelW / 2, cy + cellH - 4);
       g.textAlign = "left";
       cols.forEach((v, col) => {
         g.fillStyle = HEAT_COLORS[heatTier(v)];
@@ -315,24 +314,24 @@ export function drawShareCard(
           M + 40 + labelW + col * stepX,
           cy,
           cell,
-          cell,
-          5
+          cellH,
+          4
         );
         g.fill();
       });
     });
-    const hy = y + 7 * stepY + 26;
+    const hy = y + 7 * stepY + 22;
     g.fillStyle = "#b3a898";
     g.font = `400 21px ${FONT}`;
     for (const hMark of [0, 6, 12, 18]) {
       g.textAlign = "center";
       g.fillText(
         `${hMark}:00`,
-        M + 40 + labelW + hMark * stepX + cell / 2,
+        M + 40 + labelW + hMark * 2 * stepX + cell / 2,
         hy
       );
     }
-    g.fillText("24:00", M + 40 + labelW + 24 * stepX - 4, hy);
+    g.fillText("24:00", M + 40 + labelW + 48 * stepX - 4, hy);
     g.textAlign = "left";
     y = hy + 14;
   }

@@ -2488,13 +2488,36 @@ button.stats-range-label:hover {
   font-size: 12px;
   color: var(--primary);
 }
+/* 区间合计：五张独立卡合并为一个方框，五项紧凑排列，连续收获保留火焰强调 */
 .stats-summary {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+  gap: 0;
 }
-.stats-summary .stat {
-  text-align: center;
+.st-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+.st-row + .st-row {
+  border-top: 1px solid #f2f4f7;
+}
+.st-row span {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.st-row strong {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.st-row strong.long {
+  font-size: 15px;
+}
+.st-row.streak strong,
+.st-row strong[data-tier="mid"] {
+  color: var(--red);
 }
 .stats-empty {
   padding: 48px 24px;
@@ -2502,12 +2525,22 @@ button.stats-range-label:hover {
   color: var(--muted);
   font-size: 15px;
 }
+/* 三列布局：列1 合计+每日收获 / 列2 时段热力 / 列3 象限·时段·高光竖叠 */
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1fr);
   gap: 14px;
   align-items: stretch;
   padding-bottom: 8px;
+}
+.stats-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.stats-col .stats-bars {
+  flex: 1;
 }
 .stats-card {
   padding: 16px 18px;
@@ -2560,14 +2593,14 @@ button.stats-range-label:hover {
   color: var(--muted);
   white-space: nowrap;
 }
-/* 小时热力（周历式）：列=周一..周日，行=0–24 点每 1 小时一格，
-   时间自上而下流动；格子接近胶囊形，不再扁长 */
+/* 半小时热力（周历式）：列=周一..周日，行=0–24 点每 30 分钟一格共 48 行，
+   时间自上而下流动；行高减半，整图高度与旧 24 行版接近 */
 .sh-grid {
   display: grid;
   grid-template-columns: 26px repeat(7, 1fr);
   grid-template-rows: 17px;
-  grid-auto-rows: 12px;
-  gap: 2px 3px;
+  grid-auto-rows: 6px;
+  gap: 1px 2px;
   align-items: stretch;
 }
 .sh-corner {
@@ -2581,15 +2614,17 @@ button.stats-range-label:hover {
 }
 .sh-hour {
   font-size: 9px;
-  line-height: 8px;
+  line-height: 6px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
   padding-right: 4px;
+  overflow: visible;
+  white-space: nowrap;
 }
 .sh-cell {
   display: block;
-  border-radius: 3.5px;
+  border-radius: 2px;
 }
 .sh-cell.now {
   outline: 1.5px solid var(--primary);
@@ -2612,12 +2647,22 @@ button.stats-range-label:hover {
   font-style: normal;
 }
 /* 分布行（象限分布 / 时段偏好共用）：图标 + 名称 + 横条 + 数量 */
+/* 第三列：象限分布 / 时段偏好 / 高光时刻竖叠 */
 .stats-trio {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  align-items: stretch;
+  min-width: 0;
+}
+.stats-trio .stats-card {
+  flex: 1;
+}
+.dist-foot {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f2f4f7;
+  font-size: 12px;
+  color: var(--muted);
 }
 .dist-list {
   list-style: none;
@@ -2697,15 +2742,9 @@ button.stats-range-label:hover {
   font-size: 15px;
   font-weight: 600;
 }
-/* 窄窗/竖屏：统计页单栏 */
+/* 窄窗/竖屏：统计页单栏（顺序=合计框→每日收获→时段热力→象限/时段/高光） */
 @media (max-width: 900px), (orientation: portrait) {
-  .stats-summary {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .stats-grid {
-    grid-template-columns: 1fr;
-  }
-  .stats-trio {
     grid-template-columns: 1fr;
   }
   .side-title .stats-tabs {
@@ -2716,4 +2755,36 @@ button.stats-range-label:hover {
     order: 4;
     margin-left: 4px;
   }
+}
+
+/* 主观感受选择（结束确认页/补记共用）：5 档表情圆钮，可再点取消 */
+.mood-row {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.mood-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease,
+    background 0.12s ease;
+}
+.mood-btn:hover {
+  border-color: #f38b82;
+  transform: translateY(-1px);
+}
+.mood-btn.selected {
+  border-color: var(--red);
+  background: var(--red-soft);
+  transform: scale(1.1);
+}
+/* 带刺番茄记录行：图标轻微提示，不抢版面 */
+.r-icon.spiky {
+  filter: saturate(0.92);
 }

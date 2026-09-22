@@ -279,10 +279,3 @@ export function daypartSplit(heat: HeatMatrix): Daypart[] {
     return { ...def, count };
   });
 }
-
-// ── 小时化：48 格半小时矩阵合成 24 格小时行（展示层用，格子更接近方形） ──
-export function hourlyRows(heat: HeatMatrix): number[][] {
-  return heat.rows.map((cols) =>
-    Array.from({ length: 24 }, (_, h) => cols[2 * h] + cols[2 * h + 1])
-  );
-}
