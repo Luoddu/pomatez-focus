@@ -254,3 +254,35 @@ export function topTasks(records: FocusSession[], limit = 6): TopTask[] {
     .sort((a, b) => b.count - a.count || b.seconds - a.seconds)
     .slice(0, limit);
 }
+
+// ── 时段偏好：把热力矩阵按 深夜(0–6)/上午(6–12)/下午(12–18)/晚间(18–24)
+// 四个时段汇总，回答「我一般在什么时候专注」；不含任何任务名，隐私安全 ──
+export type Daypart = {
+  key: "night" | "morning" | "afternoon" | "evening";
+  label: string;
+  icon: string;
+  hours: string;
+  count: number; // 番茄数（跨格分摊可能带小数，展示层自行取整）
+};
+const DAYPART_DEFS: Omit<Daypart, "count">[] = [
+  { key: "night", label: "深夜", icon: "🌙", hours: "0–6 点" },
+  { key: "morning", label: "上午", icon: "🌅", hours: "6–12 点" },
+  { key: "afternoon", label: "下午", icon: "☀️", hours: "12–18 点" },
+  { key: "evening", label: "晚间", icon: "🌆", hours: "18–24 点" },
+];
+export function daypartSplit(heat: HeatMatrix): Daypart[] {
+  return DAYPART_DEFS.map((def, i) => {
+    const from = i * 12;
+    let count = 0;
+    for (const row of heat.rows)
+      for (let c = from; c < from + 12; c++) count += row[c];
+    return { ...def, count };
+  });
+}
+
+// ── 小时化：48 格半小时矩阵合成 24 格小时行（展示层用，格子更接近方形） ──
+export function hourlyRows(heat: HeatMatrix): number[][] {
+  return heat.rows.map((cols) =>
+    Array.from({ length: 24 }, (_, h) => cols[2 * h] + cols[2 * h + 1])
+  );
+}

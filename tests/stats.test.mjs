@@ -10,6 +10,8 @@ import {
   barBuckets,
   halfHourMatrix,
   topTasks,
+  daypartSplit,
+  hourlyRows,
 } from "../app/renderer/src/focus/stats.ts";
 
 const DAY = 86400000;
@@ -144,4 +146,39 @@ test("shiftRange：周/月/季/年双向翻页，月界不错档", () => {
   // isCurrentRange：当前区间含 now，翻走后再翻回来仍识别
   assert.equal(isCurrentRange(week, now), true);
   assert.equal(isCurrentRange(prevWeek, now), false);
+});
+
+test("daypartSplit：按 深夜/上午/下午/晚间 汇总热力矩阵", () => {
+  const now = at(2026, 9, 21, 15);
+  const range = rangeOf("week", now);
+  const records = [
+    rec(at(2026, 9, 21, 2), 1), // 深夜
+    rec(at(2026, 9, 21, 9), 2), // 上午
+    rec(at(2026, 9, 21, 13), 3), // 下午
+    rec(at(2026, 9, 21, 22), 4), // 晚间
+  ];
+  const parts = daypartSplit(halfHourMatrix(records, range));
+  assert.deepEqual(
+    parts.map((p) => p.key),
+    ["night", "morning", "afternoon", "evening"]
+  );
+  assert.ok(Math.abs(parts[0].count - 1) < 1e-9);
+  assert.ok(Math.abs(parts[1].count - 2) < 1e-9);
+  assert.ok(Math.abs(parts[2].count - 3) < 1e-9);
+  assert.ok(Math.abs(parts[3].count - 4) < 1e-9);
+});
+
+test("hourlyRows：48 格半小时合成 24 格小时，数值守恒", () => {
+  const now = at(2026, 9, 21, 15);
+  const range = rangeOf("week", now);
+  // 周一 10:15–10:40，2 个番茄：跨 10:00/10:30 两格
+  const heat = halfHourMatrix([rec(at(2026, 9, 21, 10, 15), 2, 25)], range);
+  const rows = hourlyRows(heat);
+  assert.equal(rows.length, 7);
+  assert.equal(rows[0].length, 24);
+  assert.ok(Math.abs(rows[0][10] - 2) < 1e-9); // 合并后守恒
+  assert.equal(
+    rows.flat().reduce((a, b) => a + b, 0),
+    heat.rows.flat().reduce((a, b) => a + b, 0)
+  );
 });

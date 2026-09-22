@@ -155,6 +155,22 @@ test("harvestTier tiers the day-total achievement display", () => {
   assert.equal(harvestTier(23), "high");
 });
 
+test("barTone：红色随数量渐深、金色随数量渐亮且光晕渐强", async () => {
+  const { barTone } = await import("../app/renderer/src/focus/week.ts");
+  // 0 个：中性灰、无光晕
+  assert.equal(barTone(0).glow, null);
+  assert.match(barTone(0).top, /^#e[ce]/);
+  // 1–9：红色谱系，底部色随数量变深（G 通道递减）
+  const g = (hex) => parseInt(hex.slice(3, 5), 16);
+  assert.ok(g(barTone(1).bottom) > g(barTone(5).bottom));
+  assert.ok(g(barTone(5).bottom) > g(barTone(9).bottom));
+  assert.equal(barTone(7).glow, null);
+  // ≥10：金色 + 光晕；越多光晕越强（半径与透明度递增）
+  const radius = (glow) => parseFloat(glow.match(/0 0 ([\d.]+)px/)[1]);
+  assert.ok(radius(barTone(20).glow) > radius(barTone(10).glow));
+  assert.ok(barTone(30).glow); // 上限截断后仍有光晕
+});
+
 test("seasonOfMonth maps Beijing calendar months to farm seasons", async () => {
   const { seasonOfMonth, beijingMonth, totalMilestone, TOTAL_MILESTONES } =
     await import("../app/renderer/src/focus/week.ts");

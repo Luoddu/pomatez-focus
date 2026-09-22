@@ -752,9 +752,9 @@ app
       ),
     });
     results.push({
-      check: "week stats: 7 bars and a vertical 7x48 half-hour heat grid",
+      check: "week stats: 7 bars and a vertical 7x24 hourly heat grid",
       pass: await js(
-        `document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length>=7*48&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.top-list li').length>0`
+        `document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length===7*24&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.dist-list li').length===9`
       ),
     });
     await shot("stats-week");

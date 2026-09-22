@@ -470,13 +470,12 @@ input:focus-visible {
 }
 .harvest-mini {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
-  /* 行内进度条：贴在任务名与番茄 chips 之间 */
-  margin: 3px 0 1px;
 }
 .harvest-mini .cells {
   display: inline-flex;
@@ -1857,7 +1856,7 @@ input:focus-visible {
   pointer-events: none;
 }
 .farm-geese {
-  animation: farm-geese-fly 60s linear infinite;
+  animation: farm-geese-fly 110s linear infinite;
 }
 .farm-geese.north {
   animation-direction: reverse;
@@ -1912,7 +1911,7 @@ input:focus-visible {
   }
 }
 .farm-butterfly {
-  animation: farm-flutter 7s ease-in-out infinite;
+  animation: farm-flutter 13s ease-in-out infinite;
 }
 @keyframes farm-flutter {
   0%,
@@ -2546,7 +2545,7 @@ button.stats-range-label:hover {
   font-weight: 600;
   margin-bottom: 12px;
 }
-/* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边、最高柱金色 */
+/* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边；颜色由 barTone 连续渐变接管 */
 .bars {
   flex: 1;
   display: flex;
@@ -2566,22 +2565,12 @@ button.stats-range-label:hover {
   justify-content: flex-end;
   gap: 3px;
 }
-/* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边。
-   成就分级（与记录页日合计同口径）：1–4 常规番茄红、5–9 小丰收深红、
-   ≥10 大丰收金色——每一天达标都能拿到，不搞「只有最高柱是金色」 */
 .bar {
   width: 100%;
   max-width: 26px;
   min-height: 0;
   border-radius: 4px 4px 2px 2px;
   background: linear-gradient(180deg, #f38b82, #e57368);
-}
-.bar.mid {
-  background: linear-gradient(180deg, #e5533f, #c22f1f);
-}
-.bar.high {
-  background: linear-gradient(180deg, #f2cd73, #e8a917);
-  box-shadow: 0 0 8px rgba(232, 169, 23, 0.35);
 }
 .bar.today {
   outline: 2px solid var(--primary);
@@ -2597,41 +2586,14 @@ button.stats-range-label:hover {
   color: var(--muted);
   white-space: nowrap;
 }
-.bars-legend {
-  display: flex;
-  gap: 14px;
-  margin-top: 10px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.bars-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.bars-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  display: inline-block;
-}
-.bars-swatch.plain {
-  background: linear-gradient(180deg, #f38b82, #e57368);
-}
-.bars-swatch.mid {
-  background: linear-gradient(180deg, #e5533f, #c22f1f);
-}
-.bars-swatch.high {
-  background: linear-gradient(180deg, #f2cd73, #e8a917);
-}
-/* 半小时热力（周历式）：列=周一..周日，行=0–24 点每半小时一格，
-   时间自上而下流动，符合日历阅读直觉 */
+/* 小时热力（周历式）：列=周一..周日，行=0–24 点每 1 小时一格，
+   时间自上而下流动；格子接近胶囊形，不再扁长 */
 .sh-grid {
   display: grid;
   grid-template-columns: 26px repeat(7, 1fr);
   grid-template-rows: 17px;
-  grid-auto-rows: 8px;
-  gap: 1px 3px;
+  grid-auto-rows: 12px;
+  gap: 2px 3px;
   align-items: stretch;
 }
 .sh-corner {
@@ -2653,7 +2615,7 @@ button.stats-range-label:hover {
 }
 .sh-cell {
   display: block;
-  border-radius: 2px;
+  border-radius: 3.5px;
 }
 .sh-cell.now {
   outline: 1.5px solid var(--primary);
@@ -2675,54 +2637,64 @@ button.stats-range-label:hover {
   margin-left: auto;
   font-style: normal;
 }
-/* 任务排行 */
-.top-list {
+/* 分布行（象限分布 / 时段偏好共用）：图标 + 名称 + 横条 + 数量 */
+.stats-trio {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.dist-list {
   list-style: none;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
 }
-.top-list li {
+.dist-list li {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 7px 0;
 }
-.top-list li + li {
+.dist-list li + li {
   border-top: 1px solid #f2f4f7;
 }
-.top-rank {
-  width: 16px;
-  font-size: 12px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-.top-dot {
+.dist-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex: none;
 }
-.top-name {
-  font-size: 14px;
-  max-width: 38%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.dist-icon {
+  font-style: normal;
+  width: 16px;
+  text-align: center;
+  flex: none;
 }
-.top-bar {
+.dist-name {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.dist-name small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.dist-bar {
   flex: 1;
   height: 8px;
   border-radius: 4px;
   background: #f1f2f4;
   overflow: hidden;
 }
-.top-bar i {
+.dist-bar i {
   display: block;
   height: 100%;
   border-radius: 4px;
   background: linear-gradient(90deg, #f9bcb8, #e57368);
 }
-.top-count {
+.dist-count {
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
@@ -2738,7 +2710,7 @@ button.stats-range-label:hover {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 0;
+  padding: 9px 0;
 }
 .glory-list li + li {
   border-top: 1px solid #f2f4f7;
@@ -2757,6 +2729,9 @@ button.stats-range-label:hover {
     grid-template-columns: repeat(2, 1fr);
   }
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-trio {
     grid-template-columns: 1fr;
   }
   .side-title .stats-tabs {

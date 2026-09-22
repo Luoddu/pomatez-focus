@@ -166,6 +166,33 @@ export function harvestTier(count: number): "" | "mid" | "high" {
   return "";
 }
 
+// 柱状图连续成就色（不用文字图例，颜色本身说话）：
+// 1–9 个在番茄红谱系内越收越深（浅鲑红→深绯红）；≥10 个进入金色谱系，
+// 收得越多金色越亮、光晕越大（闪耀感随数量连续增强，而不是只有一档金）
+export type BarTone = { top: string; bottom: string; glow: string | null };
+export function barTone(count: number): BarTone {
+  if (count >= 10) {
+    const t = Math.min(1, (count - 10) / 10); // 10 → 20+ 渐强
+    return {
+      top: mixColor("#f2cd73", "#ffedb3", t),
+      bottom: mixColor("#e8a917", "#ffc93d", t),
+      glow: `0 0 ${(6 + t * 12).toFixed(1)}px rgba(232, 169, 23, ${(
+        0.32 +
+        t * 0.45
+      ).toFixed(2)})`,
+    };
+  }
+  if (count >= 1) {
+    const t = Math.min(1, (count - 1) / 8); // 1 → 9 渐深
+    return {
+      top: mixColor("#f38b82", "#e04a35", t),
+      bottom: mixColor("#e57368", "#c02816", t),
+      glow: null,
+    };
+  }
+  return { top: "#eceef2", bottom: "#e2e5ea", glow: null };
+}
+
 // ── 季节时令（按北京时间月份）：给农场场景叠加轻量装饰 ──
 // 春 3–5 月落樱、夏 6–8 月蜻蜓、秋 9–11 月落叶、冬 12–2 月飘雪；
 // 只做克制的点景，不打断专注

@@ -1014,8 +1014,8 @@ export default function FarmField({
               <g
                 className="farm-butterfly"
                 style={{
-                  animationDelay: `${-i * 2.3}s`,
-                  animationDuration: `${7 + i * 1.6}s`,
+                  animationDelay: `${-i * 4.1}s`,
+                  animationDuration: `${13 + i * 2.5}s`,
                 }}
               >
                 <ellipse
