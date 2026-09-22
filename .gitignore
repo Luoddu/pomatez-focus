@@ -28,7 +28,6 @@ yarn-error.log*
 *.enc
 focus-records-*.json
 feishu-credentials*
-dist-preview44/
-dist-preview45/
+dist-preview*/
+scripts/__pycache__/
 shot*.log
-dist-preview45b/
