@@ -10,8 +10,8 @@ import {
   halfHourMatrix,
   inRange,
   isCurrentRange,
-  periodDelta,
   rangeOf,
+  rollingTrend,
   shiftRange,
   summarize,
 } from "../stats";
@@ -77,16 +77,12 @@ export default function StatsPanel({
   const current = isCurrentRange(range, now);
   const scoped = useMemo(() => inRange(records, range), [records, range]);
   const summary = useMemo(() => summarize(scoped), [scoped]);
-  // 上一周期（环比基线）：周 vs 上周、月 vs 上月，季/年同理
-  const prevRange = useMemo(() => shiftRange(range, -1), [range]);
-  const prevScoped = useMemo(
-    () => inRange(records, prevRange),
-    [records, prevRange]
-  );
-  const prevSummary = useMemo(() => summarize(prevScoped), [prevScoped]);
-  const prevDayparts = useMemo(
-    () => daypartSplit(halfHourMatrix(prevScoped, prevRange)),
-    [prevScoped, prevRange]
+  // 滚动窗口趋势（Apple 训练负荷式）：锚定视角最后一天，
+  // 当前区间锚今天，历史翻页锚该区间末尾；与上方区间合计解耦
+  const trendAnchor = Math.min(now, range.end - 1);
+  const trend = useMemo(
+    () => rollingTrend(records, rangeKey, trendAnchor),
+    [records, rangeKey, trendAnchor]
   );
   // 连续天数是全历史口径（不只是当前区间），切换区间不跳动
   const streak = useMemo(() => currentStreak(records, now), [records, now]);
@@ -96,11 +92,19 @@ export default function StatsPanel({
   );
   const heat = useMemo(() => halfHourMatrix(scoped, range), [scoped, range]);
   const dayparts = useMemo(() => daypartSplit(heat), [heat]);
-  // 时段趋势：与上一周期相比的产出重心变化（算不出就不显示）
-  const partTrend = useMemo(
-    () => daypartTrend(dayparts, prevDayparts),
-    [dayparts, prevDayparts]
-  );
+  // 时段趋势：滚动窗口口径，与区间合计环比同源（算不出就不显示）
+  const partTrend = useMemo(() => {
+    if (!trend) return null;
+    const curWin = { start: trend.curStart, end: trend.end };
+    const baseWin = { start: trend.baseStart, end: trend.end };
+    const cur = daypartSplit(
+      halfHourMatrix(inRange(records, curWin), curWin)
+    );
+    const base = daypartSplit(
+      halfHourMatrix(inRange(records, baseWin), baseWin)
+    );
+    return daypartTrend(cur, base);
+  }, [trend, records]);
   // 带刺番茄：本期感受为难受/很痛苦的收获番茄数
   const spikyCount = useMemo(
     () =>
@@ -157,18 +161,25 @@ export default function StatsPanel({
       col: Math.min(47, d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0)),
     };
   })();
-  // 环比小块：▲ 升（番茄红）/ ▼ 降（中性灰）/ 持平；上期无数据不显示
-  const delta = (cur: number, prev: number) => {
-    const d = periodDelta(cur, prev);
+  // 环比小块：▲ 升（番茄红）/ ▼ 降（中性灰）/ 持平，紧跟滚动窗口基准小灰字；
+  // 数据不足/基准无数据（trend 为 null 或该项为 null）时整块不显示
+  const delta = (d: { pct: number } | null | undefined, base: string) => {
     if (!d) return null;
-    if (d.pct === 0) return <em className="delta flat">持平</em>;
     return (
-      <em className={`delta ${d.pct > 0 ? "up" : "down"}`}>
-        {d.pct > 0 ? "▲" : "▼"} {d.pct > 0 ? "+" : ""}
-        {d.pct}%
-      </em>
+      <>
+        {d.pct === 0 ? (
+          <em className="delta flat">持平</em>
+        ) : (
+          <em className={`delta ${d.pct > 0 ? "up" : "down"}`}>
+            {d.pct > 0 ? "▲" : "▼"} {d.pct > 0 ? "+" : ""}
+            {d.pct}%
+          </em>
+        )}
+        <small className="delta-base">{base}</small>
+      </>
     );
   };
+  const baseLabel = trend ? `较近 ${trend.baseDays} 天` : "";
   return (
     <main className="content stats-page">
       <div className="side-title">
@@ -243,38 +254,42 @@ export default function StatsPanel({
             <section className="card stats-card stats-summary">
               <h3>区间合计</h3>
               <div className="st-row">
-                <span>番茄</span>
-                <strong>
-                  {summary.count}
-                  {delta(summary.count, prevSummary.count)}
-                </strong>
+                <span className="st-label">番茄</span>
+                <div className="st-value">
+                  <strong>{summary.count}</strong>
+                  {delta(trend?.count, `${baseLabel}日均`)}
+                </div>
               </div>
               <div className="st-row">
-                <span>专注时长</span>
-                <strong className="long">
-                  {durationText(summary.seconds)}
-                  {delta(summary.seconds, prevSummary.seconds)}
-                </strong>
+                <span className="st-label">专注时长</span>
+                <div className="st-value">
+                  <strong className="long">
+                    {durationText(summary.seconds)}
+                  </strong>
+                  {delta(trend?.seconds, `${baseLabel}日均`)}
+                </div>
               </div>
               <div className="st-row">
-                <span>活跃天数</span>
-                <strong>
-                  {summary.activeDays}
-                  {delta(summary.activeDays, prevSummary.activeDays)}
-                </strong>
+                <span className="st-label">活跃天数</span>
+                <div className="st-value">
+                  <strong>{summary.activeDays}</strong>
+                  {delta(trend?.activeRate, `${baseLabel}活跃率`)}
+                </div>
               </div>
               <div className="st-row">
-                <span>日均番茄</span>
-                <strong>
-                  {summary.avgCount}
-                  {delta(summary.avgCount, prevSummary.avgCount)}
-                </strong>
+                <span className="st-label">日均番茄</span>
+                <div className="st-value">
+                  <strong>{summary.avgCount}</strong>
+                  {delta(trend?.avgPerActiveDay, `${baseLabel}活跃日均`)}
+                </div>
               </div>
               <div className="st-row streak">
-                <span>连续收获</span>
-                <strong data-tier={streak >= 7 ? "mid" : undefined}>
-                  {streak} 天
-                </strong>
+                <span className="st-label">连续收获</span>
+                <div className="st-value">
+                  <strong data-tier={streak >= 7 ? "mid" : undefined}>
+                    {streak} 天
+                  </strong>
+                </div>
               </div>
             </section>
             <section className="card stats-card stats-bars">
@@ -413,8 +428,13 @@ export default function StatsPanel({
                   </li>
                 ))}
               </ul>
-              {partTrend && (
-                <div className="dist-foot trend">{partTrend}</div>
+              {partTrend && trend && (
+                <div className="dist-foot trend">
+                  {partTrend}{" "}
+                  <small>
+                    近 {trend.currentDays} 天 vs 近 {trend.baseDays} 天
+                  </small>
+                </div>
               )}
             </section>
             <section className="card stats-card">

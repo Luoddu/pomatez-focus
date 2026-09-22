@@ -2489,32 +2489,40 @@ button.stats-range-label:hover {
   font-size: 12px;
   color: var(--primary);
 }
-/* 区间合计：五张独立卡合并为一个方框，五项紧凑排列，连续收获保留火焰强调 */
+/* 区间合计：五张独立卡合并为一个方框；Apple 健康卡片式垂直堆叠——
+   label 小灰字在上、数值大字在下左对齐，环比箭头与基准说明紧跟数值 */
 .stats-summary {
   gap: 0;
 }
 .st-row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 10px 0;
 }
 .st-row + .st-row {
   border-top: 1px solid #f2f4f7;
 }
-.st-row span {
-  font-size: 13px;
+.st-row .st-label {
+  font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.st-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .st-row strong {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .st-row strong.long {
-  font-size: 15px;
+  font-size: 16px;
 }
 .st-row.streak strong,
 .st-row strong[data-tier="mid"] {
@@ -2829,7 +2837,7 @@ button.stats-range-label:hover {
 
 /* ── 环比小块：▲ 升（番茄红）/ ▼ 降（中性灰）/ 持平 ── */
 .delta {
-  margin-left: 8px;
+  margin-left: 0;
   font-size: 11px;
   font-style: normal;
   font-weight: 500;
@@ -2843,9 +2851,16 @@ button.stats-range-label:hover {
 .delta.flat {
   color: var(--muted);
 }
-.stats-summary .st-row strong {
-  display: inline-flex;
-  align-items: baseline;
+/* 环比基准小灰字：比箭头更轻一档，注明「较近 N 天」口径 */
+.delta-base {
+  font-size: 10px;
+  font-weight: 400;
+  color: #9aa3af;
+  white-space: nowrap;
+}
+.dist-foot.trend small {
+  font-size: 11px;
+  color: #9aa3af;
 }
 .dist-foot.trend {
   color: #6b7280;

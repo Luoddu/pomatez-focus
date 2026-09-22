@@ -289,6 +289,72 @@ export function periodDelta(
   return { pct: Math.round(((current - previous) / previous) * 100) };
 }
 
+// ── 滚动窗口趋势（Apple 训练负荷式口径）──
+// 不拿「本周/本月到目前为止」跟「上一个完整周期」比（周二 vs 上周 7 天必然误导），
+// 而是锚定视角最后一天做滚动窗口日均对比（与 Apple Watch 训练负荷
+// 「近 7 天 vs 近 28 天基线」同族，基准窗含最近 N 天）：
+//   周视图 近 7 天日均 vs 近 28 天日均；月 近 28 vs 近 90；
+//   季 近 90 vs 近 180；年 近 365 vs 近 730。
+// 数据不足完整基准窗时降级为实际可用天数（标签如实写「较近 14 天日均」）；
+// 可用天数 ≤ 当前窗（比较失去意义）或根本没有记录时返回 null（不显示对比）。
+// 指标口径：番茄/专注时长按窗口日历天日均；日均番茄按窗口活跃日日均；
+// 活跃天数是计数指标，比「活跃率」（活跃天数/窗口天数）——与
+// 「当前活跃天数 vs 基准同比例期望值」的百分比数学等价但更好解释；
+// 连续收获是 streak 本身，不参与环比。
+export type RollingTrend = {
+  currentDays: number; // 当前窗口天数（固定：7/28/90/365）
+  baseDays: number; // 实际基准窗口天数（降级后可能小于名义值 28/90/180/730）
+  curStart: number; // 当前窗口起点（含，本地 0 点）
+  baseStart: number; // 基准窗口起点（含）
+  end: number; // 两窗共同终点（排他，锚点次日 0 点）
+  count: { pct: number } | null;
+  seconds: { pct: number } | null;
+  avgPerActiveDay: { pct: number } | null;
+  activeRate: { pct: number } | null;
+};
+const ROLLING_DAYS: Record<RangeKey, { current: number; base: number }> = {
+  week: { current: 7, base: 28 },
+  month: { current: 28, base: 90 },
+  quarter: { current: 90, base: 180 },
+  year: { current: 365, base: 730 },
+};
+export function rollingTrend(
+  records: FocusSession[],
+  key: RangeKey,
+  anchor: number // 视角最后一天内的任意时刻（当前区间传今天，历史翻页传该区间末尾）
+): RollingTrend | null {
+  const { current: N, base: M } = ROLLING_DAYS[key];
+  const anchorDay = dayStart(anchor);
+  let first = Infinity;
+  for (const r of records)
+    if (r.status === "saved" && r.startedAt < first) first = r.startedAt;
+  if (!Number.isFinite(first)) return null;
+  // 可用数据跨度：首条记录所在日到锚点日的天数（锚点之前没有记录则为 0）
+  const dataDays = Math.floor((anchorDay - dayStart(first)) / DAY) + 1;
+  const B = Math.min(M, dataDays);
+  if (B <= N) return null;
+  const end = anchorDay + DAY;
+  const curStart = anchorDay - (N - 1) * DAY;
+  const baseStart = anchorDay - (B - 1) * DAY;
+  const scoped = (start: number) =>
+    inRange(records, { start, end });
+  const cur = summarize(scoped(curStart));
+  const base = summarize(scoped(baseStart));
+  return {
+    currentDays: N,
+    baseDays: B,
+    curStart,
+    baseStart,
+    end,
+    count: periodDelta(cur.count / N, base.count / B),
+    seconds: periodDelta(cur.seconds / N, base.seconds / B),
+    avgPerActiveDay: periodDelta(cur.avgCount, base.avgCount),
+    // 活跃率对比：(当前活跃天数/N) vs (基准活跃天数/B)，
+    // 等价于「当前活跃天数 vs 基准活跃天数×N/B」的期望口径
+    activeRate: periodDelta(cur.activeDays / N, base.activeDays / B),
+  };
+}
+
 // ── 时段趋势：与上期相比的产出重心变化。
 // 重心时段不同 → 「产出重心从 X 移到 Y」；重心相同但占比变化 ≥8 个百分点 →
 // 「X 产出占比 ±N 个百分点」；否则 null（数据不足或无变化时不显示） ──

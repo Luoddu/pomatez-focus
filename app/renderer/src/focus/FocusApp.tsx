@@ -198,16 +198,9 @@ const demoHistory = (): FocusSession[] => {
   return days.map(([ago, count]) => {
     const started = new Date();
     started.setDate(started.getDate() - ago);
-    // 上周的记录放晚间、其余放上午：统计页周视图可看到「产出重心从晚间移到上午」
-    const thisMonday = new Date();
-    thisMonday.setHours(0, 0, 0, 0);
-    thisMonday.setDate(
-      thisMonday.getDate() - ((thisMonday.getDay() + 6) % 7)
-    );
-    const lastWeek =
-      started.getTime() < thisMonday.getTime() &&
-      started.getTime() >= thisMonday.getTime() - 7 * 86400000;
-    started.setHours(lastWeek ? 20 : 10, 30, 0, 0);
+    // 近 7 天放上午、更早的放晚间：滚动窗口口径下统计页任何星期几打开
+    // 都能确定性看到「产出重心从晚间移到上午」（近 7 天 vs 近 28 天）
+    started.setHours(ago < 7 ? 10 : 20, 30, 0, 0);
     return {
       id: `demo-rec-${ago}`,
       task: demo[ago % demo.length],
