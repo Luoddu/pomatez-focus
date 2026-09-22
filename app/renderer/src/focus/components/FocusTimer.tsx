@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FocusSession, FocusTask, timeParts } from "../session";
+import { FocusSession, FocusTask } from "../session";
 import { QUADRANT_TONES } from "../week";
-import { Ring, clock, durationText, parseTitle, quadrantMeta } from "./shared";
+import { Ring, clock, parseTitle, quadrantMeta } from "./shared";
 
 export default function FocusTimer({
   active,
@@ -24,13 +24,9 @@ export default function FocusTimer({
   onResume: () => void;
   onFinish: () => void;
 }) {
-  const parts = timeParts(active);
   const parsed = parseTitle(active.task.title);
   const quadrant = quadrantMeta(active.task.quadrant);
   const plannedMinutes = Math.round(active.plannedSeconds / 60);
-  const gathered = Math.floor(
-    active.elapsedSeconds / active.plannedSeconds
-  );
   // 「结束」二次确认防误触：第一次进入确认态，3 秒不点自动还原；再点才真结束
   const [confirming, setConfirming] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -60,8 +56,6 @@ export default function FocusTimer({
     ? "休息中"
     : active.status === "paused"
     ? "已暂停"
-    : parts.overtime
-    ? "额外时间 · 等待你确认"
     : "专注于当下";
   // 进度弧随任务象限着色（与番茄园/记录列表同一取色口径），无象限保持主题蓝
   const ringTone = active.task.quadrant
@@ -172,25 +166,13 @@ export default function FocusTimer({
             {shownTime}
           </div>
           <div className="ring-note">{note}</div>
-          <div className="ring-elapsed">
-            已专注 {clock(active.elapsedSeconds)}
-          </div>
+          {/* 攒满一个番茄后才亮出「已专注」，此前的每一分钟保持安静 */}
+          {active.elapsedSeconds >= active.plannedSeconds && (
+            <div className="ring-elapsed">
+              已专注 {clock(active.elapsedSeconds)}
+            </div>
+          )}
         </Ring>
-        <div className="timing-chips">
-          <span className="chip-item">
-            本轮 {plannedMinutes} 分钟
-          </span>
-          {gathered >= 1 && (
-            <span className="chip-item tomato">
-              🍅 已积累 {gathered} 个
-            </span>
-          )}
-          {parts.overtime > 0 && (
-            <span className="chip-item amber">
-              多计时 {durationText(parts.overtime)} · 结束时确认
-            </span>
-          )}
-        </div>
         <div className="timing-buttons">
           <button
             className="btn-outline"

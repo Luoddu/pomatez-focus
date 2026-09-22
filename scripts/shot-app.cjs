@@ -514,11 +514,11 @@ app
         `Boolean(document.querySelector('.ring'))&&Boolean(document.querySelector('.current-task'))`
       ),
     });
-    // 进行中专注：环内已计时 + 提示 chip 行（本轮分钟）
+    // 进行中专注保持极简：无提示 chips；未满一个番茄不亮「已专注」
     results.push({
-      check: "timing view shows elapsed line and info chips",
+      check: "timing view stays minimal until the first pomodoro completes",
       pass: await js(
-        `(()=>{const e=document.querySelector('.ring-elapsed');const c=document.querySelector('.timing-chips');return Boolean(e&&/已专注 \\d{2}:\\d{2}/.test(e.textContent))&&Boolean(c&&c.textContent.includes('本轮'))})()`
+        `(()=>{return !document.querySelector('.timing-chips')&&!document.querySelector('.ring-elapsed')&&document.querySelector('.ring-note')&&document.querySelector('.ring-note').textContent==='专注于当下'})()`
       ),
     });
     await shot("timing");

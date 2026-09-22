@@ -2426,32 +2426,6 @@ input:focus-visible {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-.timing-chips {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-height: 26px;
-}
-.chip-item {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--gray-soft);
-  color: #6b7280;
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-.chip-item.tomato {
-  background: var(--red-soft);
-  color: #b32b1b;
-}
-.chip-item.amber {
-  background: var(--amber-soft);
-  color: var(--amber);
-}
 
 /* ── 专注统计页：区间 tab + 汇总条 + 图表网格 ── */
 .stats-page {

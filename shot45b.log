@@ -1,0 +1,487 @@
+
+captured app-board.png
+captured app-board-adjust-hover.png
+captured app-board-done-group.png
+captured app-board-adjust-toast.png
+captured app-board-chip-menu.png
+captured app-toast-error.png
+captured app-board-heatmap-tip.png
+captured app-farm-closeup.png
+captured app-board-weekgoal.png
+captured app-board-heatmap-weektotals.png
+captured app-board-weekgoal-met.png
+captured app-timing.png
+captured app-timing-finish-confirm.png
+captured app-timing-returned.png
+captured app-review.png
+captured app-board-saved.png
+captured app-board-weekgoal-closeup.png
+captured app-board-stats-countup.png
+captured app-timing-next.png
+captured app-board-rest.png
+captured app-heatmap-closeup.png
+captured app-board-manual.png
+captured app-stats-week.png
+captured app-stats-week-prev.png
+captured app-stats-month.png
+captured app-stats-year.png
+captured app-board-wide.png
+captured app-timing-wide.png
+captured app-settings-sound.png
+captured app-settings.png
+captured app-mini.png
+captured app-board-tall.png
+captured app-board-generating.png
+captured app-farm-dawn.png
+captured app-farm-noon.png
+captured app-farm-day.png
+captured app-farm-dusk.png
+captured app-farm-night.png
+captured app-farm-term-yushui.png
+captured app-farm-term-shuangjiang.png
+captured app-board-quadrant-borrow.png
+captured app-board-overload-800.png
+captured app-board-overload-1080.png
+captured app-task-chips-window.png
+captured app-board-chips-window.png
+{
+  "results": [
+    {
+      "check": "demo mode mounts without banner or toast",
+      "pass": true
+    },
+    {
+      "check": "window title renamed to 番茄农场",
+      "pass": true
+    },
+    {
+      "check": "chip click selects its plan row",
+      "pass": true
+    },
+    {
+      "check": "task rows show harvest badges with progress cells",
+      "pass": true
+    },
+    {
+      "check": "fully done group shows green check badge and no chips",
+      "pass": true
+    },
+    {
+      "check": "unfinished task names are larger than finished ones",
+      "pass": true
+    },
+    {
+      "check": "quadrant title pills use the enlarged font size",
+      "pass": true
+    },
+    {
+      "check": "week goal chip emphasizes the goal over the progress number",
+      "pass": true
+    },
+    {
+      "check": "week goal chip shows progress as a clean bottom bar",
+      "pass": true
+    },
+    {
+      "check": "hover adjust overlay does not shift any task layout",
+      "pass": true
+    },
+    {
+      "check": "adjust buttons render as an out-of-flow overlay",
+      "pass": true
+    },
+    {
+      "check": "hover reveals minus and plus buttons on the task row",
+      "pass": true
+    },
+    {
+      "check": "minus disabled and plus enabled on a fully done group",
+      "pass": true
+    },
+    {
+      "check": "adjust without connection shows error toast and adds no chip",
+      "pass": true
+    },
+    {
+      "check": "adjust buttons hide after mouse leaves",
+      "pass": true
+    },
+    {
+      "check": "layout is identical again after the overlay hides",
+      "pass": true
+    },
+    {
+      "check": "right-click on a pending chip shows the complete menu",
+      "pass": true
+    },
+    {
+      "check": "complete without connection shows error toast and keeps the chip",
+      "pass": true
+    },
+    {
+      "check": "menu closes when clicking elsewhere",
+      "pass": true
+    },
+    {
+      "check": "generate stays in overview title row; separate refresh button removed",
+      "pass": true
+    },
+    {
+      "check": "quadrant container has no internal scrollbar",
+      "pass": true
+    },
+    {
+      "check": "uncategorized card removed; uncategorized tasks join unu",
+      "pass": true
+    },
+    {
+      "check": "generate without connection shows persistent error toast",
+      "pass": true
+    },
+    {
+      "check": "error toast stays until dismissed",
+      "pass": true
+    },
+    {
+      "check": "error toast closes on x",
+      "pass": true
+    },
+    {
+      "check": "thin translucent scrollbar rules injected",
+      "pass": true
+    },
+    {
+      "check": "heatmap card with colored day cells",
+      "pass": true
+    },
+    {
+      "check": "heatmap hover shows tooltip with count and minutes",
+      "pass": true
+    },
+    {
+      "check": "farm field shows weekly growth caption and cumulative harvest pile",
+      "pass": true
+    },
+    {
+      "check": "farm caption carries a solar-term pill",
+      "pass": true
+    },
+    {
+      "check": "harvest pile mixes quadrant gradient tones from cumulative records",
+      "pass": true
+    },
+    {
+      "check": "farm tomatoes render as radial gradients from the softened palette",
+      "pass": true
+    },
+    {
+      "check": "tomatoes are matte with no glossy highlight dots",
+      "pass": true
+    },
+    {
+      "check": "pile tomatoes carry deterministic shape variation",
+      "pass": true
+    },
+    {
+      "check": "sky runs in live mode and matches Beijing hour",
+      "pass": true
+    },
+    {
+      "check": "sky state recomputes when the clock jumps and window refocuses",
+      "pass": true
+    },
+    {
+      "check": "harvest pile sits in the margin left of the soil band",
+      "pass": true
+    },
+    {
+      "check": "record list icons carry quadrant tone classes",
+      "pass": true
+    },
+    {
+      "check": "chips are enlarged, bold, and quadrant-toned",
+      "pass": true
+    },
+    {
+      "check": "scarecrow replaced the wooden sign",
+      "pass": true
+    },
+    {
+      "check": "farm tooltip hides after mouse leaves",
+      "pass": true
+    },
+    {
+      "check": "week goal chip shows this-week progress over default 60",
+      "pass": true
+    },
+    {
+      "check": "week goal popover opens on hover with prefilled input",
+      "pass": true
+    },
+    {
+      "check": "saving a reached goal marks chip met, stores only this week key, and toasts",
+      "pass": true
+    },
+    {
+      "check": "met week column glows gold and carries a tomato badge",
+      "pass": true
+    },
+    {
+      "check": "heatmap labels week totals, skips empty weeks, includes current week",
+      "pass": true
+    },
+    {
+      "check": "day total tiers: mid tone on 5-9 tomato days, none on a light today",
+      "pass": true
+    },
+    {
+      "check": "export button is not rendered while add/manual-sync stay",
+      "pass": true
+    },
+    {
+      "check": "week goal popover closes after mouse leaves",
+      "pass": true
+    },
+    {
+      "check": "timing view with ring and current task card",
+      "pass": true
+    },
+    {
+      "check": "timing view stays minimal until the first pomodoro completes",
+      "pass": true
+    },
+    {
+      "check": "finish needs a confirming second click",
+      "pass": true
+    },
+    {
+      "check": "finish confirm state reverts after 3s",
+      "pass": true
+    },
+    {
+      "check": "review card shown after confirmed finish",
+      "pass": true
+    },
+    {
+      "check": "review offers return-to-timing after the four main actions",
+      "pass": true
+    },
+    {
+      "check": "return-to-timing restores paused timer with elapsed kept",
+      "pass": true
+    },
+    {
+      "check": "review count quick-select replaces stepper with auto default",
+      "pass": true
+    },
+    {
+      "check": "quick-select click changes selected count",
+      "pass": true
+    },
+    {
+      "check": "save-and-next enabled when next pomodoro exists",
+      "pass": true
+    },
+    {
+      "check": "save appends one record",
+      "pass": true
+    },
+    {
+      "check": "save shows info toast",
+      "pass": true
+    },
+    {
+      "check": "today tomatoes stat counts up to the new total",
+      "pass": true
+    },
+    {
+      "check": "week goal progress number counts up in sync",
+      "pass": true
+    },
+    {
+      "check": "info toast auto-dismisses",
+      "pass": true
+    },
+    {
+      "check": "save-and-next appends record and starts pomodoro 2",
+      "pass": true
+    },
+    {
+      "check": "save-and-next disabled without next pomodoro",
+      "pass": true
+    },
+    {
+      "check": "save-and-rest appends record and shows rest bar",
+      "pass": true
+    },
+    {
+      "check": "manual entry appends record and bumps totals",
+      "pass": true
+    },
+    {
+      "check": "heatmap transposed to week columns x weekday rows",
+      "pass": true
+    },
+    {
+      "check": "heatmap cells show small day counts only when count > 0",
+      "pass": true
+    },
+    {
+      "check": "stats page opens with four range tabs and five summary cards",
+      "pass": true
+    },
+    {
+      "check": "week stats: 7 bars and a vertical 7x24 hourly heat grid",
+      "pass": true
+    },
+    {
+      "check": "stats pager steps to previous week with a back-to-current hint",
+      "pass": true
+    },
+    {
+      "check": "range label click returns to the current week and disables next",
+      "pass": true
+    },
+    {
+      "check": "month stats: one bar per day of the month",
+      "pass": true
+    },
+    {
+      "check": "year stats: 12 monthly bars and golden-slot highlight",
+      "pass": true
+    },
+    {
+      "check": "stats page closes back to the board",
+      "pass": true
+    },
+    {
+      "check": "no horizontal overflow at 1920 wide board",
+      "pass": true
+    },
+    {
+      "check": "discard adds no record",
+      "pass": true
+    },
+    {
+      "check": "settings panel shows connection form and about",
+      "pass": true
+    },
+    {
+      "check": "sound toggle visible and enabled by default",
+      "pass": true
+    },
+    {
+      "check": "sound toggle persists off to its own key",
+      "pass": true
+    },
+    {
+      "check": "sound toggle restores on",
+      "pass": true
+    },
+    {
+      "check": "compact mini view renders",
+      "pass": true
+    },
+    {
+      "check": "no horizontal overflow at 1280 board",
+      "pass": true
+    },
+    {
+      "check": "farm scene grows to fill the tall board window",
+      "pass": true
+    },
+    {
+      "check": "generate click shows inline step track and locks only its button",
+      "pass": true
+    },
+    {
+      "check": "stage text advances to write progress x/y",
+      "pass": true
+    },
+    {
+      "check": "generate mock finishes with toast and complete step track",
+      "pass": true
+    },
+    {
+      "check": "Beijing dawn shows a low left sun on warm tint and mock mode",
+      "pass": true
+    },
+    {
+      "check": "Beijing noon shows the sun near the top",
+      "pass": true
+    },
+    {
+      "check": "farm shows a high sun on a Beijing afternoon",
+      "pass": true
+    },
+    {
+      "check": "Beijing dusk shows a low right sun",
+      "pass": true
+    },
+    {
+      "check": "farm shows moon, stars and the night-watch owl on a Beijing night",
+      "pass": true
+    },
+    {
+      "check": "Yushui term shows drizzle overlay, term pill and northbound geese",
+      "pass": true
+    },
+    {
+      "check": "Shuangjiang term shows frost on the soil band and southbound geese",
+      "pass": true
+    },
+    {
+      "check": "borrow: full quadrant spreads, empty sibling shrinks to a slim strip",
+      "pass": true
+    },
+    {
+      "check": "borrow: spread quadrant lays tasks out in two columns",
+      "pass": true
+    },
+    {
+      "check": "borrow: long task names still clamp with ellipsis in two columns",
+      "pass": true
+    },
+    {
+      "check": "borrow: chips never overflow their task row while scrolling",
+      "pass": true
+    },
+    {
+      "check": "borrow: both-empty row stays fifty fifty",
+      "pass": true
+    },
+    {
+      "check": "no borrow when both quadrants in a row have tasks",
+      "pass": true
+    },
+    {
+      "check": "overload: task lists scroll internally at 1280x800",
+      "pass": true
+    },
+    {
+      "check": "overload: begin button and farm stay in viewport at 1280x800",
+      "pass": true
+    },
+    {
+      "check": "overload: begin button and farm stay in viewport at 1920x1080",
+      "pass": true
+    },
+    {
+      "check": "eight-pomodoro task renders six chips plus a +2 hint on one row",
+      "pass": true
+    },
+    {
+      "check": "finishing front pomodoros slides later ones into the window",
+      "pass": true
+    },
+    {
+      "check": "spread two-column quadrant also keeps chips on one row",
+      "pass": true
+    },
+    {
+      "check": "no renderer console errors",
+      "pass": true
+    }
+  ],
+  "failed": 0
+}
