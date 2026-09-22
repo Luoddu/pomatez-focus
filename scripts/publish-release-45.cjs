@@ -4,8 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-// dist 被本机 Kimi 桌面进程持锁，打包输出在备用目录 dist-preview45
-const dist = path.join(root, "app", "electron", "dist-preview45");
+// dist 被本机 Kimi 桌面进程持锁，打包输出在备用目录 dist-preview45b
+const dist = path.join(root, "app", "electron", "dist-preview45b");
 const TAG = "v0.1.0-preview.45";
 const PROXY = "http://127.0.0.1:7890";
 
@@ -54,7 +54,7 @@ const api = (args) => {
 const payloadPath = path.join(require("node:os").tmpdir(), "release-payload-45.json");
 fs.writeFileSync(payloadPath, JSON.stringify({
   tag_name: TAG,
-  target_commitish: "853f7b1429bb71f6e06ef0c9c4b0cd55b648a55f",
+  target_commitish: "427a32df2eb3e784c73955a6603ade11804152d8",
   name: "Pomatez Focus 0.1.0-preview.45 · 统计页改版",
   body: [
     "## 0.1.0-preview.45 统计页改版",
@@ -64,10 +64,11 @@ fs.writeFileSync(payloadPath, JSON.stringify({
     "- 隐私安全：任务排行下线（截图分享会暴露任务名），替换为「象限分布」（只统计各象限投入番茄数与占比）；新增「时段偏好」板块（深夜/上午/下午/晚间），与「高光时刻」组成三卡行。",
     "- 页面更紧凑：整体一屏基本看完，不用滚动。",
     "- 「已收 x/y」回到任务行尾右侧，文字在上、红色记数格在下，不再压住番茄筹码。",
+    "- 计时页极简：去掉「额外时间 · 等待你确认」和「本轮分钟 / 已积累 / 多计时」提示条；攒满一个番茄后才亮出「已专注 X」，此前保持安静。",
     "- 农场动物减速：蝴蝶、大雁飞行更从容。",
     "- 182 项单测、109 项界面检查、33 项桌面集成检查全部通过。",
     "",
-    "源码：853f7b1（codex/feishu-focus）。校验文件见 preview.yml（SHA-512）。",
+    "源码：427a32d（codex/feishu-focus）。校验文件见 preview.yml（SHA-512）。",
   ].join("\n"),
   draft: false,
   prerelease: true,
