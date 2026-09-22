@@ -45,6 +45,22 @@ const updaterBundle = require("esbuild").buildSync({
   outfile: "app/electron/build/focus/updater.js", metafile: true,
   legalComments: "eof",
 });
+// 护栏：esbuild 静默失败会让 tsc 的未打包输出留在原地（preview.45 首发事故），
+// 安装包里裸 require('electron-updater') 直接启动崩溃。产物必须无裸引用。
+{
+  const out = fs.readFileSync(
+    path.join(root, "app/electron/build/focus/updater.js"),
+    "utf8"
+  );
+  if (
+    out.length < 100000 ||
+    out.includes('require("electron-updater")') ||
+    out.includes("require('electron-updater')")
+  )
+    throw new Error(
+      "updater bundle guard: build/focus/updater.js is not the esbuild bundle"
+    );
+}
 // Include the license texts of every npm package actually bundled into the updater.
 const bundledPackages = new Set();
 for (const input of Object.keys(updaterBundle.metafile.inputs)) {
