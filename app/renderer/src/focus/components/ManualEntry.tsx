@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { FocusSession, FocusTask } from "../session";
-import { parseTitle } from "./shared";
+import { FocusSession, FocusTask, Mood } from "../session";
+import { MoodPicker, parseTitle } from "./shared";
 
 // datetime-local 需要本地时区的 YYYY-MM-DDTHH:mm
 const localInputValue = (value: number) => {
@@ -28,6 +28,7 @@ export default function ManualEntry({
     (initial?.acceptedSeconds ?? 1500) / 60
   );
   const [count, setCount] = useState(initial?.completedCount ?? 1);
+  const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   const [error, setError] = useState("");
   const maxWhen = useMemo(() => localInputValue(Date.now()), []);
   const groups = useMemo(
@@ -112,6 +113,8 @@ export default function ManualEntry({
           : [{ start: startedAt, end: startedAt + seconds * 1000 }],
         acceptedSeconds: seconds,
         completedCount: count,
+        // 感受只留本机；undefined 会被 JSON 序列化丢弃，等于清除
+        mood: mood ?? undefined,
         status: "saved",
         syncTarget: "plan",
         // 飞书任务走既有待同步队列；本地任务与自由专注只留本机
@@ -200,6 +203,10 @@ export default function ManualEntry({
           max={maxWhen}
           onChange={(e) => setWhen(e.target.value)}
         />
+      </div>
+      <div className="manual-row">
+        <label>感受</label>
+        <MoodPicker value={mood} onChange={setMood} />
       </div>
       {error && <div className="manual-error">{error}</div>}
       <div className="manual-actions">

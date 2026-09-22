@@ -1,15 +1,17 @@
 import React from "react";
-import { FocusSession, timeParts } from "../session";
-import { parseTitle } from "./shared";
+import { FocusSession, Mood, timeParts } from "../session";
+import { MoodPicker, parseTitle } from "./shared";
 
 export default function ReviewPanel({
   active,
   accepted,
   completed,
+  mood,
   connected,
   nextAvailable,
   onAccepted,
   onCompleted,
+  onMood,
   onSave,
   onSaveRest,
   onSaveNext,
@@ -19,10 +21,12 @@ export default function ReviewPanel({
   active: FocusSession;
   accepted: string;
   completed: number;
+  mood: Mood | null;
   connected: boolean;
   nextAvailable: boolean;
   onAccepted: (value: string) => void;
   onCompleted: (value: number) => void;
+  onMood: (value: Mood | null) => void;
   onSave: () => void;
   onSaveRest: () => void;
   onSaveNext: () => void;
@@ -125,6 +129,13 @@ export default function ReviewPanel({
                   (active.task.creditedSeconds || 0) / 60
                 ).toFixed(2)} 分钟；分钟台账仍只记在本行。选 N 个会把本行和后面连续共 N 行番茄都标记已完成，今天不够的行自动补齐。`
               : `已按每 ${plannedMinutes} 分钟 1 个番茄自动累计，点选修改`}
+          </span>
+        </div>
+        <div className="form-row">
+          <label>本次感受</label>
+          <MoodPicker value={mood} onChange={onMood} />
+          <span className="sub">
+            可选，只记在本机；难受的番茄会长出小刺
           </span>
         </div>
         <div className="review-actions">

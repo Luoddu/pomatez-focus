@@ -38,7 +38,7 @@ type CounterProps = {
   pause: () => void;
   resume: () => void;
   finish: () => void;
-  confirm: (seconds: number, completed: number) => void;
+  confirm: (seconds: number, completed: number, mood?: number) => void;
   discard: () => void;
   returnToTiming: () => void;
   markSynced: (
@@ -313,11 +313,11 @@ const CounterProvider: React.FC = ({ children }) => {
           },
         });
     });
-  const confirm = (seconds: number, completed: number) =>
+  const confirm = (seconds: number, completed: number, mood?: number) =>
     action(() => {
       const next = dataRef.current;
       if (!next.active) throw new Error("当前没有待确认记录");
-      const record = confirmSession(next.active, seconds, completed);
+      const record = confirmSession(next.active, seconds, completed, mood);
       publish({
         active: null,
         records: upsertRecord(next.records, record),

@@ -20,11 +20,29 @@ export type FocusTask = {
   // iu=重要且紧急 inu=重要不紧急 uni=紧急不重要 unu=不紧急不重要; 缺省=未分类
   quadrant?: FocusQuadrant;
 };
+// 主观感受（结束确认页可选填写）：-2 很痛苦 … +2 很愉快。
+// 只存本地记录，不上传飞书；旧记录无此字段按未填写处理。
+export type Mood = -2 | -1 | 0 | 1 | 2;
+export const MOOD_OPTIONS: { value: Mood; label: string; emoji: string }[] = [
+  { value: -2, label: "很痛苦", emoji: "😣" },
+  { value: -1, label: "难受", emoji: "😖" },
+  { value: 0, label: "平静", emoji: "😐" },
+  { value: 1, label: "愉快", emoji: "🙂" },
+  { value: 2, label: "很愉快", emoji: "😄" },
+];
+export const moodLabel = (mood?: number) =>
+  MOOD_OPTIONS.find((o) => o.value === mood)?.label;
+// 难受/很痛苦档 = 带刺番茄
+export const isSpikyMood = (mood?: number) => mood != null && mood <= -1;
+const validMood = (mood: unknown): mood is Mood =>
+  Number.isInteger(mood) && (mood as number) >= -2 && (mood as number) <= 2;
+
 export type FocusSession = {
   id: string;
   task: FocusTask;
   startedAt: number;
   endedAt?: number;
+  mood?: Mood;
   plannedSeconds: number;
   elapsedSeconds: number;
   acceptedSeconds?: number;
@@ -112,7 +130,8 @@ export function timeParts(session: FocusSession) {
 export function confirmSession(
   session: FocusSession,
   acceptedSeconds: number,
-  completedCount: number
+  completedCount: number,
+  mood?: number
 ): FocusSession {
   if (session.status !== "review")
     throw new Error("Session is not awaiting confirmation");
@@ -130,12 +149,17 @@ export function confirmSession(
   ) {
     throw new Error("完成番茄数必须是 0–100 的整数");
   }
+  if (mood !== undefined && !validMood(mood)) {
+    throw new Error("感受评级必须是 -2 到 2 的整数");
+  }
   return {
     ...session,
     acceptedSeconds,
     // 番茄数由 review 屏快选确认（默认值按分钟/番茄时长自动累计）；
     // 原表行的“已完成”勾选仍由 mergePlan 的分钟台账独立推导，与此数无关
     completedCount,
+    // 未选感受时不写入该字段（旧记录兼容：缺省即未评）
+    ...(mood !== undefined ? { mood: mood as Mood } : {}),
     status: "saved",
     sync: session.task.source === "feishu" ? "pending" : "local",
   };

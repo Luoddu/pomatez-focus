@@ -1,4 +1,4 @@
-import { FocusQuadrant, FocusTask } from "../session";
+import { FocusQuadrant, FocusTask, MOOD_OPTIONS, Mood } from "../session";
 import { mixColor } from "../week";
 
 export const QUADRANTS: {
@@ -68,13 +68,27 @@ export const api = () => (window as any).focusApi;
 
 // tone 覆盖番茄果体色（象限着色用）；缺省经典番茄红。
 // 有 tone 时果体用哑光径向渐变（中心主色→边缘略深，无高光点）；
-// 渐变 id 由 tone 派生——同 tone 的多个圆点共享 id，但 stops 完全相同，碰撞无害
+// 渐变 id 由 tone 派生——同 tone 的多个圆点共享 id，但 stops 完全相同，碰撞无害。
+// spiky=带刺番茄：果缘一圈小刺，表示这段专注感受难受/很痛苦
+const THORN_ANGLES = [-160, -120, -60, -20, 20, 160];
+const thornPath = (deg: number) => {
+  const a = (deg * Math.PI) / 180;
+  const bx = 12 + Math.cos(a) * 8.2;
+  const by = 13.5 + Math.sin(a) * 8.2;
+  const tx = 12 + Math.cos(a) * 11.4;
+  const ty = 13.5 + Math.sin(a) * 11.4;
+  const px = Math.cos(a + Math.PI / 2) * 1.5;
+  const py = Math.sin(a + Math.PI / 2) * 1.5;
+  return `M${bx + px} ${by + py}L${tx} ${ty}L${bx - px} ${by - py}Z`;
+};
 export const LogoIcon = ({
   size = 22,
   tone,
+  spiky,
 }: {
   size?: number;
   tone?: string;
+  spiky?: boolean;
 }) => {
   const gid = tone ? `logo-tomato-${tone.replace(/[^0-9a-z]/gi, "")}` : "";
   return (
@@ -89,6 +103,10 @@ export const LogoIcon = ({
         </defs>
       )}
       <circle cx="12" cy="13.5" r="9" fill={tone ? `url(#${gid})` : "#e64545"} />
+      {spiky &&
+        THORN_ANGLES.map((deg) => (
+          <path key={deg} d={thornPath(deg)} fill="#8a5a2b" />
+        ))}
       <path
         d="M12 4.5c-1.2-1.6-3-2.2-4.6-1.8.6 1.4 1.8 2.4 3.4 2.8-.8-1-1.2-2.2 1.2-1z"
         fill="#3faf62"
@@ -100,6 +118,32 @@ export const LogoIcon = ({
     </svg>
   );
 };
+
+// 主观感受选择（参考 Apple State of Mind）：5 档可选，再点已选取消；
+// 不选即跳过，不影响保存
+export const MoodPicker = ({
+  value,
+  onChange,
+}: {
+  value: Mood | null;
+  onChange: (mood: Mood | null) => void;
+}) => (
+  <span className="mood-row" role="group" aria-label="本次专注感受">
+    {MOOD_OPTIONS.map((o) => (
+      <button
+        key={o.value}
+        type="button"
+        className={`mood-btn${value === o.value ? " selected" : ""}`}
+        aria-pressed={value === o.value}
+        aria-label={`感受：${o.label}`}
+        title={o.label}
+        onClick={() => onChange(value === o.value ? null : o.value)}
+      >
+        {o.emoji}
+      </button>
+    ))}
+  </span>
+);
 
 export const Ring = ({
   size,

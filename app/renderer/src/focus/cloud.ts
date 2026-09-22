@@ -59,7 +59,13 @@ export function mergeCloudRecords(
           (!matchesTask(r.task) && !moved)
         )
           throw Error("修改记录的任务关联不符，未覆盖");
-        byId.set(r.id, r);
+        // 主观感受只存本机、不上云：远端覆盖时保留本地已填的 mood
+        byId.set(
+          r.id,
+          r.mood === undefined && old.mood !== undefined
+            ? { ...r, mood: old.mood }
+            : r
+        );
         continue;
       }
       for (const key of [

@@ -10,6 +10,7 @@ import {
   FocusSession,
   FocusTask,
   FocusQuadrant,
+  Mood,
   timeParts,
 } from "./session";
 import { EditQueue, PendingEdit, QuickTask } from "./editQueue";
@@ -247,6 +248,7 @@ export default function FocusApp() {
     [accepted, setAccepted] = useState("25"),
     [completed, setCompleted] = useState(0),
     [completedTouched, setCompletedTouched] = useState(false),
+    [reviewMood, setReviewMood] = useState<Mood | null>(null),
     [localTitle, setLocalTitle] = useState("");
   const [config, setConfig] = useState<FocusConfig>({
     appId: "",
@@ -520,6 +522,8 @@ export default function FocusApp() {
         )
       );
       setCompletedTouched(false);
+      // 进入新的结束确认页时感受重置为未选（可选，不强制）
+      setReviewMood(null);
       windowMode(false, false);
     }
     // Initialize once when entering review; elapsed/pin renders must not reset the user's edits.
@@ -1387,20 +1391,24 @@ export default function FocusApp() {
               active={active}
               accepted={accepted}
               completed={completed}
+              mood={reviewMood}
               connected={connected}
               nextAvailable={nextAvailable}
               onAccepted={handleAccepted}
               onCompleted={handleCompleted}
+              onMood={setReviewMood}
               onSave={() => {
                 timer.confirm(
                   Math.round(Number(accepted) * 60),
-                  completed
+                  completed,
+                  reviewMood ?? undefined
                 );
               }}
               onSaveRest={() => {
                 timer.confirm(
                   Math.round(Number(accepted) * 60),
-                  completed
+                  completed,
+                  reviewMood ?? undefined
                 );
                 timer.startBreak();
               }}
@@ -1411,7 +1419,8 @@ export default function FocusApp() {
                     : nextTask;
                 timer.confirm(
                   Math.round(Number(accepted) * 60),
-                  completed
+                  completed,
+                  reviewMood ?? undefined
                 );
                 if (target) beginTask(target);
               }}

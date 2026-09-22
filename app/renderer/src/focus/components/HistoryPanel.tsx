@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FocusSession, FocusTask } from "../session";
+import { FocusSession, FocusTask, isSpikyMood, moodLabel } from "../session";
 import { QUADRANT_TONES, harvestTier, totalMilestone, TOTAL_MILESTONES, weekTomatoes } from "../week";
 import {
   WEEK_GOAL_DEFAULT,
@@ -528,10 +528,20 @@ export default function HistoryPanel({
                         : "free";
                     return (
                       <li className="record" key={r.id}>
-                        <span className={`r-icon tone-${q}`}>
+                        <span
+                          className={`r-icon tone-${q}${
+                            isSpikyMood(r.mood) ? " spiky" : ""
+                          }`}
+                          title={
+                            r.mood != null
+                              ? `本次感受：${moodLabel(r.mood)}`
+                              : undefined
+                          }
+                        >
                           <LogoIcon
                             size={14}
                             tone={QUADRANT_TONES[q]}
+                            spiky={isSpikyMood(r.mood)}
                           />
                         </span>
                         <div className="r-main">
