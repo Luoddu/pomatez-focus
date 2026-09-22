@@ -52,11 +52,11 @@ test("shareCardModel：黄金时段落在最高热力格", () => {
   assert.equal(model.goldenLabel, "周二 14:00");
 });
 
-test("shareCardModel：热力矩阵 7×24 且不含任务名字段", () => {
+test("shareCardModel：热力矩阵 7×48 半小时格且不含任务名字段", () => {
   const model = shareCardModel(RECORDS, rangeOf("week", NOW), NOW);
-  assert.equal(model.hours.length, 7);
-  assert.equal(model.hours[0].length, 24);
-  assert.ok(model.hours.flat().some((v) => v > 0));
+  assert.equal(model.heat.length, 7);
+  assert.equal(model.heat[0].length, 48);
+  assert.ok(model.heat.flat().some((v) => v > 0));
   // 隐私：模型任何字段都不应携带任务名
   assert.ok(!JSON.stringify(model).includes("写报告"));
 });

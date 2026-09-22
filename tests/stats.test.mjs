@@ -11,7 +11,6 @@ import {
   halfHourMatrix,
   topTasks,
   daypartSplit,
-  hourlyRows,
 } from "../app/renderer/src/focus/stats.ts";
 
 const DAY = 86400000;
@@ -168,17 +167,18 @@ test("daypartSplit：按 深夜/上午/下午/晚间 汇总热力矩阵", () => 
   assert.ok(Math.abs(parts[3].count - 4) < 1e-9);
 });
 
-test("hourlyRows：48 格半小时合成 24 格小时，数值守恒", () => {
+test("halfHourMatrix：7×48 半小时矩阵，深夜记录落在最后一格", () => {
   const now = at(2026, 9, 21, 15);
   const range = rangeOf("week", now);
-  // 周一 10:15–10:40，2 个番茄：跨 10:00/10:30 两格
-  const heat = halfHourMatrix([rec(at(2026, 9, 21, 10, 15), 2, 25)], range);
-  const rows = hourlyRows(heat);
-  assert.equal(rows.length, 7);
-  assert.equal(rows[0].length, 24);
-  assert.ok(Math.abs(rows[0][10] - 2) < 1e-9); // 合并后守恒
-  assert.equal(
-    rows.flat().reduce((a, b) => a + b, 0),
-    heat.rows.flat().reduce((a, b) => a + b, 0)
-  );
+  // 周一 23:45 起 25 分钟：起始于 23:30 格（47），跨到次日的部分归周二 00:00 格
+  const heat = halfHourMatrix([rec(at(2026, 9, 21, 23, 45), 1, 25)], range);
+  assert.equal(heat.rows.length, 7);
+  assert.equal(heat.rows[0].length, 48);
+  assert.ok(Math.abs(heat.rows[0][47] - 0.6) < 1e-9); // 23:45–24:00 共 15 分钟
+  assert.ok(Math.abs(heat.rows[1][0] - 0.4) < 1e-9); // 00:00–00:10 共 10 分钟
+  assert.ok(
+    Math.abs(
+      heat.rows.flat().reduce((a, b) => a + b, 0) - 1
+    ) < 1e-9
+  ); // 总量守恒
 });

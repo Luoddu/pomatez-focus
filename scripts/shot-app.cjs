@@ -590,6 +590,37 @@ app
         `(()=>{const b=[...document.querySelectorAll('.quick-counts .count-btn')];return b[1].classList.contains('selected')&&!b[0].classList.contains('selected')})()`
       ),
     });
+    // 主观感受：5 档可选、默认不选；选「难受」后该番茄应成为带刺番茄
+    results.push({
+      check: "review mood picker has five optional choices, none selected by default",
+      pass: await js(
+        `(()=>{const b=[...document.querySelectorAll('.mood-row .mood-btn')];return b.length===5&&b.every(x=>x.getAttribute('aria-pressed')==='false')&&b[0].getAttribute('aria-label')==='感受：很痛苦'&&b[4].getAttribute('aria-label')==='感受：很愉快'})()`
+      ),
+    });
+    await js(
+      `(()=>{[...document.querySelectorAll('.mood-row .mood-btn')].find(b=>b.getAttribute('aria-label')==='感受：难受').click()})()`
+    );
+    await wait(150);
+    results.push({
+      check: "mood selection toggles on and off",
+      pass: await js(
+        `(()=>{const b=[...document.querySelectorAll('.mood-row .mood-btn')].find(b=>b.getAttribute('aria-label')==='感受：难受');return b.getAttribute('aria-pressed')==='true'&&b.classList.contains('selected')})()`
+      ),
+    });
+    await js(
+      `(()=>{[...document.querySelectorAll('.mood-row .mood-btn')].find(b=>b.getAttribute('aria-label')==='感受：难受').click()})()`
+    );
+    await wait(150);
+    results.push({
+      check: "mood can be unselected back to skipped",
+      pass: await js(
+        `(()=>{const b=[...document.querySelectorAll('.mood-row .mood-btn')];return b.every(x=>x.getAttribute('aria-pressed')==='false')})()`
+      ),
+    });
+    await js(
+      `(()=>{[...document.querySelectorAll('.mood-row .mood-btn')].find(b=>b.getAttribute('aria-label')==='感受：难受').click()})()`
+    );
+    await wait(150);
     results.push({
       check: "save-and-next enabled when next pomodoro exists",
       pass: await js(
@@ -614,6 +645,18 @@ app
       `JSON.parse(localStorage.getItem('pomatez-focus-v1')).records.length`
     );
     results.push({ check: "save appends one record", pass: after === before + 1 });
+    results.push({
+      check: "saved record carries the chosen mood locally",
+      pass: await js(
+        `(()=>{const rs=JSON.parse(localStorage.getItem('pomatez-focus-v1')).records;return rs[0]&&rs[0].mood===-1})()`
+      ),
+    });
+    results.push({
+      check: "painful record shows a spiky tomato icon in the record list",
+      pass: await js(
+        `(()=>{const i=document.querySelector('.record .r-icon.spiky');return Boolean(i)&&Boolean(i.querySelector('svg'))&&(i.getAttribute('title')||'').includes('难受')})()`
+      ),
+    });
     results.push({
       check: "save shows info toast",
       pass: await js(
@@ -678,8 +721,15 @@ app
       ),
     });
     // 保存并休息 5 分钟：记录 +1，操作条出现绿色休息进度条，开始按钮禁用
+    // 新一轮结束确认页未选感受 → 该记录不落 mood 字段（可选不强制）
     await click("保存并休息 5 分钟");
     await wait(400);
+    results.push({
+      check: "save without mood selection stores no mood field",
+      pass: await js(
+        `(()=>{const rs=JSON.parse(localStorage.getItem('pomatez-focus-v1')).records;return rs[0]&&!('mood' in rs[0])})()`
+      ),
+    });
     results.push({
       check: "save-and-rest appends record and shows rest bar",
       pass:
@@ -746,15 +796,21 @@ app
     );
     await wait(400);
     results.push({
-      check: "stats page opens with four range tabs and five summary cards",
+      check: "stats page opens with four range tabs and one combined summary card",
       pass: await js(
-        `document.querySelectorAll('.stats-tab').length===4&&document.querySelectorAll('.stats-summary .stat').length===5`
+        `document.querySelectorAll('.stats-tab').length===4&&document.querySelectorAll('.stats-summary .st-row').length===5`
       ),
     });
     results.push({
-      check: "week stats: 7 bars and a vertical 7x24 hourly heat grid",
+      check: "week stats: three columns (summary+bars / heat / trio) and a 7x48 half-hour heat grid",
       pass: await js(
-        `document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length===7*24&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.dist-list li').length===9`
+        `(()=>{const g=document.querySelector('.stats-grid');const kids=g?[...g.children]:[];return kids.length===3&&kids[0].classList.contains('stats-col')&&kids[1].classList.contains('stats-heat')&&kids[2].classList.contains('stats-trio')&&document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length===7*48&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.dist-list li').length===9})()`
+      ),
+    });
+    results.push({
+      check: "spiky tomato count shows under quadrant distribution",
+      pass: await js(
+        `(()=>{const f=document.querySelector('.dist-foot');return Boolean(f)&&f.textContent.includes('带刺番茄')})()`
       ),
     });
     await shot("stats-week");
