@@ -198,7 +198,16 @@ const demoHistory = (): FocusSession[] => {
   return days.map(([ago, count]) => {
     const started = new Date();
     started.setDate(started.getDate() - ago);
-    started.setHours(10, 30, 0, 0);
+    // 上周的记录放晚间、其余放上午：统计页周视图可看到「产出重心从晚间移到上午」
+    const thisMonday = new Date();
+    thisMonday.setHours(0, 0, 0, 0);
+    thisMonday.setDate(
+      thisMonday.getDate() - ((thisMonday.getDay() + 6) % 7)
+    );
+    const lastWeek =
+      started.getTime() < thisMonday.getTime() &&
+      started.getTime() >= thisMonday.getTime() - 7 * 86400000;
+    started.setHours(lastWeek ? 20 : 10, 30, 0, 0);
     return {
       id: `demo-rec-${ago}`,
       task: demo[ago % demo.length],
@@ -1507,6 +1516,7 @@ export default function FocusApp() {
               notify(`本周目标达成 🍅（${total}/${goal}）`);
               playTimeUp();
             }}
+            onMilestone={(m) => notify(`第 ${m} 面小旗升起了`)}
             onOpenStats={() => setStatsOpen(true)}
             {...windowControls}
           />

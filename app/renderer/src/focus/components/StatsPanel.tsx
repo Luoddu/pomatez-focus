@@ -6,9 +6,11 @@ import {
   barBuckets,
   currentStreak,
   daypartSplit,
+  daypartTrend,
   halfHourMatrix,
   inRange,
   isCurrentRange,
+  periodDelta,
   rangeOf,
   shiftRange,
   summarize,
@@ -21,7 +23,7 @@ import {
   quadrantCounts,
 } from "../week";
 import { renderShareCardPng, shareCardModel } from "../shareCard";
-import { WindowControls, durationText } from "./shared";
+import { WindowControls, durationText, LogoIcon } from "./shared";
 
 const WEEK_CHARS = "一二三四五六日";
 
@@ -75,6 +77,17 @@ export default function StatsPanel({
   const current = isCurrentRange(range, now);
   const scoped = useMemo(() => inRange(records, range), [records, range]);
   const summary = useMemo(() => summarize(scoped), [scoped]);
+  // 上一周期（环比基线）：周 vs 上周、月 vs 上月，季/年同理
+  const prevRange = useMemo(() => shiftRange(range, -1), [range]);
+  const prevScoped = useMemo(
+    () => inRange(records, prevRange),
+    [records, prevRange]
+  );
+  const prevSummary = useMemo(() => summarize(prevScoped), [prevScoped]);
+  const prevDayparts = useMemo(
+    () => daypartSplit(halfHourMatrix(prevScoped, prevRange)),
+    [prevScoped, prevRange]
+  );
   // 连续天数是全历史口径（不只是当前区间），切换区间不跳动
   const streak = useMemo(() => currentStreak(records, now), [records, now]);
   const buckets = useMemo(
@@ -83,6 +96,11 @@ export default function StatsPanel({
   );
   const heat = useMemo(() => halfHourMatrix(scoped, range), [scoped, range]);
   const dayparts = useMemo(() => daypartSplit(heat), [heat]);
+  // 时段趋势：与上一周期相比的产出重心变化（算不出就不显示）
+  const partTrend = useMemo(
+    () => daypartTrend(dayparts, prevDayparts),
+    [dayparts, prevDayparts]
+  );
   // 带刺番茄：本期感受为难受/很痛苦的收获番茄数
   const spikyCount = useMemo(
     () =>
@@ -139,6 +157,18 @@ export default function StatsPanel({
       col: Math.min(47, d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0)),
     };
   })();
+  // 环比小块：▲ 升（番茄红）/ ▼ 降（中性灰）/ 持平；上期无数据不显示
+  const delta = (cur: number, prev: number) => {
+    const d = periodDelta(cur, prev);
+    if (!d) return null;
+    if (d.pct === 0) return <em className="delta flat">持平</em>;
+    return (
+      <em className={`delta ${d.pct > 0 ? "up" : "down"}`}>
+        {d.pct > 0 ? "▲" : "▼"} {d.pct > 0 ? "+" : ""}
+        {d.pct}%
+      </em>
+    );
+  };
   return (
     <main className="content stats-page">
       <div className="side-title">
@@ -189,7 +219,7 @@ export default function StatsPanel({
             title="导出当前区间的成就图（不含任何任务名）"
             onClick={onShare}
           >
-            📸 分享
+            分享
           </button>
           <button className="btn-text" onClick={onClose}>
             返回
@@ -205,40 +235,50 @@ export default function StatsPanel({
       </div>
       {summary.count === 0 ? (
         <div className="card stats-empty">
-          这个区间还没有收获 · 种一颗 25 分钟的番茄，下周再来看 🍅
+          这个区间还没有收获 · 种一颗 25 分钟的番茄，下周再来看
         </div>
       ) : (
         <div className="stats-grid">
           <div className="stats-col">
             <section className="card stats-card stats-summary">
-              <h3>🌾 区间合计</h3>
+              <h3>区间合计</h3>
               <div className="st-row">
                 <span>番茄</span>
-                <strong>{summary.count}</strong>
+                <strong>
+                  {summary.count}
+                  {delta(summary.count, prevSummary.count)}
+                </strong>
               </div>
               <div className="st-row">
                 <span>专注时长</span>
                 <strong className="long">
                   {durationText(summary.seconds)}
+                  {delta(summary.seconds, prevSummary.seconds)}
                 </strong>
               </div>
               <div className="st-row">
                 <span>活跃天数</span>
-                <strong>{summary.activeDays}</strong>
+                <strong>
+                  {summary.activeDays}
+                  {delta(summary.activeDays, prevSummary.activeDays)}
+                </strong>
               </div>
               <div className="st-row">
                 <span>日均番茄</span>
-                <strong>{summary.avgCount}</strong>
+                <strong>
+                  {summary.avgCount}
+                  {delta(summary.avgCount, prevSummary.avgCount)}
+                </strong>
               </div>
               <div className="st-row streak">
-                <span>🔥 连续收获</span>
+                <span>连续收获</span>
                 <strong data-tier={streak >= 7 ? "mid" : undefined}>
                   {streak} 天
                 </strong>
               </div>
             </section>
             <section className="card stats-card stats-bars">
-              <h3>🍅 {BAR_TITLE[rangeKey]}</h3>
+              <h3>{BAR_TITLE[rangeKey]}</h3>
             <div
               className={`bars${buckets.length > 14 ? " dense" : ""}`}
               role="img"
@@ -270,7 +310,7 @@ export default function StatsPanel({
             </section>
           </div>
           <section className="card stats-card stats-heat">
-            <h3>⏰ 时段热力</h3>
+            <h3>时段热力</h3>
             <div className="sh-grid">
               <span className="sh-corner" />
               {WEEK_CHARS.split("").map((w) => (
@@ -320,7 +360,7 @@ export default function StatsPanel({
           </section>
           <div className="stats-trio">
             <section className="card stats-card">
-              <h3>🧭 象限分布</h3>
+              <h3>象限分布</h3>
               <ul className="dist-list">
                 {QUADRANT_KEYS.map((k) => (
                   <li key={k}>
@@ -349,16 +389,16 @@ export default function StatsPanel({
                   className="dist-foot"
                   title="感受评为难受或很痛苦的收获番茄"
                 >
-                  🌵 带刺番茄 {spikyCount} 个 · 辛苦了，抱抱自己
+                  <LogoIcon size={12} spiky />
+                  带刺番茄 {spikyCount} 个 · 辛苦了，抱抱自己
                 </div>
               )}
             </section>
             <section className="card stats-card">
-              <h3>🕰️ 时段偏好</h3>
+              <h3>时段偏好</h3>
               <ul className="dist-list">
                 {dayparts.map((d) => (
                   <li key={d.key}>
-                    <i className="dist-icon">{d.icon}</i>
                     <span className="dist-name">
                       {d.label} <small>{d.hours}</small>
                     </span>
@@ -373,9 +413,12 @@ export default function StatsPanel({
                   </li>
                 ))}
               </ul>
+              {partTrend && (
+                <div className="dist-foot trend">{partTrend}</div>
+              )}
             </section>
             <section className="card stats-card">
-              <h3>✨ 高光时刻</h3>
+              <h3>高光时刻</h3>
               <ul className="glory-list">
                 <li>
                   <span className="glory-label">最佳一天</span>
@@ -399,7 +442,7 @@ export default function StatsPanel({
                 </li>
                 <li>
                   <span className="glory-label">连续收获</span>
-                  <strong>{streak > 0 ? `${streak} 天 🔥` : "—"}</strong>
+                  <strong>{streak > 0 ? `${streak} 天` : "—"}</strong>
                 </li>
                 <li>
                   <span className="glory-label">平均每活跃日</span>

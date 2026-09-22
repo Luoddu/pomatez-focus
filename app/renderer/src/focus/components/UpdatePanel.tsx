@@ -13,7 +13,7 @@ export default function UpdatePanel() {
     catch { setState((s: any) => ({...s, phase: "error", message: "操作未完成，请重试。"})); }
   };
   const busy = ["checking", "downloading", "installing"].includes(state.phase);
-  return <div className="card settings-card" aria-label="软件更新">
+  return <div className="card settings-card s-update" aria-label="软件更新">
     <h3>软件更新</h3>
     <p>当前版本 {state.currentVersion}{state.version && state.phase !== "current" ? ` · 新版本 ${state.version}` : ""}</p>
     {state.phase === "downloading" && <div aria-live="polite">

@@ -260,15 +260,14 @@ export function topTasks(records: FocusSession[], limit = 6): TopTask[] {
 export type Daypart = {
   key: "night" | "morning" | "afternoon" | "evening";
   label: string;
-  icon: string;
   hours: string;
   count: number; // 番茄数（跨格分摊可能带小数，展示层自行取整）
 };
 const DAYPART_DEFS: Omit<Daypart, "count">[] = [
-  { key: "night", label: "深夜", icon: "🌙", hours: "0–6 点" },
-  { key: "morning", label: "上午", icon: "🌅", hours: "6–12 点" },
-  { key: "afternoon", label: "下午", icon: "☀️", hours: "12–18 点" },
-  { key: "evening", label: "晚间", icon: "🌆", hours: "18–24 点" },
+  { key: "night", label: "深夜", hours: "0–6 点" },
+  { key: "morning", label: "上午", hours: "6–12 点" },
+  { key: "afternoon", label: "下午", hours: "12–18 点" },
+  { key: "evening", label: "晚间", hours: "18–24 点" },
 ];
 export function daypartSplit(heat: HeatMatrix): Daypart[] {
   return DAYPART_DEFS.map((def, i) => {
@@ -278,4 +277,40 @@ export function daypartSplit(heat: HeatMatrix): Daypart[] {
       for (let c = from; c < from + 12; c++) count += row[c];
     return { ...def, count };
   });
+}
+
+// ── 环比：与上一周期的差值百分比。上期无数据（≤0）时返回 null（宁缺毋滥） ──
+export function periodDelta(
+  current: number,
+  previous: number
+): { pct: number } | null {
+  if (!Number.isFinite(previous) || previous <= 0) return null;
+  if (!Number.isFinite(current)) return null;
+  return { pct: Math.round(((current - previous) / previous) * 100) };
+}
+
+// ── 时段趋势：与上期相比的产出重心变化。
+// 重心时段不同 → 「产出重心从 X 移到 Y」；重心相同但占比变化 ≥8 个百分点 →
+// 「X 产出占比 ±N 个百分点」；否则 null（数据不足或无变化时不显示） ──
+export function daypartTrend(cur: Daypart[], prev: Daypart[]): string | null {
+  const total = (ds: Daypart[]) => ds.reduce((a, d) => a + d.count, 0);
+  const tc = total(cur);
+  const tp = total(prev);
+  if (tc <= 0 || tp <= 0) return null;
+  const dominant = (ds: Daypart[], t: number) =>
+    ds.reduce(
+      (best, d) =>
+        d.count / t > best.share
+          ? { label: d.label, share: d.count / t }
+          : best,
+      { label: "", share: -1 }
+    );
+  const cTop = dominant(cur, tc);
+  const pTop = dominant(prev, tp);
+  if (cTop.label !== pTop.label)
+    return `产出重心从${pTop.label}移到${cTop.label}`;
+  const diff = Math.round((cTop.share - pTop.share) * 100);
+  if (Math.abs(diff) >= 8)
+    return `${cTop.label}产出占比 ${diff > 0 ? "+" : ""}${diff} 个百分点`;
+  return null;
 }

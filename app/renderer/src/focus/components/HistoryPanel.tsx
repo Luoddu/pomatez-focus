@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask, isSpikyMood, moodLabel } from "../session";
-import { QUADRANT_TONES, harvestTier, totalMilestone, TOTAL_MILESTONES, weekTomatoes } from "../week";
+import { QUADRANT_TONES, harvestTier, totalMilestone, TOTAL_MILESTONES, weekTomatoes, flagMarks, crossedFlags } from "../week";
 import {
   WEEK_GOAL_DEFAULT,
   goalFill,
@@ -108,6 +108,23 @@ const PencilIcon = () => (
   </svg>
 );
 
+// 里程碑小旗（inline SVG，非 emoji）：旗杆 + 旗面；未达成时旗面低垂在杆下半段
+const FlagIcon = ({ raised, big }: { raised: boolean; big?: boolean }) => (
+  <svg
+    width={big ? 12 : 9}
+    height={big ? 16 : 13}
+    viewBox="0 0 12 16"
+    aria-hidden="true"
+  >
+    <rect x="1.1" y="1" width="1.7" height="14" rx="0.85" fill="currentColor" />
+    {raised ? (
+      <path d="M2.8 1.6 L10.8 4.1 L2.8 6.7 Z" fill="currentColor" />
+    ) : (
+      <path d="M2.8 9.2 L10.8 11.7 L2.8 14.3 Z" fill="currentColor" />
+    )}
+  </svg>
+);
+
 export default function HistoryPanel({
   records,
   pendingCount,
@@ -131,6 +148,7 @@ export default function HistoryPanel({
   onTogglePin,
   onWeekGoalMet,
   onOpenStats,
+  onMilestone,
 }: {
   records: FocusSession[];
   pendingCount: number;
@@ -154,6 +172,7 @@ export default function HistoryPanel({
   onTogglePin: () => void;
   onWeekGoalMet?: (total: number, goal: number) => void;
   onOpenStats?: () => void;
+  onMilestone?: (milestone: number) => void;
 }) {
   const [entryOpen, setEntryOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<FocusSession | null>(
@@ -212,12 +231,31 @@ export default function HistoryPanel({
   // 不再塞进「总番茄」卡内——避免左卡多出两行、右卡留空行
   const totalMs = totalMilestone(totalTomatoes);
   const totalDone = totalMs.reached >= TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
+  // 轨道按绝对刻度 0→下一档，旗子每 25 个一面、终点大旗在 next
   const totalProgress = totalDone
     ? 100
-    : Math.round(
-        ((totalTomatoes - totalMs.reached) / (totalMs.next - totalMs.reached)) *
-          1000
-      ) / 10;
+    : Math.min(100, Math.round((totalTomatoes / totalMs.next) * 1000) / 10);
+  const flags = flagMarks(totalMs.next);
+  // 越过里程碑：本会话内从 below 到 ≥ 时旗子弹起一次并通知；挂载基线不补播
+  const [justRaised, setJustRaised] = useState<number | null>(null);
+  const milestoneBase = useRef<number | null>(null);
+  useEffect(() => {
+    if (milestoneBase.current === null) {
+      milestoneBase.current = totalTomatoes;
+      return;
+    }
+    const prev = milestoneBase.current;
+    milestoneBase.current = totalTomatoes;
+    const crossed = crossedFlags(prev, totalTomatoes);
+    if (!crossed.length) return;
+    const top = crossed[crossed.length - 1];
+    setJustRaised(top);
+    onMilestone?.(top);
+    const t = setTimeout(() => setJustRaised(null), 900);
+    return () => clearTimeout(t);
+    // flags/next 由 totalTomatoes 派生，只需盯总数
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalTomatoes]);
   const stats: {
     label: string;
     value: string;
@@ -325,19 +363,43 @@ export default function HistoryPanel({
             </div>
           ))}
         </div>
-        {/* 累计里程碑通栏：进度条 + 文案一整行，四张数字卡保持等高 */}
+        {/* 累计里程碑通栏：轨道 0→下一档，每 25 个一面小旗，终点大旗 */}
         <div
           className="card stat-totalbar"
           title={`总番茄 ${totalTomatoes} 个的成就进度`}
         >
-          <span className="stb-from">{totalMs.reached || 0}</span>
+          <span className="stb-from">0</span>
           <div className="stb-main">
             <div className="stb-track" aria-hidden="true">
               <i style={{ width: `${totalProgress}%` }} />
+              {flags.map((m) => (
+                <span
+                  key={m}
+                  className={`ms-flag${
+                    totalTomatoes >= m ? " raised" : ""
+                  }${justRaised === m ? " just-raised" : ""}`}
+                  style={{ left: `${(m / totalMs.next) * 100}%` }}
+                  title={`${m} 个番茄`}
+                >
+                  <FlagIcon raised={totalTomatoes >= m} />
+                </span>
+              ))}
+              <span
+                className={`ms-flag big${
+                  totalDone || totalTomatoes >= totalMs.next ? " raised" : ""
+                }${justRaised === totalMs.next ? " just-raised" : ""}`}
+                style={{ left: "100%" }}
+                title={`${totalMs.next} 个番茄（终点）`}
+              >
+                <FlagIcon
+                  raised={totalDone || totalTomatoes >= totalMs.next}
+                  big
+                />
+              </span>
             </div>
             <em>
               {totalDone
-                ? `🏆 已达成 ${totalMs.reached} 丰收传奇`
+                ? `已达成 ${totalMs.reached} 丰收传奇`
                 : totalMs.reached
                 ? `已达成 ${totalMs.reached} · 距 ${totalMs.next} 还差 ${
                     totalMs.next - totalTomatoes
@@ -347,7 +409,7 @@ export default function HistoryPanel({
                   }`}
             </em>
           </div>
-          <span className="stb-to">🚩 {totalMs.next}</span>
+          <span className="stb-to">{totalMs.next}</span>
         </div>
       </div>
       <div className="side-section">

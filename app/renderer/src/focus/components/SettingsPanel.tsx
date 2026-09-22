@@ -90,8 +90,76 @@ export default function SettingsPanel({
             onTogglePin={onTogglePin}
           />
         </div>
+        <div className="settings-cols">
+          <div className="settings-lane">
         <UpdatePanel />
-        <div className="card settings-card">
+        <div className="card settings-card s-sync">
+          <h3>同步状态</h3>
+          <div className="sync-row">
+            <span className="sync-text">待同步 {pendingCount} 条</span>
+            <div className="spacer" />
+            <button
+              className="btn-small outline"
+              disabled={busy || !connected || !pendingCount}
+              onClick={onRetrySync}
+            >
+              立即重试
+            </button>
+          </div>
+        </div>
+        <div className="card settings-card s-sound">
+          <h3>提示音</h3>
+          <div className="sync-row">
+            <span className="sync-text">
+              计时到点与休息结束时播放合成提示音
+            </span>
+            <div className="spacer" />
+            <button
+              type="button"
+              className={`btn-small outline sound-toggle${soundOn ? " on" : ""}`}
+              aria-pressed={soundOn}
+              onClick={() => {
+                const next = !soundOn;
+                setSoundEnabled(next);
+                setSoundOn(next);
+                if (next) playRestEnd();
+              }}
+            >
+              {soundOn ? "已开启" : "已关闭"}
+            </button>
+          </div>
+        </div>
+        <div className="card settings-card s-local">
+          <h3>本地番茄</h3>
+          <div className="sync-row">
+            <input
+              className="local-input"
+              placeholder="输入任务名称"
+              aria-label="本地任务名称"
+              value={localTitle}
+              onChange={(e) => onLocalTitle(e.target.value)}
+            />
+            <button
+              className="btn-small outline"
+              disabled={!localTitle.trim() || hasActive}
+              onClick={onAddLocal}
+            >
+              添加
+            </button>
+          </div>
+        </div>
+        <div className="card settings-card s-about">
+          <h3>关于</h3>
+          <div className="about-line">
+            版本 <span className="ver">0.1.0-preview.47</span>
+            <br />
+            基于开源项目 pomatez 二次开发（MIT License，© roldanjr
+            及贡献者）
+          </div>
+        </div>
+          </div>
+          <div className="settings-lane">
+        <div className="card settings-card s-conn">
           <h3>飞书连接</h3>
           <div className="conn-status">
             <span className={`dot ${connected ? "" : "off"}`} />
@@ -154,68 +222,6 @@ export default function SettingsPanel({
             确认时累计达到目标，会勾选对应番茄的已完成。自由番茄在同一张表新增一行。
           </div>
         </div>
-        <div className="card settings-card">
-          <h3>同步状态</h3>
-          <div className="sync-row">
-            <span className="sync-text">待同步 {pendingCount} 条</span>
-            <div className="spacer" />
-            <button
-              className="btn-small outline"
-              disabled={busy || !connected || !pendingCount}
-              onClick={onRetrySync}
-            >
-              立即重试
-            </button>
-          </div>
-        </div>
-        <div className="card settings-card">
-          <h3>提示音</h3>
-          <div className="sync-row">
-            <span className="sync-text">
-              计时到点与休息结束时播放合成提示音
-            </span>
-            <div className="spacer" />
-            <button
-              type="button"
-              className={`btn-small outline sound-toggle${soundOn ? " on" : ""}`}
-              aria-pressed={soundOn}
-              onClick={() => {
-                const next = !soundOn;
-                setSoundEnabled(next);
-                setSoundOn(next);
-                if (next) playRestEnd();
-              }}
-            >
-              {soundOn ? "已开启" : "已关闭"}
-            </button>
-          </div>
-        </div>
-        <div className="card settings-card">
-          <h3>本地番茄</h3>
-          <div className="sync-row">
-            <input
-              className="local-input"
-              placeholder="输入任务名称"
-              aria-label="本地任务名称"
-              value={localTitle}
-              onChange={(e) => onLocalTitle(e.target.value)}
-            />
-            <button
-              className="btn-small outline"
-              disabled={!localTitle.trim() || hasActive}
-              onClick={onAddLocal}
-            >
-              添加
-            </button>
-          </div>
-        </div>
-        <div className="card settings-card">
-          <h3>关于</h3>
-          <div className="about-line">
-            版本 <span className="ver">0.1.0-preview.47</span>
-            <br />
-            基于开源项目 pomatez 二次开发（MIT License，© roldanjr
-            及贡献者）
           </div>
         </div>
       </div>

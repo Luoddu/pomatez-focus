@@ -220,3 +220,21 @@ export function totalMilestone(total: number): {
   const idx = TOTAL_MILESTONES.findIndex((m) => m > n);
   return { reached, next: idx === -1 ? TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1] : TOTAL_MILESTONES[idx] };
 }
+
+// 里程碑小旗：进度条轨道上每 25 个番茄一面小旗，终点档（next）为终点大旗
+export const FLAG_STEP = 25;
+export function flagMarks(next: number): number[] {
+  const marks: number[] = [];
+  for (let m = FLAG_STEP; m < next; m += FLAG_STEP) marks.push(m);
+  return marks;
+}
+// 本次新增越过的旗子（25 倍数小旗 + 里程碑档），升序；无新增或倒退为空
+export function crossedFlags(prev: number, now: number): number[] {
+  const lo = Math.max(0, Math.floor(prev));
+  const hi = Math.max(0, Math.floor(now));
+  if (hi <= lo) return [];
+  const crossed = new Set<number>();
+  for (let m = FLAG_STEP; m <= hi; m += FLAG_STEP) if (m > lo) crossed.add(m);
+  for (const t of TOTAL_MILESTONES) if (t > lo && t <= hi) crossed.add(t);
+  return Array.from(crossed).sort((a, b) => a - b);
+}

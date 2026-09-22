@@ -51,7 +51,6 @@ export type ShareCardModel = {
   rangeName: string;
   rangeLabel: string;
   barTitle: string;
-  termEmoji: string;
   termName: string;
   termDay: number;
   count: number;
@@ -62,7 +61,7 @@ export type ShareCardModel = {
   goldenLabel: string | null; // 「周三 14:30」
   buckets: { label: string; count: number }[];
   heat: number[][]; // 7 × 48（行=周一..周日，列=0–24 点每半小时一格）
-  dayparts: { label: string; icon: string; count: number }[];
+  dayparts: { label: string; count: number }[];
   quads: { key: string; tone: string; count: number }[];
   totalAll: number;
   milestoneReached: number;
@@ -84,7 +83,6 @@ export function shareCardModel(
   const heat = halfHourMatrix(scoped, range);
   const dayparts = daypartSplit(heat).map((d) => ({
     label: d.label,
-    icon: d.icon,
     count: d.count,
   }));
   const quadCounts = quadrantCounts(scoped);
@@ -113,7 +111,6 @@ export function shareCardModel(
     rangeName: RANGE_NAME[range.key],
     rangeLabel: range.label,
     barTitle: BAR_TITLE[range.key],
-    termEmoji: term.emoji,
     termName: term.name,
     termDay: term.dayOfTerm,
     count: summary.count,
@@ -194,8 +191,8 @@ export function drawShareCard(
   g.fillStyle = "#c22f1f";
   g.font = `700 46px ${FONT}`;
   g.textBaseline = "alphabetic";
-  g.fillText("🍅 番茄农场", M, y + 12);
-  const pill = `${model.termEmoji} ${model.termName} · 第 ${model.termDay} 天`;
+  g.fillText("番茄农场", M, y + 12);
+  const pill = `${model.termName} · 第 ${model.termDay} 天`;
   g.font = `500 26px ${FONT}`;
   const pillW = g.measureText(pill).width + 56;
   g.fillStyle = "rgba(194, 47, 31, 0.08)";
@@ -226,7 +223,7 @@ export function drawShareCard(
   g.fillStyle = model.streak >= 3 ? "#e8a917" : "#a09385";
   g.font = `600 30px ${FONT}`;
   g.fillText(
-    model.streak > 0 ? `🔥 连续收获 ${model.streak} 天` : "种下第一颗番茄吧",
+    model.streak > 0 ? `连续收获 ${model.streak} 天` : "种下第一颗番茄吧",
     W - M,
     y + 42
   );
@@ -252,7 +249,7 @@ export function drawShareCard(
 
   // ── 收获柱状图（成就色：红系渐深、金系渐耀，复用 barTone 色板）──
   const barCardH = 340;
-  card(barCardH, `🍅 ${model.barTitle}`);
+  card(barCardH, model.barTitle);
   {
     const n = model.buckets.length;
     const plotW = CW - 80;
@@ -291,7 +288,7 @@ export function drawShareCard(
 
   // ── 时段热力（7 行星期 × 48 列半小时，纵轴星期、横轴 0–24 点）──
   const hmCardH = 380;
-  card(hmCardH, "⏰ 时段热力");
+  card(hmCardH, "时段热力");
   {
     const labelW = 46;
     const plotW = CW - 80 - labelW;
@@ -354,17 +351,15 @@ export function drawShareCard(
     g.shadowOffsetY = 0;
     g.fillStyle = "#6b5f54";
     g.font = `600 28px ${FONT}`;
-    g.fillText(side === 0 ? "🕰️ 时段偏好" : "🧭 象限分布", x + 34, y + 56);
+    g.fillText(side === 0 ? "时段偏好" : "象限分布", x + 34, y + 56);
     const items =
       side === 0
         ? model.dayparts.map((d) => ({
-            tag: d.icon,
             label: d.label,
             count: d.count,
             tone: "#e57368",
           }))
         : model.quads.map((q) => ({
-            tag: "",
             label: "",
             count: q.count,
             tone: q.tone,
@@ -378,7 +373,7 @@ export function drawShareCard(
       if (side === 0) {
         g.font = `400 24px ${FONT}`;
         g.fillStyle = "#7d7166";
-        g.fillText(`${it.tag} ${it.label}`, x + 34, ry + rh - 2);
+        g.fillText(it.label, x + 34, ry + rh - 2);
       } else {
         g.fillStyle = it.tone;
         g.beginPath();

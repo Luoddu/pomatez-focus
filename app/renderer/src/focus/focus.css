@@ -2228,10 +2228,11 @@ input:focus-visible {
   min-width: 0;
 }
 .stb-track {
+  position: relative;
   height: 5px;
   border-radius: 3px;
   background: #eef1f5;
-  overflow: hidden;
+  overflow: visible;
 }
 .stb-track i {
   display: block;
@@ -2547,10 +2548,13 @@ button.stats-range-label:hover {
   display: flex;
   flex-direction: column;
 }
+/* 统计页标题层级：小号加字距，纯文字无图标 */
 .stats-card h3 {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 14px;
 }
 /* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边；颜色由 barTone 连续渐变接管 */
 .bars {
@@ -2686,12 +2690,6 @@ button.stats-range-label:hover {
   border-radius: 50%;
   flex: none;
 }
-.dist-icon {
-  font-style: normal;
-  width: 16px;
-  text-align: center;
-  flex: none;
-}
 .dist-name {
   font-size: 13px;
   white-space: nowrap;
@@ -2787,4 +2785,119 @@ button.stats-range-label:hover {
 /* 带刺番茄记录行：图标轻微提示，不抢版面 */
 .r-icon.spiky {
   filter: saturate(0.92);
+}
+
+/* ── 里程碑小旗：轨道 0→下一档，每 25 个一面小旗，终点大旗 ── */
+.ms-flag {
+  position: absolute;
+  bottom: -3px;
+  transform: translateX(-50%);
+  color: #c8cdd5;
+  line-height: 0;
+  pointer-events: auto;
+}
+.ms-flag.raised {
+  color: var(--red);
+}
+.ms-flag.big {
+  color: #b6bdc7;
+  bottom: -5px;
+}
+.ms-flag.big.raised {
+  color: #d99a1f;
+}
+@keyframes ms-flag-raise {
+  0% {
+    transform: translateX(-50%) scaleY(0.2);
+  }
+  60% {
+    transform: translateX(-50%) scaleY(1.18);
+  }
+  100% {
+    transform: translateX(-50%) scaleY(1);
+  }
+}
+.ms-flag.just-raised {
+  transform-origin: bottom center;
+  animation: ms-flag-raise 0.45s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-flag.just-raised {
+    animation: none;
+  }
+}
+
+/* ── 环比小块：▲ 升（番茄红）/ ▼ 降（中性灰）/ 持平 ── */
+.delta {
+  margin-left: 8px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.delta.up {
+  color: #c22f1f;
+}
+.delta.down,
+.delta.flat {
+  color: var(--muted);
+}
+.stats-summary .st-row strong {
+  display: inline-flex;
+  align-items: baseline;
+}
+.dist-foot.trend {
+  color: #6b7280;
+}
+.dist-foot .r-icon,
+.dist-foot svg {
+  vertical-align: -2px;
+  margin-right: 5px;
+}
+
+/* ── 设置页：宽屏双列均衡（轻量卡左列、飞书连接长卡右列），窄窗单列原序 ── */
+.settings-cols,
+.settings-lane {
+  display: contents;
+}
+.settings-col .s-update {
+  order: 1;
+}
+.settings-col .s-conn {
+  order: 2;
+}
+.settings-col .s-sync {
+  order: 3;
+}
+.settings-col .s-sound {
+  order: 4;
+}
+.settings-col .s-local {
+  order: 5;
+}
+.settings-col .s-about {
+  order: 6;
+}
+@media (min-width: 1101px) and (orientation: landscape) {
+  .settings-col {
+    max-width: none;
+  }
+  .settings-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .settings-lane {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+}
+
+/* 旗子高出轨道，给通栏上部留位 */
+.stat-totalbar .stb-main {
+  padding-top: 12px;
 }
