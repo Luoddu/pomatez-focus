@@ -182,3 +182,51 @@ test("halfHourMatrix：7×48 半小时矩阵，深夜记录落在最后一格", 
     ) < 1e-9
   ); // 总量守恒
 });
+
+test("periodDelta：百分比环比；上期无数据/除零/持平的边界", async () => {
+  const { periodDelta } = await import("../app/renderer/src/focus/stats.ts");
+  assert.deepEqual(periodDelta(28, 25), { pct: 12 }); // +12%
+  assert.deepEqual(periodDelta(20, 25), { pct: -20 });
+  assert.deepEqual(periodDelta(25, 25), { pct: 0 });
+  assert.equal(periodDelta(28, 0), null); // 上期无数据不显示
+  assert.equal(periodDelta(28, -3), null);
+  assert.equal(periodDelta(28, NaN), null);
+  assert.equal(periodDelta(NaN, 25), null);
+});
+
+test("daypartTrend：重心转移 / 占比变化 / 数据不足时不显示", async () => {
+  const { daypartTrend, daypartSplit, halfHourMatrix, rangeOf } =
+    await import("../app/renderer/src/focus/stats.ts");
+  const now = at(2026, 9, 28, 15); // 2026-09-28 是周一，本周 9.28 起
+  const cur = rangeOf("week", now);
+  const prev = shiftRange(cur, -1);
+  // 本周上午、上周晚间 → 重心从晚间移到上午
+  const curHeat = halfHourMatrix([rec(at(2026, 9, 28, 10), 2)], cur);
+  const prevHeat = halfHourMatrix([rec(at(2026, 9, 22, 20), 3)], prev);
+  assert.equal(
+    daypartTrend(daypartSplit(curHeat), daypartSplit(prevHeat)),
+    "产出重心从晚间移到上午"
+  );
+  // 重心相同但占比显著变化（上午 50%→100%）
+  const curHeat2 = halfHourMatrix([rec(at(2026, 9, 28, 10), 4)], cur);
+  const prevHeat2 = halfHourMatrix(
+    [rec(at(2026, 9, 22, 9), 2), rec(at(2026, 9, 23, 20), 2)],
+    prev
+  );
+  const t2 = daypartTrend(daypartSplit(curHeat2), daypartSplit(prevHeat2));
+  assert.ok(t2 && t2.includes("上午产出占比") && t2.includes("+50"));
+  // 上期无数据 → null
+  assert.equal(
+    daypartTrend(daypartSplit(curHeat), daypartSplit(halfHourMatrix([], prev))),
+    null
+  );
+  // 重心相同且占比几乎不变 → null（宁缺毋滥）
+  const prevHeat3 = halfHourMatrix([rec(at(2026, 9, 22, 10), 3)], prev);
+  assert.equal(
+    daypartTrend(
+      daypartSplit(halfHourMatrix([rec(at(2026, 9, 28, 10), 3)], cur)),
+      daypartSplit(prevHeat3)
+    ),
+    null
+  );
+});

@@ -213,3 +213,22 @@ test("totalMilestone steps through achievement tiers and clamps", async () => {
   // 非法输入按 0 处理
   assert.deepEqual(totalMilestone(NaN), { reached: 0, next: 10 });
 });
+
+test("flagMarks：终点档之前每 25 个一面小旗", async () => {
+  const { flagMarks } = await import("../app/renderer/src/focus/week.ts");
+  assert.deepEqual(flagMarks(10), []); // 第一档 10 以内无小旗
+  assert.deepEqual(flagMarks(25), []);
+  assert.deepEqual(flagMarks(100), [25, 50, 75]);
+  assert.deepEqual(flagMarks(200), [25, 50, 75, 100, 125, 150, 175]);
+  assert.equal(flagMarks(200).length, 7); // 7 小旗 + 终点大旗 = 8 面
+});
+
+test("crossedFlags：越过的小旗与里程碑档，升序、去重、倒退为空", async () => {
+  const { crossedFlags } = await import("../app/renderer/src/focus/week.ts");
+  assert.deepEqual(crossedFlags(120, 128), [125]);
+  assert.deepEqual(crossedFlags(98, 102), [100]); // 里程碑档也是旗
+  assert.deepEqual(crossedFlags(90, 130), [100, 125]);
+  assert.deepEqual(crossedFlags(128, 120), []); // 减少不触发
+  assert.deepEqual(crossedFlags(128, 128), []);
+  assert.deepEqual(crossedFlags(9, 10), [10]); // 第一档 10
+});

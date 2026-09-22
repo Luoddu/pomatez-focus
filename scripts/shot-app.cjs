@@ -34,7 +34,10 @@ app
     });
     const errors = [];
     win.webContents.on("console-message", (_e, level, message) => {
-      if (level >= 3) errors.push(message);
+      if (level >= 3) {
+        errors.push(message);
+        console.error("[renderer-error]", message);
+      }
     });
     const js = (code) => win.webContents.executeJavaScript(code, true);
     const click = (text) =>
@@ -684,6 +687,21 @@ app
     });
     await shotClip("board-weekgoal-closeup", ".weekgoal");
     await shotClip("board-stats-countup", ".stat-grid");
+    // 里程碑小旗：轨道 0→下一档，每 25 个一面小旗 + 终点大旗，
+    // 已越过的升起（番茄红），未到的灰旗低垂；旗子是 SVG 不是 emoji
+    await shotClip("board-totalbar", ".stat-totalbar");
+    results.push({
+      check: "milestone flags line up every 25 with raised state matching total",
+      pass: await js(
+        `(()=>{const fs=[...document.querySelectorAll('.stat-totalbar .ms-flag')];const big=fs.filter(f=>f.classList.contains('big'));const small=fs.filter(f=>!f.classList.contains('big'));const toEl=document.querySelector('.stb-to'),ttEl=document.querySelector('[data-stat="总番茄"] strong');if(!toEl||!ttEl)return false;const next=Number(toEl.textContent);const total=Number(ttEl.textContent);const expectSmall=Math.floor((next-1)/25);return big.length===1&&small.length===expectSmall&&fs.every(f=>f.querySelector('svg'))&&small.every((f,i)=>Math.abs(parseFloat(f.style.left)-(i+1)*25/next*100)<0.01)&&small.every(f=>{const m=(f.getAttribute('title')||'').match(/\\d+/);if(!m)return false;return f.classList.contains('raised')===(Number(m[0])<=total)})&&big[0].classList.contains('raised')===(total>=next)})()`
+      ),
+    });
+    results.push({
+      check: "milestone bar text keeps reached/remaining wording without emoji",
+      pass: await js(
+        `(()=>{const em=document.querySelector('.stat-totalbar em');const re=/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/u;return Boolean(em)&&em.textContent.includes('距')&&!re.test(document.querySelector('.stat-totalbar').textContent)})()`
+      ),
+    });
     // 信息类 toast 约 3 秒自动消失
     await wait(3400);
     results.push({
@@ -813,6 +831,27 @@ app
         `(()=>{const f=document.querySelector('.dist-foot');return Boolean(f)&&f.textContent.includes('带刺番茄')})()`
       ),
     });
+    // 高级感：标题与条目纯文字、无 emoji、无位图图标
+    results.push({
+      check: "stats page headings and rows are emoji-free plain text",
+      pass: await js(
+        `(()=>{const re=/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}\\u{FE0F}]/u;const els=[...document.querySelectorAll('.stats-page h3,.stats-page .st-row span,.stats-page .st-row strong,.stats-page .dist-foot,.stats-page .share-btn,.stats-page .glory-label,.stats-page .glory-list strong,.stats-page .dist-name,.stats-page .sh-legend')];return els.length>15&&els.every(e=>!re.test(e.textContent))&&!document.querySelector('.stats-page .dist-icon')&&document.querySelectorAll('.stats-page img').length===0})()`
+      ),
+    });
+    // 环比：与上一周期对比的 ▲/▼ 出现在区间合计
+    results.push({
+      check: "summary rows show period-over-period delta arrows",
+      pass: await js(
+        `(()=>{const d=[...document.querySelectorAll('.st-row .delta')];return d.length>=3&&d.every(x=>/▲|▼|持平/.test(x.textContent))&&d.some(x=>x.classList.contains('up')||x.classList.contains('down'))})()`
+      ),
+    });
+    // 时段趋势：本周上午 vs 上周晚间 → 重心转移描述
+    results.push({
+      check: "daypart trend compares with previous period",
+      pass: await js(
+        `(()=>{const t=document.querySelector('.dist-foot.trend');return Boolean(t)&&t.textContent.includes('移到')})()`
+      ),
+    });
     await shot("stats-week");
     // 区间翻页：‹ 翻到上一周（出现「回到本周」提示），点区间标签回到当前周
     await js(
@@ -930,6 +969,25 @@ app
         `Boolean(document.querySelector('.settings-col .field-grid'))&&document.body.textContent.includes('基于开源项目 pomatez')`
       ),
     });
+    // 宽屏双列：等宽两列，左列轻量卡、右列飞书连接长表单
+    // （file:// 无 focusApi 时 UpdatePanel/.s-update 按设计不渲染，断言只锁定恒定渲染的卡）
+    results.push({
+      check: "wide settings uses two equal columns with the long form on the right",
+      pass: await js(
+        `(()=>{const c=document.querySelector('.settings-cols');if(!c)return false;if(!getComputedStyle(c).display.includes('grid'))return false;const lanes=c.querySelectorAll('.settings-lane');if(lanes.length!==2)return false;const a=lanes[0].getBoundingClientRect(),b=lanes[1].getBoundingClientRect();return Math.abs(a.width-b.width)<2&&a.right<=b.left+1&&Boolean(lanes[1].querySelector('.field-grid'))&&Boolean(lanes[0].querySelector('.s-sync'))&&Boolean(lanes[0].querySelector('.s-about'))})()`
+      ),
+    });
+    // 窄窗退回单列且保持原有顺序（飞书连接在同步状态之前，提示音/本地番茄/关于依次在后）
+    win.setContentSize(800, 800);
+    await wait(300);
+    results.push({
+      check: "narrow settings falls back to single column in original order",
+      pass: await js(
+        `(()=>{const c=document.querySelector('.settings-cols');if(!c)return false;if(getComputedStyle(c).display!=='contents')return false;const q=(s)=>document.querySelector(s);const conn=q('.s-conn'),sync=q('.s-sync'),sound=q('.s-sound'),local=q('.s-local'),about=q('.s-about');if(!conn||!sync||!sound||!local||!about)return false;const rc=conn.getBoundingClientRect(),rs=sync.getBoundingClientRect(),rd=sound.getBoundingClientRect(),rl=local.getBoundingClientRect(),ra=about.getBoundingClientRect();return rc.bottom<=rs.top+1&&rs.bottom<=rd.top+1&&rd.bottom<=rl.top+1&&rl.bottom<=ra.top+1})()`
+      ),
+    });
+    win.setContentSize(1280, 800);
+    await wait(300);
     // 提示音开关：默认开启，点击关闭并写入独立 key（不动专注记录键）
     results.push({
       check: "sound toggle visible and enabled by default",
