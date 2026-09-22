@@ -838,21 +838,30 @@ app
         `(()=>{const re=/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}\\u{FE0F}]/u;const els=[...document.querySelectorAll('.stats-page h3,.stats-page .st-row span,.stats-page .st-row strong,.stats-page .dist-foot,.stats-page .share-btn,.stats-page .glory-label,.stats-page .glory-list strong,.stats-page .dist-name,.stats-page .sh-legend')];return els.length>15&&els.every(e=>!re.test(e.textContent))&&!document.querySelector('.stats-page .dist-icon')&&document.querySelectorAll('.stats-page img').length===0})()`
       ),
     });
-    // 环比：与上一周期对比的 ▲/▼ 出现在区间合计
+    // 合计卡新排版：label 小灰字在上、数值行在下，左缘对齐（消除水平断裂）
     results.push({
-      check: "summary rows show period-over-period delta arrows",
+      check: "summary rows stack a small label above the big value, left aligned",
       pass: await js(
-        `(()=>{const d=[...document.querySelectorAll('.st-row .delta')];return d.length>=3&&d.every(x=>/▲|▼|持平/.test(x.textContent))&&d.some(x=>x.classList.contains('up')||x.classList.contains('down'))})()`
+        `(()=>{const rows=[...document.querySelectorAll('.stats-summary .st-row')];if(rows.length!==5)return false;return rows.every(r=>{const l=r.querySelector('.st-label'),v=r.querySelector('.st-value');if(!l||!v)return false;const lr=l.getBoundingClientRect(),vr=v.getBoundingClientRect();const s=v.querySelector('strong');return lr.bottom<=vr.top+1&&Math.abs(lr.left-vr.left)<2&&parseFloat(getComputedStyle(l).fontSize)<parseFloat(getComputedStyle(s).fontSize)})})()`
       ),
     });
-    // 时段趋势：本周上午 vs 上周晚间 → 重心转移描述
+    // 环比（Apple 训练负荷式滚动窗口）：周视图 = 近 7 天日均 vs 近 28 天日均，
+    // 每项带基准小灰字；demo 数据 34 天，周视图基准窗完整（28 天）
     results.push({
-      check: "daypart trend compares with previous period",
+      check: "summary rows show rolling-window deltas with baseline labels",
       pass: await js(
-        `(()=>{const t=document.querySelector('.dist-foot.trend');return Boolean(t)&&t.textContent.includes('移到')})()`
+        `(()=>{const d=[...document.querySelectorAll('.st-row .delta')];const b=[...document.querySelectorAll('.st-row .delta-base')];return d.length>=3&&b.length===d.length&&b.every(x=>/较近 28 天(日均|活跃率|活跃日均)/.test(x.textContent))&&d.every(x=>/▲|▼|持平/.test(x.textContent))&&d.some(x=>x.classList.contains('up')||x.classList.contains('down'))})()`
+      ),
+    });
+    // 时段趋势：滚动窗口口径（近 7 天 vs 近 28 天），行内注明窗口
+    results.push({
+      check: "daypart trend compares rolling windows and says so",
+      pass: await js(
+        `(()=>{const t=document.querySelector('.dist-foot.trend');if(!t||!t.textContent.includes('移到'))return false;const s=t.querySelector('small');return Boolean(s)&&/近 7 天 vs 近 28 天/.test(s.textContent)})()`
       ),
     });
     await shot("stats-week");
+    await shotClip("stats-summary-card", ".stats-summary");
     // 区间翻页：‹ 翻到上一周（出现「回到本周」提示），点区间标签回到当前周
     await js(
       `(()=>{[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='上一区间').click()})()`
@@ -883,6 +892,13 @@ app
         `(()=>{const n=document.querySelectorAll('.bars .bar-col').length;return n>=28&&n<=31&&document.querySelector('.bars').classList.contains('dense')})()`
       ),
     });
+    // 月视图基准窗降级：demo 数据共 34 天 < 名义 90 → 如实标注「较近 34 天」
+    results.push({
+      check: "month view degrades the baseline window to the available 34 days",
+      pass: await js(
+        `(()=>{const b=[...document.querySelectorAll('.st-row .delta-base')];return b.length>=3&&b.every(x=>x.textContent.includes('较近 34 天'))})()`
+      ),
+    });
     await shot("stats-month");
     await js(
       `(()=>{[...document.querySelectorAll('.stats-tab')].find(b=>b.textContent==='年').click()})()`
@@ -892,6 +908,13 @@ app
       check: "year stats: 12 monthly bars and golden-slot highlight",
       pass: await js(
         `document.querySelectorAll('.bars .bar-col').length===12&&document.querySelectorAll('.glory-list li').length===4`
+      ),
+    });
+    // 年视图数据不足（34 天 < 365+730 窗口）→ 不显示任何环比，杜绝误导
+    results.push({
+      check: "year view hides deltas when history is shorter than the window",
+      pass: await js(
+        `document.querySelectorAll('.stats-summary .delta').length===0&&document.querySelectorAll('.stats-summary .delta-base').length===0`
       ),
     });
     await shot("stats-year");

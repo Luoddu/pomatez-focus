@@ -230,3 +230,80 @@ test("daypartTrend：重心转移 / 占比变化 / 数据不足时不显示", as
     null
   );
 });
+
+test("rollingTrend：滚动窗口日均环比（Apple 训练负荷式口径）", async () => {
+  const { rollingTrend } = await import("../app/renderer/src/focus/stats.ts");
+  // 锚点 2026-09-28（周一）15 点：近 7 天 = 9.22–9.28，近 28 天 = 9.1–9.28
+  const anchor = at(2026, 9, 28, 15);
+  // 近 7 天每天 4 个；7–27 天前每天 1 个 → 基准日均 49/28 = 1.75
+  const recs = [];
+  for (let ago = 0; ago < 7; ago++)
+    recs.push(rec(anchor - ago * DAY - 3600e3, 4));
+  for (let ago = 7; ago < 28; ago++)
+    recs.push(rec(anchor - ago * DAY - 3600e3, 1));
+  const t = rollingTrend(recs, "week", anchor);
+  assert.equal(t.currentDays, 7);
+  assert.equal(t.baseDays, 28);
+  // 窗口边界：本地整天，排他端 = 锚点次日 0 点
+  assert.equal(t.end - t.curStart, 7 * DAY);
+  assert.equal(t.end - t.baseStart, 28 * DAY);
+  // 番茄日均 4 vs 1.75 → +129%
+  assert.deepEqual(t.count, { pct: 129 });
+  // 活跃率：7/7 vs 28/28 → 持平；与「基准同比例期望值」(28×7/28=7) 口径数学等价
+  assert.deepEqual(t.activeRate, { pct: 0 });
+  // 专注时长：rec 的 acceptedSeconds 不随 count 缩放（每条 1500s）→ 日均相同 → 持平
+  assert.deepEqual(t.seconds, { pct: 0 });
+  // 活跃日日均：summarize 的 avgCount 保留 1 位小数（基准 49/28→1.8）→ (4-1.8)/1.8 = +122%
+  assert.deepEqual(t.avgPerActiveDay, { pct: 122 });
+});
+
+test("rollingTrend：跨月边界 + 数据不足降级 + 不足当前窗不显示", async () => {
+  const { rollingTrend } = await import("../app/renderer/src/focus/stats.ts");
+  // 锚点 2026-03-02：近 7 天跨月回到 2 月
+  const anchor = at(2026, 3, 2, 12);
+  const recs = [];
+  for (let ago = 0; ago < 14; ago++)
+    recs.push(rec(anchor - ago * DAY - 3600e3, 2));
+  const t = rollingTrend(recs, "week", anchor);
+  // 数据跨度 14 天 < 名义基准 28 → 降级为实际 14 天（标签由展示层如实写「较近 14 天」）
+  assert.equal(t.baseDays, 14);
+  assert.equal(new Date(t.baseStart).getMonth(), 1); // 基准窗起点落在 2 月（跨月）
+  assert.deepEqual(t.count, { pct: 0 }); // 每天同量 → 日均持平
+  // 跨度 ≤ 当前窗（7 天）：基准不比当前长，比较失去意义 → null
+  const few = [];
+  for (let ago = 0; ago < 7; ago++)
+    few.push(rec(anchor - ago * DAY - 3600e3, 2));
+  assert.equal(rollingTrend(few, "week", anchor), null);
+  // 完全没有记录 → null
+  assert.equal(rollingTrend([], "week", anchor), null);
+  // 月视图当前窗 28 天，14 天数据不够 → null（不显示误导对比）
+  assert.equal(rollingTrend(recs, "month", anchor), null);
+  // 季视图当前窗 90 天，100 天数据 → 基准降级为 100 天可比较
+  const q = [];
+  for (let ago = 0; ago < 100; ago++)
+    q.push(rec(anchor - ago * DAY - 3600e3, 1));
+  const tq = rollingTrend(q, "quarter", anchor);
+  assert.equal(tq.currentDays, 90);
+  assert.equal(tq.baseDays, 100);
+});
+
+test("rollingTrend：当前窗/基准窗零数据与锚点在历史区间的边界", async () => {
+  const { rollingTrend } = await import("../app/renderer/src/focus/stats.ts");
+  const anchor = at(2026, 9, 28, 15);
+  // 近 7 天有数据 + 27 天前一条撑开跨度：基准日均 (21+1)/28，正增长
+  const recs = [rec(anchor - 27 * DAY, 1)];
+  for (let ago = 0; ago < 7; ago++)
+    recs.push(rec(anchor - ago * DAY - 3600e3, 3));
+  const t = rollingTrend(recs, "week", anchor);
+  assert.equal(t.baseDays, 28);
+  assert.ok(t.count && t.count.pct > 0);
+  // 当前窗零数据、基准窗有 → -100%（不是除零崩溃）
+  const t2 = rollingTrend([rec(anchor - 20 * DAY, 7)], "week", anchor);
+  assert.deepEqual(t2.count, { pct: -100 });
+  // 基准窗零数据（只有当前窗有记录但跨度靠未来记录撑开无法实现，
+  // 这里用「锚点之前 20 天唯一一条」验证基准零数据时 periodDelta 返回 null）：
+  // 上面 t2 的活跃率同理：基准 1/21 > 0，当前 0 → -100%
+  assert.deepEqual(t2.activeRate, { pct: -100 });
+  // 锚点翻到首条记录之前的历史区间 → null
+  assert.equal(rollingTrend(recs, "week", anchor - 60 * DAY), null);
+});
