@@ -57,11 +57,10 @@ export default function FocusTimer({
     : active.status === "paused"
     ? "已暂停"
     : "专注于当下";
-  // 进度弧随任务象限着色（与番茄园/记录列表同一取色口径），无象限保持主题蓝
-  const ringTone =
-    active.task.projectType || active.task.quadrant
-      ? tomatoTone(active.task)
-      : "#4c6fff";
+  // 进度弧随所属项目着色；项目未归类时保持主题蓝。
+  const ringTone = active.task.projectType
+    ? tomatoTone(active.task)
+    : "#4c6fff";
   return (
     <div className="left-col timing-left">
       <div className="timing-center">

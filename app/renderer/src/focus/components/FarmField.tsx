@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   PLANT_STAGES,
   TOMATO_TONES,
+  UNCLASSIFIED_TOMATO_TONE,
   Season,
   beijingHour,
   mixColor,
@@ -801,7 +802,8 @@ const Plant = ({
 // 收获筐：卡片左侧空白区（不压土壤带）。筐里果堆随累计收获逐层长高
 // （最多 21 颗六层堆尖），每收一颗新番茄从顶部弹跳入筐（key 重挂载触发
 // 一次性动画，老番茄不重播）；30/100 颗时两侧各多出一只小筐，堆尖之上挂
-// 金星级程碑旗（50/100/200/…）。准确数量以「累计收获 N」文字为准
+// 金星里程碑旗（50/100/200/…）。准确数量以「累计收获 N」文字为准，
+// 可见果实按最近 21 个已保存番茄的项目色排列。
 const PILE_CAP = 21;
 const pileSlots = (): [number, number][] => {
   const slots: [number, number][] = [];
@@ -889,6 +891,7 @@ const Pile = ({
   const sideBaskets = n >= 100 ? 2 : n >= 30 ? 1 : 0;
   return (
     <g className="farm-pile" transform="translate(44 118)">
+      <title>{`累计收获 ${n} 个；果筐显示最近 ${shown} 个番茄的项目颜色，浅灰色表示项目未归类`}</title>
       {/* 立在卡片留白上的淡淡地影，不接地壤带 */}
       <ellipse
         cx="6"
@@ -949,6 +952,16 @@ const Pile = ({
       <text className="farm-pile-text" x="6" y="18" textAnchor="middle">
         累计收获 {n}
       </text>
+      {n > PILE_CAP && (
+        <text
+          className="farm-pile-detail"
+          x="6"
+          y="29"
+          textAnchor="middle"
+        >
+          近 {shown} 颗配色
+        </text>
+      )}
     </g>
   );
 };
@@ -963,7 +976,7 @@ export default function FarmField({
   total: number;
   week: number;
   tones: string[]; // 本周保存记录的颜色序列
-  pileTones: string[]; // 累计保存记录的颜色序列
+  pileTones: string[]; // 最近至多 21 个已保存番茄的颜色序列
   now?: number;
 }) {
   // 天空实时性：无 ?farmNow mock 时每 60s（及窗口重新聚焦/恢复可见时）
@@ -1006,7 +1019,7 @@ export default function FarmField({
       ? `本周收获 ${week} 个 · 累计收获 ${total}`
       : `${harvest.stage} · 本周收获 ${week} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${total}`;
   const toneFrom = (list: string[]) => (k: number) =>
-    list.length ? list[k % list.length] : "#e57368";
+    list.length ? list[k % list.length] : UNCLASSIFIED_TOMATO_TONE;
   const fieldTone = toneFrom(tones);
   const pileTone = toneFrom(pileTones);
   // 红熟后超出的番茄摊成各株额外果实，靠前株优先

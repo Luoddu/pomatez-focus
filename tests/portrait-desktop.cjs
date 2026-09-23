@@ -30,9 +30,15 @@ const deadline = setTimeout(() => {
   app.exit(2);
 }, 45000);
 const dayMs = 24 * 60 * 60 * 1000;
-const seedRecord = (daysAgo, hour, title, quadrant) => ({
+const seedRecord = (daysAgo, hour, title, quadrant, projectType) => ({
   id: randomUUID(),
-  task: { id: `synthetic-${title}`, title, source: "local", quadrant },
+  task: {
+    id: `synthetic-${title}`,
+    title,
+    source: "local",
+    quadrant,
+    projectType,
+  },
   startedAt: Date.now() - daysAgo * dayMs - hour * 3600000,
   endedAt: Date.now() - daysAgo * dayMs - hour * 3600000 + 1500000,
   plannedSeconds: 1500,
@@ -43,7 +49,7 @@ const seedRecord = (daysAgo, hour, title, quadrant) => ({
   sync: "local",
 });
 const seedRecords = [
-  seedRecord(5, 4, "模拟任务甲", "iu"),
+  seedRecord(5, 4, "模拟任务甲", "iu", "delivery"),
   seedRecord(1, 5, "规划下一周任务", "uni"),
   seedRecord(1, 3, "整理待办事项", "unu"),
   seedRecord(3, 6, "阅读学习资料", "uni"),
@@ -118,6 +124,9 @@ app
       const lastH4=days[days.length-1].querySelector('h4').textContent;
       const previousH4=days[days.length-2].querySelector('h4').textContent;
       const invite=days[days.length-1].querySelector('.record-invite');
+      const categoryRecord=document.querySelector('.record .r-icon[title^="所属项目：项目交付"]');
+      const pileFruit=document.querySelector('.farm-pile ellipse[fill="url(#farm-tomato-delivery)"]');
+      const quadrantChip=document.querySelector('.quad-iu .chip:not(.selected)');
       return {direction:cs.flexDirection,
         columns:grid.gridTemplateColumns.split(' ').length,
         farmHeight:farm.height,barPosition:bar.position,
@@ -136,6 +145,9 @@ app
         taskFont:getComputedStyle(document.querySelector('.task:not(.complete) .task-name')).fontSize,
         doneFont:(document.querySelector('.task.complete .task-name')?getComputedStyle(document.querySelector('.task.complete .task-name')).fontSize:null),
         chipHeight:Math.round(document.querySelector('.chip').getBoundingClientRect().height),
+        categoryRecordTone:categoryRecord?.querySelector('stop')?.getAttribute('stop-color')||null,
+        pileShowsDelivery:!!pileFruit,
+        quadrantChipTone:quadrantChip?getComputedStyle(quadrantChip).backgroundColor:null,
         lastH4,previousH4,inviteText:invite?invite.textContent:null,
         todayEmpty:days[days.length-1].querySelectorAll('.record').length===0};
     })()`);
@@ -162,6 +174,14 @@ app
       assert.equal(portrait.doneFont, "19px");
       assert.ok(portrait.chipHeight >= 40, JSON.stringify(portrait));
     });
+    check(
+      "quadrant chips keep quadrant colors while harvests use project colors",
+      () => {
+        assert.equal(portrait.quadrantChipTone, "rgb(253, 236, 234)");
+        assert.equal(portrait.categoryRecordTone, "#f2cd73");
+        assert.equal(portrait.pileShowsDelivery, true);
+      }
+    );
     check(
       "portrait keeps the farm visible and the action bar sticky",
       () => {

@@ -92,8 +92,11 @@ import {
   QUADRANT_KEYS,
   QUADRANT_TONES,
   PROJECT_TONES,
+  UNCLASSIFIED_TOMATO_TONE,
   tomatoTone,
+  tomatoCategoryLabel,
   tomatoToneList,
+  recentTomatoToneList,
   quadrantCounts,
   weekQuadrants,
   quadrantToneList,
@@ -150,7 +153,7 @@ test("quadrantToneList interleaves quadrant tones round-robin for a mixed look",
     assert.match(QUADRANT_TONES[k], /^#[0-9a-f]{6}$/);
   assert.equal(QUADRANT_TONES.iu, "#e57368");
 });
-test("saved tomatoes use project snapshot; legacy tomatoes retain quadrant fallback", () => {
+test("saved tomatoes use project snapshot; unclassified records never borrow quadrant color", () => {
   const records = [
     {
       status: "saved",
@@ -169,9 +172,48 @@ test("saved tomatoes use project snapshot; legacy tomatoes retain quadrant fallb
   assert.deepEqual(tomatoToneList(records, mondayUtc), [
     PROJECT_TONES.longterm,
     PROJECT_TONES.longterm,
-    QUADRANT_TONES.inu,
+    UNCLASSIFIED_TOMATO_TONE,
   ]);
   assert.equal(tomatoToneList(records).length, 3);
+  assert.equal(
+    tomatoCategoryLabel(records[1].task),
+    "所属项目未归类（浅灰色）"
+  );
+});
+
+test("basket colors show the most recent saved tomatoes in time order", () => {
+  const records = [
+    {
+      status: "saved",
+      startedAt: 30,
+      completedCount: 2,
+      task: { projectType: "research" },
+    },
+    {
+      status: "saved",
+      startedAt: 10,
+      completedCount: 2,
+      task: { projectType: "delivery" },
+    },
+    {
+      status: "cancelled",
+      startedAt: 40,
+      completedCount: 3,
+      task: { projectType: "personal" },
+    },
+    {
+      status: "saved",
+      startedAt: 20,
+      completedCount: 2,
+      task: { quadrant: "iu" },
+    },
+  ];
+  assert.deepEqual(recentTomatoToneList(records, 3), [
+    UNCLASSIFIED_TOMATO_TONE,
+    PROJECT_TONES.research,
+    PROJECT_TONES.research,
+  ]);
+  assert.deepEqual(recentTomatoToneList(records, 0), []);
 });
 
 test("harvestTier tiers the day-total achievement display", () => {

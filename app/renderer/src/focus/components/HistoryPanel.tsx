@@ -7,6 +7,7 @@ import {
 } from "../session";
 import {
   tomatoTone,
+  tomatoCategoryLabel,
   harvestTier,
   totalMilestone,
   TOTAL_MILESTONES,
@@ -644,26 +645,17 @@ export default function HistoryPanel({
                 ) : (
                   <ul className="record-list">
                     {group.records.map((r) => {
-                      // 记录圆点按任务象限着色（与番茄园同一取数口径：
-                      // 记录里的任务快照，无象限归 free 中性色）
-                      const q =
-                        r.task?.quadrant === "iu" ||
-                        r.task?.quadrant === "inu" ||
-                        r.task?.quadrant === "uni" ||
-                        r.task?.quadrant === "unu"
-                          ? r.task.quadrant
-                          : "free";
                       return (
                         <li className="record" key={r.id}>
                           <span
-                            className={`r-icon tone-${q}${
+                            className={`r-icon${
                               isSpikyMood(r.mood) ? " spiky" : ""
                             }`}
-                            title={
+                            title={`${tomatoCategoryLabel(r.task)}${
                               r.mood != null
-                                ? `本次感受：${moodLabel(r.mood)}`
-                                : undefined
-                            }
+                                ? ` · 本次感受：${moodLabel(r.mood)}`
+                                : ""
+                            }`}
                           >
                             <LogoIcon
                               size={14}

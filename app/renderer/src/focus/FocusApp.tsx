@@ -39,7 +39,11 @@ import {
   groupTasks,
   parseTitle,
 } from "./components/shared";
-import { weekTomatoes, tomatoToneList } from "./week";
+import {
+  weekTomatoes,
+  tomatoToneList,
+  recentTomatoToneList,
+} from "./week";
 import { CompletionQueue } from "./completionQueue";
 import { playTimeUp } from "./sound";
 import {
@@ -394,14 +398,14 @@ export default function FocusApp() {
     () => weekTomatoes(shownRecords, farmNow ?? Date.now()),
     [shownRecords, farmNow]
   );
-  // 象限色序列：田里果实按本周收获分布；果筐堆按累计收获分布（与
-  // 「累计收获 N」口径一致，且不受星期几影响）
+  // 田里果实显示本周项目色；果筐总数仍是累计收获，最多 21 颗可见果实
+  // 显示最近收获的项目色，避免旧颜色长期占据整个果筐。
   const weekTones = useMemo(
     () => tomatoToneList(shownRecords, farmNow ?? Date.now()),
     [shownRecords, farmNow]
   );
   const pileTones = useMemo(
-    () => tomatoToneList(shownRecords),
+    () => recentTomatoToneList(shownRecords),
     [shownRecords]
   );
   const run = async (work: () => Promise<void>) => {

@@ -108,7 +108,7 @@ const GroupList = ({
                         <button
                           key={task.id}
                           className={`chip tone-${
-                            task.projectType || task.quadrant || "unu"
+                            task.quadrant || "unu"
                           } ${task.id === selected ? "selected" : ""} ${
                             task.kind === "pending" ? "pending" : ""
                           }`}

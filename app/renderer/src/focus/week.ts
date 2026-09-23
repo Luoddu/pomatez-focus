@@ -79,10 +79,9 @@ export function beijingHour(now: number): number {
   return shifted.getUTCHours() + shifted.getUTCMinutes() / 60;
 }
 
-// ── 象限番茄色（行为诱导：让重要象限的番茄一眼可辨）──
+// ── 四象限任务与统计色；果实单独使用下方的项目色 ──
 // iu 重要且紧急=红（主色）、inu 重要不紧急=黄、uni 紧急不重要=青、
-// unu 不紧急不重要=灰；自由番茄/无象限=青绿（无任务自然生长的中性色）。
-// 柔化版色板：色相不变、降饱和略提亮，果实以径向渐变+高光呈现立体感
+// unu 不紧急不重要=灰；free 为统计中的无象限分组。
 export type QuadrantKey = "iu" | "inu" | "uni" | "unu" | "free";
 export const QUADRANT_KEYS: QuadrantKey[] = [
   "iu",
@@ -106,19 +105,35 @@ export const PROJECT_TONES = {
   personal: "#70a5e9",
   misc: "#aab3bd",
 } as const;
-export type TomatoTone = QuadrantKey | keyof typeof PROJECT_TONES;
-export const TOMATO_TONES: Record<TomatoTone, string> = {
-  ...QUADRANT_TONES,
-  ...PROJECT_TONES,
+export const UNCLASSIFIED_TOMATO_TONE = "#d5dce3";
+export const PROJECT_LABELS: Record<
+  keyof typeof PROJECT_TONES,
+  string
+> = {
+  research: "科研",
+  delivery: "项目交付",
+  longterm: "长线作战",
+  software: "短线软件",
+  personal: "个人生活",
+  misc: "其他杂事",
 };
-export function tomatoTone(task?: {
-  projectType?: string;
-  quadrant?: string;
-}): string {
+export type TomatoTone = keyof typeof PROJECT_TONES | "unclassified";
+export const TOMATO_TONES: Record<TomatoTone, string> = {
+  ...PROJECT_TONES,
+  unclassified: UNCLASSIFIED_TOMATO_TONE,
+};
+export function tomatoTone(task?: { projectType?: string }): string {
   const project = task?.projectType as keyof typeof PROJECT_TONES;
   if (project && PROJECT_TONES[project]) return PROJECT_TONES[project];
-  const quadrant = task?.quadrant as QuadrantKey;
-  return QUADRANT_TONES[quadrant] || QUADRANT_TONES.free;
+  return UNCLASSIFIED_TOMATO_TONE;
+}
+export function tomatoCategoryLabel(task?: {
+  projectType?: string;
+}): string {
+  const project = task?.projectType as keyof typeof PROJECT_LABELS;
+  return project && PROJECT_LABELS[project]
+    ? `所属项目：${PROJECT_LABELS[project]}`
+    : "所属项目未归类（浅灰色）";
 }
 // 颜色线性混合：t=0 返回 a，t=1 返回 b（渐变高光/暗部用）
 export function mixColor(a: string, b: string, t: number): string {
@@ -192,8 +207,8 @@ export function quadrantToneList(
       }
   return list;
 }
-// Preserve each saved record's one-time category snapshot. Legacy records
-// without one retain their previous quadrant color.
+// Each saved record keeps its one-time project snapshot. Missing categories
+// stay visibly unclassified instead of masquerading as a quadrant/project.
 export function tomatoToneList(
   records: QuadrantRecord[],
   now?: number
@@ -211,6 +226,19 @@ export function tomatoToneList(
       list.push(tomatoTone(r.task));
   }
   return list;
+}
+
+// The pile has 21 visible fruit even when the lifetime total is larger.
+// Show the most recent actual harvests, regardless of incoming record order.
+export function recentTomatoToneList(
+  records: QuadrantRecord[],
+  limit = 21
+): string[] {
+  const count = Math.max(0, Math.floor(limit));
+  if (!count) return [];
+  return tomatoToneList(
+    records.slice().sort((a, b) => a.startedAt - b.startedAt)
+  ).slice(-count);
 }
 
 // 当日番茄数的成就感分级：<5 常规灰、5–9 番茄红加粗、≥10 金色加大
