@@ -1,4 +1,5 @@
 import { textValue } from "./plan";
+import { PROJECT_TYPES } from "./project";
 
 export const HISTORY_FIELD = "跨端专注记录";
 // Explicit whitelist: never serialize credentials, active timers or arbitrary IPC properties.
@@ -61,6 +62,11 @@ export function historyRecord(r: any, sourceKey: string): any {
     if (!["iu", "inu", "uni", "unu"].includes(r.task.quadrant))
       throw Error("跨端象限无效");
     task.quadrant = r.task.quadrant;
+  }
+  if (r.task.projectType != null) {
+    if (!PROJECT_TYPES.includes(r.task.projectType))
+      throw Error("跨端项目类型无效");
+    task.projectType = r.task.projectType;
   }
   if (r.task.kind === "free") task.kind = "free";
   const result: any = {
@@ -157,10 +163,24 @@ export function mergeHistory(
 ): string {
   const records = readHistory(raw, key),
     incoming = historyRecord(record, key);
-  const old = records.find((r) => r.id === incoming.id);
-  if (old && JSON.stringify(old) !== JSON.stringify(incoming))
-    throw Error("同一专注记录的跨端内容不同，请核对原电脑；未覆盖");
-  if (!old) records.push(incoming);
+  const index = records.findIndex((r) => r.id === incoming.id);
+  const old = records[index];
+  if (old) {
+    const withoutType = (r: any) => {
+      const copy = structuredClone(r);
+      delete copy.task.projectType;
+      return JSON.stringify(copy);
+    };
+    if (
+      withoutType(old) !== withoutType(incoming) ||
+      (old.task.projectType &&
+        incoming.task.projectType &&
+        old.task.projectType !== incoming.task.projectType)
+    )
+      throw Error("同一专注记录的跨端内容不同，请核对原电脑；未覆盖");
+    if (!old.task.projectType && incoming.task.projectType)
+      records[index] = incoming;
+  } else records.push(incoming);
   const result = JSON.stringify({
     version: 1,
     records: records.sort((a, b) => a.id.localeCompare(b.id)),

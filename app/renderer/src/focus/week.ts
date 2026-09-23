@@ -37,7 +37,11 @@ export function beijingWeekStart(now: number): number {
 
 // 本周已完成番茄数：只统计已保存且开始时间落在本周窗口内的记录
 export function weekTomatoes(
-  records: { status: string; startedAt: number; completedCount?: number }[],
+  records: {
+    status: string;
+    startedAt: number;
+    completedCount?: number;
+  }[],
   now: number
 ): number {
   const start = beijingWeekStart(now);
@@ -80,7 +84,13 @@ export function beijingHour(now: number): number {
 // unu 不紧急不重要=灰；自由番茄/无象限=青绿（无任务自然生长的中性色）。
 // 柔化版色板：色相不变、降饱和略提亮，果实以径向渐变+高光呈现立体感
 export type QuadrantKey = "iu" | "inu" | "uni" | "unu" | "free";
-export const QUADRANT_KEYS: QuadrantKey[] = ["iu", "inu", "uni", "unu", "free"];
+export const QUADRANT_KEYS: QuadrantKey[] = [
+  "iu",
+  "inu",
+  "uni",
+  "unu",
+  "free",
+];
 export const QUADRANT_TONES: Record<QuadrantKey, string> = {
   iu: "#e57368",
   inu: "#f2cd73",
@@ -88,6 +98,28 @@ export const QUADRANT_TONES: Record<QuadrantKey, string> = {
   unu: "#aab3bd",
   free: "#92c883",
 };
+export const PROJECT_TONES = {
+  research: "#e57368",
+  delivery: "#f2cd73",
+  longterm: "#78bd82",
+  software: "#ae90d8",
+  personal: "#70a5e9",
+  misc: "#aab3bd",
+} as const;
+export type TomatoTone = QuadrantKey | keyof typeof PROJECT_TONES;
+export const TOMATO_TONES: Record<TomatoTone, string> = {
+  ...QUADRANT_TONES,
+  ...PROJECT_TONES,
+};
+export function tomatoTone(task?: {
+  projectType?: string;
+  quadrant?: string;
+}): string {
+  const project = task?.projectType as keyof typeof PROJECT_TONES;
+  if (project && PROJECT_TONES[project]) return PROJECT_TONES[project];
+  const quadrant = task?.quadrant as QuadrantKey;
+  return QUADRANT_TONES[quadrant] || QUADRANT_TONES.free;
+}
 // 颜色线性混合：t=0 返回 a，t=1 返回 b（渐变高光/暗部用）
 export function mixColor(a: string, b: string, t: number): string {
   const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
@@ -104,7 +136,7 @@ type QuadrantRecord = {
   status: string;
   startedAt: number;
   completedCount?: number;
-  task?: { quadrant?: string };
+  task?: { quadrant?: string; projectType?: string };
 };
 // 象限取数口径：直接用 saved 记录里的任务快照 task.quadrant（计时开始时
 // 从任务列表带入），缺失或非四象限值一律归入 free 中性色
@@ -122,7 +154,9 @@ export function quadrantCounts(
     if (r.status !== "saved") continue;
     const q = r.task?.quadrant;
     const key: QuadrantKey =
-      q === "iu" || q === "inu" || q === "uni" || q === "unu" ? q : "free";
+      q === "iu" || q === "inu" || q === "uni" || q === "unu"
+        ? q
+        : "free";
     counts[key] += r.completedCount || 0;
   }
   return counts;
@@ -158,6 +192,26 @@ export function quadrantToneList(
       }
   return list;
 }
+// Preserve each saved record's one-time category snapshot. Legacy records
+// without one retain their previous quadrant color.
+export function tomatoToneList(
+  records: QuadrantRecord[],
+  now?: number
+): string[] {
+  const start = now == null ? null : beijingWeekStart(now);
+  const list: string[] = [];
+  for (const r of records) {
+    if (
+      r.status !== "saved" ||
+      (start != null &&
+        (r.startedAt < start || r.startedAt >= start + 7 * DAY_MS))
+    )
+      continue;
+    for (let i = 0; i < (r.completedCount || 0); i++)
+      list.push(tomatoTone(r.task));
+  }
+  return list;
+}
 
 // 当日番茄数的成就感分级：<5 常规灰、5–9 番茄红加粗、≥10 金色加大
 export function harvestTier(count: number): "" | "mid" | "high" {
@@ -169,7 +223,11 @@ export function harvestTier(count: number): "" | "mid" | "high" {
 // 柱状图连续成就色（不用文字图例，颜色本身说话）：
 // 1–9 个在番茄红谱系内越收越深（浅鲑红→深绯红）；≥10 个进入金色谱系，
 // 收得越多金色越亮、光晕越大（闪耀感随数量连续增强，而不是只有一档金）
-export type BarTone = { top: string; bottom: string; glow: string | null };
+export type BarTone = {
+  top: string;
+  bottom: string;
+  glow: string | null;
+};
 export function barTone(count: number): BarTone {
   if (count >= 10) {
     const t = Math.min(1, (count - 10) / 10); // 10 → 20+ 渐强
@@ -209,7 +267,9 @@ export function beijingMonth(now: number): number {
 }
 
 // 累计收获的里程碑（总番茄的成就刻度）：返回已达成的最大里程碑与下一档
-export const TOTAL_MILESTONES = [10, 25, 50, 100, 200, 300, 500, 1000] as const;
+export const TOTAL_MILESTONES = [
+  10, 25, 50, 100, 200, 300, 500, 1000,
+] as const;
 export function totalMilestone(total: number): {
   reached: number; // 已达成档（0 = 还没到 10）
   next: number; // 下一档（全部达成后仍返回最后一档）
@@ -218,7 +278,13 @@ export function totalMilestone(total: number): {
   let reached = 0;
   for (const m of TOTAL_MILESTONES) if (n >= m) reached = m;
   const idx = TOTAL_MILESTONES.findIndex((m) => m > n);
-  return { reached, next: idx === -1 ? TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1] : TOTAL_MILESTONES[idx] };
+  return {
+    reached,
+    next:
+      idx === -1
+        ? TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1]
+        : TOTAL_MILESTONES[idx],
+  };
 }
 
 // 里程碑小旗：进度条轨道上每 25 个番茄一面小旗，终点档（next）为终点大旗
@@ -234,7 +300,9 @@ export function crossedFlags(prev: number, now: number): number[] {
   const hi = Math.max(0, Math.floor(now));
   if (hi <= lo) return [];
   const crossed = new Set<number>();
-  for (let m = FLAG_STEP; m <= hi; m += FLAG_STEP) if (m > lo) crossed.add(m);
-  for (const t of TOTAL_MILESTONES) if (t > lo && t <= hi) crossed.add(t);
+  for (let m = FLAG_STEP; m <= hi; m += FLAG_STEP)
+    if (m > lo) crossed.add(m);
+  for (const t of TOTAL_MILESTONES)
+    if (t > lo && t <= hi) crossed.add(t);
   return Array.from(crossed).sort((a, b) => a - b);
 }

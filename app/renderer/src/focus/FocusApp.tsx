@@ -39,12 +39,7 @@ import {
   groupTasks,
   parseTitle,
 } from "./components/shared";
-import {
-  weekTomatoes,
-  weekQuadrants,
-  quadrantCounts,
-  quadrantToneList,
-} from "./week";
+import { weekTomatoes, tomatoToneList } from "./week";
 import { CompletionQueue } from "./completionQueue";
 import { playTimeUp } from "./sound";
 import {
@@ -402,14 +397,11 @@ export default function FocusApp() {
   // 象限色序列：田里果实按本周收获分布；果筐堆按累计收获分布（与
   // 「累计收获 N」口径一致，且不受星期几影响）
   const weekTones = useMemo(
-    () =>
-      quadrantToneList(
-        weekQuadrants(shownRecords, farmNow ?? Date.now())
-      ),
+    () => tomatoToneList(shownRecords, farmNow ?? Date.now()),
     [shownRecords, farmNow]
   );
   const pileTones = useMemo(
-    () => quadrantToneList(quadrantCounts(shownRecords)),
+    () => tomatoToneList(shownRecords),
     [shownRecords]
   );
   const run = async (work: () => Promise<void>) => {
@@ -546,7 +538,7 @@ export default function FocusApp() {
     setCompletedTouched(true);
     setCompleted(value);
   };
-  const sync = async () => {
+  const sync = async (classify = false) => {
     if (
       !connected ||
       !sourceKey ||
@@ -620,6 +612,17 @@ export default function FocusApp() {
           .getSnapshot()
           .records.some((r) => eligible(r) && !attempted.has(r.id))
       );
+      if (classify && api().classifyHistory) {
+        try {
+          const result = await api().classifyHistory();
+          if (result.skipped)
+            failures.push(
+              `${result.skipped} 条旧记录没有唯一可识别的项目类型，沿用原色。`
+            );
+        } catch (e: any) {
+          failures.push(`旧番茄分类未完成：${e.message || "请重试"}`);
+        }
+      }
       const remote = await api().history();
       if (remote.sourceKey !== sourceKey)
         throw Error("飞书连接已变化，请重新同步");
@@ -1493,7 +1496,7 @@ export default function FocusApp() {
             syncBusy={syncBusy}
             onSync={() => {
               if (sourceKey) editQueue.retry(sourceKey);
-              sync();
+              sync(true);
             }}
             tasks={boardTasks}
             onAddManual={timer.addManual}

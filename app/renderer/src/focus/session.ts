@@ -1,4 +1,11 @@
 export type FocusQuadrant = "iu" | "inu" | "uni" | "unu";
+export type ProjectType =
+  | "research"
+  | "delivery"
+  | "longterm"
+  | "software"
+  | "personal"
+  | "misc";
 export type FocusTask = {
   id: string;
   title: string;
@@ -19,11 +26,18 @@ export type FocusTask = {
   plannedToday?: number;
   // iu=重要且紧急 inu=重要不紧急 uni=紧急不重要 unu=不紧急不重要; 缺省=未分类
   quadrant?: FocusQuadrant;
+  // Saved with the session; later changes to a project's category do not
+  // recolor an existing tomato.
+  projectType?: ProjectType;
 };
 // 主观感受（结束确认页可选填写）：-2 很痛苦 … +2 很愉快。
 // 只存本地记录，不上传飞书；旧记录无此字段按未填写处理。
 export type Mood = -2 | -1 | 0 | 1 | 2;
-export const MOOD_OPTIONS: { value: Mood; label: string; emoji: string }[] = [
+export const MOOD_OPTIONS: {
+  value: Mood;
+  label: string;
+  emoji: string;
+}[] = [
   { value: -2, label: "很痛苦", emoji: "😣" },
   { value: -1, label: "难受", emoji: "😖" },
   { value: 0, label: "平静", emoji: "😐" },
@@ -33,9 +47,12 @@ export const MOOD_OPTIONS: { value: Mood; label: string; emoji: string }[] = [
 export const moodLabel = (mood?: number) =>
   MOOD_OPTIONS.find((o) => o.value === mood)?.label;
 // 难受/很痛苦档 = 带刺番茄
-export const isSpikyMood = (mood?: number) => mood != null && mood <= -1;
+export const isSpikyMood = (mood?: number) =>
+  mood != null && mood <= -1;
 const validMood = (mood: unknown): mood is Mood =>
-  Number.isInteger(mood) && (mood as number) >= -2 && (mood as number) <= 2;
+  Number.isInteger(mood) &&
+  (mood as number) >= -2 &&
+  (mood as number) <= 2;
 
 export type FocusSession = {
   id: string;

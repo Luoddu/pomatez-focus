@@ -131,6 +131,7 @@ else {
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
       handler("history", () => service.history());
+      handler("classifyHistory", () => service.classifyHistory());
       handler("archiveHistory", (value) =>
         service.archiveHistory(value)
       );

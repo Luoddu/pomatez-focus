@@ -91,6 +91,9 @@ test("beijingHour drives the sky regardless of machine timezone", () => {
 import {
   QUADRANT_KEYS,
   QUADRANT_TONES,
+  PROJECT_TONES,
+  tomatoTone,
+  tomatoToneList,
   quadrantCounts,
   weekQuadrants,
   quadrantToneList,
@@ -134,16 +137,41 @@ test("weekQuadrants applies the Beijing week window before grouping", () => {
 });
 test("quadrantToneList interleaves quadrant tones round-robin for a mixed look", () => {
   // 轮转交错：即使 iu 占多数，前几个果实也是混色
-  assert.deepEqual(quadrantToneList({ iu: 2, inu: 1, uni: 0, unu: 1, free: 0 }), [
-    "iu",
-    "inu",
-    "unu",
-    "iu",
-  ]);
-  assert.deepEqual(quadrantToneList({ iu: 0, inu: 0, uni: 0, unu: 0, free: 0 }), []);
+  assert.deepEqual(
+    quadrantToneList({ iu: 2, inu: 1, uni: 0, unu: 1, free: 0 }),
+    ["iu", "inu", "unu", "iu"]
+  );
+  assert.deepEqual(
+    quadrantToneList({ iu: 0, inu: 0, uni: 0, unu: 0, free: 0 }),
+    []
+  );
   // 五个象限键都有稳定色值，红=重要且紧急
-  for (const k of QUADRANT_KEYS) assert.match(QUADRANT_TONES[k], /^#[0-9a-f]{6}$/);
+  for (const k of QUADRANT_KEYS)
+    assert.match(QUADRANT_TONES[k], /^#[0-9a-f]{6}$/);
   assert.equal(QUADRANT_TONES.iu, "#e57368");
+});
+test("saved tomatoes use project snapshot; legacy tomatoes retain quadrant fallback", () => {
+  const records = [
+    {
+      status: "saved",
+      startedAt: mondayUtc,
+      completedCount: 2,
+      task: { projectType: "longterm", quadrant: "iu" },
+    },
+    {
+      status: "saved",
+      startedAt: mondayUtc,
+      completedCount: 1,
+      task: { quadrant: "inu" },
+    },
+  ];
+  assert.equal(tomatoTone(records[0].task), PROJECT_TONES.longterm);
+  assert.deepEqual(tomatoToneList(records, mondayUtc), [
+    PROJECT_TONES.longterm,
+    PROJECT_TONES.longterm,
+    QUADRANT_TONES.inu,
+  ]);
+  assert.equal(tomatoToneList(records).length, 3);
 });
 
 test("harvestTier tiers the day-total achievement display", () => {
@@ -172,8 +200,12 @@ test("barTone：红色随数量渐深、金色随数量渐亮且光晕渐强", a
 });
 
 test("seasonOfMonth maps Beijing calendar months to farm seasons", async () => {
-  const { seasonOfMonth, beijingMonth, totalMilestone, TOTAL_MILESTONES } =
-    await import("../app/renderer/src/focus/week.ts");
+  const {
+    seasonOfMonth,
+    beijingMonth,
+    totalMilestone,
+    TOTAL_MILESTONES,
+  } = await import("../app/renderer/src/focus/week.ts");
   // 春 3–5 月（month 2..4）、夏 6–8（5..7）、秋 9–11（8..10）、冬 12–2（11,0,1）
   assert.equal(seasonOfMonth(2), "spring");
   assert.equal(seasonOfMonth(4), "spring");
@@ -190,7 +222,9 @@ test("seasonOfMonth maps Beijing calendar months to farm seasons", async () => {
 });
 
 test("beijingMonth reads the UTC+8 calendar month regardless of machine timezone", async () => {
-  const { beijingMonth } = await import("../app/renderer/src/focus/week.ts");
+  const { beijingMonth } = await import(
+    "../app/renderer/src/focus/week.ts"
+  );
   // 北京时间 2026-03-01 00:30 = UTC 2026-02-28 16:30：UTC 月还是 2 月，北京已 3 月
   assert.equal(beijingMonth(Date.UTC(2026, 1, 28, 16, 30, 0)), 2);
   // 北京时间 2026-01-31 20:00 = UTC 2026-01-31 12:00
@@ -209,13 +243,18 @@ test("totalMilestone steps through achievement tiers and clamps", async () => {
   assert.deepEqual(totalMilestone(109), { reached: 100, next: 200 });
   // 超过最高档后不再上涨，进度条按满格处理
   const last = TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
-  assert.deepEqual(totalMilestone(last + 500), { reached: last, next: last });
+  assert.deepEqual(totalMilestone(last + 500), {
+    reached: last,
+    next: last,
+  });
   // 非法输入按 0 处理
   assert.deepEqual(totalMilestone(NaN), { reached: 0, next: 10 });
 });
 
 test("flagMarks：终点档之前每 25 个一面小旗", async () => {
-  const { flagMarks } = await import("../app/renderer/src/focus/week.ts");
+  const { flagMarks } = await import(
+    "../app/renderer/src/focus/week.ts"
+  );
   assert.deepEqual(flagMarks(10), []); // 第一档 10 以内无小旗
   assert.deepEqual(flagMarks(25), []);
   assert.deepEqual(flagMarks(100), [25, 50, 75]);
@@ -224,7 +263,9 @@ test("flagMarks：终点档之前每 25 个一面小旗", async () => {
 });
 
 test("crossedFlags：越过的小旗与里程碑档，升序、去重、倒退为空", async () => {
-  const { crossedFlags } = await import("../app/renderer/src/focus/week.ts");
+  const { crossedFlags } = await import(
+    "../app/renderer/src/focus/week.ts"
+  );
   assert.deepEqual(crossedFlags(120, 128), [125]);
   assert.deepEqual(crossedFlags(98, 102), [100]); // 里程碑档也是旗
   assert.deepEqual(crossedFlags(90, 130), [100, 125]);

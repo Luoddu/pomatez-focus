@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { FocusTask, FocusQuadrant } from "../session";
 import QuickTaskEntry from "./QuickTaskEntry";
-import { QuadrantKey } from "../week";
 import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import { chipWindow } from "../chipWindow";
 import FarmField from "./FarmField";
@@ -109,7 +108,7 @@ const GroupList = ({
                         <button
                           key={task.id}
                           className={`chip tone-${
-                            task.quadrant || "unu"
+                            task.projectType || task.quadrant || "unu"
                           } ${task.id === selected ? "selected" : ""} ${
                             task.kind === "pending" ? "pending" : ""
                           }`}
@@ -282,8 +281,8 @@ export default function QuadrantBoard({
   restSeconds: number;
   totalTomatoes: number;
   weekTomatoes: number;
-  weekTones: QuadrantKey[];
-  pileTones: QuadrantKey[];
+  weekTones: string[];
+  pileTones: string[];
   farmNow?: number;
   onAdjust?: (taskId: string, delta: 1 | -1) => void;
   adjusting: string;

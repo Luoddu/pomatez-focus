@@ -27,7 +27,16 @@ function cleanRows(value: unknown, sourceKey: string): FocusTask[] {
       v.sourceKey !== sourceKey ||
       (v.kind !== undefined && !["done", "free"].includes(v.kind)) ||
       (v.quadrant !== undefined &&
-        !["iu", "inu", "uni", "unu"].includes(v.quadrant))
+        !["iu", "inu", "uni", "unu"].includes(v.quadrant)) ||
+      (v.projectType !== undefined &&
+        ![
+          "research",
+          "delivery",
+          "longterm",
+          "software",
+          "personal",
+          "misc",
+        ].includes(v.projectType))
     )
       throw Error("Invalid task");
     ids.add(v.id);
@@ -74,6 +83,7 @@ function cleanRows(value: unknown, sourceKey: string): FocusTask[] {
     }
     if (v.kind) row.kind = v.kind;
     if (v.quadrant) row.quadrant = v.quadrant;
+    if (v.projectType) row.projectType = v.projectType;
     return row;
   });
 }

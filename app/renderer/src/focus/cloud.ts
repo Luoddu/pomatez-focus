@@ -32,6 +32,12 @@ export function mergeCloudRecords(
         throw Error("相同记录 ID 属于不同飞书表，未合并");
       const oldRevision = old.revision || 0,
         incomingRevision = r.revision || 0;
+      if (
+        old.task.projectType &&
+        r.task.projectType &&
+        old.task.projectType !== r.task.projectType
+      )
+        throw Error("同一条专注的项目类型快照不同，未覆盖");
       if (!Number.isInteger(incomingRevision) || incomingRevision < 0)
         throw Error("云端记录版本无效");
       if (incomingRevision < oldRevision) continue;
@@ -60,11 +66,18 @@ export function mergeCloudRecords(
         )
           throw Error("修改记录的任务关联不符，未覆盖");
         // 主观感受只存本机、不上云：远端覆盖时保留本地已填的 mood
+        const updated =
+          old.task.projectType && !r.task.projectType
+            ? {
+                ...r,
+                task: { ...r.task, projectType: old.task.projectType },
+              }
+            : r;
         byId.set(
           r.id,
-          r.mood === undefined && old.mood !== undefined
-            ? { ...r, mood: old.mood }
-            : r
+          updated.mood === undefined && old.mood !== undefined
+            ? { ...updated, mood: old.mood }
+            : updated
         );
         continue;
       }
@@ -96,7 +109,15 @@ export function mergeCloudRecords(
           if (old.task[key] !== r.task[key])
             throw Error("同一条专注的任务关联或象限不同，未覆盖");
     }
-    byId.set(r.id, r);
+    byId.set(
+      r.id,
+      old && old.task.projectType && !r.task.projectType
+        ? {
+            ...r,
+            task: { ...r.task, projectType: old.task.projectType },
+          }
+        : r
+    );
   }
   return Array.from(byId.values()).sort(
     (a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id)

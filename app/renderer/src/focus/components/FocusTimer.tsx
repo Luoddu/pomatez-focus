@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask } from "../session";
-import { QUADRANT_TONES } from "../week";
+import { tomatoTone } from "../week";
 import { Ring, clock, parseTitle, quadrantMeta } from "./shared";
 
 export default function FocusTimer({
@@ -58,9 +58,10 @@ export default function FocusTimer({
     ? "已暂停"
     : "专注于当下";
   // 进度弧随任务象限着色（与番茄园/记录列表同一取色口径），无象限保持主题蓝
-  const ringTone = active.task.quadrant
-    ? QUADRANT_TONES[active.task.quadrant]
-    : "#4c6fff";
+  const ringTone =
+    active.task.projectType || active.task.quadrant
+      ? tomatoTone(active.task)
+      : "#4c6fff";
   return (
     <div className="left-col timing-left">
       <div className="timing-center">
@@ -76,7 +77,9 @@ export default function FocusTimer({
               <>
                 <div
                   ref={descRef}
-                  className={`ct-description${expanded ? " expanded" : ""}`}
+                  className={`ct-description${
+                    expanded ? " expanded" : ""
+                  }`}
                 >
                   {active.task.description}
                 </div>

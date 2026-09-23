@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   PLANT_STAGES,
-  QUADRANT_TONES,
-  QuadrantKey,
+  TOMATO_TONES,
   Season,
   beijingHour,
   mixColor,
@@ -47,7 +46,7 @@ const rand = (i: number, salt: number) => {
 // 仓库验收要求哑光无白色高光点（scripts/shot-app.cjs），立体感靠
 // 渐变压深 + 每颗果实的确定性形态微差（大小/椭圆比/倾角/萼片）呈现
 const TOMATO_GRADS: [string, string][] = [
-  ...(Object.entries(QUADRANT_TONES) as [string, string][]),
+  ...(Object.entries(TOMATO_TONES) as [string, string][]),
   ["unripe", "#7fbf6b"],
 ];
 const GRAD_BY_TONE: Record<string, string> = Object.fromEntries(
@@ -963,8 +962,8 @@ export default function FarmField({
 }: {
   total: number;
   week: number;
-  tones: QuadrantKey[]; // 本周收获的象限色序列（田里果实用）
-  pileTones: QuadrantKey[]; // 累计收获的象限色序列（果筐堆用）
+  tones: string[]; // 本周保存记录的颜色序列
+  pileTones: string[]; // 累计保存记录的颜色序列
   now?: number;
 }) {
   // 天空实时性：无 ?farmNow mock 时每 60s（及窗口重新聚焦/恢复可见时）
@@ -1006,9 +1005,8 @@ export default function FarmField({
     harvest.plants === 0
       ? `本周收获 ${week} 个 · 累计收获 ${total}`
       : `${harvest.stage} · 本周收获 ${week} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${total}`;
-  // 象限色按下标循环取近似比例；无记录时回退经典番茄红
-  const toneFrom = (list: QuadrantKey[]) => (k: number) =>
-    list.length ? QUADRANT_TONES[list[k % list.length]] : "#e57368";
+  const toneFrom = (list: string[]) => (k: number) =>
+    list.length ? list[k % list.length] : "#e57368";
   const fieldTone = toneFrom(tones);
   const pileTone = toneFrom(pileTones);
   // 红熟后超出的番茄摊成各株额外果实，靠前株优先

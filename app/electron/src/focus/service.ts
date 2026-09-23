@@ -202,6 +202,30 @@ export class FocusService {
   history() {
     return this.connected().history();
   }
+  async classifyHistory() {
+    if (this.planWriting) throw Error("正在写入番茄计划，请稍候");
+    this.planWriting = true;
+    try {
+      this.cryptoReady();
+      const client = this.connected();
+      const backup = await client.historyFieldBackup();
+      const directory = path.join(app.getPath("userData"), "backups");
+      fs.mkdirSync(directory, { recursive: true });
+      const target = path.join(
+        directory,
+        `project-colors-before-${backup.sourceKey.slice(0, 16)}.enc`
+      );
+      if (!fs.existsSync(target))
+        fs.writeFileSync(
+          target,
+          safeStorage.encryptString(JSON.stringify(backup)),
+          { flag: "wx", mode: 0o600 }
+        );
+      return await client.classifyHistory();
+    } finally {
+      this.planWriting = false;
+    }
+  }
   async archiveHistory(value: any) {
     if (this.planWriting) throw Error("正在写入番茄计划，请稍候");
     this.planWriting = true;

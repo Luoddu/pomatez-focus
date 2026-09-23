@@ -6,7 +6,7 @@ import {
   moodLabel,
 } from "../session";
 import {
-  QUADRANT_TONES,
+  tomatoTone,
   harvestTier,
   totalMilestone,
   TOTAL_MILESTONES,
@@ -667,7 +667,7 @@ export default function HistoryPanel({
                           >
                             <LogoIcon
                               size={14}
-                              tone={QUADRANT_TONES[q]}
+                              tone={tomatoTone(r.task)}
                               spiky={isSpikyMood(r.mood)}
                             />
                           </span>

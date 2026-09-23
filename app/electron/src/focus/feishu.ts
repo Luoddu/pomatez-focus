@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { projectTypeOf, ProjectType } from "./project";
 import {
   MOVE_FIELD,
   readMove,
@@ -390,6 +391,43 @@ export class Feishu {
     } catch {
       return null;
     }
+  }
+  private async projectTypesByTask(taskTable: string, taskRows: any[]) {
+    const result = new Map<string, ProjectType>();
+    const taskFields = await this.list(
+      `${this.root()}/tables/${id(taskTable)}/fields`
+    );
+    const links = taskFields.filter((f) => f.field_name === "所属项目");
+    if (
+      links.length !== 1 ||
+      ![18, 21].includes(links[0].type) ||
+      !links[0].property?.table_id
+    )
+      return result;
+    const projectTable = links[0].property.table_id;
+    const projectPath = `${this.root()}/tables/${id(projectTable)}`;
+    const projectFields = await this.list(`${projectPath}/fields`);
+    const types = projectFields.filter(
+      (f) => f.field_name === "项目类型"
+    );
+    if (types.length !== 1 || types[0].type !== 3) return result;
+    const projects = new Map(
+      (await this.list(`${projectPath}/records`)).map((r) => [
+        r.record_id,
+        r,
+      ])
+    );
+    for (const task of taskRows) {
+      const refs = linkedRecordIds(
+        task.fields?.["所属项目"],
+        projectTable
+      );
+      if (refs.length !== 1) continue;
+      const label = plain(projects.get(refs[0])?.fields?.["项目类型"]);
+      const type = projectTypeOf(label);
+      if (type) result.set(task.record_id, type);
+    }
+    return result;
   }
   async correctRecord(input: any) {
     const key = connectionKey(this.config);
@@ -1355,6 +1393,14 @@ export class Feishu {
           ))
         : null;
     const linkedById = new Map(linked.map((r) => [r.record_id, r]));
+    // Project category is optional display metadata. Missing or ambiguous
+    // relationships leave the previous quadrant coloring in place.
+    const projectTypes =
+      linkedTable && linked.length
+        ? await this.projectTypesByTask(linkedTable, linked).catch(
+            () => new Map()
+          )
+        : new Map<string, ProjectType>();
     const titles = new Map(
       linked.map((r) => [
         r.record_id,
@@ -1405,6 +1451,9 @@ export class Feishu {
         ...(free ? { kind: "free" } : {}),
         // 象限缺失或标签无法识别时归入“不紧急不重要”
         quadrant: quadrant || "unu",
+        ...(refs.length === 1 && projectTypes.has(refs[0])
+          ? { projectType: projectTypes.get(refs[0]) }
+          : {}),
         ...(h ? { doneToday: h.done, plannedToday: h.planned } : {}),
       };
     });
@@ -1432,6 +1481,9 @@ export class Feishu {
         sourceKey: connectionKey(this.config),
         kind: "done",
         quadrant: taskQuadrant(refs) || "unu",
+        ...(refs.length === 1 && projectTypes.has(refs[0])
+          ? { projectType: projectTypes.get(refs[0]) }
+          : {}),
         doneToday: h.done,
         plannedToday: h.planned,
       } as any);
@@ -1879,6 +1931,100 @@ export class Feishu {
     if (textValue(actual?.fields?.[HISTORY_FIELD]) !== merged)
       throw Error("跨端记录回读不符，请重新同步");
     return { ...snapshot, syncedPlanId: planId, cloudSynced: true };
+  }
+
+  // One-time, App-managed classification of existing shared records. Only
+  // HISTORY_FIELD is written; elapsed time, completion and links stay intact.
+  async historyFieldBackup() {
+    const schema = await this.planSchema();
+    const key = connectionKey(this.config);
+    const rows = await this.list(`${schema.path}/records`);
+    return {
+      version: 1,
+      sourceKey: key,
+      rows: rows.map((row) => {
+        const history = textValue(row.fields?.[HISTORY_FIELD]);
+        readHistory(history, key);
+        return { id: row.record_id, history };
+      }),
+    };
+  }
+
+  async classifyHistory() {
+    const schema = await this.planSchema();
+    const column = schema.fields.filter(
+      (f) => f.field_name === HISTORY_FIELD
+    );
+    if (column.length !== 1 || column[0].type !== 1)
+      throw Error("跨端专注记录字段不符，未归类旧番茄");
+    const taskTable = schema.fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    if (!taskTable) throw Error("关联任务表不明确，未归类旧番茄");
+    const rows = await this.list(`${schema.path}/records`);
+    const tasks = await this.list(
+      `${this.root()}/tables/${id(taskTable)}/records`
+    );
+    const categories = await this.projectTypesByTask(taskTable, tasks);
+    const key = connectionKey(this.config);
+    const changes: {
+      planId: string;
+      before: string;
+      after: string;
+      count: number;
+    }[] = [];
+    let skipped = 0;
+    // Validate every envelope before the first write. A malformed row cannot
+    // be rewritten from a lossy interpretation.
+    for (const row of rows) {
+      const before = textValue(row.fields?.[HISTORY_FIELD]);
+      const records = readHistory(before, key);
+      if (!records.length) continue;
+      const refs = linkedRecordIds(
+        row.fields?.[this.config.taskField],
+        taskTable
+      );
+      let count = 0;
+      for (const record of records) {
+        if (record.task.projectType) continue;
+        const taskId = record.task.taskId;
+        if (
+          refs.length !== 1 ||
+          refs[0] !== taskId ||
+          !categories.has(taskId)
+        ) {
+          skipped++;
+          continue;
+        }
+        record.task.projectType = categories.get(taskId);
+        count++;
+      }
+      if (!count) continue;
+      const after = JSON.stringify({ version: 1, records });
+      if (after.length > 70000)
+        throw Error("旧番茄分类超过跨端字段容量，未继续写入");
+      changes.push({ planId: row.record_id, before, after, count });
+    }
+    let classified = 0;
+    for (const change of changes) {
+      const route = `${schema.path}/records/${id(change.planId)}`;
+      const latest = (await this.call("GET", route)).data?.record;
+      if (textValue(latest?.fields?.[HISTORY_FIELD]) !== change.before)
+        throw Error("另一台电脑已更新跨端记录，请重新同步");
+      await this.call("PUT", route, {
+        fields: { [HISTORY_FIELD]: change.after },
+      });
+      const actual = (await this.call("GET", route)).data?.record;
+      if (textValue(actual?.fields?.[HISTORY_FIELD]) !== change.after)
+        throw Error("旧番茄分类回读不符，请重新同步");
+      if (
+        readHistory(actual.fields[HISTORY_FIELD], key).length !==
+        readHistory(change.before, key).length
+      )
+        throw Error("旧番茄记录数量回读不符，请核对");
+      classified += change.count;
+    }
+    return { classified, skipped };
   }
 
   async history() {

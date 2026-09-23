@@ -421,6 +421,36 @@ input:focus-visible {
   border-color: #aab3bd;
   color: #7d8790;
 }
+.chip.tone-research {
+  background: #fdecea;
+  border-color: #e57368;
+  color: #cf5446;
+}
+.chip.tone-delivery {
+  background: #fdf6e3;
+  border-color: #e0b64f;
+  color: #b98f2c;
+}
+.chip.tone-longterm {
+  background: #eaf6e9;
+  border-color: #78bd82;
+  color: #43894b;
+}
+.chip.tone-software {
+  background: #f3ecfa;
+  border-color: #ae90d8;
+  color: #7654a0;
+}
+.chip.tone-personal {
+  background: #eaf2fd;
+  border-color: #70a5e9;
+  color: #477bc0;
+}
+.chip.tone-misc {
+  background: #f2f4f6;
+  border-color: #aab3bd;
+  color: #7d8790;
+}
 .chip:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);

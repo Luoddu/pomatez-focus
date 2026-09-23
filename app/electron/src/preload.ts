@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("focusApi", {
   setup: () => invoke("setup"),
   sync: (value: any) => invoke("sync", value),
   history: () => invoke("history"),
+  classifyHistory: () => invoke("classifyHistory"),
   archiveHistory: (value: any) => invoke("archiveHistory", value),
   backupHistory: (value: any) => invoke("backupHistory", value),
   windowMode: (value: any) => invoke("windowMode", value),

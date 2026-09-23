@@ -49,6 +49,31 @@ const r = (id, count = 3) => ({
   sync: "synced",
   cloudSynced: true,
 });
+test("cloud color enrichment is idempotent and a fixed category cannot change", () => {
+  const old = r("color");
+  const colored = {
+    ...old,
+    task: { ...old.task, projectType: "research" },
+  };
+  const first = mergeCloudRecords([old], [colored], "base");
+  assert.equal(first.length, 1);
+  assert.equal(first[0].task.projectType, "research");
+  assert.deepEqual(mergeCloudRecords(first, [old], "base"), first);
+  assert.throws(
+    () =>
+      mergeCloudRecords(
+        first,
+        [
+          {
+            ...colored,
+            task: { ...colored.task, projectType: "delivery" },
+          },
+        ],
+        "base"
+      ),
+    /项目类型/
+  );
+});
 test("merge deduplicates exact records, retains local/other-Base data, and has stable totals", () => {
   const local = [
     r("a"),
