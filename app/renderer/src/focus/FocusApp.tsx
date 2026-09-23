@@ -616,12 +616,14 @@ export default function FocusApp() {
           .getSnapshot()
           .records.some((r) => eligible(r) && !attempted.has(r.id))
       );
+      let classified = 0;
       if (classify && api().classifyHistory) {
         try {
           const result = await api().classifyHistory();
+          classified = result.classified;
           if (result.skipped)
             failures.push(
-              `${result.skipped} 条旧记录没有唯一可识别的项目类型，沿用原色。`
+              `${result.skipped} 条旧记录的项目关联不完整或与原记录不符，暂保持浅灰色。`
             );
         } catch (e: any) {
           failures.push(`旧番茄分类未完成：${e.message || "请重试"}`);
@@ -639,6 +641,8 @@ export default function FocusApp() {
       notify(
         failures.length
           ? `已同步可处理的成果，仍有待处理项：${failures[0]}`
+          : classified
+          ? `已同步，并为 ${classified} 条旧记录补上项目颜色。`
           : "专注成果已同步，其他电脑同步后即可查看。",
         failures.length ? "error" : "info"
       );

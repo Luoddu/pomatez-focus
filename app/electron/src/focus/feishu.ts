@@ -1394,7 +1394,7 @@ export class Feishu {
         : null;
     const linkedById = new Map(linked.map((r) => [r.record_id, r]));
     // Project category is optional display metadata. Missing or ambiguous
-    // relationships leave the previous quadrant coloring in place.
+    // relationships remain visibly unclassified in tomato displays.
     const projectTypes =
       linkedTable && linked.length
         ? await this.projectTypesByTask(linkedTable, linked).catch(
@@ -1988,15 +1988,21 @@ export class Feishu {
       for (const record of records) {
         if (record.task.projectType) continue;
         const taskId = record.task.taskId;
+        // Early snapshots can omit taskId even though their original plan row
+        // still has exactly one task. Trust that link only when the snapshot
+        // itself identifies this same plan; never infer a category from title.
+        const samePlan = record.task.planId
+          ? record.task.planId === row.record_id
+          : record.task.id === row.record_id;
         if (
           refs.length !== 1 ||
-          refs[0] !== taskId ||
-          !categories.has(taskId)
+          (taskId ? refs[0] !== taskId : !samePlan) ||
+          !categories.has(refs[0])
         ) {
           skipped++;
           continue;
         }
-        record.task.projectType = categories.get(taskId);
+        record.task.projectType = categories.get(refs[0]);
         count++;
       }
       if (!count) continue;

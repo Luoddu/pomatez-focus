@@ -73,10 +73,10 @@ test("weekHarvest maps weekly count to plants and real tomato growth stages", ()
   // 24 个：全部进入「成株」
   assert.deepEqual(weekHarvest(24).steps, Array(8).fill(3));
   assert.equal(weekHarvest(24).stage, "成株");
-  // 满负荷一周约 60 个：全部红熟且有富余果实
+  // 满负荷一周约 60 个：全部成熟且有富余果实
   const full = weekHarvest(60);
   assert.deepEqual(full.steps, Array(8).fill(PLANT_STAGES.length));
-  assert.equal(full.stage, "红熟");
+  assert.equal(full.stage, "成熟");
   assert.equal(full.bonus, 60 - 8 * PLANT_STAGES.length);
   // 非法输入按空地处理
   assert.equal(weekHarvest(NaN).plants, 0);

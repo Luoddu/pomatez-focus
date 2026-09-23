@@ -349,20 +349,20 @@ app
         `(()=>{const p=document.querySelector('.term-pill');const s=document.querySelector('.farm-scene');if(!p||!s||!s.dataset.term)return false;return p.textContent.includes(s.dataset.term)&&p.textContent.includes('第')&&p.title.includes('天后交')})()`
       ),
     });
-    // 象限着色：果筐堆按累计象限分布混色（红/黄/青渐变里至少看到黄和青）
+    // 演示记录没有项目快照，应保持未归类色；页面不展示内部配色口径。
     results.push({
       check:
-        "harvest pile mixes quadrant gradient tones from cumulative records",
+        "unclassified demo tomatoes stay neutral without a technical pile label",
       pass: await js(
-        `(()=>{const p=document.querySelector('.farm-pile');return Boolean(p)&&p.innerHTML.includes('url(#farm-tomato-inu)')&&p.innerHTML.includes('url(#farm-tomato-uni)')&&p.innerHTML.includes('url(#farm-tomato-iu)')})()`
+        `(()=>{const p=document.querySelector('.farm-pile');return Boolean(p)&&p.innerHTML.includes('url(#farm-tomato-unclassified)')&&!p.textContent.includes('颗配色')})()`
       ),
     });
-    // 柔化色板 + 哑光径向渐变：场景内有 6 只番茄渐变 defs，色值来自新色板
+    // 项目色板 + 哑光径向渐变：演示记录可以中性，但定义仍备齐项目色。
     results.push({
       check:
-        "farm tomatoes render as radial gradients from the softened palette",
+        "farm tomatoes render project and neutral radial gradients",
       pass: await js(
-        `(()=>{const s=document.querySelector('.farm-scene');if(!s)return false;if(s.querySelectorAll('radialGradient').length<6)return false;const h=s.innerHTML;return h.includes('#f2cd73')&&h.includes('#63c3d2')&&h.includes('#e57368')&&[...s.querySelectorAll('.farm-pile ellipse')].some(c=>(c.getAttribute('fill')||'').startsWith('url('))})()`
+        `(()=>{const s=document.querySelector('.farm-scene');if(!s)return false;if(s.querySelectorAll('radialGradient').length<7)return false;const h=s.innerHTML;return h.includes('#f2cd73')&&h.includes('#e57368')&&h.includes('#d5dce3')&&[...s.querySelectorAll('.farm-pile ellipse')].some(c=>(c.getAttribute('fill')||'').startsWith('url('))})()`
       ),
     });
     // 哑光化：无白色高光点（fill #fff + opacity .45 的椭圆/圆），
@@ -370,7 +370,7 @@ app
     results.push({
       check: "tomatoes are matte with no glossy highlight dots",
       pass: await js(
-        `(()=>{const s=document.querySelector('.farm-scene');if(!s)return false;const glossy=[...s.querySelectorAll('ellipse,circle')].some(e=>e.getAttribute('fill')==='#fff'&&e.getAttribute('opacity')==='.45');const first=s.querySelector('#farm-tomato-iu stop');return !glossy&&first&&first.getAttribute('stop-color')==='#e57368'})()`
+        `(()=>{const s=document.querySelector('.farm-scene');if(!s)return false;const glossy=[...s.querySelectorAll('ellipse,circle')].some(e=>e.getAttribute('fill')==='#fff'&&e.getAttribute('opacity')==='.45');const first=s.querySelector('#farm-tomato-research stop');return !glossy&&first&&first.getAttribute('stop-color')==='#e57368'})()`
       ),
     });
     // 形态微差：果筐堆果实是椭圆且 rx 至少 3 种取值（确定性伪随机，不闪变）
@@ -415,11 +415,11 @@ app
         `(()=>{const p=document.querySelector('.farm-pile').getBoundingClientRect();const g=document.querySelector('.farm-ground').getBoundingClientRect();return p.right<=g.left+1})()`
       ),
     });
-    // 专注记录圆点按象限着色：至少出现 3 种象限色 class
+    // 演示记录没有项目快照：记录图标应明确标作未归类，不借用象限色。
     results.push({
-      check: "record list icons carry quadrant tone classes",
+      check: "unclassified record icons do not borrow quadrant tone classes",
       pass: await js(
-        `(()=>{const set=new Set([...document.querySelectorAll('.r-icon')].map(e=>(e.className.match(/tone-(iu|inu|uni|unu|free)/)||[])[1]).filter(Boolean));return set.size>=3})()`
+        `(()=>{const icons=[...document.querySelectorAll('.r-icon')];return icons.length>0&&icons.every(e=>e.title.includes('所属项目未归类')&&!/tone-(iu|inu|uni|unu|free)/.test(e.className))})()`
       ),
     });
     // chip 强化：放大到 34px、加粗、按象限淡色底 + 象限色描边/数字色

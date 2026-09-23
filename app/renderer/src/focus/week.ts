@@ -3,8 +3,8 @@
 // 生长映射：本周每完成 1 个番茄 = 田里多 1 格生长进度；
 // 株数 = min(本周完成数, 8)（视觉上限），进度在株间尽量均分、靠前株优先 +1；
 // 每株 7 格对应真实番茄生长阶段：发芽(两片子叶) → 幼苗(真叶) → 成株(羽状
-// 复叶、茎粗壮) → 开花(黄色星形小花) → 坐果(绿果) → 转色 → 红熟；
-// 一周满负荷约 60 个刚好全部红熟（8×7=56）并有富余，超出的番茄不再长高，
+// 复叶、茎粗壮) → 开花(黄色星形小花) → 坐果 → 转色 → 成熟；
+// 一周满负荷约 60 个刚好全部成熟（8×7=56）并有富余，超出的番茄不再长高，
 // 变成单株额外果实（更繁茂）。
 export const WEEK_PLANT_CAP = 8;
 export const PLANT_STAGES = [
@@ -14,7 +14,7 @@ export const PLANT_STAGES = [
   "开花",
   "坐果",
   "转色",
-  "红熟",
+  "成熟",
 ] as const;
 const DAY_MS = 86400000;
 const BEIJING_OFFSET_MS = 8 * 3600000;
@@ -58,7 +58,7 @@ export function weekTomatoes(
 export type WeekHarvest = {
   plants: number; // 田里株数（0 = 空地）
   steps: number[]; // 每株生长格数 1..7，对应 PLANT_STAGES 下标 0..6
-  bonus: number; // 全部红熟后超出的番茄数（转成额外果实）
+  bonus: number; // 全部成熟后超出的番茄数（转成额外果实）
   stage: string; // 最靠前株的阶段名，空地时为「空地」
 };
 export function weekHarvest(week: number): WeekHarvest {

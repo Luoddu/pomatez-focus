@@ -103,6 +103,75 @@ test("project category snapshots old records once without changing accounting", 
       )
   );
 });
+test("old snapshot without task ID uses its unique original plan link once", async () => {
+  const { client: base, state } = harness();
+  const items = (rows) => ({ data: { items: rows, has_more: false } });
+  const client = new Feishu({ ...config }, async (method, route, body, token) => {
+    const path = route.split("?")[0];
+    if (method === "GET" && path.endsWith("/tasks/fields"))
+      return items([
+        { field_name: "所属项目", type: 21, property: { table_id: "projects" } },
+      ]);
+    if (method === "GET" && path.endsWith("/projects/fields"))
+      return items([{ field_name: "项目类型", type: 3 }]);
+    if (method === "GET" && path.endsWith("/projects/records"))
+      return items([{ record_id: "pr1", fields: { 项目类型: "🔬科研" } }]);
+    return base.request(method, route, body, token);
+  });
+  state.tasks[0].fields.所属项目 = [
+    { table_id: "projects", record_ids: ["pr1"] },
+  ];
+  const old = record(1200);
+  old.task.taskId = "";
+  await client.archiveHistory(saved(old, await client.sync(old)));
+  const before = state.plans.map((row) => {
+    const fields = structuredClone(row.fields);
+    delete fields[HISTORY_FIELD];
+    return fields;
+  });
+  assert.deepEqual(await client.classifyHistory(), { classified: 1, skipped: 0 });
+  assert.equal((await client.history()).records[0].task.projectType, "research");
+  assert.deepEqual(await client.classifyHistory(), { classified: 0, skipped: 0 });
+  state.plans.forEach((row, i) => {
+    const fields = { ...row.fields };
+    delete fields[HISTORY_FIELD];
+    assert.deepEqual(fields, before[i]);
+  });
+});
+test("ambiguous or conflicting old task links remain unclassified", async () => {
+  const { client: base, state } = harness();
+  const items = (rows) => ({ data: { items: rows, has_more: false } });
+  const client = new Feishu({ ...config }, async (method, route, body, token) => {
+    const path = route.split("?")[0];
+    if (method === "GET" && path.endsWith("/tasks/fields"))
+      return items([
+        { field_name: "所属项目", type: 21, property: { table_id: "projects" } },
+      ]);
+    if (method === "GET" && path.endsWith("/projects/fields"))
+      return items([{ field_name: "项目类型", type: 3 }]);
+    if (method === "GET" && path.endsWith("/projects/records"))
+      return items([{ record_id: "pr1", fields: { 项目类型: "🔬科研" } }]);
+    return base.request(method, route, body, token);
+  });
+  state.tasks[0].fields.所属项目 = [
+    { table_id: "projects", record_ids: ["pr1"] },
+  ];
+  const old = record(1200);
+  old.task.taskId = "";
+  await client.archiveHistory(saved(old, await client.sync(old)));
+  const oldText = state.plans[0].fields[HISTORY_FIELD];
+  const oldEnvelope = JSON.parse(oldText);
+  oldEnvelope.records[0].task.planId = "p2";
+  state.plans[0].fields[HISTORY_FIELD] = JSON.stringify(oldEnvelope);
+  const writes = state.writes.length;
+  assert.deepEqual(await client.classifyHistory(), { classified: 0, skipped: 1 });
+  assert.equal(state.writes.length, writes);
+  assert.equal((await client.history()).records[0].task.projectType, undefined);
+  state.plans[0].fields[HISTORY_FIELD] = oldText;
+  state.plans[0].fields.任务 = ["t1", "t2"];
+  assert.deepEqual(await client.classifyHistory(), { classified: 0, skipped: 1 });
+  assert.equal(state.writes.length, writes);
+});
 test("A and B share exact user counts; repeat metadata migration never writes minutes or completion", async () => {
   const { client: a, state } = harness(),
     b = new Feishu({ ...config }, a.request);

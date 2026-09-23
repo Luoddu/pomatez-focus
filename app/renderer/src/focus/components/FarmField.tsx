@@ -43,12 +43,11 @@ const rand = (i: number, salt: number) => {
   return x - Math.floor(x);
 };
 
-// 果体哑光径向渐变：中心主色 → 边缘略深（16% 黑）；坐果青绿也有一只。
+// 果体哑光径向渐变：中心主色 → 边缘略深（16% 黑）。
 // 仓库验收要求哑光无白色高光点（scripts/shot-app.cjs），立体感靠
 // 渐变压深 + 每颗果实的确定性形态微差（大小/椭圆比/倾角/萼片）呈现
 const TOMATO_GRADS: [string, string][] = [
   ...(Object.entries(TOMATO_TONES) as [string, string][]),
-  ["unripe", "#7fbf6b"],
 ];
 const GRAD_BY_TONE: Record<string, string> = Object.fromEntries(
   TOMATO_GRADS.map(([k, tone]) => [tone, `farm-tomato-${k}`])
@@ -674,8 +673,7 @@ const Geese = ({ south }: { south: boolean }) => (
 );
 
 // 一株番茄的某个生长阶段（局部原点在株基）。形态参考真实番茄生长过程。
-// 坐果的果实是青绿的（未熟）；转色开始染象限色；红熟整果按本周收获
-// 的象限分布着色——一眼看出这周红番茄多还是灰番茄多
+// 果实一出现就使用专注记录的项目色；成熟进度由株形、花朵和果量表达。
 const Plant = ({
   index,
   stage,
@@ -683,7 +681,7 @@ const Plant = ({
   toneAt,
 }: {
   index: number;
-  stage: number; // 0 发芽 … 6 红熟
+  stage: number; // 0 发芽 … 6 成熟
   extraFruit: number;
   toneAt: (k: number) => string;
 }) => {
@@ -724,15 +722,7 @@ const Plant = ({
   const tall = stage >= 4;
   const stemH = tall ? 46 : 34;
   const leaves = 3 + Math.floor(rand(index, 5) * 2);
-  const fruitTone = (k: number) =>
-    stage === 4
-      ? "#7fbf6b" // 坐果一律青绿（未熟）
-      : stage === 5
-      ? rand(index, 61 + k) > 0.45
-        ? toneAt(k)
-        : "#7fbf6b"
-      : toneAt(k);
-  // 坐果起每株 3 个基础果位；红熟后超出周产能的番茄加成额外果实（更繁茂）
+  // 坐果起每株 3 个基础果位；成熟后超出周产能的番茄加成额外果实（更繁茂）
   const slots =
     stage >= 4
       ? [
@@ -788,7 +778,7 @@ const Plant = ({
               key={k}
               x={s.x}
               y={s.y}
-              tone={fruitTone(k)}
+              tone={toneAt(k)}
               seed={index * 31 + k}
             />
           ))}
@@ -891,7 +881,7 @@ const Pile = ({
   const sideBaskets = n >= 100 ? 2 : n >= 30 ? 1 : 0;
   return (
     <g className="farm-pile" transform="translate(44 118)">
-      <title>{`累计收获 ${n} 个；果筐显示最近 ${shown} 个番茄的项目颜色，浅灰色表示项目未归类`}</title>
+      <title>{`累计收获 ${n} 个`}</title>
       {/* 立在卡片留白上的淡淡地影，不接地壤带 */}
       <ellipse
         cx="6"
@@ -952,16 +942,6 @@ const Pile = ({
       <text className="farm-pile-text" x="6" y="18" textAnchor="middle">
         累计收获 {n}
       </text>
-      {n > PILE_CAP && (
-        <text
-          className="farm-pile-detail"
-          x="6"
-          y="29"
-          textAnchor="middle"
-        >
-          近 {shown} 颗配色
-        </text>
-      )}
     </g>
   );
 };
@@ -1022,7 +1002,7 @@ export default function FarmField({
     list.length ? list[k % list.length] : UNCLASSIFIED_TOMATO_TONE;
   const fieldTone = toneFrom(tones);
   const pileTone = toneFrom(pileTones);
-  // 红熟后超出的番茄摊成各株额外果实，靠前株优先
+  // 成熟后超出的番茄摊成各株额外果实，靠前株优先
   const extraFruit = (i: number) =>
     harvest.bonus
       ? Math.floor(harvest.bonus / harvest.plants) +

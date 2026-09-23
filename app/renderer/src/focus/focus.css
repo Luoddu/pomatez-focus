@@ -1987,10 +1987,6 @@ input:focus-visible {
   font-size: 11px;
   fill: #6b4a26;
 }
-.farm-pile-detail {
-  font-size: 8px;
-  fill: #8a6a46;
-}
 .farm-sway {
   transform-box: fill-box;
   transform-origin: 50% 100%;
