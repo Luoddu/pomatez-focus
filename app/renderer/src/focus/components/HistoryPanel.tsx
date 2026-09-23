@@ -35,6 +35,7 @@ import {
 } from "./shared";
 import HeatmapCalendar from "./HeatmapCalendar";
 import ManualEntry from "./ManualEntry";
+import { dailyFocusTheme } from "../stats";
 
 const WEEK_CHARS = "日一二三四五六";
 const dayLabel = (value: number) => {
@@ -624,7 +625,18 @@ export default function HistoryPanel({
                 key={group.date}
               >
                 <h4>
-                  {group.date}
+                  <span className="day-date">{group.date}</span>
+                  {(() => {
+                    const theme = dailyFocusTheme(group.records);
+                    return theme ? (
+                      <span
+                        className="day-theme"
+                        title={`当天主要做的事：${theme}`}
+                      >
+                        {theme}
+                      </span>
+                    ) : null;
+                  })()}
                   {(() => {
                     const dayCount = group.records.reduce(
                       (total, r) => total + (r.completedCount || 0),

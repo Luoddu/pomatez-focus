@@ -1025,8 +1025,23 @@ input:focus-visible {
   align-items: baseline;
   gap: 8px;
 }
+.record-day h4 .day-date {
+  flex: none;
+  white-space: nowrap;
+}
+.record-day h4 .day-theme {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #74695f;
+  font-size: 12px;
+  font-weight: 400;
+}
 .record-day h4 .day-total {
   margin-left: auto;
+  flex: none;
   font-size: 12px;
   font-weight: 400;
   white-space: nowrap;
@@ -2635,9 +2650,15 @@ input:focus-visible {
 }
 .stats-tab.selected {
   background: var(--card);
-  color: var(--primary);
+  color: #b54f45;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.1);
+  box-shadow: 0 1px 3px rgba(112, 74, 49, 0.12);
+}
+.stats-page .stats-tabs {
+  background: #f6eee9;
+}
+.stats-page .stats-range-label em {
+  color: #b54f45;
 }
 .stats-range-label {
   margin-left: 10px;
@@ -2674,23 +2695,23 @@ button.stats-range-label:hover {
   font-size: 12px;
   color: var(--primary);
 }
-/* 实际收获和三期移动平均共用真实分桶；只画已到达的时间。 */
+/* 专注时长的 7 天与 28 天日均，保留番茄农场的浅暖色。 */
 .stats-trend {
   position: relative;
   overflow: hidden;
   flex: none;
   min-height: 310px;
   padding: 25px 30px 18px;
-  border: 1px solid #eee6e9;
+  border: 1px solid #f0e4da;
   border-radius: 22px;
-  color: #2d3441;
+  color: #3c302c;
   background: radial-gradient(
       ellipse at 92% -12%,
-      rgba(240, 218, 235, 0.58) 0,
+      rgba(255, 226, 183, 0.56) 0,
       transparent 44%
     ),
-    linear-gradient(145deg, #fffefd, #fff8f7 70%, #fbf9ff);
-  box-shadow: 0 8px 24px rgba(75, 53, 72, 0.06);
+    linear-gradient(145deg, #fffefd, #fff9f4 70%, #fff5ed);
+  box-shadow: 0 8px 24px rgba(112, 74, 49, 0.06);
 }
 .stats-trend-heading {
   display: flex;
@@ -2706,30 +2727,56 @@ button.stats-range-label:hover {
 }
 .stats-trend h3 {
   margin: 5px 0 4px;
-  color: #252b36;
+  color: #3c302c;
   font-size: 27px;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 .stats-trend-heading p,
 .stats-trend-note {
-  color: #6f7887;
+  color: #86766e;
   font-size: 12px;
+}
+.stats-trend-comparison {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.stats-trend-comparison div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #83736a;
+  font-size: 11px;
+}
+.stats-trend-comparison strong {
+  color: #a9473e;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.stats-trend-comparison em {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+}
+.stats-trend-comparison em.up {
+  color: #b44f45;
+}
+.stats-trend-comparison em.down {
+  color: #79736c;
 }
 .stats-trend-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 16px;
+  margin-top: 8px;
 }
 .stats-trend-legend span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 9px;
-  border: 1px solid #e9dfe5;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #535b6b;
+  color: #776c65;
   font-size: 11px;
   white-space: nowrap;
 }
@@ -2743,11 +2790,21 @@ button.stats-range-label:hover {
   background: #e7645d;
 }
 .trend-key.average {
-  background: #936fc7;
+  background: #e3b65e;
 }
 .stats-trend-plot {
+  position: relative;
   margin-top: 10px;
   height: 166px;
+}
+.stats-trend-insufficient {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #8c7b72;
+  font-size: 13px;
 }
 .stats-trend-plot svg {
   display: block;
@@ -2756,25 +2813,25 @@ button.stats-range-label:hover {
   overflow: visible;
 }
 .trend-gridline {
-  stroke: #c3cad5;
+  stroke: #dccfc3;
   stroke-opacity: 0.72;
   stroke-dasharray: 3 6;
 }
 .trend-axis {
-  fill: #7c8694;
+  fill: #86766e;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .trend-average-path {
   fill: none;
-  stroke: #936fc7;
+  stroke: #e3b65e;
   stroke-width: 2.5;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 .trend-actual-path {
   fill: none;
-  stroke: url(#stats-trend-stroke);
+  stroke: #dc625a;
   stroke-width: 3.5;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -3050,10 +3107,10 @@ button.stats-range-label:hover {
   color: var(--muted);
   font-size: 15px;
 }
-/* 三列布局：列1 合计+每日收获 / 列2 时段热力 / 列3 象限·时段·高光竖叠 */
+/* 四块内容：趋势在上，合计与每日收获在左，时段热力在右。 */
 .stats-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
   gap: 14px;
   align-items: stretch;
   padding-bottom: 8px;
@@ -3108,7 +3165,7 @@ button.stats-range-label:hover {
   background: linear-gradient(180deg, #f38b82, #e57368);
 }
 .bar.today {
-  outline: 2px solid var(--primary);
+  outline: 2px solid #c95f55;
   outline-offset: 1px;
 }
 .bar-val {
@@ -3155,7 +3212,7 @@ button.stats-range-label:hover {
   border-radius: 2px;
 }
 .sh-cell.now {
-  outline: 1.5px solid var(--primary);
+  outline: 1.5px solid #c95f55;
   outline-offset: 0;
 }
 .sh-legend {
@@ -3302,12 +3359,6 @@ button.stats-range-label:hover {
 @media (orientation: portrait) and (min-width: 901px) {
   .stats-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  }
-  .stats-trio {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: stretch;
   }
 }
 @media (max-width: 540px) {

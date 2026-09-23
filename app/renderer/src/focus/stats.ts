@@ -277,6 +277,78 @@ export function harvestTrend(
   });
 }
 
+export type FocusTrendPoint = {
+  label: string;
+  seven: number | null;
+  twentyEight: number | null;
+};
+
+// 只按已保存的专注秒数计算日历日均。完整观察窗不足时不画该均线，
+// 以免把尚未开始使用本应用的日子当成零专注。
+export function focusDurationTrend(
+  records: FocusSession[],
+  anchor: number
+): FocusTrendPoint[] {
+  const saved = records.filter((r) => r.status === "saved");
+  if (!saved.length) return [];
+  const first = Math.min(...saved.map((r) => dayStart(r.startedAt)));
+  const byDay = new Map<number, number>();
+  for (const r of saved) {
+    const day = dayStart(r.startedAt);
+    byDay.set(
+      day,
+      (byDay.get(day) || 0) + Math.max(0, r.acceptedSeconds || 0)
+    );
+  }
+  const last = dayStart(anchor);
+  const offsetDay = (from: number, offset: number) => {
+    const d = new Date(from);
+    d.setDate(d.getDate() + offset);
+    return dayStart(d.getTime());
+  };
+  return Array.from({ length: 28 }, (_, index) => {
+    const day = offsetDay(last, index - 27);
+    const average = (days: number) => {
+      if (offsetDay(day, 1 - days) < first) return null;
+      let seconds = 0;
+      for (let i = 0; i < days; i++)
+        seconds += byDay.get(offsetDay(day, -i)) || 0;
+      return Math.round(seconds / days / 60);
+    };
+    return {
+      label: md(day),
+      seven: average(7),
+      twentyEight: average(28),
+    };
+  });
+}
+
+// 日卡片显示已记录工作中投入时长最多的一项；只截短展示，不改原记录。
+export function dailyFocusTheme(
+  records: FocusSession[]
+): string | null {
+  const saved = records.filter((r) => r.status === "saved");
+  if (!saved.length) return null;
+  const totals = new Map<string, { seconds: number; count: number }>();
+  for (const r of saved) {
+    const title = baseName(r.task.title).trim() || "自由专注";
+    const item = totals.get(title) || { seconds: 0, count: 0 };
+    item.seconds += Math.max(0, r.acceptedSeconds || 0);
+    item.count += Math.max(0, r.completedCount || 0);
+    totals.set(title, item);
+  }
+  const top = Array.from(totals.entries()).sort(
+    (a, b) =>
+      b[1].seconds - a[1].seconds ||
+      b[1].count - a[1].count ||
+      a[0].localeCompare(b[0])
+  )[0][0];
+  const characters = Array.from(top);
+  return `${characters.slice(0, 18).join("")}${
+    characters.length > 18 ? "…" : ""
+  }`;
+}
+
 // ── 半小时 × 星期热力矩阵：行=周一..周日，列=00:00–24:00 共 48 格。
 // 一段 N 番茄的专注按覆盖时长占比摊到各格（如 25 分钟跨两格则各摊一半），
 // 缺 endedAt 时用 startedAt + acceptedSeconds/plannedSeconds 兜底

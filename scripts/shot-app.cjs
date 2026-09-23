@@ -417,7 +417,8 @@ app
     });
     // 演示记录没有项目快照：记录图标应明确标作未归类，不借用象限色。
     results.push({
-      check: "unclassified record icons do not borrow quadrant tone classes",
+      check:
+        "unclassified record icons do not borrow quadrant tone classes",
       pass: await js(
         `(()=>{const icons=[...document.querySelectorAll('.r-icon')];return icons.length>0&&icons.every(e=>e.title.includes('所属项目未归类')&&!/tone-(iu|inu|uni|unu|free)/.test(e.className))})()`
       ),
@@ -845,29 +846,22 @@ app
     });
     results.push({
       check:
-        "stats trend uses saved bucket counts and labels its trailing average",
+        "stats trend compares saved focus duration over 7 and 28 calendar days",
       pass: await js(
-        `(()=>{const c=document.querySelector('.stats-trend');const svg=c?.querySelector('svg');return Boolean(c&&svg&&c.textContent.includes('移动平均')&&c.textContent.includes('不是预测')&&svg.querySelector('.trend-actual-path')&&svg.querySelector('.trend-average-path')&&svg.querySelectorAll('.trend-dot').length>=1)})()`
+        `(()=>{const c=document.querySelector('.stats-trend');const svg=c?.querySelector('svg');return Boolean(c&&svg&&c.textContent.includes('近 7 天')&&c.textContent.includes('近 28 天')&&svg.querySelector('.trend-actual-path')&&svg.querySelector('.trend-average-path')&&svg.querySelectorAll('.trend-dot').length>=1)})()`
       ),
     });
     results.push({
       check:
-        "week stats: three columns (summary+bars / heat / trio) and a 7x48 half-hour heat grid",
+        "week stats contains exactly four sections and a 7x48 half-hour heat grid",
       pass: await js(
-        `(()=>{const g=document.querySelector('.stats-grid');const kids=g?[...g.children]:[];return kids.length===3&&kids[0].classList.contains('stats-col')&&kids[1].classList.contains('stats-heat')&&kids[2].classList.contains('stats-trio')&&document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length===7*48&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.dist-list li').length===9})()`
+        `(()=>{const headings=[...document.querySelectorAll('.stats-page h3')].map(x=>x.textContent.trim());return JSON.stringify(headings)==='["专注趋势","区间合计","每日收获","时段热力"]'&&document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell').length===7*48&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&!document.querySelector('.sh-legend')})()`
       ),
     });
     results.push({
-      check: "spiky tomato count shows under quadrant distribution",
+      check: "stats page keeps a light warm trend card",
       pass: await js(
-        `(()=>{const f=document.querySelector('.dist-foot');return Boolean(f)&&f.textContent.includes('带刺番茄')})()`
-      ),
-    });
-    // 高级感：标题与条目纯文字、无 emoji、无位图图标
-    results.push({
-      check: "stats page headings and rows are emoji-free plain text",
-      pass: await js(
-        `(()=>{const re=/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}\\u{FE0F}]/u;const els=[...document.querySelectorAll('.stats-page h3,.stats-page .st-row span,.stats-page .st-row strong,.stats-page .dist-foot,.stats-page .share-btn,.stats-page .glory-label,.stats-page .glory-list strong,.stats-page .dist-name,.stats-page .sh-legend')];return els.length>15&&els.every(e=>!re.test(e.textContent))&&!document.querySelector('.stats-page .dist-icon')&&document.querySelectorAll('.stats-page img').length===0})()`
+        `(()=>{const c=getComputedStyle(document.querySelector('.stats-trend'));return c.backgroundImage.includes('255, 226, 183')&&!c.backgroundImage.includes('blue')})()`
       ),
     });
     // 合计卡新排版：label 小灰字在上、数值行在下，左缘对齐（消除水平断裂）
@@ -876,22 +870,6 @@ app
         "summary rows stack a small label above the big value, left aligned",
       pass: await js(
         `(()=>{const rows=[...document.querySelectorAll('.stats-summary .st-row')];if(rows.length!==5)return false;return rows.every(r=>{const l=r.querySelector('.st-label'),v=r.querySelector('.st-value');if(!l||!v)return false;const lr=l.getBoundingClientRect(),vr=v.getBoundingClientRect();const s=v.querySelector('strong');return lr.bottom<=vr.top+1&&Math.abs(lr.left-vr.left)<2&&parseFloat(getComputedStyle(l).fontSize)<parseFloat(getComputedStyle(s).fontSize)})})()`
-      ),
-    });
-    // 环比（Apple 训练负荷式滚动窗口）：周视图 = 近 7 天日均 vs 近 28 天日均，
-    // 每项带基准小灰字；demo 数据 34 天，周视图基准窗完整（28 天）
-    results.push({
-      check:
-        "summary rows show rolling-window deltas with baseline labels",
-      pass: await js(
-        `(()=>{const d=[...document.querySelectorAll('.st-row .delta')];const b=[...document.querySelectorAll('.st-row .delta-base')];return d.length>=3&&b.length===d.length&&b.every(x=>/较近 28 天(日均|活跃率|活跃日均)/.test(x.textContent))&&d.every(x=>/▲|▼|持平/.test(x.textContent))&&d.some(x=>x.classList.contains('up')||x.classList.contains('down'))})()`
-      ),
-    });
-    // 时段趋势：滚动窗口口径（近 7 天 vs 近 28 天），行内注明窗口
-    results.push({
-      check: "daypart trend compares rolling windows and says so",
-      pass: await js(
-        `(()=>{const t=document.querySelector('.dist-foot.trend');if(!t||!t.textContent.includes('移到'))return false;const s=t.querySelector('small');return Boolean(s)&&/近 7 天 vs 近 28 天/.test(s.textContent)})()`
       ),
     });
     await shot("stats-week");
@@ -936,31 +914,16 @@ app
         `(()=>{const n=document.querySelectorAll('.bars .bar-col').length;return n>=28&&n<=31&&document.querySelector('.bars').classList.contains('dense')})()`
       ),
     });
-    // 月视图基准窗降级：demo 数据共 34 天 < 名义 90 → 如实标注「较近 34 天」
-    results.push({
-      check:
-        "month view degrades the baseline window to the available 34 days",
-      pass: await js(
-        `(()=>{const b=[...document.querySelectorAll('.st-row .delta-base')];return b.length>=3&&b.every(x=>x.textContent.includes('较近 34 天'))})()`
-      ),
-    });
     await shot("stats-month");
     await js(
       `(()=>{[...document.querySelectorAll('.stats-tab')].find(b=>b.textContent==='年').click()})()`
     );
     await wait(250);
     results.push({
-      check: "year stats: 12 monthly bars and golden-slot highlight",
-      pass: await js(
-        `document.querySelectorAll('.bars .bar-col').length===12&&document.querySelectorAll('.glory-list li').length===4`
-      ),
-    });
-    // 年视图数据不足（34 天 < 365+730 窗口）→ 不显示任何环比，杜绝误导
-    results.push({
       check:
-        "year view hides deltas when history is shorter than the window",
+        "year stats shows monthly harvest bars without removed sections",
       pass: await js(
-        `document.querySelectorAll('.stats-summary .delta').length===0&&document.querySelectorAll('.stats-summary .delta-base').length===0`
+        `document.querySelectorAll('.bars .bar-col').length===12&&!document.querySelector('.glory-list')&&!document.querySelector('.stats-insights')`
       ),
     });
     await shot("stats-year");

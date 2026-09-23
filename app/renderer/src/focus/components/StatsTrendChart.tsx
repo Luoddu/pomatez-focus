@@ -1,9 +1,13 @@
 import React from "react";
-import type { RangeKey } from "../stats";
+import type { FocusTrendPoint } from "../stats";
 
-type Point = { label: string; count: number; average: number };
+const minutesText = (minutes: number | null) => {
+  if (minutes == null) return "—";
+  return minutes < 60
+    ? `${minutes} 分钟`
+    : `${(minutes / 60).toFixed(1)} 小时`;
+};
 
-// 控制点都落在相邻两点的高度上，不会把平滑曲线画出原始数据的范围。
 const curvePath = (points: { x: number; y: number }[]) =>
   points.reduce(
     (path, point, index) =>
@@ -19,65 +23,82 @@ const curvePath = (points: { x: number; y: number }[]) =>
 
 export default function StatsTrendChart({
   points,
-  rangeKey,
-  current,
 }: {
-  points: Point[];
-  rangeKey: RangeKey;
-  current: boolean;
+  points: FocusTrendPoint[];
 }) {
-  const period =
-    rangeKey === "quarter" ? "周" : rangeKey === "year" ? "月" : "日";
-  const max = Math.max(1, ...points.map((point) => point.count));
-  const position = (value: number, index: number) => ({
-    x: 36 + (index * 628) / Math.max(1, points.length - 1),
-    y: 172 - (value / max) * 124,
-  });
-  const actual = points.map((point, index) =>
-    position(point.count, index)
+  const latest = points[points.length - 1];
+  const max = Math.max(
+    30,
+    ...points.flatMap((point) =>
+      [point.seven, point.twentyEight].filter(
+        (value): value is number => value !== null
+      )
+    )
   );
-  const average = points.map((point, index) =>
-    position(point.average, index)
-  );
-  const area = actual.length
-    ? `${curvePath(actual)} L ${actual[actual.length - 1].x} 172 L ${
-        actual[0].x
-      } 172 Z`
-    : "";
-  const tickIndexes = [
-    0,
-    Math.floor((points.length - 1) / 2),
-    points.length - 1,
-  ].filter((index, offset, all) => all.indexOf(index) === offset);
+  const coords = (key: "seven" | "twentyEight") =>
+    points
+      .map((point, index) =>
+        point[key] === null
+          ? null
+          : {
+              x: 44 + (index * 610) / Math.max(1, points.length - 1),
+              y: 168 - ((point[key] || 0) / max) * 122,
+            }
+      )
+      .filter(
+        (point): point is { x: number; y: number } => point !== null
+      );
+  const recent = coords("seven");
+  const baseline = coords("twentyEight");
+  const delta =
+    latest?.seven != null &&
+    latest.twentyEight != null &&
+    latest.twentyEight > 0
+      ? Math.round(
+          ((latest.seven - latest.twentyEight) / latest.twentyEight) *
+            100
+        )
+      : null;
+  const ticks = [0, 9, 18, 27];
   return (
     <section className="stats-trend" aria-label="专注趋势">
       <div className="stats-trend-heading">
         <div>
           <span className="stats-trend-eyebrow">专注节奏</span>
           <h3>专注趋势</h3>
-          <p>
-            {current ? "本期截至现在" : "所选区间"} · 每{period}番茄数
-          </p>
+          <p>已保存专注时长 · 日历日均</p>
         </div>
-        <div className="stats-trend-legend">
-          <span>
-            <i className="trend-key actual" />
-            实际收获
-          </span>
-          <span>
-            <i className="trend-key average" />近 3 {period}移动平均
-          </span>
+        <div className="stats-trend-comparison">
+          <div>
+            <span>近 7 天</span>
+            <strong>{minutesText(latest?.seven ?? null)}</strong>
+          </div>
+          <div>
+            <span>近 28 天</span>
+            <strong>{minutesText(latest?.twentyEight ?? null)}</strong>
+          </div>
+          {delta !== null && (
+            <em className={delta >= 0 ? "up" : "down"}>
+              {delta > 0 ? "+" : ""}
+              {delta}%
+            </em>
+          )}
         </div>
       </div>
       <div
         className="stats-trend-plot"
         role="img"
-        aria-label={`收获曲线，${points
-          .map((p) => `${p.label} ${p.count} 个`)
-          .join("，")}`}
+        aria-label={`近 7 天日均 ${minutesText(
+          latest?.seven ?? null
+        )}，近 28 天日均 ${minutesText(latest?.twentyEight ?? null)}`}
       >
+        {recent.length === 0 && (
+          <p className="stats-trend-insufficient">
+            记录满 7 天后显示趋势
+          </p>
+        )}
         <svg
-          viewBox="0 0 700 204"
+          viewBox="0 0 700 208"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
@@ -89,71 +110,64 @@ export default function StatsTrendChart({
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor="#ee8178" stopOpacity=".22" />
-              <stop offset="100%" stopColor="#ee8178" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient
-              id="stats-trend-stroke"
-              x1="0"
-              y1="0"
-              x2="1"
-              y2="0"
-            >
-              <stop offset="0%" stopColor="#ed8c82" />
-              <stop offset="100%" stopColor="#dc514f" />
+              <stop offset="0%" stopColor="#e87970" stopOpacity=".2" />
+              <stop offset="100%" stopColor="#e87970" stopOpacity="0" />
             </linearGradient>
           </defs>
-          {[48, 110, 172].map((y) => (
+          {[46, 107, 168].map((y) => (
             <line
               key={y}
               className="trend-gridline"
-              x1="36"
-              x2="664"
+              x1="44"
+              x2="654"
               y1={y}
               y2={y}
             />
           ))}
-          <text className="trend-axis" x="4" y="52">
-            {max}
+          <text className="trend-axis" x="4" y="50">
+            {Math.round(max)} 分
           </text>
-          <text className="trend-axis" x="16" y="176">
+          <text className="trend-axis" x="24" y="172">
             0
           </text>
-          {area && <path d={area} fill="url(#stats-trend-fill)" />}
-          {average.length > 1 && (
+          {recent.length > 1 && (
             <path
-              className="trend-average-path"
-              d={curvePath(average)}
+              d={`${curvePath(recent)} L ${
+                recent[recent.length - 1].x
+              } 168 L ${recent[0].x} 168 Z`}
+              fill="url(#stats-trend-fill)"
             />
           )}
-          {actual.length > 1 && (
-            <path className="trend-actual-path" d={curvePath(actual)} />
+          {baseline.length > 1 && (
+            <path
+              className="trend-average-path"
+              d={curvePath(baseline)}
+            />
           )}
-          {actual.map((point, index) => (
+          {recent.length > 1 && (
+            <path className="trend-actual-path" d={curvePath(recent)} />
+          )}
+          {recent.map((point, index) => (
             <circle
               key={index}
               className={
-                index === actual.length - 1
+                index === recent.length - 1
                   ? "trend-dot latest"
                   : "trend-dot"
               }
               cx={point.x}
               cy={point.y}
-              r={index === actual.length - 1 ? 5.5 : 3.5}
+              r={index === recent.length - 1 ? 5 : 2.6}
             />
           ))}
-          {tickIndexes.map((index) => (
+          {ticks.map((index) => (
             <text
               key={index}
               className="trend-axis trend-date"
-              x={actual[index]?.x || 36}
-              y="198"
+              x={44 + (index * 610) / 27}
+              y="199"
               textAnchor={
-                index === 0
-                  ? "start"
-                  : index === points.length - 1
-                  ? "end"
-                  : "middle"
+                index === 0 ? "start" : index === 27 ? "end" : "middle"
               }
             >
               {points[index]?.label}
@@ -161,9 +175,14 @@ export default function StatsTrendChart({
           ))}
         </svg>
       </div>
-      <p className="stats-trend-note">
-        曲线仅依据已保存记录；移动平均是平滑参考，不是预测。
-      </p>
+      <div className="stats-trend-legend">
+        <span>
+          <i className="trend-key actual" />近 7 天日均
+        </span>
+        <span>
+          <i className="trend-key average" />近 28 天日均
+        </span>
+      </div>
     </section>
   );
 }

@@ -9,6 +9,8 @@ import {
   currentStreak,
   barBuckets,
   harvestTrend,
+  focusDurationTrend,
+  dailyFocusTheme,
   halfHourMatrix,
   topTasks,
   daypartSplit,
@@ -119,6 +121,39 @@ test("收获走势仅显示已到达分桶，移动平均只回看已保存数�
     harvestTrend(barBuckets([], previous, now), previous, now).length,
     7
   );
+});
+
+test("专注趋势使用完整 7/28 日历日窗口，忽略未保存记录", () => {
+  const records = Array.from({ length: 35 }, (_, index) => {
+    const date = new Date(2026, 7, 1 + index, 9);
+    return rec(date.getTime(), 1, index >= 28 ? 120 : 60);
+  });
+  records.push({
+    ...rec(at(2026, 9, 4, 11), 10, 999),
+    status: "active",
+  });
+  const trend = focusDurationTrend(records, at(2026, 9, 4, 18));
+  assert.equal(trend.length, 28);
+  assert.equal(trend[27].seven, 120);
+  assert.equal(trend[27].twentyEight, 75);
+  assert.equal(trend[0].twentyEight, null);
+  assert.deepEqual(focusDurationTrend([], at(2026, 9, 4)), []);
+});
+
+test("日卡片主题按保存的时长选主要任务并去掉番茄序号", () => {
+  const day = at(2026, 9, 23);
+  const records = [
+    rec(day, 1, 25, {
+      task: { id: "a", title: "绘图修订 · 第 1 个番茄" },
+    }),
+    rec(day + 3600000, 1, 40, {
+      task: { id: "a", title: "绘图修订 · 第 2 个番茄" },
+    }),
+    rec(day + 7200000, 1, 20, { task: { id: "b", title: "资料整理" } }),
+    { ...rec(day + 10800000, 5, 300), status: "active" },
+  ];
+  assert.equal(dailyFocusTheme(records), "绘图修订");
+  assert.equal(dailyFocusTheme([]), null);
 });
 
 test("summarize：总数/活跃天数/日均/最佳一天", () => {

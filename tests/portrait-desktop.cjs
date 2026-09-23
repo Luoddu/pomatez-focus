@@ -260,16 +260,16 @@ app
       const hero=document.querySelector('.stats-trend').getBoundingClientRect();
       const rows=[...document.querySelectorAll('.stats-summary .st-row')];
       const a=rows[0].getBoundingClientRect(),b=rows[1].getBoundingClientRect();
-      return {curve:Boolean(document.querySelector('.trend-actual-path')),
+      return {insufficient:Boolean(document.querySelector('.stats-trend-insufficient')),
         heroFits:hero.left>=0&&hero.right<=innerWidth,
         summaryTwoColumns:Math.abs(a.top-b.top)<2&&b.left>a.left+20,
         horizontalOverflow:page.scrollWidth>page.clientWidth+2};
     })()`);
     check(
-      "portrait stats show a fitted curve and compact summary without horizontal overflow",
+      "portrait stats show an honest short-history state and compact summary without horizontal overflow",
       () => {
         assert.equal(
-          statsPortrait.curve,
+          statsPortrait.insufficient,
           true,
           JSON.stringify(statsPortrait)
         );
