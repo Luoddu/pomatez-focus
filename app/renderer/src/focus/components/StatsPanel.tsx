@@ -26,6 +26,7 @@ import {
 import { renderShareCardPng, shareCardModel } from "../shareCard";
 import { WindowControls, durationText, LogoIcon } from "./shared";
 import StatsTrendChart from "./StatsTrendChart";
+import StatsOverviewCards from "./StatsOverviewCards";
 
 const WEEK_CHARS = "一二三四五六日";
 
@@ -278,10 +279,15 @@ export default function StatsPanel({
           onTogglePin={onTogglePin}
         />
       </div>
-      {summary.count === 0 ? (
-        <div className="card stats-empty">
-          这个区间还没有收获 · 种一颗 25 分钟的番茄，下周再来看
-        </div>
+      <StatsOverviewCards
+        records={records}
+        scoped={scoped}
+        buckets={buckets}
+        range={range}
+        now={now}
+      />
+      {summary.count === 0 && summary.seconds === 0 ? (
+        <div className="card stats-empty">所选区间暂无专注记录</div>
       ) : (
         <>
           <StatsTrendChart

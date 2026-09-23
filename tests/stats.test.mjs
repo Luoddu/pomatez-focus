@@ -12,6 +12,7 @@ import {
   halfHourMatrix,
   topTasks,
   daypartSplit,
+  annualHeatmap,
 } from "../app/renderer/src/focus/stats.ts";
 
 const DAY = 86400000;
@@ -30,6 +31,29 @@ const rec = (startedAt, count, minutes = 25, extra = {}) => ({
   status: "saved",
   sync: "local",
   ...extra,
+});
+
+test("年度热力按本地日期聚合真实记录，忽略进行中及其他年份", () => {
+  const cells = annualHeatmap(
+    [
+      rec(at(2024, 2, 29, 9), 1, 25),
+      rec(at(2024, 2, 29, 16), 2, 30),
+      { ...rec(at(2024, 2, 29, 18), 9), status: "active" },
+      rec(at(2023, 2, 28, 9), 4),
+    ],
+    2024
+  );
+  assert.equal(cells.length % 7, 0);
+  assert.equal(new Date(cells[0].date).getDay(), 1);
+  const leapDay = cells.find(
+    (cell) => cell.date === at(2024, 2, 29, 0)
+  );
+  assert.equal(leapDay?.count, 3);
+  assert.equal(leapDay?.seconds, 55 * 60);
+  assert.equal(
+    cells.reduce((total, cell) => total + cell.count, 0),
+    3
+  );
 });
 
 test("rangeOf：周一起算 / 月 / 季 / 年", () => {

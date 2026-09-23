@@ -2806,6 +2806,205 @@ button.stats-range-label:hover {
 .stats-trend-note {
   margin-top: 9px;
 }
+/* 真实专注记录的时间线、年度热力和两种独立趋势。 */
+.stats-insights-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.stats-overview-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 18px 20px;
+  border: 1px solid #e9edf3;
+  border-radius: 18px;
+  background: #fff;
+}
+.stats-overview-strip > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 10px;
+  text-align: center;
+}
+.stats-overview-strip > div + div {
+  border-left: 1px solid #eef1f6;
+}
+.stats-overview-strip strong {
+  color: #4672dd;
+  font-size: clamp(19px, 2vw, 27px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stats-overview-strip span {
+  color: #7f8a9a;
+  font-size: 12px;
+}
+.stats-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.stats-insight-card {
+  min-width: 0;
+  min-height: 230px;
+  padding: 19px 22px;
+  border: 1px solid #e9edf3;
+  border-radius: 18px;
+  background: #fff;
+}
+.stats-insight-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+.stats-insight-heading h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #273247;
+}
+.stats-insight-heading span {
+  font-size: 11px;
+  color: #8490a2;
+  white-space: nowrap;
+}
+.stats-insight-empty {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  color: #929baa;
+  font-size: 13px;
+}
+.stats-timeline {
+  max-height: 210px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0 4px 0 0;
+  list-style: none;
+}
+.stats-timeline li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-height: 39px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f2f4f8;
+  font-variant-numeric: tabular-nums;
+}
+.stats-timeline-dot {
+  align-self: center;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7195e7;
+  box-shadow: 0 0 0 4px #e9efff;
+}
+.stats-timeline time {
+  flex: 1;
+  min-width: 0;
+  color: #5b6575;
+  font-size: 12px;
+}
+.stats-timeline strong {
+  color: #2e3c59;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.stats-timeline small {
+  color: #8792a3;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.stats-annual-scroll {
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+.stats-annual-months {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  color: #8c97a8;
+  font-size: 10px;
+}
+.stats-annual-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 12px);
+  grid-auto-columns: 12px;
+  gap: 3px;
+  width: max-content;
+}
+.stats-annual-cell {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #edf1f7;
+}
+.stats-annual-cell.outside {
+  background: transparent;
+}
+.stats-annual-cell.level-1 {
+  background: #d9e5ff;
+}
+.stats-annual-cell.level-2 {
+  background: #9dbaf9;
+}
+.stats-annual-cell.level-3 {
+  background: #628ce9;
+}
+.stats-annual-cell.level-4 {
+  background: #3869d6;
+}
+.stats-annual-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 10px;
+  color: #8792a3;
+  font-size: 10px;
+}
+.stats-metric-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 160px;
+  padding-top: 8px;
+  border-bottom: 1px solid #e9edf3;
+}
+.stats-metric-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+  height: 100%;
+}
+.stats-metric-bar {
+  display: block;
+  width: min(100%, 25px);
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #f79b90, #e96760);
+}
+.stats-metric-bar.seconds {
+  background: linear-gradient(180deg, #a8bfff, #5e83e5);
+}
+.stats-metric-col small {
+  height: 16px;
+  color: #8b95a4;
+  font-size: 10px;
+  white-space: nowrap;
+}
 /* 汇总信息保持数值层级，窄窗也不再堆成五条长行。 */
 .stats-summary {
   gap: 0;
@@ -3081,6 +3280,18 @@ button.stats-range-label:hover {
 }
 /* 窄窗/竖屏：走势优先、其后紧凑汇总和详细分布。 */
 @media (max-width: 900px), (orientation: portrait) {
+  .stats-overview-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stats-overview-strip > div:nth-child(3) {
+    border-left: 0;
+  }
+  .stats-overview-strip > div:nth-child(n + 3) {
+    border-top: 1px solid #eef1f6;
+  }
+  .stats-insights {
+    grid-template-columns: 1fr;
+  }
   .stats-grid {
     grid-template-columns: 1fr;
   }

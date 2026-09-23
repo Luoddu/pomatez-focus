@@ -50,11 +50,11 @@ export default function StatsTrendChart({
     points.length - 1,
   ].filter((index, offset, all) => all.indexOf(index) === offset);
   return (
-    <section className="stats-trend" aria-label="收获走势">
+    <section className="stats-trend" aria-label="专注趋势">
       <div className="stats-trend-heading">
         <div>
           <span className="stats-trend-eyebrow">专注节奏</span>
-          <h3>收获走势</h3>
+          <h3>专注趋势</h3>
           <p>
             {current ? "本期截至现在" : "所选区间"} · 每{period}番茄数
           </p>

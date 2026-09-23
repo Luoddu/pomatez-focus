@@ -93,6 +93,50 @@ export const inRange = (
       r.startedAt < range.end
   );
 
+// 年度热力只计已保存的真实记录；用日历日期递增，避免夏令时跨日偏移。
+export type AnnualHeatCell = {
+  date: number;
+  inYear: boolean;
+  count: number;
+  seconds: number;
+};
+export function annualHeatmap(
+  records: FocusSession[],
+  year: number
+): AnnualHeatCell[] {
+  const byDay = new Map<number, { count: number; seconds: number }>();
+  for (const record of records) {
+    if (record.status !== "saved") continue;
+    const date = new Date(record.startedAt);
+    if (date.getFullYear() !== year) continue;
+    const key = dayStart(record.startedAt);
+    const value = byDay.get(key) || { count: 0, seconds: 0 };
+    value.count += record.completedCount || 0;
+    value.seconds += record.acceptedSeconds || 0;
+    byDay.set(key, value);
+  }
+  const first = new Date(year, 0, 1);
+  first.setDate(first.getDate() - ((first.getDay() + 6) % 7));
+  const last = new Date(year, 11, 31);
+  last.setDate(last.getDate() + ((7 - last.getDay()) % 7));
+  const cells: AnnualHeatCell[] = [];
+  for (
+    const day = new Date(first);
+    day <= last;
+    day.setDate(day.getDate() + 1)
+  ) {
+    const date = day.getTime();
+    const value = byDay.get(date);
+    cells.push({
+      date,
+      inYear: day.getFullYear() === year,
+      count: value?.count || 0,
+      seconds: value?.seconds || 0,
+    });
+  }
+  return cells;
+}
+
 // ── 汇总数字 ──
 export type Summary = {
   count: number; // 番茄总数
