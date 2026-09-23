@@ -1986,7 +1986,8 @@ export class Feishu {
       );
       let count = 0;
       for (const record of records) {
-        if (record.task.projectType) continue;
+        if (record.task.projectType || record.task.kind === "free")
+          continue;
         const taskId = record.task.taskId;
         // Early snapshots can omit taskId even though their original plan row
         // still has exactly one task. Trust that link only when the snapshot

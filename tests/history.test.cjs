@@ -171,6 +171,12 @@ test("ambiguous or conflicting old task links remain unclassified", async () => 
   state.plans[0].fields.任务 = ["t1", "t2"];
   assert.deepEqual(await client.classifyHistory(), { classified: 0, skipped: 1 });
   assert.equal(state.writes.length, writes);
+  state.plans[0].fields.任务 = ["t1"];
+  const free = JSON.parse(oldText);
+  free.records[0].task.kind = "free";
+  state.plans[0].fields[HISTORY_FIELD] = JSON.stringify(free);
+  assert.deepEqual(await client.classifyHistory(), { classified: 0, skipped: 0 });
+  assert.equal(state.writes.length, writes);
 });
 test("A and B share exact user counts; repeat metadata migration never writes minutes or completion", async () => {
   const { client: a, state } = harness(),
