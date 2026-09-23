@@ -36,7 +36,12 @@ export function rangeOf(key: RangeKey, now: number): RangeInfo {
   if (key === "week") {
     const start = dayStart(now) - ((d.getDay() + 6) % 7) * DAY; // 周一起算
     const end = start + 7 * DAY;
-    return { key, start, end, label: `${md(start)} – ${md(end - DAY)}` };
+    return {
+      key,
+      start,
+      end,
+      label: `${md(start)} – ${md(end - DAY)}`,
+    };
   }
   if (key === "month") {
     const start = new Date(y, m, 1).getTime();
@@ -59,11 +64,17 @@ export function rangeOf(key: RangeKey, now: number): RangeInfo {
 export function shiftRange(range: RangeInfo, delta: -1 | 1): RangeInfo {
   const mid = range.start + (range.end - range.start) / 2;
   const d = new Date(mid);
-  if (range.key === "week") return rangeOf("week", mid + delta * 7 * DAY);
-  const months = range.key === "month" ? 1 : range.key === "quarter" ? 3 : 12;
+  if (range.key === "week")
+    return rangeOf("week", mid + delta * 7 * DAY);
+  const months =
+    range.key === "month" ? 1 : range.key === "quarter" ? 3 : 12;
   return rangeOf(
     range.key,
-    new Date(d.getFullYear(), d.getMonth() + delta * months, 1).getTime()
+    new Date(
+      d.getFullYear(),
+      d.getMonth() + delta * months,
+      1
+    ).getTime()
   );
 }
 
@@ -77,7 +88,9 @@ export const inRange = (
 ): FocusSession[] =>
   records.filter(
     (r) =>
-      r.status === "saved" && r.startedAt >= range.start && r.startedAt < range.end
+      r.status === "saved" &&
+      r.startedAt >= range.start &&
+      r.startedAt < range.end
   );
 
 // ── 汇总数字 ──
@@ -113,13 +126,18 @@ export function summarize(records: FocusSession[]): Summary {
     count,
     seconds,
     activeDays: byDay.size,
-    avgCount: byDay.size ? Math.round((count / byDay.size) * 10) / 10 : 0,
+    avgCount: byDay.size
+      ? Math.round((count / byDay.size) * 10) / 10
+      : 0,
     bestDay,
   };
 }
 
 // 连续收获天数：今天已有收获算到今天，否则算到昨天（今天还在进行中不清零）
-export function currentStreak(records: FocusSession[], now: number): number {
+export function currentStreak(
+  records: FocusSession[],
+  now: number
+): number {
   const days = new Set<number>();
   for (const r of records)
     if (r.status === "saved" && (r.completedCount || 0) > 0)
@@ -136,6 +154,7 @@ export function currentStreak(records: FocusSession[], now: number): number {
 
 // ── 柱状图分桶 ──
 export type BarBucket = {
+  start: number;
   label: string;
   count: number;
   seconds: number;
@@ -149,6 +168,7 @@ export function barBuckets(
   const today = dayStart(now);
   const WEEK_CHARS = "一二三四五六日";
   const bucketAt = (start: number, label: string): BarBucket => ({
+    start,
     label,
     count: 0,
     seconds: 0,
@@ -175,7 +195,10 @@ export function barBuckets(
     bucketOf = (ms) => Math.floor((ms - range.start) / (7 * DAY));
   } else {
     buckets = Array.from({ length: 12 }, (_, i) =>
-      bucketAt(new Date(new Date(range.start).getFullYear(), i, 1).getTime(), `${i + 1}月`)
+      bucketAt(
+        new Date(new Date(range.start).getFullYear(), i, 1).getTime(),
+        `${i + 1}月`
+      )
     );
     bucketOf = (ms) => new Date(ms).getMonth();
   }
@@ -188,6 +211,28 @@ export function barBuckets(
   return buckets;
 }
 
+// 绘图只使用已经到达的分桶。平滑线为向后看的三期移动平均，
+// 不预测未来，也不把尚未发生的日期当作零收获。
+export function harvestTrend(
+  buckets: BarBucket[],
+  range: RangeInfo,
+  now: number
+): { label: string; count: number; average: number }[] {
+  const visible = isCurrentRange(range, now)
+    ? buckets.filter((bucket) => bucket.start <= now)
+    : buckets;
+  return visible.map((bucket, index) => {
+    const recent = visible.slice(Math.max(0, index - 2), index + 1);
+    return {
+      label: bucket.label,
+      count: bucket.count,
+      average:
+        recent.reduce((sum, item) => sum + item.count, 0) /
+        recent.length,
+    };
+  });
+}
+
 // ── 半小时 × 星期热力矩阵：行=周一..周日，列=00:00–24:00 共 48 格。
 // 一段 N 番茄的专注按覆盖时长占比摊到各格（如 25 分钟跨两格则各摊一半），
 // 缺 endedAt 时用 startedAt + acceptedSeconds/plannedSeconds 兜底
@@ -196,7 +241,9 @@ export function halfHourMatrix(
   records: FocusSession[],
   range: { start: number; end: number }
 ): HeatMatrix {
-  const rows = Array.from({ length: 7 }, () => new Array<number>(48).fill(0));
+  const rows = Array.from({ length: 7 }, () =>
+    new Array<number>(48).fill(0)
+  );
   let max = 0;
   for (const r of records) {
     const count = r.completedCount || 0;
@@ -232,7 +279,10 @@ export type TopTask = {
   seconds: number;
   quadrant?: string;
 };
-export function topTasks(records: FocusSession[], limit = 6): TopTask[] {
+export function topTasks(
+  records: FocusSession[],
+  limit = 6
+): TopTask[] {
   const map = new Map<string, TopTask>();
   for (const r of records) {
     const name = baseName(r.task?.title || "自由番茄");
@@ -312,7 +362,10 @@ export type RollingTrend = {
   avgPerActiveDay: { pct: number } | null;
   activeRate: { pct: number } | null;
 };
-const ROLLING_DAYS: Record<RangeKey, { current: number; base: number }> = {
+const ROLLING_DAYS: Record<
+  RangeKey,
+  { current: number; base: number }
+> = {
   week: { current: 7, base: 28 },
   month: { current: 28, base: 90 },
   quarter: { current: 90, base: 180 },
@@ -327,7 +380,8 @@ export function rollingTrend(
   const anchorDay = dayStart(anchor);
   let first = Infinity;
   for (const r of records)
-    if (r.status === "saved" && r.startedAt < first) first = r.startedAt;
+    if (r.status === "saved" && r.startedAt < first)
+      first = r.startedAt;
   if (!Number.isFinite(first)) return null;
   // 可用数据跨度：首条记录所在日到锚点日的天数（锚点之前没有记录则为 0）
   const dataDays = Math.floor((anchorDay - dayStart(first)) / DAY) + 1;
@@ -336,8 +390,7 @@ export function rollingTrend(
   const end = anchorDay + DAY;
   const curStart = anchorDay - (N - 1) * DAY;
   const baseStart = anchorDay - (B - 1) * DAY;
-  const scoped = (start: number) =>
-    inRange(records, { start, end });
+  const scoped = (start: number) => inRange(records, { start, end });
   const cur = summarize(scoped(curStart));
   const base = summarize(scoped(baseStart));
   return {
@@ -358,7 +411,10 @@ export function rollingTrend(
 // ── 时段趋势：与上期相比的产出重心变化。
 // 重心时段不同 → 「产出重心从 X 移到 Y」；重心相同但占比变化 ≥8 个百分点 →
 // 「X 产出占比 ±N 个百分点」；否则 null（数据不足或无变化时不显示） ──
-export function daypartTrend(cur: Daypart[], prev: Daypart[]): string | null {
+export function daypartTrend(
+  cur: Daypart[],
+  prev: Daypart[]
+): string | null {
   const total = (ds: Daypart[]) => ds.reduce((a, d) => a + d.count, 0);
   const tc = total(cur);
   const tp = total(prev);
@@ -377,6 +433,8 @@ export function daypartTrend(cur: Daypart[], prev: Daypart[]): string | null {
     return `产出重心从${pTop.label}移到${cTop.label}`;
   const diff = Math.round((cTop.share - pTop.share) * 100);
   if (Math.abs(diff) >= 8)
-    return `${cTop.label}产出占比 ${diff > 0 ? "+" : ""}${diff} 个百分点`;
+    return `${cTop.label}产出占比 ${
+      diff > 0 ? "+" : ""
+    }${diff} 个百分点`;
   return null;
 }

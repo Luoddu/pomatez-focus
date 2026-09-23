@@ -1,6 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FocusSession, FocusTask, isSpikyMood, moodLabel } from "../session";
-import { QUADRANT_TONES, harvestTier, totalMilestone, TOTAL_MILESTONES, weekTomatoes, flagMarks, crossedFlags } from "../week";
+import {
+  FocusSession,
+  FocusTask,
+  isSpikyMood,
+  moodLabel,
+} from "../session";
+import {
+  QUADRANT_TONES,
+  harvestTier,
+  totalMilestone,
+  TOTAL_MILESTONES,
+  weekTomatoes,
+  flagMarks,
+  crossedFlags,
+} from "../week";
 import {
   WEEK_GOAL_DEFAULT,
   goalFill,
@@ -65,8 +78,11 @@ const todayInvite = () => {
 };
 // 同步状态 → 圆点 + 文案：绿=已上云、橙=待同步、灰=本地。颜色弱依赖，
 // 文案始终完整，色点只是快速扫读锚点
-const syncInfo = (record: FocusSession): { cls: string; text: string } => {
-  if (record.cloudSynced) return { cls: "is-synced", text: "已共享到飞书" };
+const syncInfo = (
+  record: FocusSession
+): { cls: string; text: string } => {
+  if (record.cloudSynced)
+    return { cls: "is-synced", text: "已共享到飞书" };
   if (record.sync === "synced")
     return {
       cls: "is-pending",
@@ -108,20 +124,23 @@ const PencilIcon = () => (
   </svg>
 );
 
-// 里程碑小旗（inline SVG，非 emoji）：旗杆 + 旗面；未达成时旗面低垂在杆下半段
-const FlagIcon = ({ raised, big }: { raised: boolean; big?: boolean }) => (
+// 里程碑小旗：未达成时只改变颜色，旗面始终直立。
+const FlagIcon = ({ big }: { raised: boolean; big?: boolean }) => (
   <svg
     width={big ? 12 : 9}
     height={big ? 16 : 13}
     viewBox="0 0 12 16"
     aria-hidden="true"
   >
-    <rect x="1.1" y="1" width="1.7" height="14" rx="0.85" fill="currentColor" />
-    {raised ? (
-      <path d="M2.8 1.6 L10.8 4.1 L2.8 6.7 Z" fill="currentColor" />
-    ) : (
-      <path d="M2.8 9.2 L10.8 11.7 L2.8 14.3 Z" fill="currentColor" />
-    )}
+    <rect
+      x="1.1"
+      y="1"
+      width="1.7"
+      height="14"
+      rx="0.85"
+      fill="currentColor"
+    />
+    <path d="M2.8 1.6 L10.8 4.1 L2.8 6.7 Z" fill="currentColor" />
   </svg>
 );
 
@@ -178,6 +197,7 @@ export default function HistoryPanel({
   const [editRecord, setEditRecord] = useState<FocusSession | null>(
     null
   );
+  const recordScrollRef = useRef<HTMLDivElement>(null);
   // 周目标：覆盖表（仅按周键），chip 显示本周已收/目标，悬浮开弹窗仅改本周
   const [goals, setGoals] = useState(loadWeekGoals);
   const [goalOpen, setGoalOpen] = useState(false);
@@ -227,15 +247,23 @@ export default function HistoryPanel({
   const shownWeekTotal = useCountUp(weekTotal);
   const totalTomatoes = sum(records, (r) => r.completedCount || 0);
   const todayTier = harvestTier(shownTodayTomatoes);
-  // 总番茄的成就刻度：独立通栏里程碑条（放在四张数字卡下方），
-  // 不再塞进「总番茄」卡内——避免左卡多出两行、右卡留空行
+  // 里程碑按上一个成果到下一档计进度。
   const totalMs = totalMilestone(totalTomatoes);
-  const totalDone = totalMs.reached >= TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
-  // 轨道按绝对刻度 0→下一档，旗子每 25 个一面、终点大旗在 next
+  const totalDone =
+    totalMs.reached >= TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
   const totalProgress = totalDone
     ? 100
-    : Math.min(100, Math.round((totalTomatoes / totalMs.next) * 1000) / 10);
-  const flags = flagMarks(totalMs.next);
+    : Math.min(
+        100,
+        Math.round(
+          ((totalTomatoes - totalMs.reached) /
+            (totalMs.next - totalMs.reached)) *
+            1000
+        ) / 10
+      );
+  const flags = flagMarks(totalMs.next).filter(
+    (m) => m > totalMs.reached
+  );
   // 越过里程碑：本会话内从 below 到 ≥ 时旗子弹起一次并通知；挂载基线不补播
   const [justRaised, setJustRaised] = useState<number | null>(null);
   const milestoneBase = useRef<number | null>(null);
@@ -261,10 +289,17 @@ export default function HistoryPanel({
     value: string;
     tier?: string;
   }[] = [
-    { label: "今日番茄", value: String(shownTodayTomatoes), tier: todayTier },
+    {
+      label: "今日番茄",
+      value: String(shownTodayTomatoes),
+      tier: todayTier,
+    },
     { label: "今日专注时长", value: durationText(shownTodaySeconds) },
     { label: "总番茄", value: String(totalTomatoes) },
-    { label: "总专注时长", value: durationText(sum(records, (r) => r.acceptedSeconds || 0)) },
+    {
+      label: "总专注时长",
+      value: durationText(sum(records, (r) => r.acceptedSeconds || 0)),
+    },
   ];
   const groups = records
     .slice()
@@ -280,6 +315,17 @@ export default function HistoryPanel({
   const todayKey = dayLabel(Date.now());
   if (!groups.length || groups[0].date !== todayKey)
     groups.unshift({ date: todayKey, records: [] });
+  // 历史在左、今天在右；默认定位到最右，继续翻旧记录时不强行拉回。
+  const latestDay = groups[0]?.date;
+  useEffect(() => {
+    const alignLatest = () => {
+      const el = recordScrollRef.current;
+      if (el) el.scrollLeft = el.scrollWidth - el.clientWidth;
+    };
+    alignLatest();
+    window.addEventListener("resize", alignLatest);
+    return () => window.removeEventListener("resize", alignLatest);
+  }, [groups.length, latestDay]);
   return (
     <div className="right-col">
       <div className="side-section">
@@ -288,7 +334,7 @@ export default function HistoryPanel({
           <span className="side-title-actions">
             {onOpenStats && (
               <button
-                className="btn-text"
+                className="btn-text overview-action"
                 aria-label="专注统计"
                 title="周 / 月 / 季 / 年统计与时段热力"
                 onClick={onOpenStats}
@@ -298,9 +344,11 @@ export default function HistoryPanel({
             )}
             {/* Same compact feedback for both foreground and background work. */}
             <button
-              className={`btn-text gen-btn${generating ? " busy" : ""}${
-                genFailed ? " failed" : ""
-              }${genPercent === 100 ? " complete" : ""}`}
+              className={`btn-text gen-btn overview-action${
+                generating ? " busy" : ""
+              }${genFailed ? " failed" : ""}${
+                genPercent === 100 ? " complete" : ""
+              }`}
               aria-label="生成今日番茄"
               title={
                 genStageText
@@ -363,22 +411,40 @@ export default function HistoryPanel({
             </div>
           ))}
         </div>
-        {/* 累计里程碑通栏：轨道 0→下一档，每 25 个一面小旗，终点大旗 */}
+        {/* 上一个已达成果 → 下一档，实时值贴着进度端点。 */}
         <div
           className="card stat-totalbar"
           title={`总番茄 ${totalTomatoes} 个的成就进度`}
         >
-          <span className="stb-from">0</span>
+          <span className="stb-from">{totalMs.reached}</span>
           <div className="stb-main">
             <div className="stb-track" aria-hidden="true">
               <i style={{ width: `${totalProgress}%` }} />
+              <span
+                className={`stb-current${
+                  totalProgress <= 4
+                    ? " at-start"
+                    : totalProgress >= 96
+                    ? " at-end"
+                    : ""
+                }`}
+                style={{ left: `${totalProgress}%` }}
+              >
+                {totalTomatoes}
+              </span>
               {flags.map((m) => (
                 <span
                   key={m}
                   className={`ms-flag${
                     totalTomatoes >= m ? " raised" : ""
                   }${justRaised === m ? " just-raised" : ""}`}
-                  style={{ left: `${(m / totalMs.next) * 100}%` }}
+                  style={{
+                    left: `${
+                      ((m - totalMs.reached) /
+                        (totalMs.next - totalMs.reached)) *
+                      100
+                    }%`,
+                  }}
                   title={`${m} 个番茄`}
                 >
                   <FlagIcon raised={totalTomatoes >= m} />
@@ -386,7 +452,9 @@ export default function HistoryPanel({
               ))}
               <span
                 className={`ms-flag big${
-                  totalDone || totalTomatoes >= totalMs.next ? " raised" : ""
+                  totalDone || totalTomatoes >= totalMs.next
+                    ? " raised"
+                    : ""
                 }${justRaised === totalMs.next ? " just-raised" : ""}`}
                 style={{ left: "100%" }}
                 title={`${totalMs.next} 个番茄（终点）`}
@@ -397,17 +465,6 @@ export default function HistoryPanel({
                 />
               </span>
             </div>
-            <em>
-              {totalDone
-                ? `已达成 ${totalMs.reached} 丰收传奇`
-                : totalMs.reached
-                ? `已达成 ${totalMs.reached} · 距 ${totalMs.next} 还差 ${
-                    totalMs.next - totalTomatoes
-                  }`
-                : `距第一个里程碑 ${totalMs.next} 还差 ${
-                    totalMs.next - totalTomatoes
-                  }`}
-            </em>
           </div>
           <span className="stb-to">{totalMs.next}</span>
         </div>
@@ -499,7 +556,7 @@ export default function HistoryPanel({
       </div>
       <div className="side-section records-section">
         <div className="side-title">
-          专注记录
+          专注积累
           <span className="side-title-actions">
             <button
               className="btn-text"
@@ -554,99 +611,108 @@ export default function HistoryPanel({
             onCancel={() => setEditRecord(null)}
           />
         )}
-        <div className="card records">
-          {groups.map((group) => (
-            <section className="record-day" key={group.date}>
-              <h4>
-                {group.date}
-                {(() => {
-                  const dayCount = group.records.reduce(
-                    (total, r) => total + (r.completedCount || 0),
-                    0
-                  );
-                  const tier = harvestTier(dayCount);
-                  return (
-                    <span
-                      className={`day-total${tier ? ` ${tier}` : ""}`}
-                    >
-                      共 {dayCount} 个番茄
-                    </span>
-                  );
-                })()}
-              </h4>
-              {group.records.length === 0 ? (
-                <p className="record-invite">{todayInvite()}</p>
-              ) : (
-                <ul className="record-list">
-                  {group.records.map((r) => {
-                    // 记录圆点按任务象限着色（与番茄园同一取数口径：
-                    // 记录里的任务快照，无象限归 free 中性色）
-                    const q =
-                      r.task?.quadrant === "iu" ||
-                      r.task?.quadrant === "inu" ||
-                      r.task?.quadrant === "uni" ||
-                      r.task?.quadrant === "unu"
-                        ? r.task.quadrant
-                        : "free";
-                    return (
-                      <li className="record" key={r.id}>
-                        <span
-                          className={`r-icon tone-${q}${
-                            isSpikyMood(r.mood) ? " spiky" : ""
-                          }`}
-                          title={
-                            r.mood != null
-                              ? `本次感受：${moodLabel(r.mood)}`
-                              : undefined
-                          }
-                        >
-                          <LogoIcon
-                            size={14}
-                            tone={QUADRANT_TONES[q]}
-                            spiky={isSpikyMood(r.mood)}
-                          />
-                        </span>
-                        <div className="r-main">
-                          <div className="r-line1">
-                            <span className="r-time">
-                              {recordTime(r.startedAt)} —{" "}
-                              {r.endedAt ? recordTime(r.endedAt) : ""}
-                            </span>
-                            <span className="r-task">
-                              {parseTitle(r.task.title).name}
-                            </span>
-                            <span className="r-dur">
-                              {durationText(r.acceptedSeconds || 0)}
-                            </span>
-                          </div>
-                          <div className="r-sub">
-                            完成 {r.completedCount} 个 · <SyncBadge record={r} />
-                            {onEdit && (
-                              <button
-                                className="btn-text record-edit"
-                                aria-label={`修改记录 ${r.id}`}
-                                title="修改这条记录"
-                                disabled={editingIds.includes(r.id)}
-                                onClick={() => {
-                                  setEntryOpen(false);
-                                  setEditRecord(r);
-                                }}
-                              >
-                                <PencilIcon />
-                                {editingIds.includes(r.id)
-                                  ? "修改待同步"
-                                  : "修改"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </li>
+        <div className="card records" ref={recordScrollRef}>
+          {groups
+            .slice()
+            .reverse()
+            .map((group) => (
+              <section
+                className={`record-day${
+                  group.date === todayKey ? " is-today" : ""
+                }`}
+                key={group.date}
+              >
+                <h4>
+                  {group.date}
+                  {(() => {
+                    const dayCount = group.records.reduce(
+                      (total, r) => total + (r.completedCount || 0),
+                      0
                     );
-                  })}
-                </ul>
-              )}
-            </section>
-          ))}
+                    const tier = harvestTier(dayCount);
+                    return (
+                      <span
+                        className={`day-total${tier ? ` ${tier}` : ""}`}
+                      >
+                        共 {dayCount} 个番茄
+                      </span>
+                    );
+                  })()}
+                </h4>
+                {group.records.length === 0 ? (
+                  <p className="record-invite">{todayInvite()}</p>
+                ) : (
+                  <ul className="record-list">
+                    {group.records.map((r) => {
+                      // 记录圆点按任务象限着色（与番茄园同一取数口径：
+                      // 记录里的任务快照，无象限归 free 中性色）
+                      const q =
+                        r.task?.quadrant === "iu" ||
+                        r.task?.quadrant === "inu" ||
+                        r.task?.quadrant === "uni" ||
+                        r.task?.quadrant === "unu"
+                          ? r.task.quadrant
+                          : "free";
+                      return (
+                        <li className="record" key={r.id}>
+                          <span
+                            className={`r-icon tone-${q}${
+                              isSpikyMood(r.mood) ? " spiky" : ""
+                            }`}
+                            title={
+                              r.mood != null
+                                ? `本次感受：${moodLabel(r.mood)}`
+                                : undefined
+                            }
+                          >
+                            <LogoIcon
+                              size={14}
+                              tone={QUADRANT_TONES[q]}
+                              spiky={isSpikyMood(r.mood)}
+                            />
+                          </span>
+                          <div className="r-main">
+                            <div className="r-line1">
+                              <span className="r-time">
+                                {recordTime(r.startedAt)} —{" "}
+                                {r.endedAt ? recordTime(r.endedAt) : ""}
+                              </span>
+                              <span className="r-task">
+                                {parseTitle(r.task.title).name}
+                              </span>
+                              <span className="r-dur">
+                                {durationText(r.acceptedSeconds || 0)}
+                              </span>
+                            </div>
+                            <div className="r-sub">
+                              完成 {r.completedCount} 个 ·{" "}
+                              <SyncBadge record={r} />
+                              {onEdit && (
+                                <button
+                                  className="btn-text record-edit"
+                                  aria-label={`修改记录 ${r.id}`}
+                                  title="修改这条记录"
+                                  disabled={editingIds.includes(r.id)}
+                                  onClick={() => {
+                                    setEntryOpen(false);
+                                    setEditRecord(r);
+                                  }}
+                                >
+                                  <PencilIcon />
+                                  {editingIds.includes(r.id)
+                                    ? "修改待同步"
+                                    : "修改"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            ))}
         </div>
       </div>
     </div>

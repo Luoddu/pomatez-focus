@@ -56,10 +56,19 @@ const GRAD_BY_TONE: Record<string, string> = Object.fromEntries(
 const TomatoDefs = () => (
   <defs>
     {TOMATO_GRADS.map(([k, tone]) => (
-      <radialGradient key={k} id={`farm-tomato-${k}`} cx="42%" cy="32%" r="78%">
+      <radialGradient
+        key={k}
+        id={`farm-tomato-${k}`}
+        cx="42%"
+        cy="32%"
+        r="78%"
+      >
         <stop offset="0%" stopColor={tone} />
         <stop offset="55%" stopColor={tone} />
-        <stop offset="100%" stopColor={mixColor(tone, "#000000", 0.16)} />
+        <stop
+          offset="100%"
+          stopColor={mixColor(tone, "#000000", 0.16)}
+        />
       </radialGradient>
     ))}
   </defs>
@@ -95,9 +104,9 @@ const Tomato = ({
         Math.PI) /
       180;
     const len = 2.4 + rand(seed, 21 + k) * 1.4;
-    return `M${x} ${(y - ry).toFixed(2)} l${(Math.cos(a) * len).toFixed(2)} ${(
-      Math.sin(a) * len
-    ).toFixed(2)}`;
+    return `M${x} ${(y - ry).toFixed(2)} l${(Math.cos(a) * len).toFixed(
+      2
+    )} ${(Math.sin(a) * len).toFixed(2)}`;
   }).join(" ");
   return (
     <g transform={`rotate(${tilt.toFixed(1)} ${x} ${y})`}>
@@ -243,14 +252,21 @@ const skyTint = (h: number) => {
       [h1, c1, o1] = SKY_TINTS[i + 1];
     if (h >= h0 && h <= h1) {
       const t = (h - h0) / (h1 - h0);
-      return { color: mixColor(c0, c1, t), opacity: o0 + (o1 - o0) * t };
+      return {
+        color: mixColor(c0, c1, t),
+        opacity: o0 + (o1 - o0) * t,
+      };
     }
   }
   return { color: "#2b3a6b", opacity: 0.22 };
 };
 const rgba = (hex: string, alpha: number) => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
+  const [r, g, b] = [1, 3, 5].map((i) =>
+    parseInt(hex.slice(i, i + 2), 16)
+  );
+  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha)).toFixed(
+    3
+  )})`;
 };
 const Sky = ({ now }: { now: number }) => {
   const h = beijingHour(now);
@@ -260,7 +276,11 @@ const Sky = ({ now }: { now: number }) => {
   const altitude = Math.sin(Math.min(1, Math.max(0, t)) * Math.PI);
   const bodyLeft = 8 + t * 84;
   const bodyTop = 10 + (1 - altitude) * 52;
-  const sun = mixColor("#f2994a", "#ffd45e", Math.min(1, altitude * 1.6));
+  const sun = mixColor(
+    "#f2994a",
+    "#ffd45e",
+    Math.min(1, altitude * 1.6)
+  );
   return (
     <>
       <div
@@ -269,7 +289,10 @@ const Sky = ({ now }: { now: number }) => {
           background: `linear-gradient(180deg, ${rgba(
             tint.color,
             tint.opacity * 1.6
-          )}, ${rgba(tint.color, tint.opacity * 0.3)} 70%, transparent)`,
+          )}, ${rgba(
+            tint.color,
+            tint.opacity * 0.3
+          )} 70%, transparent)`,
         }}
       />
       {day ? (
@@ -311,7 +334,11 @@ const Sky = ({ now }: { now: number }) => {
         style={{ left: "66%", top: "7%", animationDelay: "-13s" }}
       />
       {day && h >= 7 && h < 17 && (
-        <svg className="farm-birds" viewBox="0 0 720 60" preserveAspectRatio="xMidYMin meet">
+        <svg
+          className="farm-birds"
+          viewBox="0 0 720 60"
+          preserveAspectRatio="xMidYMin meet"
+        >
           <Bird x={330} y={22} />
           <Bird x={372} y={34} />
         </svg>
@@ -321,7 +348,13 @@ const Sky = ({ now }: { now: number }) => {
 };
 
 // 稻草人：立在土壤带右缘的可爱看守，local 原点在杆底；冬天戴红围巾
-const Scarecrow = ({ x, scarf = false }: { x: number; scarf?: boolean }) => (
+const Scarecrow = ({
+  x,
+  scarf = false,
+}: {
+  x: number;
+  scarf?: boolean;
+}) => (
   <g
     className="farm-scarecrow"
     transform={`translate(${x} 18) scale(.85)`}
@@ -329,7 +362,10 @@ const Scarecrow = ({ x, scarf = false }: { x: number; scarf?: boolean }) => (
     <rect x="-2.5" y="86" width="5" height="34" rx="2" fill="#a9763f" />
     {scarf && (
       <>
-        <path d="M-9 70.5 Q0 75.5 9 70.5 L8 78 L2 75.5 L-7 79 Z" fill="#d9564a" />
+        <path
+          d="M-9 70.5 Q0 75.5 9 70.5 L8 78 L2 75.5 L-7 79 Z"
+          fill="#d9564a"
+        />
         <path d="M2 75.5 l5 13 l4 -1.5 l-4.5 -12.5 Z" fill="#c94337" />
       </>
     )}
@@ -402,9 +438,33 @@ const SNOWFLAKES: [number, number][] = [
 ];
 const Dragonfly = () => (
   <g className="farm-dragonfly" transform="translate(520 66)">
-    <line x1="0" y1="0" x2="0" y2="12" stroke="#5b7f99" strokeWidth="1.6" strokeLinecap="round" />
-    <ellipse className="farm-wing" cx="-4" cy="-2" rx="5" ry="1.8" fill="#bcd8ec" opacity=".85" />
-    <ellipse className="farm-wing right" cx="4" cy="-2" rx="5" ry="1.8" fill="#bcd8ec" opacity=".85" />
+    <line
+      x1="0"
+      y1="0"
+      x2="0"
+      y2="12"
+      stroke="#5b7f99"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+    <ellipse
+      className="farm-wing"
+      cx="-4"
+      cy="-2"
+      rx="5"
+      ry="1.8"
+      fill="#bcd8ec"
+      opacity=".85"
+    />
+    <ellipse
+      className="farm-wing right"
+      cx="4"
+      cy="-2"
+      rx="5"
+      ry="1.8"
+      fill="#bcd8ec"
+      opacity=".85"
+    />
     <circle cx="0" cy="-3" r="1.6" fill="#5b7f99" />
   </g>
 );
@@ -469,7 +529,13 @@ const SeasonLayer = ({ season }: { season: Season }) => {
               animationDuration: `${8 + (i % 3)}s`,
             }}
           >
-            <circle cx="0" cy="0" r="2.1" fill="#ffffff" opacity=".95" />
+            <circle
+              cx="0"
+              cy="0"
+              r="2.1"
+              fill="#ffffff"
+              opacity=".95"
+            />
             <path
               d="M-3.4 0 L3.4 0 M0 -3.4 L0 3.4"
               stroke="#ffffff"
@@ -673,10 +739,13 @@ const Plant = ({
           { x: -9, y: -(stemH - 12) },
           { x: 8, y: -(stemH - 20) },
           { x: -2, y: -(stemH - 30) },
-          ...Array.from({ length: Math.min(extraFruit, 6) }, (_, k) => ({
-            x: (rand(index, 71 + k) - 0.5) * 26,
-            y: -(14 + rand(index, 81 + k) * (stemH - 18)),
-          })),
+          ...Array.from(
+            { length: Math.min(extraFruit, 6) },
+            (_, k) => ({
+              x: (rand(index, 71 + k) - 0.5) * 26,
+              y: -(14 + rand(index, 81 + k) * (stemH - 18)),
+            })
+          ),
         ]
       : [];
   return (
@@ -715,7 +784,13 @@ const Plant = ({
       {stage >= 4 && (
         <>
           {slots.map((s, k) => (
-            <Tomato key={k} x={s.x} y={s.y} tone={fruitTone(k)} seed={index * 31 + k} />
+            <Tomato
+              key={k}
+              x={s.x}
+              y={s.y}
+              tone={fruitTone(k)}
+              seed={index * 31 + k}
+            />
           ))}
           {stage === 4 && <StarFlower x={5} y={-stemH - 2} s={0.7} />}
         </>
@@ -752,10 +827,29 @@ const MiniBasket = ({
 }) => (
   <g transform={`translate(${x} -2) scale(.52)`}>
     <path d="M-24 -12 L24 -12 L19 6 L-19 6 Z" fill="#b07840" />
-    <rect x="-27" y="-16" width="54" height="7" rx="3.5" fill="#a9763f" />
+    <rect
+      x="-27"
+      y="-16"
+      width="54"
+      height="7"
+      rx="3.5"
+      fill="#a9763f"
+    />
     <Tomato x={-9} y={-20} r={6} tone={toneAt(seed)} seed={seed * 7} />
-    <Tomato x={4} y={-22} r={6} tone={toneAt(seed + 1)} seed={seed * 7 + 1} />
-    <Tomato x={-2} y={-29} r={6} tone={toneAt(seed + 2)} seed={seed * 7 + 2} />
+    <Tomato
+      x={4}
+      y={-22}
+      r={6}
+      tone={toneAt(seed + 1)}
+      seed={seed * 7 + 1}
+    />
+    <Tomato
+      x={-2}
+      y={-29}
+      r={6}
+      tone={toneAt(seed + 2)}
+      seed={seed * 7 + 2}
+    />
   </g>
 );
 
@@ -763,9 +857,21 @@ const MiniBasket = ({
 const MilestoneFlag = ({ reached }: { reached: number }) =>
   reached >= 50 ? (
     <g transform="translate(0 -72)">
-      <line x1="0" y1="10" x2="0" y2="-2" stroke="#a9763f" strokeWidth="1.8" />
+      <line
+        x1="0"
+        y1="10"
+        x2="0"
+        y2="-2"
+        stroke="#a9763f"
+        strokeWidth="1.8"
+      />
       <path d="M0 -2 L15 -2 L12.5 3 L15 8 L0 8 Z" fill="#f2b544" />
-      <text className="farm-flag-text" x="5.5" y="5.4" textAnchor="middle">
+      <text
+        className="farm-flag-text"
+        x="5.5"
+        y="5.4"
+        textAnchor="middle"
+      >
         {reached}
       </text>
     </g>
@@ -785,14 +891,42 @@ const Pile = ({
   return (
     <g className="farm-pile" transform="translate(44 118)">
       {/* 立在卡片留白上的淡淡地影，不接地壤带 */}
-      <ellipse cx="6" cy="5" rx="46" ry="5" fill="#7a4f21" opacity=".08" />
-      {sideBaskets > 0 && <MiniBasket x={-32} toneAt={toneAt} seed={30} />}
-      {sideBaskets > 1 && <MiniBasket x={46} toneAt={toneAt} seed={33} />}
+      <ellipse
+        cx="6"
+        cy="5"
+        rx="46"
+        ry="5"
+        fill="#7a4f21"
+        opacity=".08"
+      />
+      {sideBaskets > 0 && (
+        <MiniBasket x={-32} toneAt={toneAt} seed={30} />
+      )}
+      {sideBaskets > 1 && (
+        <MiniBasket x={46} toneAt={toneAt} seed={33} />
+      )}
       {/* 编织筐：筐身 + 两道织纹 + 提手 */}
       <path d="M-32 -14 L32 -14 L25 5 L-25 5 Z" fill="#b07840" />
-      <path d="M-29.5 -8 L29.5 -8" stroke="#9c6733" strokeWidth="1.6" opacity=".7" />
-      <path d="M-27 -2 L27 -2" stroke="#9c6733" strokeWidth="1.6" opacity=".7" />
-      <rect x="-35" y="-18" width="70" height="7" rx="3.5" fill="#a9763f" />
+      <path
+        d="M-29.5 -8 L29.5 -8"
+        stroke="#9c6733"
+        strokeWidth="1.6"
+        opacity=".7"
+      />
+      <path
+        d="M-27 -2 L27 -2"
+        stroke="#9c6733"
+        strokeWidth="1.6"
+        opacity=".7"
+      />
+      <rect
+        x="-35"
+        y="-18"
+        width="70"
+        height="7"
+        rx="3.5"
+        fill="#a9763f"
+      />
       <path
         d="M-20 -18 Q0 -34 20 -18"
         stroke="#a9763f"
@@ -802,16 +936,16 @@ const Pile = ({
       />
       {PILE_SLOTS.slice(0, shown).map(([sx, sy], k) => (
         // key=k：堆高时新番茄挂载触发弹跳，既有番茄不重播
-        <Tomato key={k} x={sx} y={sy} r={5.4} tone={toneAt(k)} seed={200 + k} pop />
+        <Tomato
+          key={k}
+          x={sx}
+          y={sy}
+          r={5.4}
+          tone={toneAt(k)}
+          seed={200 + k}
+          pop
+        />
       ))}
-      {n > PILE_CAP && (
-        <g transform="translate(30 -52)">
-          <rect x="-14" y="-9" width="30" height="15" rx="7.5" fill="#f2b544" />
-          <text className="farm-flag-text" x="1" y="2.4" textAnchor="middle">
-            +{n - PILE_CAP}
-          </text>
-        </g>
-      )}
       <MilestoneFlag reached={milestone.reached} />
       <text className="farm-pile-text" x="6" y="18" textAnchor="middle">
         累计收获 {n}
@@ -870,8 +1004,8 @@ export default function FarmField({
   const harvest = weekHarvest(week);
   const caption =
     harvest.plants === 0
-      ? `空地 · 本周还没种 · 完成 1 个番茄就发芽 · 累计收获 ${total}`
-      : `${harvest.stage} · 本周已收 ${week} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${total} · 周日翻篇`;
+      ? `本周收获 ${week} 个 · 累计收获 ${total}`
+      : `${harvest.stage} · 本周收获 ${week} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${total}`;
   // 象限色按下标循环取近似比例；无记录时回退经典番茄红
   const toneFrom = (list: QuadrantKey[]) => (k: number) =>
     list.length ? QUADRANT_TONES[list[k % list.length]] : "#e57368";
@@ -969,11 +1103,46 @@ export default function FarmField({
           )}
           {/* 小栅栏：土壤带左缘 */}
           <g className="farm-fence">
-            <rect x="114" y="106" width="4" height="16" rx="1.5" fill="#c68b59" />
-            <rect x="134" y="106" width="4" height="16" rx="1.5" fill="#c68b59" />
-            <rect x="154" y="106" width="4" height="16" rx="1.5" fill="#c68b59" />
-            <rect x="110" y="110" width="52" height="3" rx="1.5" fill="#d9a066" />
-            <rect x="110" y="117" width="52" height="3" rx="1.5" fill="#d9a066" />
+            <rect
+              x="114"
+              y="106"
+              width="4"
+              height="16"
+              rx="1.5"
+              fill="#c68b59"
+            />
+            <rect
+              x="134"
+              y="106"
+              width="4"
+              height="16"
+              rx="1.5"
+              fill="#c68b59"
+            />
+            <rect
+              x="154"
+              y="106"
+              width="4"
+              height="16"
+              rx="1.5"
+              fill="#c68b59"
+            />
+            <rect
+              x="110"
+              y="110"
+              width="52"
+              height="3"
+              rx="1.5"
+              fill="#d9a066"
+            />
+            <rect
+              x="110"
+              y="117"
+              width="52"
+              height="3"
+              rx="1.5"
+              fill="#d9a066"
+            />
           </g>
           {/* 猫头鹰夜晚上栅栏守田（会眨眼），白天飞走 */}
           {owlOut && <Owl x={136} y={97} />}
@@ -987,7 +1156,9 @@ export default function FarmField({
             return (
               <g
                 key={PLANTS[i]}
-                transform={`translate(${PLANTS[i]} ${GROUND}) rotate(${tilt.toFixed(
+                transform={`translate(${
+                  PLANTS[i]
+                } ${GROUND}) rotate(${tilt.toFixed(
                   2
                 )}) scale(${scale.toFixed(3)})`}
               >
@@ -995,7 +1166,9 @@ export default function FarmField({
                   className="farm-sway"
                   style={{
                     animationDuration: `${dur.toFixed(2)}s`,
-                    animationDelay: `${(-rand(i, 4) * dur).toFixed(2)}s`,
+                    animationDelay: `${(-rand(i, 4) * dur).toFixed(
+                      2
+                    )}s`,
                   }}
                 >
                   <Plant
@@ -1010,56 +1183,59 @@ export default function FarmField({
           })}
           {butterfliesOut &&
             BUTTERFLIES.map(([bx, by], i) => (
-            <g key={`${bx}-${by}`} transform={`translate(${bx} ${by})`}>
               <g
-                className="farm-butterfly"
-                style={{
-                  animationDelay: `${-i * 4.1}s`,
-                  animationDuration: `${13 + i * 2.5}s`,
-                }}
+                key={`${bx}-${by}`}
+                transform={`translate(${bx} ${by})`}
               >
-                <ellipse
-                  className="farm-wing"
-                  cx="-3.2"
-                  cy="0"
-                  rx="4"
-                  ry="2.6"
-                  fill={i ? "#f2b544" : "#ec9bb6"}
-                />
-                <ellipse
-                  className="farm-wing right"
-                  cx="3.2"
-                  cy="0"
-                  rx="4"
-                  ry="2.6"
-                  fill={i ? "#f2b544" : "#ec9bb6"}
-                />
-                <rect
-                  x="-0.8"
-                  y="-3"
-                  width="1.6"
-                  height="6"
-                  rx="0.8"
-                  fill="#7a4f21"
-                />
+                <g
+                  className="farm-butterfly"
+                  style={{
+                    animationDelay: `${-i * 4.1}s`,
+                    animationDuration: `${13 + i * 2.5}s`,
+                  }}
+                >
+                  <ellipse
+                    className="farm-wing"
+                    cx="-3.2"
+                    cy="0"
+                    rx="4"
+                    ry="2.6"
+                    fill={i ? "#f2b544" : "#ec9bb6"}
+                  />
+                  <ellipse
+                    className="farm-wing right"
+                    cx="3.2"
+                    cy="0"
+                    rx="4"
+                    ry="2.6"
+                    fill={i ? "#f2b544" : "#ec9bb6"}
+                  />
+                  <rect
+                    x="-0.8"
+                    y="-3"
+                    width="1.6"
+                    height="6"
+                    rx="0.8"
+                    fill="#7a4f21"
+                  />
+                </g>
               </g>
-            </g>
-          ))}
+            ))}
           {firefliesOut &&
             FIREFLIES.map(([fx, fy], i) => (
-            <circle
-              key={`${fx}-${fy}`}
-              className="farm-firefly"
-              cx={fx}
-              cy={fy}
-              r="2"
-              fill="#e9f79b"
-              style={{
-                animationDelay: `${i * 0.8}s`,
-                animationDuration: `${2 + i * 0.4}s`,
-              }}
-            />
-          ))}
+              <circle
+                key={`${fx}-${fy}`}
+                className="farm-firefly"
+                cx={fx}
+                cy={fy}
+                r="2"
+                fill="#e9f79b"
+                style={{
+                  animationDelay: `${i * 0.8}s`,
+                  animationDuration: `${2 + i * 0.4}s`,
+                }}
+              />
+            ))}
           {/* 时令装饰：花瓣 / 蜻蜓 / 落叶 / 雪花，按真实节气换景；
               其上再叠节气点景（细雨 / 露珠） */}
           <SeasonLayer season={season} />

@@ -8,6 +8,7 @@ import {
   daypartSplit,
   daypartTrend,
   halfHourMatrix,
+  harvestTrend,
   inRange,
   isCurrentRange,
   rangeOf,
@@ -24,6 +25,7 @@ import {
 } from "../week";
 import { renderShareCardPng, shareCardModel } from "../shareCard";
 import { WindowControls, durationText, LogoIcon } from "./shared";
+import StatsTrendChart from "./StatsTrendChart";
 
 const WEEK_CHARS = "一二三四五六日";
 
@@ -34,7 +36,9 @@ const heatTier = (v: number) =>
 const countText = (v: number) =>
   v >= 10 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1);
 const slotLabel = (col: number) =>
-  `${String(Math.floor(col / 2)).padStart(2, "0")}:${col % 2 ? "30" : "00"}`;
+  `${String(Math.floor(col / 2)).padStart(2, "0")}:${
+    col % 2 ? "30" : "00"
+  }`;
 
 // 象限名（只展示象限，不展示任何任务名——统计页可被截图分享，隐私安全）
 const QUAD_LABELS: Record<QuadrantKey, string> = {
@@ -73,9 +77,15 @@ export default function StatsPanel({
   // anchor：区间内的任意一天；翻页只动 anchor，tab 切换重置回今天
   const [anchor, setAnchor] = useState(() => Date.now());
   const now = Date.now();
-  const range = useMemo(() => rangeOf(rangeKey, anchor), [rangeKey, anchor]);
+  const range = useMemo(
+    () => rangeOf(rangeKey, anchor),
+    [rangeKey, anchor]
+  );
   const current = isCurrentRange(range, now);
-  const scoped = useMemo(() => inRange(records, range), [records, range]);
+  const scoped = useMemo(
+    () => inRange(records, range),
+    [records, range]
+  );
   const summary = useMemo(() => summarize(scoped), [scoped]);
   // 滚动窗口趋势（Apple 训练负荷式）：锚定视角最后一天，
   // 当前区间锚今天，历史翻页锚该区间末尾；与上方区间合计解耦
@@ -85,12 +95,22 @@ export default function StatsPanel({
     [records, rangeKey, trendAnchor]
   );
   // 连续天数是全历史口径（不只是当前区间），切换区间不跳动
-  const streak = useMemo(() => currentStreak(records, now), [records, now]);
+  const streak = useMemo(
+    () => currentStreak(records, now),
+    [records, now]
+  );
   const buckets = useMemo(
     () => barBuckets(scoped, range, now),
     [scoped, range, now]
   );
-  const heat = useMemo(() => halfHourMatrix(scoped, range), [scoped, range]);
+  const trendPoints = useMemo(
+    () => harvestTrend(buckets, range, now),
+    [buckets, range, now]
+  );
+  const heat = useMemo(
+    () => halfHourMatrix(scoped, range),
+    [scoped, range]
+  );
   const dayparts = useMemo(() => daypartSplit(heat), [heat]);
   // 时段趋势：滚动窗口口径，与区间合计环比同源（算不出就不显示）
   const partTrend = useMemo(() => {
@@ -149,7 +169,9 @@ export default function StatsPanel({
     }
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = `番茄农场-${RANGE_LABELS[rangeKey]}-${range.label.replace(/[\\/:*?"<>|]/g, "")}.png`;
+    a.download = `番茄农场-${
+      RANGE_LABELS[rangeKey]
+    }-${range.label.replace(/[\\/:*?"<>|]/g, "")}.png`;
     a.click();
   };
   // 「现在」标记：仅当前周视图，在今天这列的当前半小时格上描边
@@ -158,12 +180,18 @@ export default function StatsPanel({
     const d = new Date(now);
     return {
       row: (d.getDay() + 6) % 7,
-      col: Math.min(47, d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0)),
+      col: Math.min(
+        47,
+        d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0)
+      ),
     };
   })();
   // 环比小块：▲ 升（番茄红）/ ▼ 降（中性灰）/ 持平，紧跟滚动窗口基准小灰字；
   // 数据不足/基准无数据（trend 为 null 或该项为 null）时整块不显示
-  const delta = (d: { pct: number } | null | undefined, base: string) => {
+  const delta = (
+    d: { pct: number } | null | undefined,
+    base: string
+  ) => {
     if (!d) return null;
     return (
       <>
@@ -184,13 +212,19 @@ export default function StatsPanel({
     <main className="content stats-page">
       <div className="side-title">
         专注统计
-        <div className="stats-tabs" role="tablist" aria-label="统计区间">
+        <div
+          className="stats-tabs"
+          role="tablist"
+          aria-label="统计区间"
+        >
           {(Object.keys(RANGE_LABELS) as RangeKey[]).map((key) => (
             <button
               key={key}
               role="tab"
               aria-selected={rangeKey === key}
-              className={`stats-tab${rangeKey === key ? " selected" : ""}`}
+              className={`stats-tab${
+                rangeKey === key ? " selected" : ""
+              }`}
               onClick={() => switchRange(key)}
             >
               {RANGE_LABELS[key]}
@@ -249,235 +283,265 @@ export default function StatsPanel({
           这个区间还没有收获 · 种一颗 25 分钟的番茄，下周再来看
         </div>
       ) : (
-        <div className="stats-grid">
-          <div className="stats-col">
-            <section className="card stats-card stats-summary">
-              <h3>区间合计</h3>
-              <div className="st-row">
-                <span className="st-label">番茄</span>
-                <div className="st-value">
-                  <strong>{summary.count}</strong>
-                  {delta(trend?.count, `${baseLabel}日均`)}
-                </div>
-              </div>
-              <div className="st-row">
-                <span className="st-label">专注时长</span>
-                <div className="st-value">
-                  <strong className="long">
-                    {durationText(summary.seconds)}
-                  </strong>
-                  {delta(trend?.seconds, `${baseLabel}日均`)}
-                </div>
-              </div>
-              <div className="st-row">
-                <span className="st-label">活跃天数</span>
-                <div className="st-value">
-                  <strong>{summary.activeDays}</strong>
-                  {delta(trend?.activeRate, `${baseLabel}活跃率`)}
-                </div>
-              </div>
-              <div className="st-row">
-                <span className="st-label">日均番茄</span>
-                <div className="st-value">
-                  <strong>{summary.avgCount}</strong>
-                  {delta(trend?.avgPerActiveDay, `${baseLabel}活跃日均`)}
-                </div>
-              </div>
-              <div className="st-row streak">
-                <span className="st-label">连续收获</span>
-                <div className="st-value">
-                  <strong data-tier={streak >= 7 ? "mid" : undefined}>
-                    {streak} 天
-                  </strong>
-                </div>
-              </div>
-            </section>
-            <section className="card stats-card stats-bars">
-              <h3>{BAR_TITLE[rangeKey]}</h3>
-            <div
-              className={`bars${buckets.length > 14 ? " dense" : ""}`}
-              role="img"
-              aria-label={`${BAR_TITLE[rangeKey]}柱状图`}
-            >
-              {buckets.map((b, i) => {
-                const tone = barTone(b.count);
-                return (
-                  <div className="bar-col" key={i}>
-                    {buckets.length <= 14 && b.count > 0 && (
-                      <span className="bar-val">{b.count}</span>
-                    )}
-                    <div
-                      className={`bar${b.isToday ? " today" : ""}`}
-                      style={{
-                        height: `${(b.count / barMax) * 100}%`,
-                        background: `linear-gradient(180deg, ${tone.top}, ${tone.bottom})`,
-                        boxShadow: tone.glow || undefined,
-                      }}
-                      title={`${b.label} · ${b.count} 个番茄 · ${durationText(
-                        b.seconds
-                      )}`}
-                    />
-                    <span className="bar-label">{b.label}</span>
+        <>
+          <StatsTrendChart
+            points={trendPoints}
+            rangeKey={rangeKey}
+            current={current}
+          />
+          <div className="stats-grid">
+            <div className="stats-col">
+              <section className="card stats-card stats-summary">
+                <h3>区间合计</h3>
+                <div className="stats-summary-metrics">
+                  <div className="st-row">
+                    <span className="st-label">番茄</span>
+                    <div className="st-value">
+                      <strong>{summary.count}</strong>
+                      {delta(trend?.count, `${baseLabel}日均`)}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-            </section>
-          </div>
-          <section className="card stats-card stats-heat">
-            <h3>时段热力</h3>
-            <div className="sh-grid">
-              <span className="sh-corner" />
-              {WEEK_CHARS.split("").map((w) => (
-                <span className="sh-weekday" key={w}>
-                  {w}
-                </span>
-              ))}
-              {Array.from({ length: 48 }, (_, col) => (
-                <React.Fragment key={col}>
-                  {col % 4 === 0 ? (
-                    <span className="sh-hour">{col / 2}</span>
-                  ) : (
-                    <span className="sh-hour" />
-                  )}
-                  {heat.rows.map((cols, row) => {
-                    const value = cols[col];
-                    const tip = `周${WEEK_CHARS[row]} ${slotLabel(
-                      col
-                    )}–${slotLabel(col + 1)}`;
+                  <div className="st-row">
+                    <span className="st-label">专注时长</span>
+                    <div className="st-value">
+                      <strong className="long">
+                        {durationText(summary.seconds)}
+                      </strong>
+                      {delta(trend?.seconds, `${baseLabel}日均`)}
+                    </div>
+                  </div>
+                  <div className="st-row">
+                    <span className="st-label">活跃天数</span>
+                    <div className="st-value">
+                      <strong>{summary.activeDays}</strong>
+                      {delta(trend?.activeRate, `${baseLabel}活跃率`)}
+                    </div>
+                  </div>
+                  <div className="st-row">
+                    <span className="st-label">日均番茄</span>
+                    <div className="st-value">
+                      <strong>{summary.avgCount}</strong>
+                      {delta(
+                        trend?.avgPerActiveDay,
+                        `${baseLabel}活跃日均`
+                      )}
+                    </div>
+                  </div>
+                  <div className="st-row streak">
+                    <span className="st-label">连续收获</span>
+                    <div className="st-value">
+                      <strong
+                        data-tier={streak >= 7 ? "mid" : undefined}
+                      >
+                        {streak} 天
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <section className="card stats-card stats-bars">
+                <h3>{BAR_TITLE[rangeKey]}</h3>
+                <div
+                  className={`bars${
+                    buckets.length > 14 ? " dense" : ""
+                  }`}
+                  role="img"
+                  aria-label={`${BAR_TITLE[rangeKey]}柱状图`}
+                >
+                  {buckets.map((b, i) => {
+                    const tone = barTone(b.count);
                     return (
-                      <span
-                        key={row}
-                        className={`sh-cell hm-t${heatTier(value)}${
-                          nowSlot && nowSlot.row === row && nowSlot.col === col
-                            ? " now"
-                            : ""
-                        }`}
-                        title={
-                          value > 0
-                            ? `${tip} · ${countText(value)} 个番茄`
-                            : `${tip} · 暂无收获`
-                        }
-                      />
+                      <div className="bar-col" key={i}>
+                        {buckets.length <= 14 && b.count > 0 && (
+                          <span className="bar-val">{b.count}</span>
+                        )}
+                        <div
+                          className={`bar${b.isToday ? " today" : ""}`}
+                          style={{
+                            height: `${(b.count / barMax) * 100}%`,
+                            background: `linear-gradient(180deg, ${tone.top}, ${tone.bottom})`,
+                            boxShadow: tone.glow || undefined,
+                          }}
+                          title={`${b.label} · ${
+                            b.count
+                          } 个番茄 · ${durationText(b.seconds)}`}
+                        />
+                        <span className="bar-label">{b.label}</span>
+                      </div>
                     );
                   })}
-                </React.Fragment>
-              ))}
-            </div>
-            <div className="sh-legend">
-              <span>少</span>
-              {[1, 2, 3, 4, 5].map((t) => (
-                <i key={t} className={`sh-cell hm-t${t}`} />
-              ))}
-              <span>多</span>
-              <em>纵轴 0–24 点 · 每格 30 分钟</em>
-            </div>
-          </section>
-          <div className="stats-trio">
-            <section className="card stats-card">
-              <h3>象限分布</h3>
-              <ul className="dist-list">
-                {QUADRANT_KEYS.map((k) => (
-                  <li key={k}>
-                    <i
-                      className="dist-dot"
-                      style={{ background: QUADRANT_TONES[k] }}
-                    />
-                    <span className="dist-name">{QUAD_LABELS[k]}</span>
-                    <span className="dist-bar">
-                      <i
-                        style={{
-                          width: `${(quads[k] / quadMax) * 100}%`,
-                          background: QUADRANT_TONES[k],
-                        }}
-                      />
-                    </span>
-                    <span className="dist-count">
-                      {quads[k]} 个 · {Math.round((quads[k] / quadTotal) * 100)}
-                      %
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {spikyCount > 0 && (
-                <div
-                  className="dist-foot"
-                  title="感受评为难受或很痛苦的收获番茄"
-                >
-                  <LogoIcon size={12} spiky />
-                  带刺番茄 {spikyCount} 个 · 辛苦了，抱抱自己
                 </div>
-              )}
-            </section>
-            <section className="card stats-card">
-              <h3>时段偏好</h3>
-              <ul className="dist-list">
-                {dayparts.map((d) => (
-                  <li key={d.key}>
-                    <span className="dist-name">
-                      {d.label} <small>{d.hours}</small>
-                    </span>
-                    <span className="dist-bar">
-                      <i
-                        style={{ width: `${(d.count / partMax) * 100}%` }}
-                      />
-                    </span>
-                    <span className="dist-count">
-                      {countText(d.count)} 个
-                    </span>
-                  </li>
+              </section>
+            </div>
+            <section className="card stats-card stats-heat">
+              <h3>时段热力</h3>
+              <div className="sh-grid">
+                <span className="sh-corner" />
+                {WEEK_CHARS.split("").map((w) => (
+                  <span className="sh-weekday" key={w}>
+                    {w}
+                  </span>
                 ))}
-              </ul>
-              {partTrend && trend && (
-                <div className="dist-foot trend">
-                  {partTrend}{" "}
-                  <small>
-                    近 {trend.currentDays} 天 vs 近 {trend.baseDays} 天
-                  </small>
-                </div>
-              )}
+                {Array.from({ length: 48 }, (_, col) => (
+                  <React.Fragment key={col}>
+                    {col % 4 === 0 ? (
+                      <span className="sh-hour">{col / 2}</span>
+                    ) : (
+                      <span className="sh-hour" />
+                    )}
+                    {heat.rows.map((cols, row) => {
+                      const value = cols[col];
+                      const tip = `周${WEEK_CHARS[row]} ${slotLabel(
+                        col
+                      )}–${slotLabel(col + 1)}`;
+                      return (
+                        <span
+                          key={row}
+                          className={`sh-cell hm-t${heatTier(value)}${
+                            nowSlot &&
+                            nowSlot.row === row &&
+                            nowSlot.col === col
+                              ? " now"
+                              : ""
+                          }`}
+                          title={
+                            value > 0
+                              ? `${tip} · ${countText(value)} 个番茄`
+                              : `${tip} · 暂无收获`
+                          }
+                        />
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className="sh-legend">
+                <span>少</span>
+                {[1, 2, 3, 4, 5].map((t) => (
+                  <i key={t} className={`sh-cell hm-t${t}`} />
+                ))}
+                <span>多</span>
+                <em>纵轴 0–24 点 · 每格 30 分钟</em>
+              </div>
             </section>
-            <section className="card stats-card">
-              <h3>高光时刻</h3>
-              <ul className="glory-list">
-                <li>
-                  <span className="glory-label">最佳一天</span>
-                  <strong>
-                    {summary.bestDay
-                      ? `${
-                          new Date(summary.bestDay.date).getMonth() + 1
-                        }.${new Date(summary.bestDay.date).getDate()} · ${
-                          summary.bestDay.count
-                        } 个番茄`
-                      : "—"}
-                  </strong>
-                </li>
-                <li>
-                  <span className="glory-label">黄金时段</span>
-                  <strong>
-                    {golden
-                      ? `周${WEEK_CHARS[golden.row]} ${slotLabel(golden.col)}`
-                      : "—"}
-                  </strong>
-                </li>
-                <li>
-                  <span className="glory-label">连续收获</span>
-                  <strong>{streak > 0 ? `${streak} 天` : "—"}</strong>
-                </li>
-                <li>
-                  <span className="glory-label">平均每活跃日</span>
-                  <strong>
-                    {summary.activeDays
-                      ? `${summary.avgCount} 个 · ${durationText(
-                          Math.round(summary.seconds / summary.activeDays)
-                        )}`
-                      : "—"}
-                  </strong>
-                </li>
-              </ul>
-            </section>
+            <div className="stats-trio">
+              <section className="card stats-card">
+                <h3>象限分布</h3>
+                <ul className="dist-list">
+                  {QUADRANT_KEYS.map((k) => (
+                    <li key={k}>
+                      <i
+                        className="dist-dot"
+                        style={{ background: QUADRANT_TONES[k] }}
+                      />
+                      <span className="dist-name">
+                        {QUAD_LABELS[k]}
+                      </span>
+                      <span className="dist-bar">
+                        <i
+                          style={{
+                            width: `${(quads[k] / quadMax) * 100}%`,
+                            background: QUADRANT_TONES[k],
+                          }}
+                        />
+                      </span>
+                      <span className="dist-count">
+                        {quads[k]} 个 ·{" "}
+                        {Math.round((quads[k] / quadTotal) * 100)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {spikyCount > 0 && (
+                  <div
+                    className="dist-foot"
+                    title="感受评为难受或很痛苦的收获番茄"
+                  >
+                    <LogoIcon size={12} spiky />
+                    带刺番茄 {spikyCount} 个 · 辛苦了，抱抱自己
+                  </div>
+                )}
+              </section>
+              <section className="card stats-card">
+                <h3>时段偏好</h3>
+                <ul className="dist-list">
+                  {dayparts.map((d) => (
+                    <li key={d.key}>
+                      <span className="dist-name">
+                        {d.label} <small>{d.hours}</small>
+                      </span>
+                      <span className="dist-bar">
+                        <i
+                          style={{
+                            width: `${(d.count / partMax) * 100}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="dist-count">
+                        {countText(d.count)} 个
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {partTrend && trend && (
+                  <div className="dist-foot trend">
+                    {partTrend}{" "}
+                    <small>
+                      近 {trend.currentDays} 天 vs 近 {trend.baseDays}{" "}
+                      天
+                    </small>
+                  </div>
+                )}
+              </section>
+              <section className="card stats-card">
+                <h3>高光时刻</h3>
+                <ul className="glory-list">
+                  <li>
+                    <span className="glory-label">最佳一天</span>
+                    <strong>
+                      {summary.bestDay
+                        ? `${
+                            new Date(summary.bestDay.date).getMonth() +
+                            1
+                          }.${new Date(
+                            summary.bestDay.date
+                          ).getDate()} · ${
+                            summary.bestDay.count
+                          } 个番茄`
+                        : "—"}
+                    </strong>
+                  </li>
+                  <li>
+                    <span className="glory-label">黄金时段</span>
+                    <strong>
+                      {golden
+                        ? `周${WEEK_CHARS[golden.row]} ${slotLabel(
+                            golden.col
+                          )}`
+                        : "—"}
+                    </strong>
+                  </li>
+                  <li>
+                    <span className="glory-label">连续收获</span>
+                    <strong>{streak > 0 ? `${streak} 天` : "—"}</strong>
+                  </li>
+                  <li>
+                    <span className="glory-label">平均每活跃日</span>
+                    <strong>
+                      {summary.activeDays
+                        ? `${summary.avgCount} 个 · ${durationText(
+                            Math.round(
+                              summary.seconds / summary.activeDays
+                            )
+                          )}`
+                        : "—"}
+                    </strong>
+                  </li>
+                </ul>
+              </section>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </main>
   );

@@ -138,7 +138,8 @@ app
     });
     // 周目标 chip：目标值强调 + 进度填充层
     results.push({
-      check: "week goal chip emphasizes the goal over the progress number",
+      check:
+        "week goal chip emphasizes the goal over the progress number",
       pass: await js(
         `(()=>{const c=document.querySelector('.weekgoal-chip');if(!c)return false;const g=c.querySelector('.wg-goal'),n=c.querySelector('.wg-now');if(!g||!n)return false;const gs=getComputedStyle(g),ns=getComputedStyle(n);return parseFloat(gs.fontSize)>parseFloat(ns.fontSize)&&Number(gs.fontWeight)>Number(ns.fontWeight)})()`
       ),
@@ -187,13 +188,16 @@ app
     });
     await shotClip("board-done-group", '[data-quadrant="iu"]');
     // 未连接飞书点 ＋：明确错误 toast，chip 不变
-    const chipsBefore = await js(`document.querySelectorAll('.chip').length`);
+    const chipsBefore = await js(
+      `document.querySelectorAll('.chip').length`
+    );
     await js(
       `(()=>{const t=[...document.querySelectorAll('.task')].find(x=>x.querySelector('.task-name')?.textContent.includes('回复工作邮件'));t.querySelector('.adjust-btn:not(:disabled)').click()})()`
     );
     await wait(200);
     results.push({
-      check: "adjust without connection shows error toast and adds no chip",
+      check:
+        "adjust without connection shows error toast and adds no chip",
       pass:
         (await js(
           `(()=>{const t=document.querySelector('.toast.error');return Boolean(t)&&t.textContent.includes('连接飞书')})()`
@@ -235,7 +239,8 @@ app
     await js(`document.querySelector('.ctx-menu .ctx-item').click()`);
     await wait(200);
     results.push({
-      check: "complete without connection shows error toast and keeps the chip",
+      check:
+        "complete without connection shows error toast and keeps the chip",
       pass:
         (await js(
           `(()=>{const t=document.querySelector('.toast.error');return Boolean(t)&&t.textContent.includes('连接飞书')})()`
@@ -260,7 +265,8 @@ app
 
     // ⟳ 已并入「生成今日番茄」（静默分支含纯重读），工具行整行删除；无象限任务归入 unu
     results.push({
-      check: "generate stays in overview title row; separate refresh button removed",
+      check:
+        "generate stays in overview title row; separate refresh button removed",
       pass: await js(
         `!document.querySelector('.board-toolbar')&&Boolean(document.querySelector('.side-title-actions .gen-btn'))&&!document.querySelector('.refresh-btn')`
       ),
@@ -330,9 +336,10 @@ app
       `(()=>{const c=[...document.querySelectorAll('.hm-cell')].find(x=>Number(x.dataset.count)>0);c.dispatchEvent(new MouseEvent('mouseout',{bubbles:true,relatedTarget:document.body}))})()`
     );
     results.push({
-      check: "farm field shows weekly growth caption and cumulative harvest pile",
+      check:
+        "farm field shows weekly growth caption and cumulative harvest pile",
       pass: await js(
-        `(()=>{const f=document.querySelector('.farm-field');if(!f)return false;const t=f.textContent;return t.includes('本周已收')&&t.includes('累计收获')&&t.includes('周日翻篇')&&Boolean(f.querySelector('.farm-pile'))&&f.querySelector('.farm-pile-text').textContent.includes('累计收获')})()`
+        `(()=>{const f=document.querySelector('.farm-field');if(!f)return false;const t=f.textContent;return t.includes('本周收获')&&t.includes('累计收获')&&!t.includes('周日翻篇')&&!f.querySelector('.farm-pile text').textContent.includes('+')&&Boolean(f.querySelector('.farm-pile'))})()`
       ),
     });
     // 节气 pill：农场标题行展示当前节气与第几天，场景 data-term 同步
@@ -344,14 +351,16 @@ app
     });
     // 象限着色：果筐堆按累计象限分布混色（红/黄/青渐变里至少看到黄和青）
     results.push({
-      check: "harvest pile mixes quadrant gradient tones from cumulative records",
+      check:
+        "harvest pile mixes quadrant gradient tones from cumulative records",
       pass: await js(
         `(()=>{const p=document.querySelector('.farm-pile');return Boolean(p)&&p.innerHTML.includes('url(#farm-tomato-inu)')&&p.innerHTML.includes('url(#farm-tomato-uni)')&&p.innerHTML.includes('url(#farm-tomato-iu)')})()`
       ),
     });
     // 柔化色板 + 哑光径向渐变：场景内有 6 只番茄渐变 defs，色值来自新色板
     results.push({
-      check: "farm tomatoes render as radial gradients from the softened palette",
+      check:
+        "farm tomatoes render as radial gradients from the softened palette",
       pass: await js(
         `(()=>{const s=document.querySelector('.farm-scene');if(!s)return false;if(s.querySelectorAll('radialGradient').length<6)return false;const h=s.innerHTML;return h.includes('#f2cd73')&&h.includes('#63c3d2')&&h.includes('#e57368')&&[...s.querySelectorAll('.farm-pile ellipse')].some(c=>(c.getAttribute('fill')||'').startsWith('url('))})()`
       ),
@@ -387,7 +396,8 @@ app
     );
     await wait(200);
     results.push({
-      check: "sky state recomputes when the clock jumps and window refocuses",
+      check:
+        "sky state recomputes when the clock jumps and window refocuses",
       pass: await js(
         `(()=>{const s=document.querySelector('.farm-scene');const d=parseFloat(s.dataset.skyHour)-parseFloat(${JSON.stringify(
           skyHourBefore
@@ -458,7 +468,8 @@ app
     await js(`document.querySelector('.weekgoal-pop button').click()`);
     await wait(300);
     results.push({
-      check: "saving a reached goal marks chip met, stores only this week key, and toasts",
+      check:
+        "saving a reached goal marks chip met, stores only this week key, and toasts",
       pass: await js(`(()=>{
         const c=document.querySelector('.weekgoal-chip');
         const stored=JSON.parse(localStorage.getItem('pomatez-focus-weekgoal-v1')||'{}');
@@ -479,16 +490,18 @@ app
     });
     // 月历周合计：有记录的周标注总数，无记录周不标，当前周（最右列）也标
     results.push({
-      check: "heatmap labels week totals, skips empty weeks, includes current week",
+      check:
+        "heatmap labels week totals, skips empty weeks, includes current week",
       pass: await js(
         `(()=>{const slots=[...document.querySelectorAll('.hm-badge-slot')];const totals=[...document.querySelectorAll('.hm-week-total')];if(!slots.length||!totals.length)return false;if(totals.length>=slots.length)return false;if(!totals.every(t=>/^[1-9]\\d*$/.test(t.textContent)))return false;const last=slots[slots.length-1].querySelector('.hm-week-total');return Boolean(last)&&Number(last.textContent)>0})()`
       ),
     });
     // 「共 N 个番茄」分级：demo 里 5-9 个的日期带 mid，今天（2 个）不带档
     results.push({
-      check: "day total tiers: mid tone on 5-9 tomato days, none on a light today",
+      check:
+        "day total tiers: mid tone on 5-9 tomato days, none on a light today",
       pass: await js(
-        `(()=>{const mid=[...document.querySelectorAll('.day-total.mid')];if(!mid.length||!mid.every(e=>{const n=Number(e.textContent.match(/共 (\\d+) 个番茄/)?.[1]);return n>=5&&n<=9}))return false;const today=document.querySelector('.record-day .day-total');return Boolean(today)&&!today.className.includes('mid')&&!today.className.includes('high')})()`
+        `(()=>{const mid=[...document.querySelectorAll('.day-total.mid')];if(!mid.length||!mid.every(e=>{const n=Number(e.textContent.match(/共 (\\d+) 个番茄/)?.[1]);return n>=5&&n<=9}))return false;const today=document.querySelector('.record-day.is-today .day-total');return Boolean(today)&&!today.className.includes('mid')&&!today.className.includes('high')})()`
       ),
     });
     results.push({
@@ -519,7 +532,8 @@ app
     });
     // 进行中专注保持极简：无提示 chips；未满一个番茄不亮「已专注」
     results.push({
-      check: "timing view stays minimal until the first pomodoro completes",
+      check:
+        "timing view stays minimal until the first pomodoro completes",
       pass: await js(
         `(()=>{return !document.querySelector('.timing-chips')&&!document.querySelector('.ring-elapsed')&&document.querySelector('.ring-note')&&document.querySelector('.ring-note').textContent==='专注于当下'})()`
       ),
@@ -555,7 +569,8 @@ app
     });
     // 误点结束的回退路径：返回继续计时 → 暂停中的计时屏，分钟数保留
     results.push({
-      check: "review offers return-to-timing after the four main actions",
+      check:
+        "review offers return-to-timing after the four main actions",
       pass: await js(
         `(()=>{const t=[...document.querySelectorAll('.review-actions button')].map(b=>b.textContent);return ['记录番茄','保存并休息 5 分钟','保存并开始下一个','放弃本次','返回继续计时'].every(x=>t.includes(x))&&t.indexOf('返回继续计时')>t.indexOf('放弃本次')})()`
       ),
@@ -578,7 +593,8 @@ app
     await wait(300);
     // 完成番茄数快选：按钮数 = floor(实际分钟/番茄时长)+1 再 +1 个 0 档，默认选中自动累计值
     results.push({
-      check: "review count quick-select replaces stepper with auto default",
+      check:
+        "review count quick-select replaces stepper with auto default",
       pass: await js(
         `(()=>{const b=[...document.querySelectorAll('.quick-counts .count-btn')];return b.length>=2&&b[0].textContent==='0'&&b[0].classList.contains('selected')&&!document.querySelector('.review-card .stepper')})()`
       ),
@@ -595,7 +611,8 @@ app
     });
     // 主观感受：5 档可选、默认不选；选「难受」后该番茄应成为带刺番茄
     results.push({
-      check: "review mood picker has five optional choices, none selected by default",
+      check:
+        "review mood picker has five optional choices, none selected by default",
       pass: await js(
         `(()=>{const b=[...document.querySelectorAll('.mood-row .mood-btn')];return b.length===5&&b.every(x=>x.getAttribute('aria-pressed')==='false')&&b[0].getAttribute('aria-label')==='感受：很痛苦'&&b[4].getAttribute('aria-label')==='感受：很愉快'})()`
       ),
@@ -647,7 +664,10 @@ app
     const after = await js(
       `JSON.parse(localStorage.getItem('pomatez-focus-v1')).records.length`
     );
-    results.push({ check: "save appends one record", pass: after === before + 1 });
+    results.push({
+      check: "save appends one record",
+      pass: after === before + 1,
+    });
     results.push({
       check: "saved record carries the chosen mood locally",
       pass: await js(
@@ -655,7 +675,8 @@ app
       ),
     });
     results.push({
-      check: "painful record shows a spiky tomato icon in the record list",
+      check:
+        "painful record shows a spiky tomato icon in the record list",
       pass: await js(
         `(()=>{const i=document.querySelector('.record .r-icon.spiky');return Boolean(i)&&Boolean(i.querySelector('svg'))&&(i.getAttribute('title')||'').includes('难受')})()`
       ),
@@ -687,19 +708,20 @@ app
     });
     await shotClip("board-weekgoal-closeup", ".weekgoal");
     await shotClip("board-stats-countup", ".stat-grid");
-    // 里程碑小旗：轨道 0→下一档，每 25 个一面小旗 + 终点大旗，
-    // 已越过的升起（番茄红），未到的灰旗低垂；旗子是 SVG 不是 emoji
+    // 里程碑从上一成果到下一档，灰旗保持直立，当前数字随进度移动。
     await shotClip("board-totalbar", ".stat-totalbar");
     results.push({
-      check: "milestone flags line up every 25 with raised state matching total",
+      check:
+        "milestone flags line up every 25 with raised state matching total",
       pass: await js(
-        `(()=>{const fs=[...document.querySelectorAll('.stat-totalbar .ms-flag')];const big=fs.filter(f=>f.classList.contains('big'));const small=fs.filter(f=>!f.classList.contains('big'));const toEl=document.querySelector('.stb-to'),ttEl=document.querySelector('[data-stat="总番茄"] strong');if(!toEl||!ttEl)return false;const next=Number(toEl.textContent);const total=Number(ttEl.textContent);const expectSmall=Math.floor((next-1)/25);return big.length===1&&small.length===expectSmall&&fs.every(f=>f.querySelector('svg'))&&small.every((f,i)=>Math.abs(parseFloat(f.style.left)-(i+1)*25/next*100)<0.01)&&small.every(f=>{const m=(f.getAttribute('title')||'').match(/\\d+/);if(!m)return false;return f.classList.contains('raised')===(Number(m[0])<=total)})&&big[0].classList.contains('raised')===(total>=next)})()`
+        `(()=>{const root=document.querySelector('.stat-totalbar'),fs=[...root.querySelectorAll('.ms-flag')],small=fs.filter(f=>!f.classList.contains('big'));const from=Number(root.querySelector('.stb-from').textContent),to=Number(root.querySelector('.stb-to').textContent),total=Number(document.querySelector('[data-stat="总番茄"] strong').textContent),now=root.querySelector('.stb-current');return fs.filter(f=>f.classList.contains('big')).length===1&&small.every(f=>{const m=Number(f.title.match(/\\d+/)?.[0]);return m>from&&m<to&&Math.abs(parseFloat(f.style.left)-(m-from)/(to-from)*100)<.02})&&Number(now.textContent)===total&&Math.abs(parseFloat(now.style.left)-(total-from)/(to-from)*100)<.02&&fs.every(f=>Boolean(f.querySelector('path[d^="M2.8 1.6"]')))})()`
       ),
     });
     results.push({
-      check: "milestone bar text keeps reached/remaining wording without emoji",
+      check:
+        "milestone bar shows previous achievement and current value without prompts",
       pass: await js(
-        `(()=>{const em=document.querySelector('.stat-totalbar em');const re=/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/u;return Boolean(em)&&em.textContent.includes('距')&&!re.test(document.querySelector('.stat-totalbar').textContent)})()`
+        `(()=>{const r=document.querySelector('.stat-totalbar');return Number(r.querySelector('.stb-from').textContent)>0&&!r.querySelector('em')&&Number(r.querySelector('.stb-current').textContent)>Number(r.querySelector('.stb-from').textContent)})()`
       ),
     });
     // 信息类 toast 约 3 秒自动消失
@@ -790,8 +812,9 @@ app
           `Number(document.querySelector('[data-stat="总番茄"] strong').textContent)`
         )) ===
           totalBefore + 1 &&
-        (await js(`document.querySelector('.hm-cell.today').dataset.count`)) ===
-          String(Number(todayBefore) + 1),
+        (await js(
+          `document.querySelector('.hm-cell.today').dataset.count`
+        )) === String(Number(todayBefore) + 1),
     });
     results.push({
       check: "heatmap transposed to week columns x weekday rows",
@@ -814,13 +837,22 @@ app
     );
     await wait(400);
     results.push({
-      check: "stats page opens with four range tabs and one combined summary card",
+      check:
+        "stats page opens with four range tabs and one combined summary card",
       pass: await js(
         `document.querySelectorAll('.stats-tab').length===4&&document.querySelectorAll('.stats-summary .st-row').length===5`
       ),
     });
     results.push({
-      check: "week stats: three columns (summary+bars / heat / trio) and a 7x48 half-hour heat grid",
+      check:
+        "stats trend uses saved bucket counts and labels its trailing average",
+      pass: await js(
+        `(()=>{const c=document.querySelector('.stats-trend');const svg=c?.querySelector('svg');return Boolean(c&&svg&&c.textContent.includes('移动平均')&&c.textContent.includes('不是预测')&&svg.querySelector('.trend-actual-path')&&svg.querySelector('.trend-average-path')&&svg.querySelectorAll('.trend-dot').length>=1)})()`
+      ),
+    });
+    results.push({
+      check:
+        "week stats: three columns (summary+bars / heat / trio) and a 7x48 half-hour heat grid",
       pass: await js(
         `(()=>{const g=document.querySelector('.stats-grid');const kids=g?[...g.children]:[];return kids.length===3&&kids[0].classList.contains('stats-col')&&kids[1].classList.contains('stats-heat')&&kids[2].classList.contains('stats-trio')&&document.querySelectorAll('.bars .bar-col').length===7&&document.querySelectorAll('.sh-cell:not(.sh-legend .sh-cell)').length===7*48&&document.querySelectorAll('.sh-weekday').length===7&&[...document.querySelectorAll('.sh-hour')].filter(x=>x.textContent.trim()).length===12&&document.querySelectorAll('.dist-list li').length===9})()`
       ),
@@ -840,7 +872,8 @@ app
     });
     // 合计卡新排版：label 小灰字在上、数值行在下，左缘对齐（消除水平断裂）
     results.push({
-      check: "summary rows stack a small label above the big value, left aligned",
+      check:
+        "summary rows stack a small label above the big value, left aligned",
       pass: await js(
         `(()=>{const rows=[...document.querySelectorAll('.stats-summary .st-row')];if(rows.length!==5)return false;return rows.every(r=>{const l=r.querySelector('.st-label'),v=r.querySelector('.st-value');if(!l||!v)return false;const lr=l.getBoundingClientRect(),vr=v.getBoundingClientRect();const s=v.querySelector('strong');return lr.bottom<=vr.top+1&&Math.abs(lr.left-vr.left)<2&&parseFloat(getComputedStyle(l).fontSize)<parseFloat(getComputedStyle(s).fontSize)})})()`
       ),
@@ -848,7 +881,8 @@ app
     // 环比（Apple 训练负荷式滚动窗口）：周视图 = 近 7 天日均 vs 近 28 天日均，
     // 每项带基准小灰字；demo 数据 34 天，周视图基准窗完整（28 天）
     results.push({
-      check: "summary rows show rolling-window deltas with baseline labels",
+      check:
+        "summary rows show rolling-window deltas with baseline labels",
       pass: await js(
         `(()=>{const d=[...document.querySelectorAll('.st-row .delta')];const b=[...document.querySelectorAll('.st-row .delta-base')];return d.length>=3&&b.length===d.length&&b.every(x=>/较近 28 天(日均|活跃率|活跃日均)/.test(x.textContent))&&d.every(x=>/▲|▼|持平/.test(x.textContent))&&d.some(x=>x.classList.contains('up')||x.classList.contains('down'))})()`
       ),
@@ -861,23 +895,33 @@ app
       ),
     });
     await shot("stats-week");
+    await shotClip("stats-trend-card", ".stats-trend");
     await shotClip("stats-summary-card", ".stats-summary");
+    win.setContentSize(1080, 1840);
+    await wait(350);
+    await shot("stats-week-portrait");
+    win.setContentSize(1280, 800);
+    await wait(250);
     // 区间翻页：‹ 翻到上一周（出现「回到本周」提示），点区间标签回到当前周
     await js(
       `(()=>{[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='上一区间').click()})()`
     );
     await wait(250);
     results.push({
-      check: "stats pager steps to previous week with a back-to-current hint",
+      check:
+        "stats pager steps to previous week with a back-to-current hint",
       pass: await js(
         `(()=>{const l=document.querySelector('.stats-range-label');return Boolean(l&&l.querySelector('em')&&l.querySelector('em').textContent.includes('回到本周'))&&document.querySelectorAll('.bars .bar-col').length===7&&!document.querySelector('button[aria-label="下一区间"]').disabled})()`
       ),
     });
     await shot("stats-week-prev");
-    await js(`(()=>{document.querySelector('.stats-range-label').click()})()`);
+    await js(
+      `(()=>{document.querySelector('.stats-range-label').click()})()`
+    );
     await wait(250);
     results.push({
-      check: "range label click returns to the current week and disables next",
+      check:
+        "range label click returns to the current week and disables next",
       pass: await js(
         `(()=>{const l=document.querySelector('.stats-range-label');return Boolean(l)&&!l.querySelector('em')&&document.querySelector('button[aria-label="下一区间"]').disabled})()`
       ),
@@ -894,7 +938,8 @@ app
     });
     // 月视图基准窗降级：demo 数据共 34 天 < 名义 90 → 如实标注「较近 34 天」
     results.push({
-      check: "month view degrades the baseline window to the available 34 days",
+      check:
+        "month view degrades the baseline window to the available 34 days",
       pass: await js(
         `(()=>{const b=[...document.querySelectorAll('.st-row .delta-base')];return b.length>=3&&b.every(x=>x.textContent.includes('较近 34 天'))})()`
       ),
@@ -912,7 +957,8 @@ app
     });
     // 年视图数据不足（34 天 < 365+730 窗口）→ 不显示任何环比，杜绝误导
     results.push({
-      check: "year view hides deltas when history is shorter than the window",
+      check:
+        "year view hides deltas when history is shorter than the window",
       pass: await js(
         `document.querySelectorAll('.stats-summary .delta').length===0&&document.querySelectorAll('.stats-summary .delta-base').length===0`
       ),
@@ -926,10 +972,16 @@ app
     await wait(400);
     {
       const dataUrl = await js(`window.__shareCardPng||''`);
-      const ok = typeof dataUrl === "string" && dataUrl.startsWith("data:image/png") && dataUrl.length > 20000;
+      const ok =
+        typeof dataUrl === "string" &&
+        dataUrl.startsWith("data:image/png") &&
+        dataUrl.length > 20000;
       if (ok) {
         const out = path.join(outDir, "share-card.png");
-        fs.writeFileSync(out, Buffer.from(dataUrl.split(",")[1], "base64"));
+        fs.writeFileSync(
+          out,
+          Buffer.from(dataUrl.split(",")[1], "base64")
+        );
       }
       results.push({
         check: "share button renders a share-card PNG via canvas hook",
@@ -942,7 +994,9 @@ app
     await wait(300);
     results.push({
       check: "stats page closes back to the board",
-      pass: await js(`!document.querySelector('.stats-page')&&Boolean(document.querySelector('.quadrants'))`),
+      pass: await js(
+        `!document.querySelector('.stats-page')&&Boolean(document.querySelector('.quadrants'))`
+      ),
     });
     // 等补记的信息 toast 自动消失后再进大视口复查
     await wait(3200);
@@ -995,7 +1049,8 @@ app
     // 宽屏双列：等宽两列，左列轻量卡、右列飞书连接长表单
     // （file:// 无 focusApi 时 UpdatePanel/.s-update 按设计不渲染，断言只锁定恒定渲染的卡）
     results.push({
-      check: "wide settings uses two equal columns with the long form on the right",
+      check:
+        "wide settings uses two equal columns with the long form on the right",
       pass: await js(
         `(()=>{const c=document.querySelector('.settings-cols');if(!c)return false;if(!getComputedStyle(c).display.includes('grid'))return false;const lanes=c.querySelectorAll('.settings-lane');if(lanes.length!==2)return false;const a=lanes[0].getBoundingClientRect(),b=lanes[1].getBoundingClientRect();return Math.abs(a.width-b.width)<2&&a.right<=b.left+1&&Boolean(lanes[1].querySelector('.field-grid'))&&Boolean(lanes[0].querySelector('.s-sync'))&&Boolean(lanes[0].querySelector('.s-about'))})()`
       ),
@@ -1004,7 +1059,8 @@ app
     win.setContentSize(800, 800);
     await wait(300);
     results.push({
-      check: "narrow settings falls back to single column in original order",
+      check:
+        "narrow settings falls back to single column in original order",
       pass: await js(
         `(()=>{const c=document.querySelector('.settings-cols');if(!c)return false;if(getComputedStyle(c).display!=='contents')return false;const q=(s)=>document.querySelector(s);const conn=q('.s-conn'),sync=q('.s-sync'),sound=q('.s-sound'),local=q('.s-local'),about=q('.s-about');if(!conn||!sync||!sound||!local||!about)return false;const rc=conn.getBoundingClientRect(),rs=sync.getBoundingClientRect(),rd=sound.getBoundingClientRect(),rl=local.getBoundingClientRect(),ra=about.getBoundingClientRect();return rc.bottom<=rs.top+1&&rs.bottom<=rd.top+1&&rd.bottom<=rl.top+1&&rl.bottom<=ra.top+1})()`
       ),
@@ -1049,7 +1105,9 @@ app
     // mini：开始新番茄后切换小窗（无主进程时 windowMode 本地回退）
     await click("开始专注");
     await wait(300);
-    await js(`document.querySelector('[aria-label="切换小窗"]').click()`);
+    await js(
+      `document.querySelector('[aria-label="切换小窗"]').click()`
+    );
     await wait(200);
     win.setContentSize(360, 220);
     await wait(300);
@@ -1060,7 +1118,9 @@ app
       ),
     });
     await shot("mini");
-    await js(`document.querySelector('[aria-label="切换小窗"]').click()`);
+    await js(
+      `document.querySelector('[aria-label="切换小窗"]').click()`
+    );
     await wait(300);
     results.push({
       check: "no horizontal overflow at 1280 board",
@@ -1100,7 +1160,8 @@ app
     await click("生成今日番茄");
     await wait(300);
     results.push({
-      check: "generate click shows inline step track and locks only its button",
+      check:
+        "generate click shows inline step track and locks only its button",
       pass: await js(
         `(()=>{const b=document.querySelector('.gen-btn');const p=document.querySelector('.gen-track');return Boolean(b&&b.disabled&&b.textContent.includes('正在'))&&Boolean(p&&Number(p.getAttribute('aria-valuenow'))>0)})()`
       ),
@@ -1117,7 +1178,8 @@ app
     });
     await wait(2600);
     results.push({
-      check: "generate mock finishes with toast and complete step track",
+      check:
+        "generate mock finishes with toast and complete step track",
       pass: await js(
         `(()=>{const b=document.querySelector('.gen-btn');return Boolean(b)&&!b.disabled&&document.querySelector('.gen-track')?.getAttribute('aria-valuenow')==='100'&&document.body.textContent.includes('模拟生成完成')})()`
       ),
@@ -1133,7 +1195,8 @@ app
     );
     await wait(800);
     results.push({
-      check: "Beijing dawn shows a low left sun on warm tint and mock mode",
+      check:
+        "Beijing dawn shows a low left sun on warm tint and mock mode",
       pass: await js(
         `(()=>{const s=document.querySelector('.farm-sun');const sc=document.querySelector('.farm-scene');return Boolean(s)&&!document.querySelector('.farm-moon')&&sc.dataset.sky==='mock'&&parseFloat(s.style.left)<15&&parseFloat(s.style.top)>50})()`
       ),
@@ -1179,7 +1242,8 @@ app
     );
     await wait(800);
     results.push({
-      check: "farm shows moon, stars and the night-watch owl on a Beijing night",
+      check:
+        "farm shows moon, stars and the night-watch owl on a Beijing night",
       pass: await js(
         `Boolean(document.querySelector('.farm-moon'))&&!document.querySelector('.farm-sun')&&document.querySelectorAll('.farm-star').length>0&&Boolean(document.querySelector('.farm-owl'))`
       ),
@@ -1191,7 +1255,8 @@ app
     );
     await wait(800);
     results.push({
-      check: "Yushui term shows drizzle overlay, term pill and northbound geese",
+      check:
+        "Yushui term shows drizzle overlay, term pill and northbound geese",
       pass: await js(
         `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='雨水'&&document.querySelectorAll('.farm-rain').length>=5&&document.querySelector('.term-pill').textContent.includes('雨水')&&Boolean(document.querySelector('.farm-geese.north'))})()`
       ),
@@ -1203,7 +1268,8 @@ app
     );
     await wait(800);
     results.push({
-      check: "Shuangjiang term shows frost on the soil band and southbound geese",
+      check:
+        "Shuangjiang term shows frost on the soil band and southbound geese",
       pass: await js(
         `(()=>{const s=document.querySelector('.farm-scene');return s.dataset.term==='霜降'&&[...s.querySelectorAll('path')].some(p=>p.getAttribute('fill')==='#f4fafd')&&Boolean(document.querySelector('.farm-geese:not(.north)'))})()`
       ),
@@ -1216,7 +1282,8 @@ app
     await win.loadURL(`${pathToFileURL(html).href}?demoTasks=iu:17`);
     await wait(800);
     results.push({
-      check: "borrow: full quadrant spreads, empty sibling shrinks to a slim strip",
+      check:
+        "borrow: full quadrant spreads, empty sibling shrinks to a slim strip",
       pass: await js(
         `(()=>{const q1=document.querySelector('.quad-iu'),q2=document.querySelector('.quad-inu');if(!q1.classList.contains('spread')||!q2.classList.contains('slim'))return false;const a=q1.getBoundingClientRect(),b=q2.getBoundingClientRect();const list=q1.querySelector('.task-list');return a.width>b.width*2&&b.width<280&&getComputedStyle(list).display==='grid'&&q2.textContent.includes('暂无任务')&&q2.textContent.includes('0 个任务')})()`
       ),
@@ -1228,14 +1295,16 @@ app
       ),
     });
     results.push({
-      check: "borrow: long task names still clamp with ellipsis in two columns",
+      check:
+        "borrow: long task names still clamp with ellipsis in two columns",
       pass: await js(
         // TaskTitle 按钮自带 line-clamp：截断证据在按钮的 scrollHeight 上
         `[...document.querySelectorAll('.quad-iu .task-title-button')].some(e=>e.scrollHeight>e.clientHeight+1)`
       ),
     });
     results.push({
-      check: "borrow: chips never overflow their task row while scrolling",
+      check:
+        "borrow: chips never overflow their task row while scrolling",
       pass: await js(
         `[...document.querySelectorAll('.quad-iu .task')].every(t=>{const r=t.getBoundingClientRect();const c=t.querySelector('.chips');return !c||c.getBoundingClientRect().bottom<=r.bottom+1})`
       ),
@@ -1248,7 +1317,9 @@ app
     });
     await shotClip("board-quadrant-borrow", ".quadrants");
     // 场景 B：同行两个都有任务 → 维持 50/50，无借用
-    await win.loadURL(`${pathToFileURL(html).href}?demoTasks=iu:3,inu:2`);
+    await win.loadURL(
+      `${pathToFileURL(html).href}?demoTasks=iu:3,inu:2`
+    );
     await wait(800);
     results.push({
       check: "no borrow when both quadrants in a row have tasks",
@@ -1269,14 +1340,16 @@ app
     });
     const beginVisible = `(()=>{const r=document.querySelector('.btn-begin').getBoundingClientRect();const f=document.querySelector('.farm-field').getBoundingClientRect();return r.top>=0&&r.bottom<=window.innerHeight+1&&f.bottom<=window.innerHeight+1})()`;
     results.push({
-      check: "overload: begin button and farm stay in viewport at 1280x800",
+      check:
+        "overload: begin button and farm stay in viewport at 1280x800",
       pass: await js(beginVisible),
     });
     await shot("board-overload-800");
     await win.setContentSize(1920, 1080);
     await wait(400);
     results.push({
-      check: "overload: begin button and farm stay in viewport at 1920x1080",
+      check:
+        "overload: begin button and farm stay in viewport at 1920x1080",
       pass: await js(beginVisible),
     });
     await shot("board-overload-1080");
@@ -1288,7 +1361,8 @@ app
     );
     await wait(800);
     results.push({
-      check: "eight-pomodoro task renders six chips plus a +2 hint on one row",
+      check:
+        "eight-pomodoro task renders six chips plus a +2 hint on one row",
       pass: await js(
         `(()=>{const g=document.querySelector('.quad-iu .chips');const chips=[...g.querySelectorAll('.chip')];const more=g.querySelector('.chips-more');return chips.length===6&&chips.every(c=>c.offsetTop===chips[0].offsetTop)&&chips.map(c=>c.textContent).join()=='1,2,3,4,5,6'&&more&&more.textContent=='+2'&&more.title.includes('继续出现')})()`
       ),
@@ -1299,7 +1373,8 @@ app
     );
     await wait(800);
     results.push({
-      check: "finishing front pomodoros slides later ones into the window",
+      check:
+        "finishing front pomodoros slides later ones into the window",
       pass: await js(
         `(()=>{const g=document.querySelector('.quad-iu .chips');const chips=[...g.querySelectorAll('.chip')];return chips.length===5&&chips.map(c=>c.textContent).join()=='4,5,6,7,8'&&!g.querySelector('.chips-more')})()`
       ),
@@ -1316,10 +1391,15 @@ app
     await shotClip("task-chips-window", ".quad-iu .task");
     await shot("board-chips-window");
 
-    results.push({ check: "no renderer console errors", pass: !errors.length });
+    results.push({
+      check: "no renderer console errors",
+      pass: !errors.length,
+    });
     if (errors.length) console.error("console errors:", errors);
     const failed = results.filter((r) => !r.pass);
-    console.log(JSON.stringify({ results, failed: failed.length }, null, 2));
+    console.log(
+      JSON.stringify({ results, failed: failed.length }, null, 2)
+    );
     win.destroy();
     clearTimeout(deadline);
     app.exit(failed.length ? 1 : 0);

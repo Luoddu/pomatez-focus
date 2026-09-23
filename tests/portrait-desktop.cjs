@@ -43,6 +43,7 @@ const seedRecord = (daysAgo, hour, title, quadrant) => ({
   sync: "local",
 });
 const seedRecords = [
+  seedRecord(5, 4, "模拟任务甲", "iu"),
   seedRecord(1, 5, "规划下一周任务", "uni"),
   seedRecord(1, 3, "整理待办事项", "unu"),
   seedRecord(3, 6, "阅读学习资料", "uni"),
@@ -93,7 +94,7 @@ app
     win.webContents.debugger.detach();
     // Programmatic resize may exceed the host work area; content size is what
     // media queries see, so drive the viewport directly.
-    win.setContentSize(900, 1600);
+    win.setContentSize(1080, 1840);
     await wait(250);
     const portrait = await js(`(()=>{
       const cs=getComputedStyle(document.querySelector('.content'));
@@ -108,71 +109,177 @@ app
       const hm=document.querySelector('.hm-grid').getBoundingClientRect();
       const sc=document.querySelector('.hm-scroll').getBoundingClientRect();
       const recs=getComputedStyle(document.querySelector('.records'));
+      const recEl=document.querySelector('.records');
       const rc=document.querySelector('.right-col');
       const sections=[...rc.querySelectorAll(':scope > .side-section')];
       const r=sections.map(s=>s.getBoundingClientRect());
       const rcRect=rc.getBoundingClientRect();
       const days=[...document.querySelectorAll('.record-day')];
-      const firstH4=days[0].querySelector('h4').textContent;
-      const secondH4=days[1].querySelector('h4').textContent;
-      const invite=days[0].querySelector('.record-invite');
+      const lastH4=days[days.length-1].querySelector('h4').textContent;
+      const previousH4=days[days.length-2].querySelector('h4').textContent;
+      const invite=days[days.length-1].querySelector('.record-invite');
       return {direction:cs.flexDirection,
         columns:grid.gridTemplateColumns.split(' ').length,
         farmHeight:farm.height,barPosition:bar.position,
         statHeights,statAlign,fonts:[...new Set(fonts)],
         cellSize:Math.round(cell.width),
-        hmMarginDelta:Math.abs((hm.left-sc.left)-(sc.right-hm.right)),
-        recordColumns:recs.gridTemplateColumns.split(' ').length,
+        hmFill:hm.width/sc.width,
+        recordColumns:Math.round((recEl.clientWidth-24+14)/(days[0].getBoundingClientRect().width+14)),
         recordDays:days.length,
+        recordScrollable:recEl.scrollWidth>recEl.clientWidth,
+        recordAtRight:Math.abs(recEl.scrollLeft-(recEl.scrollWidth-recEl.clientWidth))<=16,
+        recordScrollLeft:recEl.scrollLeft,recordScrollMax:recEl.scrollWidth-recEl.clientWidth,
+        lastIsToday:days[days.length-1].classList.contains('is-today'),
         rightDisplay:getComputedStyle(rc).display,
         sideBySide:Math.abs(r[0].top-r[1].top)<=2&&r[1].left>r[0].left+50,
         recordsFullWidth:Math.abs(r[2].width-rcRect.width)<=2&&r[2].top>r[0].top+50,
         taskFont:getComputedStyle(document.querySelector('.task:not(.complete) .task-name')).fontSize,
         doneFont:(document.querySelector('.task.complete .task-name')?getComputedStyle(document.querySelector('.task.complete .task-name')).fontSize:null),
         chipHeight:Math.round(document.querySelector('.chip').getBoundingClientRect().height),
-        firstH4,secondH4,inviteText:invite?invite.textContent:null,
-        todayEmpty:days[0].querySelectorAll('.record').length===0};
+        lastH4,previousH4,inviteText:invite?invite.textContent:null,
+        todayEmpty:days[days.length-1].querySelectorAll('.record').length===0};
     })()`);
-    check("portrait stacks panels in one column with paired overview and heatmap", () => {
-      assert.equal(portrait.direction, "column");
-      assert.equal(portrait.columns, 2);
-      assert.equal(portrait.rightDisplay, "grid");
-      assert.equal(portrait.sideBySide, true, JSON.stringify(portrait));
-      assert.equal(portrait.recordsFullWidth, true, JSON.stringify(portrait));
-    });
+    check(
+      "portrait stacks panels in one column with paired overview and heatmap",
+      () => {
+        assert.equal(portrait.direction, "column");
+        assert.equal(portrait.columns, 2);
+        assert.equal(portrait.rightDisplay, "grid");
+        assert.equal(
+          portrait.sideBySide,
+          true,
+          JSON.stringify(portrait)
+        );
+        assert.equal(
+          portrait.recordsFullWidth,
+          true,
+          JSON.stringify(portrait)
+        );
+      }
+    );
     check("portrait quadrants scale up for readability", () => {
       assert.equal(portrait.taskFont, "20px");
       assert.equal(portrait.doneFont, "19px");
       assert.ok(portrait.chipHeight >= 40, JSON.stringify(portrait));
     });
-    check("portrait keeps the farm visible and the action bar sticky", () => {
-      assert.ok(portrait.farmHeight >= 200, JSON.stringify(portrait));
-      assert.equal(portrait.barPosition, "sticky");
-    });
-    check("portrait stats are equal-height centered cards with one font tier", () => {
-      assert.equal(new Set(portrait.statHeights).size, 1, JSON.stringify(portrait));
-      assert.equal(portrait.statAlign, "center");
-      assert.equal(portrait.fonts.length, 1, JSON.stringify(portrait.fonts));
-    });
-    check("portrait heatmap uses larger centered cells", () => {
-      assert.ok(portrait.cellSize >= 14 && portrait.cellSize <= 18, JSON.stringify(portrait));
-      assert.ok(portrait.hmMarginDelta <= 4, JSON.stringify(portrait));
+    check(
+      "portrait keeps the farm visible and the action bar sticky",
+      () => {
+        assert.ok(portrait.farmHeight >= 200, JSON.stringify(portrait));
+        assert.equal(portrait.barPosition, "sticky");
+      }
+    );
+    check(
+      "portrait stats are equal-height centered cards with one font tier",
+      () => {
+        assert.equal(
+          new Set(portrait.statHeights).size,
+          1,
+          JSON.stringify(portrait)
+        );
+        assert.equal(portrait.statAlign, "center");
+        assert.equal(
+          portrait.fonts.length,
+          1,
+          JSON.stringify(portrait.fonts)
+        );
+      }
+    );
+    check("portrait heatmap cells fill the available panel", () => {
+      assert.ok(portrait.cellSize >= 20, JSON.stringify(portrait));
+      assert.ok(portrait.hmFill >= 0.8, JSON.stringify(portrait));
     });
     check("portrait records flow into three day-card columns", () => {
       assert.equal(portrait.recordColumns, 3);
-      assert.ok(portrait.recordDays >= 3, JSON.stringify(portrait));
+      assert.ok(portrait.recordDays >= 4, JSON.stringify(portrait));
+      assert.equal(
+        portrait.recordScrollable,
+        true,
+        JSON.stringify(portrait)
+      );
+      assert.equal(
+        portrait.recordAtRight,
+        true,
+        JSON.stringify(portrait)
+      );
+      assert.equal(
+        portrait.lastIsToday,
+        true,
+        JSON.stringify(portrait)
+      );
     });
-    check("today card leads with a seeded invite, yesterday shows weekday and total", () => {
-      assert.ok(portrait.firstH4.startsWith("今天 · 周"), portrait.firstH4);
+    check("today card is at the right with a seeded invite", () => {
+      assert.ok(
+        portrait.lastH4.startsWith("今天 · 周"),
+        portrait.lastH4
+      );
       assert.equal(portrait.todayEmpty, true);
-      assert.ok(portrait.inviteText && portrait.inviteText.length >= 8, JSON.stringify(portrait));
-      assert.ok(/^昨天 · 周[日一二三四五六]/.test(portrait.secondH4), portrait.secondH4);
-      assert.ok(portrait.secondH4.includes("共 2 个番茄"), portrait.secondH4);
+      assert.ok(
+        portrait.inviteText && portrait.inviteText.length >= 8,
+        JSON.stringify(portrait)
+      );
+      assert.ok(
+        /^昨天 · 周[日一二三四五六]/.test(portrait.previousH4),
+        portrait.previousH4
+      );
+      assert.ok(
+        portrait.previousH4.includes("共 2 个番茄"),
+        portrait.previousH4
+      );
     });
     fs.writeFileSync(
       path.join(artifacts, "portrait-preview.png"),
       (await win.capturePage()).toPNG()
     );
+    await js(
+      `document.querySelector('button[aria-label="专注统计"]').click()`
+    );
+    await wait(500);
+    const statsPortrait = await js(`(()=>{
+      const page=document.querySelector('.stats-page');
+      const hero=document.querySelector('.stats-trend').getBoundingClientRect();
+      const rows=[...document.querySelectorAll('.stats-summary .st-row')];
+      const a=rows[0].getBoundingClientRect(),b=rows[1].getBoundingClientRect();
+      return {curve:Boolean(document.querySelector('.trend-actual-path')),
+        heroFits:hero.left>=0&&hero.right<=innerWidth,
+        summaryTwoColumns:Math.abs(a.top-b.top)<2&&b.left>a.left+20,
+        horizontalOverflow:page.scrollWidth>page.clientWidth+2};
+    })()`);
+    check(
+      "portrait stats show a fitted curve and compact summary without horizontal overflow",
+      () => {
+        assert.equal(
+          statsPortrait.curve,
+          true,
+          JSON.stringify(statsPortrait)
+        );
+        assert.equal(
+          statsPortrait.heroFits,
+          true,
+          JSON.stringify(statsPortrait)
+        );
+        assert.equal(
+          statsPortrait.summaryTwoColumns,
+          true,
+          JSON.stringify(statsPortrait)
+        );
+        assert.equal(
+          statsPortrait.horizontalOverflow,
+          false,
+          JSON.stringify(statsPortrait)
+        );
+      }
+    );
+    win.webContents.invalidate();
+    await wait(200);
+    fs.writeFileSync(
+      path.join(artifacts, "portrait-stats-preview.png"),
+      (await win.capturePage()).toPNG()
+    );
+    await js(
+      `[...document.querySelectorAll('button')].find(b=>b.textContent==='返回').click()`
+    );
+    await wait(100);
     win.setContentSize(1600, 900);
     await wait(250);
     const landscape = await js(`(()=>{
@@ -197,34 +304,63 @@ app
         taskFont:getComputedStyle(document.querySelector('.task:not(.complete) .task-name')).fontSize,
         doneFont:(document.querySelector('.task.complete .task-name')?getComputedStyle(document.querySelector('.task.complete .task-name')).fontSize:null),
         chipHeight:Math.round(document.querySelector('.chip').getBoundingClientRect().height),
-        firstH4:days[0].querySelector('h4').textContent,
-        secondH4:days[1].querySelector('h4').textContent,
-        todayInvite:Boolean(days[0].querySelector('.record-invite'))};
+        lastH4:days[days.length-1].querySelector('h4').textContent,
+        previousH4:days[days.length-2].querySelector('h4').textContent,
+        todayInvite:Boolean(days[days.length-1].querySelector('.record-invite'))};
     })()`);
     check("landscape keeps the original side-by-side layout", () => {
       assert.equal(landscape.direction, "row");
       assert.equal(landscape.columns, 2);
       assert.equal(landscape.sideBySide, true);
-      assert.ok(Math.abs(landscape.rightWidth - 380) <= 2, JSON.stringify(landscape));
+      assert.ok(
+        Math.abs(landscape.rightWidth - 380) <= 2,
+        JSON.stringify(landscape)
+      );
     });
-    check("landscape keeps original heatmap cells, records list and stat style", () => {
-      assert.equal(landscape.cellSize, 13);
-      assert.equal(landscape.recordsDisplay, "block");
-      assert.ok(["left", "start"].includes(landscape.statAlign), landscape.statAlign);
-      assert.deepEqual(landscape.fonts.sort(), ["22px", "28px"], JSON.stringify(landscape.fonts));
-    });
-    check("landscape keeps stacked right column and original quadrant scale", () => {
-      assert.equal(landscape.rightDisplay, "flex");
-      assert.equal(landscape.stacked, true, JSON.stringify(landscape));
-      assert.equal(landscape.taskFont, "16px");
-      assert.equal(landscape.doneFont, "15px");
-      assert.equal(landscape.chipHeight, 34);
-    });
-    check("landscape also shows today invite, weekday and day totals", () => {
-      assert.ok(landscape.firstH4.startsWith("今天 · 周"), landscape.firstH4);
-      assert.equal(landscape.todayInvite, true);
-      assert.ok(landscape.secondH4.includes("共 2 个番茄"), landscape.secondH4);
-    });
+    check(
+      "landscape keeps original heatmap cells, records list and stat style",
+      () => {
+        assert.equal(landscape.cellSize, 13);
+        assert.equal(landscape.recordsDisplay, "block");
+        assert.ok(
+          ["left", "start"].includes(landscape.statAlign),
+          landscape.statAlign
+        );
+        assert.deepEqual(
+          landscape.fonts.sort(),
+          ["22px", "28px"],
+          JSON.stringify(landscape.fonts)
+        );
+      }
+    );
+    check(
+      "landscape keeps stacked right column and original quadrant scale",
+      () => {
+        assert.equal(landscape.rightDisplay, "flex");
+        assert.equal(
+          landscape.stacked,
+          true,
+          JSON.stringify(landscape)
+        );
+        assert.equal(landscape.taskFont, "16px");
+        assert.equal(landscape.doneFont, "15px");
+        assert.equal(landscape.chipHeight, 34);
+      }
+    );
+    check(
+      "landscape also shows today invite, weekday and day totals",
+      () => {
+        assert.ok(
+          landscape.lastH4.startsWith("今天 · 周"),
+          landscape.lastH4
+        );
+        assert.equal(landscape.todayInvite, true);
+        assert.ok(
+          landscape.previousH4.includes("共 2 个番茄"),
+          landscape.previousH4
+        );
+      }
+    );
     fs.writeFileSync(
       path.join(artifacts, "landscape-preview.png"),
       (await win.capturePage()).toPNG()

@@ -8,6 +8,7 @@ import {
   summarize,
   currentStreak,
   barBuckets,
+  harvestTrend,
   halfHourMatrix,
   topTasks,
   daypartSplit,
@@ -15,7 +16,8 @@ import {
 
 const DAY = 86400000;
 // 本地某天某时刻的时间戳
-const at = (y, m, d, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime();
+const at = (y, m, d, h = 12, min = 0) =>
+  new Date(y, m - 1, d, h, min).getTime();
 const rec = (startedAt, count, minutes = 25, extra = {}) => ({
   id: `r-${startedAt}-${count}`,
   task: { id: "t", title: "写报告 · 第 1 个番茄", source: "local" },
@@ -58,6 +60,43 @@ test("inRange 只统计 saved 且落在窗口内的记录", () => {
   assert.equal(inRange(records, range).length, 2);
 });
 
+test("收获走势仅显示已到达分桶，移动平均只回看已保存数据", () => {
+  const now = at(2026, 9, 23, 12);
+  const range = rangeOf("week", now);
+  const records = inRange(
+    [
+      rec(at(2026, 9, 21, 10), 3),
+      rec(at(2026, 9, 22, 10), 6),
+      rec(at(2026, 9, 23, 10), 0, 25),
+      { ...rec(at(2026, 9, 23, 11), 9), status: "active" },
+    ],
+    range
+  );
+  const buckets = barBuckets(records, range, now);
+  const points = harvestTrend(buckets, range, now);
+  assert.equal(buckets.length, 7);
+  assert.deepEqual(
+    points.map((p) => p.count),
+    [3, 6, 0]
+  );
+  assert.deepEqual(
+    points.map((p) => p.average),
+    [3, 4.5, 3]
+  );
+  assert.equal(points.length, 3);
+  assert.deepEqual(
+    harvestTrend(barBuckets([], range, now), range, now).map(
+      (p) => p.count
+    ),
+    [0, 0, 0]
+  );
+  const previous = rangeOf("week", at(2026, 9, 14));
+  assert.equal(
+    harvestTrend(barBuckets([], previous, now), previous, now).length,
+    7
+  );
+});
+
 test("summarize：总数/活跃天数/日均/最佳一天", () => {
   const records = [
     rec(at(2026, 9, 21, 9), 2, 50),
@@ -80,13 +119,20 @@ test("currentStreak：今天有收获算到今天；今天暂无算到昨天", (
     rec(at(2026, 9, 17, 10), 1), // 9/18 断档
   ];
   assert.equal(currentStreak(records, now), 2);
-  assert.equal(currentStreak([...records, rec(now - 3600000, 1)], now), 3);
+  assert.equal(
+    currentStreak([...records, rec(now - 3600000, 1)], now),
+    3
+  );
   assert.equal(currentStreak([], now), 0);
 });
 
 test("barBuckets：周 7 桶 / 月按天 / 季按周 / 年 12 桶", () => {
   const now = at(2026, 9, 21, 15);
-  const week = barBuckets([rec(at(2026, 9, 21, 10), 3)], rangeOf("week", now), now);
+  const week = barBuckets(
+    [rec(at(2026, 9, 21, 10), 3)],
+    rangeOf("week", now),
+    now
+  );
   assert.equal(week.length, 7);
   assert.equal(week[0].count, 3);
   assert.equal(week[0].isToday, true);
@@ -94,7 +140,11 @@ test("barBuckets：周 7 桶 / 月按天 / 季按周 / 年 12 桶", () => {
   assert.equal(month.length, 30); // 九月
   const quarter = barBuckets([], rangeOf("quarter", now), now);
   assert.equal(quarter.length, 14);
-  const year = barBuckets([rec(at(2026, 3, 5, 10), 2)], rangeOf("year", now), now);
+  const year = barBuckets(
+    [rec(at(2026, 3, 5, 10), 2)],
+    rangeOf("year", now),
+    now
+  );
   assert.equal(year.length, 12);
   assert.equal(year[2].count, 2);
 });
@@ -115,9 +165,26 @@ test("halfHourMatrix：跨格按时间占比分摊，行=周一..周日", () => 
 test("topTasks：按任务名聚合去序号，按番茄数排序截断", () => {
   const records = [
     rec(at(2026, 9, 21, 9), 2),
-    { ...rec(at(2026, 9, 21, 10), 1), id: "x1", task: { id: "t", title: "写报告 · 第 2 个番茄", source: "local" } },
-    { ...rec(at(2026, 9, 20, 10), 5), id: "x2", task: { id: "u", title: "读论文", source: "local", quadrant: "inu" } },
-    { ...rec(at(2026, 9, 19, 10), 0), id: "x3", task: { id: "v", title: "零收获", source: "local" } },
+    {
+      ...rec(at(2026, 9, 21, 10), 1),
+      id: "x1",
+      task: { id: "t", title: "写报告 · 第 2 个番茄", source: "local" },
+    },
+    {
+      ...rec(at(2026, 9, 20, 10), 5),
+      id: "x2",
+      task: {
+        id: "u",
+        title: "读论文",
+        source: "local",
+        quadrant: "inu",
+      },
+    },
+    {
+      ...rec(at(2026, 9, 19, 10), 0),
+      id: "x3",
+      task: { id: "v", title: "零收获", source: "local" },
+    },
   ];
   const top = topTasks(records);
   assert.equal(top.length, 2);
@@ -171,20 +238,23 @@ test("halfHourMatrix：7×48 半小时矩阵，深夜记录落在最后一格", 
   const now = at(2026, 9, 21, 15);
   const range = rangeOf("week", now);
   // 周一 23:45 起 25 分钟：起始于 23:30 格（47），跨到次日的部分归周二 00:00 格
-  const heat = halfHourMatrix([rec(at(2026, 9, 21, 23, 45), 1, 25)], range);
+  const heat = halfHourMatrix(
+    [rec(at(2026, 9, 21, 23, 45), 1, 25)],
+    range
+  );
   assert.equal(heat.rows.length, 7);
   assert.equal(heat.rows[0].length, 48);
   assert.ok(Math.abs(heat.rows[0][47] - 0.6) < 1e-9); // 23:45–24:00 共 15 分钟
   assert.ok(Math.abs(heat.rows[1][0] - 0.4) < 1e-9); // 00:00–00:10 共 10 分钟
   assert.ok(
-    Math.abs(
-      heat.rows.flat().reduce((a, b) => a + b, 0) - 1
-    ) < 1e-9
+    Math.abs(heat.rows.flat().reduce((a, b) => a + b, 0) - 1) < 1e-9
   ); // 总量守恒
 });
 
 test("periodDelta：百分比环比；上期无数据/除零/持平的边界", async () => {
-  const { periodDelta } = await import("../app/renderer/src/focus/stats.ts");
+  const { periodDelta } = await import(
+    "../app/renderer/src/focus/stats.ts"
+  );
   assert.deepEqual(periodDelta(28, 25), { pct: 12 }); // +12%
   assert.deepEqual(periodDelta(20, 25), { pct: -20 });
   assert.deepEqual(periodDelta(25, 25), { pct: 0 });
@@ -213,11 +283,17 @@ test("daypartTrend：重心转移 / 占比变化 / 数据不足时不显示", as
     [rec(at(2026, 9, 22, 9), 2), rec(at(2026, 9, 23, 20), 2)],
     prev
   );
-  const t2 = daypartTrend(daypartSplit(curHeat2), daypartSplit(prevHeat2));
+  const t2 = daypartTrend(
+    daypartSplit(curHeat2),
+    daypartSplit(prevHeat2)
+  );
   assert.ok(t2 && t2.includes("上午产出占比") && t2.includes("+50"));
   // 上期无数据 → null
   assert.equal(
-    daypartTrend(daypartSplit(curHeat), daypartSplit(halfHourMatrix([], prev))),
+    daypartTrend(
+      daypartSplit(curHeat),
+      daypartSplit(halfHourMatrix([], prev))
+    ),
     null
   );
   // 重心相同且占比几乎不变 → null（宁缺毋滥）
@@ -232,7 +308,9 @@ test("daypartTrend：重心转移 / 占比变化 / 数据不足时不显示", as
 });
 
 test("rollingTrend：滚动窗口日均环比（Apple 训练负荷式口径）", async () => {
-  const { rollingTrend } = await import("../app/renderer/src/focus/stats.ts");
+  const { rollingTrend } = await import(
+    "../app/renderer/src/focus/stats.ts"
+  );
   // 锚点 2026-09-28（周一）15 点：近 7 天 = 9.22–9.28，近 28 天 = 9.1–9.28
   const anchor = at(2026, 9, 28, 15);
   // 近 7 天每天 4 个；7–27 天前每天 1 个 → 基准日均 49/28 = 1.75
@@ -258,7 +336,9 @@ test("rollingTrend：滚动窗口日均环比（Apple 训练负荷式口径）",
 });
 
 test("rollingTrend：跨月边界 + 数据不足降级 + 不足当前窗不显示", async () => {
-  const { rollingTrend } = await import("../app/renderer/src/focus/stats.ts");
+  const { rollingTrend } = await import(
+    "../app/renderer/src/focus/stats.ts"
+  );
   // 锚点 2026-03-02：近 7 天跨月回到 2 月
   const anchor = at(2026, 3, 2, 12);
   const recs = [];
@@ -288,7 +368,9 @@ test("rollingTrend：跨月边界 + 数据不足降级 + 不足当前窗不显�
 });
 
 test("rollingTrend：当前窗/基准窗零数据与锚点在历史区间的边界", async () => {
-  const { rollingTrend } = await import("../app/renderer/src/focus/stats.ts");
+  const { rollingTrend } = await import(
+    "../app/renderer/src/focus/stats.ts"
+  );
   const anchor = at(2026, 9, 28, 15);
   // 近 7 天有数据 + 27 天前一条撑开跨度：基准日均 (21+1)/28，正增长
   const recs = [rec(anchor - 27 * DAY, 1)];

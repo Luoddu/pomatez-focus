@@ -16,8 +16,8 @@
   --amber: #b45309;
   --amber-soft: #fdf3e3;
   --line: #dfe3ea;
-  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei",
-    sans-serif;
+  font-family: -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
   color: var(--text);
   background: var(--bg);
   font-size: 15px;
@@ -322,9 +322,21 @@ input:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.task-title-button:hover { color: var(--primary); }
-.task-details-hint { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 400; color: #60709e; white-space: nowrap; }
-.task-title-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.task-title-button:hover {
+  color: var(--primary);
+}
+.task-details-hint {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #60709e;
+  white-space: nowrap;
+}
+.task-title-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .task-detail-popover {
   position: fixed;
   z-index: 1000;
@@ -343,8 +355,13 @@ input:focus-visible {
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
-.task-detail-heading { font-weight: 600; margin-bottom: 8px; }
-.task-detail-text { white-space: pre-wrap; }
+.task-detail-heading {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.task-detail-text {
+  white-space: pre-wrap;
+}
 .quad-empty {
   font-size: 13px;
   color: var(--muted);
@@ -380,9 +397,7 @@ input:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease,
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
     background-color 0.15s ease;
 }
 /* 按象限淡色底 + 象限色描边/数字色；selected/pending 在其后定义以保持优先 */
@@ -840,6 +855,35 @@ input:focus-visible {
 .side-title-actions .gen-btn {
   font-size: 13px;
 }
+.side-title-actions .overview-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 31px;
+  padding: 5px 12px;
+  border: 1px solid #cbd6ff;
+  border-radius: 9px;
+  background: #f4f6ff;
+  color: #3657dc;
+  font-weight: 600;
+}
+.side-title-actions .overview-action:hover {
+  background: #e9edff;
+  border-color: #9eb1ff;
+}
+.side-title-actions .gen-btn.overview-action {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.side-title-actions .gen-btn.overview-action:hover {
+  background: #355beb;
+}
+.side-title-actions .gen-btn.overview-action.busy,
+.side-title-actions .gen-btn.overview-action.complete,
+.side-title-actions .gen-btn.overview-action.failed {
+  color: #fff;
+}
 /* Fixed-width header control: step progress mirrors the weekly-goal track. */
 .gen-btn {
   display: inline-flex;
@@ -971,9 +1015,7 @@ input:focus-visible {
   font-weight: 400;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  transition:
-    color 0.4s ease-out,
-    font-size 0.4s ease-out,
+  transition: color 0.4s ease-out, font-size 0.4s ease-out,
     font-weight 0.4s ease-out;
 }
 /* 成就感分级：5–9 番茄红加粗，≥10 金色加大加粗 */
@@ -1115,12 +1157,37 @@ input:focus-visible {
   font-size: 12px;
   margin-top: 1px;
 }
-.change-task-button { margin-top: 5px; }
-.active-task-picker { margin-top: 8px; width: min(420px, 100%); }
-.active-task-picker label { display: block; font-size: 13px; margin-bottom: 4px; }
-.active-task-picker select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: white; font: inherit; font-size: 13px; }
-.active-task-picker p { margin: 4px 0; font-size: 12px; color: #606b7b; }
-.active-task-picker-actions { display: flex; gap: 16px; }
+.change-task-button {
+  margin-top: 5px;
+}
+.active-task-picker {
+  margin-top: 8px;
+  width: min(420px, 100%);
+}
+.active-task-picker label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.active-task-picker select {
+  width: 100%;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  font: inherit;
+  font-size: 13px;
+}
+.active-task-picker p {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #606b7b;
+}
+.active-task-picker-actions {
+  display: flex;
+  gap: 16px;
+}
 .ring {
   position: relative;
   width: 300px;
@@ -1585,7 +1652,10 @@ input:focus-visible {
   outline-offset: 1px;
 }
 .hm-cell.hm-goal-met {
-  background-image: linear-gradient(rgba(232, 169, 23, 0.22), rgba(232, 169, 23, 0.22));
+  background-image: linear-gradient(
+    rgba(232, 169, 23, 0.22),
+    rgba(232, 169, 23, 0.22)
+  );
   box-shadow: 0 0 4px 1px rgba(232, 169, 23, 0.4);
 }
 /* 徽章行同时承载周合计：槽位锁定格宽不外扩（数字可略微溢出居中显示），
@@ -1653,9 +1723,7 @@ input:focus-visible {
   height: 3px;
   max-width: calc(100% - 10px);
   border-radius: 2px;
-  transition:
-    width 0.5s ease-out,
-    background-color 0.5s ease-out;
+  transition: width 0.5s ease-out, background-color 0.5s ease-out;
   pointer-events: none;
 }
 .weekgoal-chip.met .wg-fill {
@@ -1776,12 +1844,18 @@ input:focus-visible {
   pointer-events: none;
 }
 .farm-moon {
-  background:
-    radial-gradient(circle at 62% 58%, rgba(0, 0, 0, 0.07) 0 3px, transparent 3.6px),
-    radial-gradient(circle at 44% 70%, rgba(0, 0, 0, 0.05) 0 2px, transparent 2.6px),
+  background: radial-gradient(
+      circle at 62% 58%,
+      rgba(0, 0, 0, 0.07) 0 3px,
+      transparent 3.6px
+    ),
+    radial-gradient(
+      circle at 44% 70%,
+      rgba(0, 0, 0, 0.05) 0 2px,
+      transparent 2.6px
+    ),
     radial-gradient(circle at 38% 32%, #fdfbf3, #e8e4d2 72%);
-  box-shadow:
-    0 0 0 5px rgba(232, 228, 210, 0.35),
+  box-shadow: 0 0 0 5px rgba(232, 228, 210, 0.35),
     0 0 0 11px rgba(232, 228, 210, 0.14);
 }
 .farm-star {
@@ -2089,7 +2163,10 @@ input:focus-visible {
   .right-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     align-items: stretch;
+    flex: 1;
+    min-height: 680px;
   }
   .side-section.records-section {
     grid-column: 1 / -1;
@@ -2124,17 +2201,32 @@ input:focus-visible {
     height: 240px;
   }
   .records {
-    max-height: 480px;
+    height: 100%;
+    min-height: 360px;
+    max-height: none;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 10px 14px;
-    align-items: start;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 28px) / 3);
+    grid-template-columns: none;
+    gap: 14px;
+    align-items: stretch;
     padding: 10px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
   }
   .record-day {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 8px 14px;
+    min-width: 0;
+    height: 100%;
+    overflow-y: auto;
+    scroll-snap-align: end;
+  }
+  .record-day.is-today {
+    background: #fffaf5;
+    border-color: #f4dfd0;
   }
   .record .r-dur {
     min-width: 76px;
@@ -2142,20 +2234,73 @@ input:focus-visible {
   }
   /* 月历格子加大并水平居中，半宽列内不溢出 */
   .heatmap {
-    --hm-cell: 16px;
+    --hm-cell: 22px;
     --hm-dow-w: 22px;
-    --hm-gap: 4px;
+    --hm-gap: 5px;
+  }
+  .hm-grid {
+    margin: 0;
+  }
+  .action-side {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 20px;
+  }
+  .action-side-row {
+    min-height: 40px;
   }
 }
 
-.completion-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 20px; color: #344054; background: #eef2ff; border-top: 1px solid #d0d5dd; font-size: 14px; }
-.completion-status button { border: 1px solid #5265db; background: white; color: #3448ba; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-.quad-add { opacity: 0; pointer-events: none; margin-left: 8px; }
-.quad:hover .quad-add, .quad:focus-within .quad-add { opacity: 1; pointer-events: auto; }
-@media (hover: none) { .quad-add { opacity: 1; pointer-events: auto; } }
-.quick-task-form { display: grid; gap: 10px; padding: 12px 0; }
-.quick-task-form > input { width: 100%; padding: 8px; border: 1px solid #dce1eb; border-radius: 8px; }
-.quick-task-form input[type=number] { width: 65px; }
+.completion-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 20px;
+  color: #344054;
+  background: #eef2ff;
+  border-top: 1px solid #d0d5dd;
+  font-size: 14px;
+}
+.completion-status button {
+  border: 1px solid #5265db;
+  background: white;
+  color: #3448ba;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.quad-add {
+  opacity: 0;
+  pointer-events: none;
+  margin-left: 8px;
+}
+.quad:hover .quad-add,
+.quad:focus-within .quad-add {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .quad-add {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.quick-task-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+}
+.quick-task-form > input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #dce1eb;
+  border-radius: 8px;
+}
+.quick-task-form input[type="number"] {
+  width: 65px;
+}
 .record-edit {
   margin-left: auto;
   font-size: 12px;
@@ -2165,9 +2310,7 @@ input:focus-visible {
   /* 默认收起，悬浮该行时滑出：列表更干净，需要时随手可得 */
   opacity: 0;
   transform: translateX(4px);
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .record:hover .record-edit,
 .record:focus-within .record-edit,
@@ -2184,7 +2327,13 @@ input:focus-visible {
     transform: none;
   }
 }
-.outbox-status { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 18px; font-size: 13px; }
+.outbox-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 13px;
+}
 
 /* ── 概览统计卡：今日番茄分级变色 + 总番茄里程碑进度 ── */
 .stat strong {
@@ -2214,7 +2363,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 27px 14px 14px;
 }
 .stb-from,
 .stb-to {
@@ -2240,6 +2389,26 @@ input:focus-visible {
   border-radius: 3px;
   background: linear-gradient(90deg, #f2cd73, #f2b544);
   transition: width 0.6s ease-out;
+}
+.stb-current {
+  position: absolute;
+  top: -25px;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #fff4dd;
+  color: #9d6408;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.stb-current.at-end {
+  transform: translateX(-100%);
+}
+.stb-current.at-start {
+  transform: translateX(0);
 }
 .stb-main em {
   display: block;
@@ -2489,20 +2658,146 @@ button.stats-range-label:hover {
   font-size: 12px;
   color: var(--primary);
 }
-/* 区间合计：五张独立卡合并为一个方框；Apple 健康卡片式垂直堆叠——
-   label 小灰字在上、数值大字在下左对齐，环比箭头与基准说明紧跟数值 */
+/* 实际收获和三期移动平均共用真实分桶；只画已到达的时间。 */
+.stats-trend {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  min-height: 310px;
+  padding: 25px 30px 18px;
+  border: 1px solid #eee6e9;
+  border-radius: 22px;
+  color: #2d3441;
+  background: radial-gradient(
+      ellipse at 92% -12%,
+      rgba(240, 218, 235, 0.58) 0,
+      transparent 44%
+    ),
+    linear-gradient(145deg, #fffefd, #fff8f7 70%, #fbf9ff);
+  box-shadow: 0 8px 24px rgba(75, 53, 72, 0.06);
+}
+.stats-trend-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+.stats-trend-eyebrow {
+  color: #bb5c56;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+.stats-trend h3 {
+  margin: 5px 0 4px;
+  color: #252b36;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.stats-trend-heading p,
+.stats-trend-note {
+  color: #6f7887;
+  font-size: 12px;
+}
+.stats-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.stats-trend-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid #e9dfe5;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #535b6b;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.trend-key {
+  display: block;
+  width: 13px;
+  height: 3px;
+  border-radius: 3px;
+}
+.trend-key.actual {
+  background: #e7645d;
+}
+.trend-key.average {
+  background: #936fc7;
+}
+.stats-trend-plot {
+  margin-top: 10px;
+  height: 166px;
+}
+.stats-trend-plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.trend-gridline {
+  stroke: #c3cad5;
+  stroke-opacity: 0.72;
+  stroke-dasharray: 3 6;
+}
+.trend-axis {
+  fill: #7c8694;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.trend-average-path {
+  fill: none;
+  stroke: #936fc7;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trend-actual-path {
+  fill: none;
+  stroke: url(#stats-trend-stroke);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trend-dot {
+  fill: #ef9b94;
+  stroke: #fffaf9;
+  stroke-width: 2;
+}
+.trend-dot.latest {
+  fill: #e45e57;
+  stroke: #fff;
+  stroke-width: 2.5;
+}
+.stats-trend-note {
+  margin-top: 9px;
+}
+/* 汇总信息保持数值层级，窄窗也不再堆成五条长行。 */
 .stats-summary {
   gap: 0;
+}
+.stats-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
 }
 .st-row {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 3px;
-  padding: 10px 0;
+  padding: 8px 0;
 }
-.st-row + .st-row {
+.stats-summary-metrics .st-row:nth-child(n + 3) {
   border-top: 1px solid #f2f4f7;
+}
+.stats-summary-metrics .st-row:nth-child(2n) {
+  padding-left: 12px;
+  border-left: 1px solid #f2f4f7;
 }
 .st-row .st-label {
   font-size: 12px;
@@ -2520,6 +2815,12 @@ button.stats-range-label:hover {
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+.stats-summary-metrics .st-row:nth-child(-n + 2) strong {
+  font-size: 26px;
+}
+.stats-summary-metrics .st-row:nth-child(2) strong.long {
+  font-size: 19px;
 }
 .st-row strong.long {
   font-size: 16px;
@@ -2748,7 +3049,7 @@ button.stats-range-label:hover {
   font-size: 15px;
   font-weight: 600;
 }
-/* 窄窗/竖屏：统计页单栏（顺序=合计框→每日收获→时段热力→象限/时段/高光） */
+/* 窄窗/竖屏：走势优先、其后紧凑汇总和详细分布。 */
 @media (max-width: 900px), (orientation: portrait) {
   .stats-grid {
     grid-template-columns: 1fr;
@@ -2760,6 +3061,41 @@ button.stats-range-label:hover {
   .stats-range-label {
     order: 4;
     margin-left: 4px;
+  }
+  .stats-trend {
+    padding: 22px 22px 16px;
+  }
+  .stats-trend-heading {
+    align-items: start;
+  }
+  .stats-trend-legend {
+    justify-content: flex-end;
+  }
+}
+@media (orientation: portrait) and (min-width: 901px) {
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  }
+  .stats-trio {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+}
+@media (max-width: 540px) {
+  .stats-trend-heading {
+    display: block;
+  }
+  .stats-trend-legend {
+    justify-content: flex-start;
+    margin-top: 12px;
+  }
+  .stats-trend h3 {
+    font-size: 24px;
+  }
+  .stats-summary-metrics {
+    gap: 0 10px;
   }
 }
 
