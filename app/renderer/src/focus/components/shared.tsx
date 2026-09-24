@@ -192,19 +192,15 @@ export const Ring = ({
   );
 };
 
-// 窗口控制：设置/小窗/置顶，放在各屏标题行右侧（compact 用 MiniView 浮动钮）
+// 主窗口仅保留设置与小窗入口；置顶在紧凑小窗内控制。
 export const WindowControls = ({
-  pinned,
   settingsOpen,
   onToggleSettings,
   onToggleCompact,
-  onTogglePin,
 }: {
-  pinned: boolean;
   settingsOpen: boolean;
   onToggleSettings: () => void;
   onToggleCompact: () => void;
-  onTogglePin: () => void;
 }) => (
   <div className="win-controls">
     <button
@@ -223,15 +219,6 @@ export const WindowControls = ({
       onClick={onToggleCompact}
     >
       ↙
-    </button>
-    <button
-      className={`ghost-btn ${pinned ? "selected" : ""}`}
-      title={pinned ? "取消置顶" : "切换为置顶小窗"}
-      aria-label="置顶"
-      aria-pressed={pinned}
-      onClick={onTogglePin}
-    >
-      ⌖
     </button>
   </div>
 );

@@ -1348,11 +1348,9 @@ export default function FocusApp() {
       </div>
     );
   const windowControls = {
-    pinned,
     settingsOpen,
     onToggleSettings: () => setSettingsOpen(!settingsOpen),
     onToggleCompact: () => windowMode(true, true),
-    onTogglePin: () => windowMode(true, !pinned),
   };
   return (
     <div className="focus-app">

@@ -877,28 +877,38 @@ input:focus-visible {
   justify-content: center;
   min-height: 31px;
   padding: 5px 12px;
-  border: 1px solid #cbd6ff;
-  border-radius: 9px;
-  background: #f4f6ff;
-  color: #3657dc;
-  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: #6b7280;
+  font-weight: 500;
 }
 .side-title-actions .overview-action:hover {
-  background: #e9edff;
-  border-color: #9eb1ff;
+  background: var(--card);
+  color: var(--primary);
+  border-color: #cbd6ff;
 }
 .side-title-actions .gen-btn.overview-action {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
+  background: var(--card);
+  border-color: var(--border);
+  color: #6b7280;
 }
 .side-title-actions .gen-btn.overview-action:hover {
-  background: #355beb;
+  background: var(--card);
+  border-color: #cbd6ff;
+  color: var(--primary);
 }
-.side-title-actions .gen-btn.overview-action.busy,
-.side-title-actions .gen-btn.overview-action.complete,
+.side-title-actions .gen-btn.overview-action.busy {
+  background: var(--card);
+  color: var(--primary);
+}
+.side-title-actions .gen-btn.overview-action.complete {
+  background: var(--card);
+  color: #328754;
+}
 .side-title-actions .gen-btn.overview-action.failed {
-  color: #fff;
+  background: var(--card);
+  color: #bb4343;
 }
 /* Fixed-width header control: step progress mirrors the weekly-goal track. */
 .gen-btn {

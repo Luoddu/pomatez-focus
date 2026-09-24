@@ -43,7 +43,6 @@ export default function SettingsPanel({
   canConnect,
   localTitle,
   hasActive,
-  pinned,
   settingsOpen,
   onConfig,
   onSubmit,
@@ -53,7 +52,6 @@ export default function SettingsPanel({
   onAddLocal,
   onToggleSettings,
   onToggleCompact,
-  onTogglePin,
 }: {
   config: FocusConfig;
   connected: boolean;
@@ -64,7 +62,6 @@ export default function SettingsPanel({
   canConnect: boolean;
   localTitle: string;
   hasActive: boolean;
-  pinned: boolean;
   settingsOpen: boolean;
   onConfig: (config: FocusConfig) => void;
   onSubmit: () => void;
@@ -74,7 +71,6 @@ export default function SettingsPanel({
   onAddLocal: () => void;
   onToggleSettings: () => void;
   onToggleCompact: () => void;
-  onTogglePin: () => void;
 }) {
   const [soundOn, setSoundOn] = useState(isSoundEnabled);
   return (
@@ -83,11 +79,9 @@ export default function SettingsPanel({
         <div className="settings-title-row">
           <h1>设置</h1>
           <WindowControls
-            pinned={pinned}
             settingsOpen={settingsOpen}
             onToggleSettings={onToggleSettings}
             onToggleCompact={onToggleCompact}
-            onTogglePin={onTogglePin}
           />
         </div>
         <div className="settings-cols">
@@ -151,7 +145,7 @@ export default function SettingsPanel({
         <div className="card settings-card s-about">
           <h3>关于</h3>
           <div className="about-line">
-            版本 <span className="ver">0.1.0-preview.56</span>
+            版本 <span className="ver">0.1.0-preview.57</span>
             <br />
             基于开源项目 pomatez 二次开发（MIT License，© roldanjr
             及贡献者）

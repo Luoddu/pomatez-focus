@@ -41,19 +41,15 @@ const BAR_TITLE: Record<RangeKey, string> = {
 export default function StatsPanel({
   records,
   onClose,
-  pinned,
   settingsOpen,
   onToggleSettings,
   onToggleCompact,
-  onTogglePin,
 }: {
   records: FocusSession[];
   onClose: () => void;
-  pinned: boolean;
   settingsOpen: boolean;
   onToggleSettings: () => void;
   onToggleCompact: () => void;
-  onTogglePin: () => void;
 }) {
   const [rangeKey, setRangeKey] = useState<RangeKey>("week");
   // anchor：区间内的任意一天；翻页只动 anchor，tab 切换重置回今天
@@ -184,11 +180,9 @@ export default function StatsPanel({
           </button>
         </span>
         <WindowControls
-          pinned={pinned}
           settingsOpen={settingsOpen}
           onToggleSettings={onToggleSettings}
           onToggleCompact={onToggleCompact}
-          onTogglePin={onTogglePin}
         />
       </div>
       {summary.count === 0 && summary.seconds === 0 ? (

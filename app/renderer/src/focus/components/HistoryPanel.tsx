@@ -162,11 +162,9 @@ export default function HistoryPanel({
   genPercent,
   genFailed,
   refreshBusy,
-  pinned,
   settingsOpen,
   onToggleSettings,
   onToggleCompact,
-  onTogglePin,
   onWeekGoalMet,
   onOpenStats,
   onMilestone,
@@ -186,11 +184,9 @@ export default function HistoryPanel({
   genPercent: number;
   genFailed: boolean;
   refreshBusy: boolean;
-  pinned: boolean;
   settingsOpen: boolean;
   onToggleSettings: () => void;
   onToggleCompact: () => void;
-  onTogglePin: () => void;
   onWeekGoalMet?: (total: number, goal: number) => void;
   onOpenStats?: () => void;
   onMilestone?: (milestone: number) => void;
@@ -392,11 +388,9 @@ export default function HistoryPanel({
             </button>
           </span>
           <WindowControls
-            pinned={pinned}
             settingsOpen={settingsOpen}
             onToggleSettings={onToggleSettings}
             onToggleCompact={onToggleCompact}
-            onTogglePin={onTogglePin}
           />
         </div>
         <div className="stat-grid">

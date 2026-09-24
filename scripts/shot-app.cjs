@@ -272,6 +272,12 @@ app
       ),
     });
     results.push({
+      check: "overview actions match window controls and omit the duplicate pin",
+      pass: await js(
+        `(()=>{const stats=document.querySelector('[aria-label="专注统计"]'),gen=document.querySelector('[aria-label="生成今日番茄"]'),gear=document.querySelector('.win-controls [aria-label="设置"]'),controls=document.querySelector('.win-controls');if(!stats||!gen||!gear||!controls)return false;const g=getComputedStyle(gear);return [stats,gen].every(b=>{const s=getComputedStyle(b);return s.backgroundColor===g.backgroundColor&&s.borderTopColor===g.borderTopColor})&&controls.querySelectorAll('button').length===2&&!controls.querySelector('[aria-label="置顶"]')})()`
+      ),
+    });
+    results.push({
       check: "quadrant container has no internal scrollbar",
       pass: await js(
         `(()=>{const q=document.querySelector('.quadrants');return getComputedStyle(q).overflowY==='visible'&&q.scrollHeight<=q.clientHeight+1})()`
@@ -1078,6 +1084,12 @@ app
       check: "compact mini view renders",
       pass: await js(
         `document.querySelector('.focus-app').classList.contains('compact')&&Boolean(document.querySelector('.mini-body .ring'))`
+      ),
+    });
+    results.push({
+      check: "compact view retains its independent pin control",
+      pass: await js(
+        `Boolean(document.querySelector('.mini-controls [aria-label="置顶"]'))`
       ),
     });
     await shot("mini");
