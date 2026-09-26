@@ -128,6 +128,19 @@ export class FocusService {
       this.planWriting = false;
     }
   }
+  dailyReviews() {
+    return this.connected().dailyReviews();
+  }
+  async recolorRecord(value: any) {
+    if (this.planWriting)
+      throw Error("飞书正在同步，改色已保留，可稍后重试");
+    this.planWriting = true;
+    try {
+      return await this.connected().recolorRecord(value);
+    } finally {
+      this.planWriting = false;
+    }
+  }
   async correctRecord(value: any) {
     if (this.planWriting)
       throw Error("飞书正在同步，修改已保留，可稍后重试");

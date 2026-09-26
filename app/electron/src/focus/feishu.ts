@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { projectTypeOf, ProjectType } from "./project";
+import { dailyReviews as parseDailyReviews } from "./reviews";
 import {
   MOVE_FIELD,
   readMove,
@@ -12,6 +13,7 @@ import {
   historyRecord,
   readHistory,
   mergeHistory,
+  serializeHistory,
 } from "./history";
 import {
   PLAN_FIELDS,
@@ -429,6 +431,72 @@ export class Feishu {
     }
     return result;
   }
+  async dailyReviews() {
+    const key = connectionKey(this.config);
+    const table = await this.findTable("安排与复盘", false);
+    if (!table) return { sourceKey: key, summaries: {} };
+    const path = `${this.root()}/tables/${id(table.table_id)}`;
+    const fields = await this.list(`${path}/fields`);
+    for (const [name, type] of [
+      ["周期类型", 1],
+      ["周期开始", 5],
+      ["进展与卡点", 1],
+    ] as [string, number][])
+      if (!fields.some((f) => f.field_name === name && f.type === type))
+        throw Error("复盘表字段未匹配，未读取摘要");
+    return {
+      sourceKey: key,
+      summaries: parseDailyReviews(await this.list(`${path}/records`)),
+    };
+  }
+  async recolorRecord(input: any) {
+    const key = connectionKey(this.config);
+    const before = historyRecord(input?.before, key);
+    const after = historyRecord(input?.after, key);
+    const withoutColor = (r: any) => {
+      const copy = { ...r };
+      delete copy.colorOverride;
+      delete copy.colorRevision;
+      return JSON.stringify(copy);
+    };
+    if (
+      withoutColor(before) !== withoutColor(after) ||
+      (after.colorRevision || 0) !== (before.colorRevision || 0) + 1
+    )
+      throw Error("改色只能更改番茄分类，不能修改数量、时间或任务");
+    const schema = await this.planSchema();
+    await this.guardRecordMoves(schema);
+    const rows = await this.list(`${schema.path}/records`);
+    const matches = rows
+      .map((row) => ({
+        row,
+        records: readHistory(row.fields?.[HISTORY_FIELD], key),
+      }))
+      .filter((item) => item.records.some((r) => r.id === before.id));
+    if (matches.length !== 1)
+      throw Error("请先完成原专注记录的共享同步");
+    const { row, records } = matches[0];
+    const current = records.find((r) => r.id === before.id);
+    if (
+      JSON.stringify(current) !== JSON.stringify(before) &&
+      JSON.stringify(current) !== JSON.stringify(after)
+    )
+      throw Error("记录已在另一台电脑修改，请同步后再改色");
+    const patch = {
+      [HISTORY_FIELD]: serializeHistory(
+        records.map((r) => (r.id === after.id ? after : r))
+      ),
+    };
+    if (patch[HISTORY_FIELD].length > 70000)
+      throw Error("番茄明细超过容量，未改色");
+    const route = `${schema.path}/records/${id(row.record_id)}`;
+    if (!fieldsAgree(row.fields, patch))
+      await this.call("PUT", route, { fields: patch });
+    const verified = (await this.call("GET", route)).data?.record;
+    if (!verified?.fields || !fieldsAgree(verified.fields, patch))
+      throw Error("改色回读未通过，保留待重试");
+    return { record: { ...after, cloudSynced: true } };
+  }
   async correctRecord(input: any) {
     const key = connectionKey(this.config);
     const before = historyRecord(input?.before, key);
@@ -511,10 +579,9 @@ export class Feishu {
       )
     )
       patch[this.config.completedField] = false;
-    patch[HISTORY_FIELD] = JSON.stringify({
-      version: 1,
-      records: history.map((r) => (r.id === after.id ? after : r)),
-    });
+    patch[HISTORY_FIELD] = serializeHistory(
+      history.map((r) => (r.id === after.id ? after : r))
+    );
     if (patch[HISTORY_FIELD].length > 70000)
       throw Error("修改后的专注明细超过容量");
     const route = `${schema.path}/records/${id(row.record_id)}`;
@@ -837,10 +904,9 @@ export class Feishu {
             [completed]: false,
           });
       }
-      sourcePatch[HISTORY_FIELD] = JSON.stringify({
-        version: 1,
-        records: oldHistory.filter((r) => r.id !== before.id),
-      });
+      sourcePatch[HISTORY_FIELD] = serializeHistory(
+        oldHistory.filter((r) => r.id !== before.id)
+      );
       patches.get(source.record_id)[HISTORY_FIELD] =
         sourcePatch[HISTORY_FIELD];
       patches.get(target.record_id)[HISTORY_FIELD] = mergeHistory(
@@ -2007,7 +2073,7 @@ export class Feishu {
         count++;
       }
       if (!count) continue;
-      const after = JSON.stringify({ version: 1, records });
+      const after = serializeHistory(records);
       if (after.length > 70000)
         throw Error("旧番茄分类超过跨端字段容量，未继续写入");
       changes.push({ planId: row.record_id, before, after, count });

@@ -272,7 +272,8 @@ app
       ),
     });
     results.push({
-      check: "overview actions match window controls and omit the duplicate pin",
+      check:
+        "overview actions match window controls and omit the duplicate pin",
       pass: await js(
         `(()=>{const stats=document.querySelector('[aria-label="专注统计"]'),gen=document.querySelector('[aria-label="生成今日番茄"]'),gear=document.querySelector('.win-controls [aria-label="设置"]'),controls=document.querySelector('.win-controls');if(!stats||!gen||!gear||!controls)return false;const g=getComputedStyle(gear);return [stats,gen].every(b=>{const s=getComputedStyle(b);return s.backgroundColor===g.backgroundColor&&s.borderTopColor===g.borderTopColor})&&controls.querySelectorAll('button').length===2&&!controls.querySelector('[aria-label="置顶"]')})()`
       ),
@@ -421,6 +422,16 @@ app
         `(()=>{const p=document.querySelector('.farm-pile').getBoundingClientRect();const g=document.querySelector('.farm-ground').getBoundingClientRect();return p.right<=g.left+1})()`
       ),
     });
+    results.push({
+      check: "past details are absent until glass is opened",
+      pass: await js(
+        "document.querySelectorAll('.record-day.is-folded .record').length===0 && document.querySelectorAll('.day-glass').length>0"
+      ),
+    });
+    await js(
+      "document.querySelectorAll('.day-glass').forEach(b=>b.click())"
+    );
+    await wait(100);
     // 演示记录没有项目快照：记录图标应明确标作未归类，不借用象限色。
     results.push({
       check:

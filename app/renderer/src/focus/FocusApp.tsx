@@ -11,9 +11,12 @@ import {
   FocusTask,
   FocusQuadrant,
   Mood,
+  ProjectType,
   timeParts,
 } from "./session";
 import { EditQueue, PendingEdit, QuickTask } from "./editQueue";
+import { recolorSession } from "./classification.js";
+import { loadReviews, saveReviews } from "./reviewCache";
 import {
   projectQuickTasks,
   quickRows,
@@ -293,9 +296,42 @@ export default function FocusApp() {
     sourceKey
   );
   const editingIds = outbox
-    .filter((e) => e.kind === "edit")
+    .filter((e) => e.kind !== "task")
     .map((e) => (e.payload as PendingEdit).before.id);
-  const [demoSeed] = useState(demoHistory);
+  const [demoSeed, setDemoSeed] = useState(demoHistory);
+  const [dayReviews, setDayReviews] = useState<Record<string, string>>(
+    {}
+  );
+  const [reviewState, setReviewState] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
+  const reviewSource = useRef(sourceKey);
+  reviewSource.current = sourceKey;
+  const refreshReviews = async () => {
+    const source = sourceKey;
+    if (!source || !api()?.dailyReviews) return;
+    try {
+      const reply = await api().dailyReviews();
+      if (reviewSource.current !== source) return;
+      if (reply.sourceKey !== source) throw Error("复盘所属飞书表不符");
+      setDayReviews(saveReviews(localStorage, source, reply.summaries));
+      setReviewState("loaded");
+    } catch {
+      if (reviewSource.current === source) setReviewState("error");
+    }
+  };
+  useEffect(() => {
+    setDayReviews({});
+    setReviewState(
+      api() ? (sourceKey ? "loading" : "error") : "loaded"
+    );
+    if (!sourceKey) return;
+    try {
+      setDayReviews(loadReviews(localStorage, sourceKey));
+    } catch {}
+    refreshReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceKey]);
   const active = timer.active,
     parts = active ? timeParts(active) : null;
   const pending = timer.records.filter((r) => r.sync === "pending");
@@ -306,8 +342,28 @@ export default function FocusApp() {
   );
   // Demo 模式把内存态演示记录叠在真实记录后展示；接入飞书后只用真实记录
   const shownRecords = useMemo(
-    () => (api() ? timer.records : [...timer.records, ...demoSeed]),
-    [timer.records, demoSeed]
+    () =>
+      (api() ? timer.records : [...timer.records, ...demoSeed]).map(
+        (record) => {
+          const intent = outbox.find(
+            (e) =>
+              e.kind === "color" &&
+              (e.payload as PendingEdit).before.id === record.id
+          );
+          const after = (intent?.payload as PendingEdit | undefined)
+            ?.after;
+          return after &&
+            (after.colorRevision || 0) > (record.colorRevision || 0)
+            ? {
+                ...record,
+                colorOverride: after.colorOverride,
+                colorRevision: after.colorRevision,
+              }
+            : record;
+        }
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [timer.records, demoSeed, editRevision, sourceKey]
   );
   const totalTomatoes = useMemo(
     () =>
@@ -633,6 +689,7 @@ export default function FocusApp() {
       if (remote.sourceKey !== sourceKey)
         throw Error("飞书连接已变化，请重新同步");
       timer.mergeCloud(remote.records, sourceKey);
+      await refreshReviews();
       await refresh();
       if (remote.missing)
         failures.push(
@@ -716,6 +773,40 @@ export default function FocusApp() {
       state: "pending",
     });
     notify("修改已保存在本机，将在当前同步结束后更新飞书。");
+  };
+  const recolorRecord = (before: FocusSession, type?: ProjectType) => {
+    if (!api() && demoSeed.some((r) => r.id === before.id)) {
+      setDemoSeed((rows) =>
+        rows.map((r) =>
+          r.id === before.id ? recolorSession(r, type) : r
+        )
+      );
+      return;
+    }
+    if (before.task.source === "local" && !before.cloudSynced) {
+      timer.recolor(before.id, type);
+      return;
+    }
+    if (
+      !connected ||
+      !sourceKey ||
+      !api() ||
+      before.task.sourceKey !== sourceKey
+    )
+      throw Error("请连接这条记录所属的飞书表后改色");
+    const id = crypto.randomUUID();
+    editQueue.add({
+      id,
+      sourceKey,
+      kind: "color",
+      state: "pending",
+      payload: {
+        id,
+        sourceKey,
+        before,
+        after: recolorSession(before, type),
+      },
+    });
   };
   const editReady = useRef(false);
   editReady.current =
@@ -818,6 +909,24 @@ export default function FocusApp() {
                   ? latest!.completionOwnedPlanIds
                   : undefined),
             };
+            if (item.kind === "color") {
+              const colorBefore = {
+                ...latest,
+                colorOverride: edit.before.colorOverride,
+                colorRevision: edit.before.colorRevision,
+              };
+              const colorAfter = {
+                ...colorBefore,
+                colorOverride: edit.after.colorOverride,
+                colorRevision: edit.after.colorRevision,
+              };
+              const result = await api().recolorRecord({
+                before: colorBefore,
+                after: colorAfter,
+              });
+              timer.mergeCloud([result.record], sourceKey);
+              return;
+            }
             const after = {
               ...before,
               task:
@@ -1507,6 +1616,9 @@ export default function FocusApp() {
             tasks={boardTasks}
             onAddManual={timer.addManual}
             onEdit={editRecord}
+            onRecolor={recolorRecord}
+            dayReviews={dayReviews}
+            reviewState={reviewState}
             editingIds={editingIds}
             onGenerate={generate}
             generating={generating || silentGenerating}

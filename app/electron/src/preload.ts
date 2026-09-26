@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("focusApi", {
   adjustToday: (value: any) => invoke("adjustToday", value),
   createQuickTask: (value: any) => invoke("createQuickTask", value),
   correctRecord: (value: any) => invoke("correctRecord", value),
+  recolorRecord: (value: any) => invoke("recolorRecord", value),
+  dailyReviews: () => invoke("dailyReviews"),
   completeToday: (value: any) => invoke("completeToday", value),
   configure: (value: any) => invoke("configure", value),
   setup: () => invoke("setup"),

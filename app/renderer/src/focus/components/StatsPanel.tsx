@@ -3,7 +3,8 @@ import { FocusSession } from "../session";
 import {
   RANGE_LABELS,
   RangeKey,
-  barBuckets,
+  categoryBuckets,
+  STAT_CATEGORIES,
   currentStreak,
   focusDurationTrend,
   halfHourMatrix,
@@ -13,7 +14,13 @@ import {
   shiftRange,
   summarize,
 } from "../stats";
-import { barTone } from "../week";
+import {
+  barTone,
+  TOMATO_TONES,
+  PROJECT_LABELS,
+  mixColor,
+} from "../week";
+import type { CategoryFilter } from "../classification.js";
 import { renderShareCardPng, shareCardModel } from "../shareCard";
 import { WindowControls, durationText } from "./shared";
 import StatsTrendChart from "./StatsTrendChart";
@@ -52,6 +59,18 @@ export default function StatsPanel({
   onToggleCompact: () => void;
 }) {
   const [rangeKey, setRangeKey] = useState<RangeKey>("week");
+  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [harvestView, setHarvestView] = useState<"total" | "category">(
+    "total"
+  );
+  const categoryLabel =
+    category === "all"
+      ? "全部"
+      : category === "unclassified"
+      ? "未分类"
+      : PROJECT_LABELS[category];
+  const categoryTone =
+    category === "all" ? undefined : TOMATO_TONES[category];
   // anchor：区间内的任意一天；翻页只动 anchor，tab 切换重置回今天
   const [anchor, setAnchor] = useState(() => Date.now());
   const now = Date.now();
@@ -73,12 +92,12 @@ export default function StatsPanel({
     [records, now]
   );
   const buckets = useMemo(
-    () => barBuckets(scoped, range, now),
+    () => categoryBuckets(scoped, range, now),
     [scoped, range, now]
   );
   const trendPoints = useMemo(
-    () => focusDurationTrend(records, trendAnchor),
-    [records, trendAnchor]
+    () => focusDurationTrend(records, trendAnchor, category),
+    [records, trendAnchor, category]
   );
   const heat = useMemo(
     () => halfHourMatrix(scoped, range),
@@ -189,7 +208,43 @@ export default function StatsPanel({
         <div className="card stats-empty">所选区间暂无专注记录</div>
       ) : (
         <>
-          <StatsTrendChart points={trendPoints} />
+          <StatsTrendChart
+            points={trendPoints}
+            categoryLabel={categoryLabel}
+            tone={
+              categoryTone && mixColor(categoryTone, "#675b50", 0.15)
+            }
+            baselineTone={
+              categoryTone && mixColor(categoryTone, "#ffffff", 0.35)
+            }
+            filters={
+              <div
+                className="category-filters"
+                role="group"
+                aria-label="趋势番茄分类"
+              >
+                {(["all", ...STAT_CATEGORIES] as CategoryFilter[]).map(
+                  (type) => (
+                    <button
+                      key={type}
+                      className="category-filter"
+                      aria-pressed={category === type}
+                      onClick={() => setCategory(type)}
+                    >
+                      {type !== "all" && (
+                        <i style={{ background: TOMATO_TONES[type] }} />
+                      )}
+                      {type === "all"
+                        ? "全部"
+                        : type === "unclassified"
+                        ? "未分类"
+                        : PROJECT_LABELS[type]}
+                    </button>
+                  )
+                )}
+              </div>
+            }
+          />
           <div className="stats-grid">
             <div className="stats-col">
               <section className="card stats-card stats-summary">
@@ -234,7 +289,27 @@ export default function StatsPanel({
                 </div>
               </section>
               <section className="card stats-card stats-bars">
-                <h3>{BAR_TITLE[rangeKey]}</h3>
+                <div className="harvest-heading">
+                  <h3>{BAR_TITLE[rangeKey]}</h3>
+                  <div
+                    className="harvest-switch"
+                    role="group"
+                    aria-label="收获视图"
+                  >
+                    <button
+                      aria-pressed={harvestView === "total"}
+                      onClick={() => setHarvestView("total")}
+                    >
+                      总量
+                    </button>
+                    <button
+                      aria-pressed={harvestView === "category"}
+                      onClick={() => setHarvestView("category")}
+                    >
+                      分类
+                    </button>
+                  </div>
+                </div>
                 <div
                   className={`bars${
                     buckets.length > 14 ? " dense" : ""
@@ -250,21 +325,66 @@ export default function StatsPanel({
                           <span className="bar-val">{b.count}</span>
                         )}
                         <div
-                          className={`bar${b.isToday ? " today" : ""}`}
+                          className={`bar${b.isToday ? " today" : ""}${
+                            harvestView === "category" ? " stacked" : ""
+                          }`}
                           style={{
                             height: `${(b.count / barMax) * 100}%`,
-                            background: `linear-gradient(180deg, ${tone.top}, ${tone.bottom})`,
-                            boxShadow: tone.glow || undefined,
+                            background:
+                              harvestView === "total"
+                                ? `linear-gradient(180deg, ${tone.top}, ${tone.bottom})`
+                                : undefined,
+                            boxShadow:
+                              harvestView === "total"
+                                ? tone.glow || undefined
+                                : undefined,
                           }}
                           title={`${b.label} · ${
                             b.count
                           } 个番茄 · ${durationText(b.seconds)}`}
-                        />
+                        >
+                          {harvestView === "category" &&
+                            b.categories
+                              .filter((c) => c.count > 0)
+                              .map((c) => (
+                                <span
+                                  key={c.category}
+                                  className="bar-segment"
+                                  data-category={c.category}
+                                  style={{
+                                    height: `${
+                                      (c.count / b.count) * 100
+                                    }%`,
+                                    background:
+                                      TOMATO_TONES[c.category],
+                                  }}
+                                  title={`${b.label} · ${
+                                    c.category === "unclassified"
+                                      ? "未分类"
+                                      : PROJECT_LABELS[c.category]
+                                  } · ${c.count} 个（${Math.round(
+                                    (c.count / b.count) * 100
+                                  )}%）· ${durationText(c.seconds)}`}
+                                />
+                              ))}
+                        </div>
                         <span className="bar-label">{b.label}</span>
                       </div>
                     );
                   })}
                 </div>
+                {harvestView === "category" && (
+                  <div className="harvest-legend">
+                    {STAT_CATEGORIES.map((type) => (
+                      <span key={type}>
+                        <i style={{ background: TOMATO_TONES[type] }} />
+                        {type === "unclassified"
+                          ? "未分类"
+                          : PROJECT_LABELS[type]}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </section>
             </div>
             <section className="card stats-card stats-heat">

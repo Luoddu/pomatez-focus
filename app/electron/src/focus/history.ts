@@ -86,6 +86,19 @@ export function historyRecord(r: any, sourceKey: string): any {
       throw Error("专注修改版本无效");
     result.revision = r.revision;
   }
+  if (r.colorRevision != null) {
+    if (!Number.isInteger(r.colorRevision) || r.colorRevision < 0)
+      throw Error("番茄颜色版本无效");
+    result.colorRevision = r.colorRevision;
+  }
+  if (r.colorOverride != null) {
+    if (
+      !PROJECT_TYPES.includes(r.colorOverride) ||
+      !(r.colorRevision > 0)
+    )
+      throw Error("番茄颜色分类无效");
+    result.colorOverride = r.colorOverride;
+  }
   if (r.previousTasks != null) {
     if (
       !Array.isArray(r.previousTasks) ||
@@ -145,7 +158,7 @@ export function readHistory(raw: any, key: string): any[] {
     throw Error("跨端记录无法解析，未覆盖");
   }
   if (
-    data?.version !== 1 ||
+    ![1, 2].includes(data?.version) ||
     !Array.isArray(data.records) ||
     data.records.length > 100
   )
@@ -169,6 +182,8 @@ export function mergeHistory(
     const withoutType = (r: any) => {
       const copy = structuredClone(r);
       delete copy.task.projectType;
+      delete copy.colorOverride;
+      delete copy.colorRevision;
       return JSON.stringify(copy);
     };
     if (
@@ -178,14 +193,38 @@ export function mergeHistory(
         old.task.projectType !== incoming.task.projectType)
     )
       throw Error("同一专注记录的跨端内容不同，请核对原电脑；未覆盖");
-    if (!old.task.projectType && incoming.task.projectType)
-      records[index] = incoming;
+    const a = old.colorRevision || 0,
+      b = incoming.colorRevision || 0;
+    if (a === b && old.colorOverride !== incoming.colorOverride)
+      throw Error("番茄颜色版本冲突，未覆盖");
+    records[index] = {
+      ...old,
+      task: {
+        ...old.task,
+        ...(incoming.task.projectType
+          ? { projectType: incoming.task.projectType }
+          : {}),
+      },
+      ...(b > a
+        ? {
+            colorOverride: incoming.colorOverride,
+            colorRevision: incoming.colorRevision,
+          }
+        : {}),
+    };
   } else records.push(incoming);
-  const result = JSON.stringify({
-    version: 1,
-    records: records.sort((a, b) => a.id.localeCompare(b.id)),
-  });
+  const result = serializeHistory(
+    records.sort((a, b) => a.id.localeCompare(b.id))
+  );
   if (records.length > 100 || result.length > 70000)
     throw Error("此番茄的跨端明细已满，记录仍保留本机");
   return result;
+}
+
+// Version 2 protects manual color metadata from older clients stripping it.
+export function serializeHistory(records: any[]): string {
+  return JSON.stringify({
+    version: records.some((r) => r.colorRevision > 0) ? 2 : 1,
+    records,
+  });
 }

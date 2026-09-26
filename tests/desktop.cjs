@@ -141,7 +141,9 @@ app
     assert.equal((await stored()).active.status, "review");
     checks.push("early end opens inline review");
     assert.equal(
-      await js(`Boolean(document.querySelector('.review-card .discard'))`),
+      await js(
+        `Boolean(document.querySelector('.review-card .discard'))`
+      ),
       true
     );
     await click("记录番茄");
@@ -324,10 +326,23 @@ app
     // The native resize completes before the renderer necessarily receives it.
     // Wait for viewport delivery, then assert layout separately (never poll PASS).
     for (let i = 0; i < 100; i++) {
-      if (await js('Math.abs(innerWidth-1100)<=2 && Math.abs(innerHeight-760)<=2')) break;
+      if (
+        await js(
+          "Math.abs(innerWidth-1100)<=2 && Math.abs(innerHeight-760)<=2"
+        )
+      )
+        break;
       await wait(30);
     }
-    assert.ok(await js('Math.abs(innerWidth-1100)<=2 && Math.abs(innerHeight-760)<=2'));
+    assert.ok(
+      await js(
+        "Math.abs(innerWidth-1100)<=2 && Math.abs(innerHeight-760)<=2"
+      )
+    );
+    await js(
+      "document.querySelectorAll('.day-glass').forEach(b=>b.click())"
+    );
+    await wait(100);
     const layout = await js(`(()=>{
       const a=document.querySelector('.left-col').getBoundingClientRect();
       const b=document.querySelector('.right-col').getBoundingClientRect();

@@ -1024,7 +1024,137 @@ input:focus-visible {
   overflow-y: auto;
 }
 .record-day {
+  position: relative;
   padding: 8px 18px;
+}
+.record-day.is-folded {
+  display: flex;
+  flex-direction: column;
+  background: #fcfbf8;
+  overflow: hidden;
+}
+.record-day.is-folded::before {
+  content: "";
+  position: absolute;
+  inset: 55px 20px 16px;
+  opacity: 0.3;
+  background: repeating-linear-gradient(
+    180deg,
+    #e3dfd1 0 6px,
+    transparent 6px 33px
+  );
+  filter: blur(9px);
+  pointer-events: none;
+}
+.day-glass {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  width: 100%;
+  min-height: 165px;
+  padding: 22px 16px 14px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  color: #5c584f;
+}
+.day-glass:hover {
+  background: rgba(255, 255, 255, 0.74);
+}
+.day-review-label {
+  color: #9c8d78;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.day-review-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 1.85;
+}
+.day-review-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 15px;
+  color: #9b8c78;
+  font-size: 12px;
+}
+.day-collapse {
+  flex: none;
+  font-size: 11px;
+}
+.record:focus-visible {
+  outline: 1px solid #e3c8b6;
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+.record-color-menu {
+  position: fixed;
+  z-index: 500;
+  width: 216px;
+  padding: 8px;
+  border: 1px solid #e8e3dd;
+  border-radius: 12px;
+  background: #fffefc;
+  box-shadow: 0 8px 30px #31271a24;
+  font-size: 13px;
+  color: #57534d;
+}
+.color-menu-title {
+  display: block;
+  padding: 6px 8px 8px;
+  color: #968875;
+  font-size: 11px;
+}
+.record-color-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.record-color-menu button:hover,
+.record-color-menu button:focus-visible {
+  background: #f5efe5;
+}
+.record-color-menu button i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.record-color-menu button span {
+  margin-left: auto;
+  color: #a08d65;
+}
+.record-color-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.record-color-menu .color-reset {
+  border-top: 1px solid #eee7dc;
+  border-radius: 0;
+  margin-top: 5px;
+}
+.record-color-menu p {
+  color: #b34b42;
+  font-size: 12px;
+  margin: 6px;
 }
 .record-day h4 {
   font-size: 14px;
@@ -2797,10 +2927,10 @@ button.stats-range-label:hover {
   border-radius: 3px;
 }
 .trend-key.actual {
-  background: #e7645d;
+  background: var(--trend-tone, #e7645d);
 }
 .trend-key.average {
-  background: #e3b65e;
+  background: var(--trend-baseline, #e3b65e);
 }
 .stats-trend-plot {
   position: relative;
@@ -2834,25 +2964,25 @@ button.stats-range-label:hover {
 }
 .trend-average-path {
   fill: none;
-  stroke: #e3b65e;
+  stroke: var(--trend-baseline, #e3b65e);
   stroke-width: 2.5;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 .trend-actual-path {
   fill: none;
-  stroke: #dc625a;
+  stroke: var(--trend-tone, #dc625a);
   stroke-width: 3.5;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 .trend-dot {
-  fill: #ef9b94;
+  fill: var(--trend-tone, #ef9b94);
   stroke: #fffaf9;
   stroke-width: 2;
 }
 .trend-dot.latest {
-  fill: #e45e57;
+  fill: var(--trend-tone, #e45e57);
   stroke: #fff;
   stroke-width: 2.5;
 }
@@ -3148,6 +3278,95 @@ button.stats-range-label:hover {
   margin-bottom: 14px;
 }
 /* 柱状图：弹性柱，柱高=番茄数占比；今日柱描边；颜色由 barTone 连续渐变接管 */
+.category-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+.category-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: transparent;
+  color: #8b7b6b;
+  font-size: 12px;
+  cursor: pointer;
+}
+.category-filter i,
+.harvest-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.category-filter[aria-pressed="true"] {
+  border-color: #e3d2bb;
+  background: #ffffffbf;
+  color: #594c40;
+}
+.category-filter:hover {
+  background: #ffffff8c;
+}
+.harvest-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.harvest-heading h3 {
+  margin: 0;
+}
+.harvest-switch {
+  display: flex;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 7px;
+  background: #f7f3ed;
+}
+.harvest-switch button {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #a0917f;
+  font-size: 11px;
+  cursor: pointer;
+}
+.harvest-switch button[aria-pressed="true"] {
+  background: #fff;
+  color: #6d5b47;
+  box-shadow: 0 1px 3px #6b502915;
+}
+.harvest-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 13px;
+  color: #8d8173;
+  font-size: 10px;
+}
+.harvest-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bar.stacked {
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: hidden;
+  background: transparent;
+}
+.bar-segment {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+}
 .bars {
   flex: 1;
   display: flex;

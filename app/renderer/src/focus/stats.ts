@@ -2,6 +2,8 @@
 // 取数口径与月历一致：仅 status==="saved" 的记录，按本地日期/时刻聚合；
 // 半小时热力把一段专注的番茄数按时间占比摊到覆盖的半小时格子里。
 import type { FocusSession } from "./session";
+import type { Category, CategoryFilter } from "./classification.js";
+import { PROJECT_TYPES, recordCategory } from "./classification.js";
 
 export type RangeKey = "week" | "month" | "quarter" | "year";
 export const RANGE_LABELS: Record<RangeKey, string> = {
@@ -287,13 +289,15 @@ export type FocusTrendPoint = {
 // 以免把尚未开始使用本应用的日子当成零专注。
 export function focusDurationTrend(
   records: FocusSession[],
-  anchor: number
+  anchor: number,
+  category: CategoryFilter = "all"
 ): FocusTrendPoint[] {
   const saved = records.filter((r) => r.status === "saved");
   if (!saved.length) return [];
   const first = Math.min(...saved.map((r) => dayStart(r.startedAt)));
   const byDay = new Map<number, number>();
   for (const r of saved) {
+    if (category !== "all" && recordCategory(r) !== category) continue;
     const day = dayStart(r.startedAt);
     byDay.set(
       day,
@@ -321,6 +325,34 @@ export function focusDurationTrend(
       twentyEight: average(28),
     };
   });
+}
+
+export const STAT_CATEGORIES: Category[] = [
+  ...PROJECT_TYPES,
+  "unclassified",
+];
+export function categoryBuckets(
+  records: FocusSession[],
+  range: RangeInfo,
+  now: number
+) {
+  const saved = records.filter((r) => r.status === "saved");
+  const totals = barBuckets(saved, range, now);
+  const perCategory = STAT_CATEGORIES.map((category) =>
+    barBuckets(
+      saved.filter((r) => recordCategory(r) === category),
+      range,
+      now
+    )
+  );
+  return totals.map((bucket, index) => ({
+    ...bucket,
+    categories: STAT_CATEGORIES.map((category, c) => ({
+      category,
+      count: perCategory[c][index].count,
+      seconds: perCategory[c][index].seconds,
+    })),
+  }));
 }
 
 // 日卡片显示已记录工作中投入时长最多的一项；只截短展示，不改原记录。

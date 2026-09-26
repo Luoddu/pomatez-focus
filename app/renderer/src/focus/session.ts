@@ -69,6 +69,9 @@ export type FocusSession = {
   syncTarget?: "plan";
   syncedPlanId?: string;
   cloudSynced?: boolean;
+  // User-picked category is independent of the frozen project snapshot.
+  colorOverride?: ProjectType;
+  colorRevision?: number;
   revision?: number;
   previousTasks?: FocusTask[];
   completionOwnedPlanIds?: string[];

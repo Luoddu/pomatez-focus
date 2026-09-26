@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   FocusSession,
   FocusTask,
+  ProjectType,
   isSpikyMood,
   moodLabel,
 } from "../session";
 import {
-  tomatoTone,
+  tomatoRecordTone,
+  PROJECT_LABELS,
+  PROJECT_TONES,
   tomatoCategoryLabel,
   harvestTier,
   totalMilestone,
@@ -36,6 +40,8 @@ import {
 import HeatmapCalendar from "./HeatmapCalendar";
 import ManualEntry from "./ManualEntry";
 import { dailyFocusTheme } from "../stats";
+import { PROJECT_TYPES, recordCategory } from "../classification.js";
+import { reviewDayKey } from "../reviewCache";
 
 const WEEK_CHARS = "日一二三四五六";
 const dayLabel = (value: number) => {
@@ -155,6 +161,9 @@ export default function HistoryPanel({
   tasks,
   onAddManual,
   onEdit,
+  onRecolor,
+  dayReviews = {},
+  reviewState = "loaded",
   editingIds = [],
   onGenerate,
   generating,
@@ -177,6 +186,9 @@ export default function HistoryPanel({
   tasks: FocusTask[];
   onAddManual: (record: FocusSession) => void;
   onEdit?: (before: FocusSession, after: FocusSession) => void;
+  onRecolor?: (record: FocusSession, type?: ProjectType) => void;
+  dayReviews?: Record<string, string>;
+  reviewState?: "loading" | "loaded" | "error";
   editingIds?: string[];
   onGenerate: () => void;
   generating: boolean;
@@ -196,6 +208,36 @@ export default function HistoryPanel({
     null
   );
   const recordScrollRef = useRef<HTMLDivElement>(null);
+  const [openDays, setOpenDays] = useState<string[]>([]);
+  const [colorMenu, setColorMenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [colorError, setColorError] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRecord = records.find((r) => r.id === colorMenu?.id);
+  useEffect(() => {
+    if (!colorMenu) return;
+    const close = (e: Event) => {
+      if (!menuRef.current?.contains(e.target as Node))
+        setColorMenu(null);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setColorMenu(null);
+    };
+    menuRef.current
+      ?.querySelector<HTMLButtonElement>("button")
+      ?.focus();
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", key);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("resize", close);
+    };
+  }, [colorMenu]);
   // 周目标：覆盖表（仅按周键），chip 显示本周已收/目标，悬浮开弹窗仅改本周
   const [goals, setGoals] = useState(loadWeekGoals);
   const [goalOpen, setGoalOpen] = useState(false);
@@ -615,13 +657,22 @@ export default function HistoryPanel({
               <section
                 className={`record-day${
                   group.date === todayKey ? " is-today" : ""
+                }${
+                  group.date !== todayKey &&
+                  !openDays.includes(group.date)
+                    ? " is-folded"
+                    : ""
                 }`}
                 key={group.date}
               >
                 <h4>
                   <span className="day-date">{group.date}</span>
                   {(() => {
-                    const theme = dailyFocusTheme(group.records);
+                    const theme =
+                      group.date === todayKey ||
+                      openDays.includes(group.date)
+                        ? dailyFocusTheme(group.records)
+                        : null;
                     return theme ? (
                       <span
                         className="day-theme"
@@ -645,19 +696,129 @@ export default function HistoryPanel({
                       </span>
                     );
                   })()}
+                  {group.date !== todayKey &&
+                    openDays.includes(group.date) && (
+                      <button
+                        className="btn-text day-collapse"
+                        aria-label={`收起 ${group.date}`}
+                        onClick={() =>
+                          setOpenDays((days) =>
+                            days.filter((d) => d !== group.date)
+                          )
+                        }
+                      >
+                        收起
+                      </button>
+                    )}
                 </h4>
-                {group.records.length === 0 ? (
+                {group.date !== todayKey &&
+                !openDays.includes(group.date) ? (
+                  <button
+                    className="day-glass"
+                    aria-label={`展开 ${group.date} 明细`}
+                    aria-expanded={false}
+                    onClick={() =>
+                      setOpenDays((days) => [...days, group.date])
+                    }
+                  >
+                    <span className="day-review-label">当日复盘</span>
+                    <span className="day-review-text">
+                      {dayReviews[
+                        reviewDayKey(group.records[0].startedAt)
+                      ] ||
+                        (reviewState === "loading"
+                          ? "正在读取复盘…"
+                          : reviewState === "error"
+                          ? "复盘暂未读取"
+                          : "暂无复盘摘要")}
+                    </span>
+                    <span className="day-review-footer">
+                      {durationText(
+                        group.records.reduce(
+                          (sum, r) => sum + (r.acceptedSeconds || 0),
+                          0
+                        )
+                      )}
+                      <span>查看明细 ›</span>
+                    </span>
+                  </button>
+                ) : group.records.length === 0 ? (
                   <p className="record-invite">{todayInvite()}</p>
                 ) : (
                   <ul className="record-list">
                     {group.records.map((r) => {
                       return (
-                        <li className="record" key={r.id}>
+                        <li
+                          className="record"
+                          key={r.id}
+                          tabIndex={onRecolor ? 0 : undefined}
+                          aria-label={
+                            onRecolor
+                              ? "专注记录，右键更改番茄分类"
+                              : undefined
+                          }
+                          onContextMenu={(e) => {
+                            if (!onRecolor) return;
+                            e.preventDefault();
+                            setColorError("");
+                            setColorMenu({
+                              id: r.id,
+                              x: Math.max(
+                                8,
+                                Math.min(
+                                  e.clientX,
+                                  window.innerWidth - 224
+                                )
+                              ),
+                              y: Math.max(
+                                8,
+                                Math.min(
+                                  e.clientY,
+                                  window.innerHeight - 325
+                                )
+                              ),
+                            });
+                          }}
+                          onKeyDown={(e) => {
+                            if (
+                              !onRecolor ||
+                              !(
+                                e.key === "ContextMenu" ||
+                                (e.shiftKey && e.key === "F10")
+                              )
+                            )
+                              return;
+                            e.preventDefault();
+                            const rect =
+                              e.currentTarget.getBoundingClientRect();
+                            setColorError("");
+                            setColorMenu({
+                              id: r.id,
+                              x: Math.min(
+                                rect.left,
+                                window.innerWidth - 224
+                              ),
+                              y: Math.max(
+                                8,
+                                Math.min(
+                                  rect.bottom,
+                                  window.innerHeight - 325
+                                )
+                              ),
+                            });
+                          }}
+                        >
                           <span
                             className={`r-icon${
                               isSpikyMood(r.mood) ? " spiky" : ""
                             }`}
-                            title={`${tomatoCategoryLabel(r.task)}${
+                            title={`${
+                              r.colorOverride
+                                ? `手动分类：${
+                                    PROJECT_LABELS[r.colorOverride]
+                                  }`
+                                : tomatoCategoryLabel(r.task)
+                            }${
                               r.mood != null
                                 ? ` · 本次感受：${moodLabel(r.mood)}`
                                 : ""
@@ -665,7 +826,7 @@ export default function HistoryPanel({
                           >
                             <LogoIcon
                               size={14}
-                              tone={tomatoTone(r.task)}
+                              tone={tomatoRecordTone(r)}
                               spiky={isSpikyMood(r.mood)}
                             />
                           </span>
@@ -712,6 +873,89 @@ export default function HistoryPanel({
               </section>
             ))}
         </div>
+        {colorMenu &&
+          menuRecord &&
+          onRecolor &&
+          createPortal(
+            <div
+              ref={menuRef}
+              className="record-color-menu"
+              role="menu"
+              aria-label="番茄分类"
+              onKeyDown={(e) => {
+                if (
+                  !["ArrowDown", "ArrowUp", "Home", "End"].includes(
+                    e.key
+                  )
+                )
+                  return;
+                e.preventDefault();
+                const buttons = Array.from(
+                  e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                    "button:not(:disabled)"
+                  )
+                );
+                const current = buttons.indexOf(
+                  document.activeElement as HTMLButtonElement
+                );
+                const index =
+                  e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                    ? buttons.length - 1
+                    : (current +
+                        (e.key === "ArrowDown" ? 1 : -1) +
+                        buttons.length) %
+                      buttons.length;
+                buttons[index]?.focus();
+              }}
+              style={{ left: colorMenu.x, top: colorMenu.y }}
+            >
+              <span className="color-menu-title">番茄分类</span>
+              {PROJECT_TYPES.map((type) => (
+                <button
+                  key={type}
+                  role="menuitemradio"
+                  aria-checked={recordCategory(menuRecord) === type}
+                  disabled={editingIds.includes(menuRecord.id)}
+                  onClick={() => {
+                    try {
+                      onRecolor(menuRecord, type);
+                      setColorMenu(null);
+                    } catch (e: any) {
+                      setColorError(e.message || "改色未完成");
+                    }
+                  }}
+                >
+                  <i style={{ background: PROJECT_TONES[type] }} />
+                  {PROJECT_LABELS[type]}
+                  {recordCategory(menuRecord) === type && (
+                    <span>✓</span>
+                  )}
+                </button>
+              ))}
+              <button
+                className="color-reset"
+                role="menuitem"
+                disabled={
+                  !menuRecord.colorOverride ||
+                  editingIds.includes(menuRecord.id)
+                }
+                onClick={() => {
+                  try {
+                    onRecolor(menuRecord, undefined);
+                    setColorMenu(null);
+                  } catch (e: any) {
+                    setColorError(e.message || "改色未完成");
+                  }
+                }}
+              >
+                恢复项目默认
+              </button>
+              {colorError && <p role="alert">{colorError}</p>}
+            </div>,
+            document.body
+          )}
       </div>
     </div>
   );

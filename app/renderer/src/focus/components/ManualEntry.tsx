@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { FocusSession, FocusTask, Mood } from "../session";
 import { MoodPicker, parseTitle } from "./shared";
+import { manualRecord } from "../manualRecord";
 
 // datetime-local 需要本地时区的 YYYY-MM-DDTHH:mm
 const localInputValue = (value: number) => {
   const d = new Date(value);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
+  return d.toISOString().slice(0, 19);
 };
 
 export default function ManualEntry({
@@ -27,6 +28,10 @@ export default function ManualEntry({
   const [minutes, setMinutes] = useState(
     (initial?.acceptedSeconds ?? 1500) / 60
   );
+  const [endWhen, setEndWhen] = useState(() =>
+    localInputValue(initial?.endedAt ?? Date.now())
+  );
+  const [customName, setCustomName] = useState("");
   const [count, setCount] = useState(initial?.completedCount ?? 1);
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   const [error, setError] = useState("");
@@ -54,7 +59,9 @@ export default function ManualEntry({
     const mins = Math.round(value);
     setMinutes(mins);
     if (!initial && Number.isFinite(mins))
-      setWhen(localInputValue(Date.now() - mins * 60000));
+      setWhen(
+        localInputValue(new Date(endWhen).getTime() - mins * 60000)
+      );
   };
   const changeCount = (value: number) => {
     const next = Math.min(100, Math.max(0, Math.round(value) || 0));
@@ -63,27 +70,26 @@ export default function ManualEntry({
     if (!initial && next > 0) changeMinutes(next * 25);
   };
   const save = () => {
-    const sameTime =
-      !!initial &&
-      when === localInputValue(initial.startedAt) &&
-      minutes === (initial.acceptedSeconds || 0) / 60;
-    const startedAt = sameTime
-      ? initial!.startedAt
-      : new Date(when).getTime();
+    const startedAt =
+      initial && when === localInputValue(initial.startedAt)
+        ? initial!.startedAt
+        : new Date(when).getTime();
+    const endedAt =
+      initial &&
+      endWhen === localInputValue(initial.endedAt ?? initial.startedAt)
+        ? initial.endedAt!
+        : new Date(endWhen).getTime();
     if (!when || !Number.isFinite(startedAt))
       return setError("请选择开始时间");
     if (startedAt > Date.now()) return setError("开始时间不能在未来");
     if (
       !Number.isFinite(minutes) ||
       minutes < (initial ? 0 : 1) ||
-      minutes > 600 ||
-      (!initial && !Number.isInteger(minutes))
+      minutes > 600
     )
       return setError("时长必须是 1–600 分钟");
     if (!Number.isInteger(count) || count < 0 || count > 100)
       return setError("番茄数必须是 0–100 的整数");
-    if (startedAt + minutes * 60000 > Date.now() + 60000)
-      return setError("结束时间不能在未来，请调整开始时间或时长");
     const chosen =
       initial?.task.id === taskId
         ? initial.task
@@ -92,27 +98,23 @@ export default function ManualEntry({
       return setError("所选任务已变化，请重新选择");
     const task: FocusTask = chosen || {
       id: crypto.randomUUID(),
-      title: "自由番茄",
+      title: customName.trim() || "自由番茄",
       kind: "free",
       source: "local",
     };
     const seconds = minutes * 60;
     try {
       onSave({
-        ...initial,
-        id: initial?.id || crypto.randomUUID(),
-        task,
-        startedAt,
-        endedAt: sameTime
-          ? initial!.endedAt
-          : startedAt + seconds * 1000,
-        plannedSeconds: initial?.plannedSeconds || 1500,
-        elapsedSeconds: sameTime ? initial!.elapsedSeconds : seconds,
-        segments: sameTime
-          ? initial!.segments
-          : [{ start: startedAt, end: startedAt + seconds * 1000 }],
-        acceptedSeconds: seconds,
-        completedCount: count,
+        ...manualRecord({
+          initial,
+          id: crypto.randomUUID(),
+          task,
+          startedAt,
+          endedAt,
+          seconds,
+          count,
+          now: Date.now(),
+        }),
         // 感受只留本机；undefined 会被 JSON 序列化丢弃，等于清除
         mood: mood ?? undefined,
         status: "saved",
@@ -146,6 +148,19 @@ export default function ManualEntry({
           ))}
         </select>
       </div>
+      {!initial && taskId === "free" && (
+        <div className="manual-row">
+          <label htmlFor="manual-name">名称</label>
+          <input
+            id="manual-name"
+            type="text"
+            maxLength={120}
+            placeholder="为这次专注取个名字"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+          />
+        </div>
+      )}
       <div className="manual-row">
         <label>番茄数</label>
         <span className="stepper">
@@ -185,7 +200,7 @@ export default function ManualEntry({
           <input
             id="manual-minutes"
             type="number"
-            min="1"
+            min={initial ? 0 : 1}
             max="600"
             step="1"
             value={minutes}
@@ -201,7 +216,32 @@ export default function ManualEntry({
           type="datetime-local"
           value={when}
           max={maxWhen}
-          onChange={(e) => setWhen(e.target.value)}
+          step="1"
+          onChange={(e) => {
+            setWhen(e.target.value);
+            const at = new Date(e.target.value).getTime();
+            if (!initial && Number.isFinite(at))
+              setEndWhen(localInputValue(at + minutes * 60000));
+          }}
+        />
+      </div>
+      <div className="manual-row">
+        <label htmlFor="manual-end">结束时间</label>
+        <input
+          id="manual-end"
+          type="datetime-local"
+          step="1"
+          value={endWhen}
+          max={maxWhen}
+          onChange={(e) => {
+            setEndWhen(e.target.value);
+            if (!initial)
+              setMinutes(
+                (new Date(e.target.value).getTime() -
+                  new Date(when).getTime()) /
+                  60000
+              );
+          }}
         />
       </div>
       <div className="manual-row">

@@ -1,11 +1,13 @@
 // Adapted from Pomatez's CounterProvider: one elapsed-time loop owns focus and break timing.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mergeCloudRecords } from "focus/cloud";
+import { recolorSession } from "focus/classification.js";
 import { bindQuickSessions } from "focus/quickTasks";
 import type { QuickTask } from "focus/editQueue";
 import { playTimeUp, playRestEnd } from "focus/sound";
 import {
   FocusSession,
+  ProjectType,
   FocusTask,
   advanceSession,
   confirmSession,
@@ -51,6 +53,7 @@ type CounterProps = {
   ) => void;
   startBreak: () => void;
   addManual: (record: FocusSession) => void;
+  recolor: (id: string, type?: ProjectType) => void;
   resetTimerAction: () => void;
 };
 const CounterContext = React.createContext<CounterProps>(
@@ -317,7 +320,12 @@ const CounterProvider: React.FC = ({ children }) => {
     action(() => {
       const next = dataRef.current;
       if (!next.active) throw new Error("当前没有待确认记录");
-      const record = confirmSession(next.active, seconds, completed, mood);
+      const record = confirmSession(
+        next.active,
+        seconds,
+        completed,
+        mood
+      );
       publish({
         active: null,
         records: upsertRecord(next.records, record),
@@ -415,6 +423,19 @@ const CounterProvider: React.FC = ({ children }) => {
       setNotice("已补记专注记录。");
       setError("");
     });
+  const recolor = (id: string, type?: ProjectType) =>
+    action(() => {
+      const record = dataRef.current.records.find((r) => r.id === id);
+      if (!record) throw Error("原专注记录不存在");
+      if (record.cloudSynced || record.task.source !== "local")
+        throw Error("共享记录请通过飞书改色");
+      publish({
+        ...dataRef.current,
+        records: dataRef.current.records.map((r) =>
+          r.id === id ? recolorSession(r, type) : r
+        ),
+      });
+    });
   const count = data.active ? timeParts(data.active).remaining : 1500;
   const mergeCloud = (records: FocusSession[], sourceKey: string) => {
     // Compute first: a conflicting response must leave all local state intact.
@@ -460,6 +481,7 @@ const CounterProvider: React.FC = ({ children }) => {
         markSynced,
         startBreak,
         addManual,
+        recolor,
         resetTimerAction: finish,
       }}
     >

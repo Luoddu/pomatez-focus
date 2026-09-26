@@ -135,6 +135,14 @@ export function tomatoCategoryLabel(task?: {
     ? `所属项目：${PROJECT_LABELS[project]}`
     : "所属项目未归类（浅灰色）";
 }
+export function tomatoRecordTone(record: {
+  task?: { projectType?: string };
+  colorOverride?: string;
+}): string {
+  return tomatoTone({
+    projectType: record.colorOverride || record.task?.projectType,
+  });
+}
 // 颜色线性混合：t=0 返回 a，t=1 返回 b（渐变高光/暗部用）
 export function mixColor(a: string, b: string, t: number): string {
   const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
@@ -152,6 +160,7 @@ type QuadrantRecord = {
   startedAt: number;
   completedCount?: number;
   task?: { quadrant?: string; projectType?: string };
+  colorOverride?: string;
 };
 // 象限取数口径：直接用 saved 记录里的任务快照 task.quadrant（计时开始时
 // 从任务列表带入），缺失或非四象限值一律归入 free 中性色
@@ -223,7 +232,7 @@ export function tomatoToneList(
     )
       continue;
     for (let i = 0; i < (r.completedCount || 0); i++)
-      list.push(tomatoTone(r.task));
+      list.push(tomatoRecordTone(r));
   }
   return list;
 }

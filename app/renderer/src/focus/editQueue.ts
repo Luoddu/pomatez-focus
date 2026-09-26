@@ -25,7 +25,7 @@ export type PendingEdit = {
 export type OutboxItem = {
   id: string;
   sourceKey: string;
-  kind: "task" | "edit";
+  kind: "task" | "edit" | "color";
   payload: QuickTask | PendingEdit;
   state: "pending" | "failed";
   error?: string;
@@ -50,10 +50,10 @@ export class EditQueue {
             !r.id ||
             !r.sourceKey ||
             !r.payload ||
-            (r.kind === "edit" &&
+            (r.kind !== "task" &&
               (!r.payload.before?.id ||
                 r.payload.before.id !== r.payload.after?.id)) ||
-            !["task", "edit"].includes(r.kind) ||
+            !["task", "edit", "color"].includes(r.kind) ||
             !["pending", "failed"].includes(r.state)
         )
       )
@@ -84,8 +84,8 @@ export class EditQueue {
       this.entries.some(
         (e) =>
           e.id === item.id ||
-          (e.kind === "edit" &&
-            item.kind === "edit" &&
+          (e.kind !== "task" &&
+            item.kind !== "task" &&
             (e.payload as PendingEdit).before.id ===
               (item.payload as PendingEdit).before.id)
       )
@@ -116,7 +116,7 @@ export class EditQueue {
     this.save(
       this.entries.map((e) => {
         if (e.id === id) return { ...e, taskRows: rows };
-        if (e.kind !== "edit" || e.sourceKey !== q.sourceKey) return e;
+        if (e.kind === "task" || e.sourceKey !== q.sourceKey) return e;
         const p = e.payload as PendingEdit;
         return {
           ...e,

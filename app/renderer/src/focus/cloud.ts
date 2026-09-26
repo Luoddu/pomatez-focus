@@ -1,4 +1,5 @@
 import type { FocusSession } from "./session";
+import { mergeRecordColor } from "./classification.js";
 
 // Merge by immutable session identity. Never replace the active timer or erase
 // local-only/other-Base history because a remote response omitted it.
@@ -9,7 +10,7 @@ export function mergeCloudRecords(
 ): FocusSession[] {
   const byId = new Map(local.map((r) => [r.id, r]));
   const seen = new Set<string>();
-  for (const r of incoming) {
+  for (let r of incoming) {
     if (
       !r.id ||
       seen.has(r.id) ||
@@ -24,6 +25,7 @@ export function mergeCloudRecords(
       throw Error("云端专注数据不完整或重复，未合并");
     seen.add(r.id);
     const old = byId.get(r.id);
+    r = mergeRecordColor(old || r, r);
     if (old) {
       if (
         old.task.source === "feishu" &&

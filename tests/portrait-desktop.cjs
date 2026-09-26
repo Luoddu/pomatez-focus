@@ -102,6 +102,16 @@ app
     // media queries see, so drive the viewport directly.
     win.setContentSize(1080, 1840);
     await wait(250);
+    assert.equal(
+      await js(
+        "document.querySelectorAll('.record-day.is-folded .record').length"
+      ),
+      0
+    );
+    await js(
+      "document.querySelectorAll('.day-glass').forEach(b=>b.click())"
+    );
+    await wait(100);
     const portrait = await js(`(()=>{
       const cs=getComputedStyle(document.querySelector('.content'));
       const grid=getComputedStyle(document.querySelector('.stat-grid'));

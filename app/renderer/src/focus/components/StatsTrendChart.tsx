@@ -23,8 +23,16 @@ const curvePath = (points: { x: number; y: number }[]) =>
 
 export default function StatsTrendChart({
   points,
+  tone,
+  baselineTone,
+  categoryLabel = "全部",
+  filters,
 }: {
   points: FocusTrendPoint[];
+  tone?: string;
+  baselineTone?: string;
+  categoryLabel?: string;
+  filters?: React.ReactNode;
 }) {
   const latest = points[points.length - 1];
   const max = Math.max(
@@ -61,12 +69,21 @@ export default function StatsTrendChart({
       : null;
   const ticks = [0, 9, 18, 27];
   return (
-    <section className="stats-trend" aria-label="专注趋势">
+    <section
+      className="stats-trend"
+      aria-label="专注趋势"
+      style={
+        {
+          "--trend-tone": tone,
+          "--trend-baseline": baselineTone,
+        } as React.CSSProperties
+      }
+    >
       <div className="stats-trend-heading">
         <div>
           <span className="stats-trend-eyebrow">专注节奏</span>
           <h3>专注趋势</h3>
-          <p>已保存专注时长 · 日历日均</p>
+          <p>{categoryLabel} · 已保存专注时长 · 日历日均</p>
         </div>
         <div className="stats-trend-comparison">
           <div>
@@ -85,6 +102,7 @@ export default function StatsTrendChart({
           )}
         </div>
       </div>
+      {filters}
       <div
         className="stats-trend-plot"
         role="img"
@@ -110,8 +128,16 @@ export default function StatsTrendChart({
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor="#e87970" stopOpacity=".2" />
-              <stop offset="100%" stopColor="#e87970" stopOpacity="0" />
+              <stop
+                offset="0%"
+                stopColor={tone || "#e87970"}
+                stopOpacity=".2"
+              />
+              <stop
+                offset="100%"
+                stopColor={tone || "#e87970"}
+                stopOpacity="0"
+              />
             </linearGradient>
           </defs>
           {[46, 107, 168].map((y) => (

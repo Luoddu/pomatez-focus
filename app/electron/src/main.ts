@@ -127,6 +127,8 @@ else {
         service.createQuickTask(value)
       );
       handler("correctRecord", (value) => service.correctRecord(value));
+      handler("recolorRecord", (value) => service.recolorRecord(value));
+      handler("dailyReviews", () => service.dailyReviews());
       handler("completeToday", (value) => service.completeToday(value));
       handler("setup", () => service.setup());
       handler("sync", (value) => service.sync(value));
