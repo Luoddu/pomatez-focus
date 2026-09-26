@@ -1,7 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { FocusSession, FocusTask, Mood } from "../session";
 import { MoodPicker, parseTitle } from "./shared";
-import { manualRecord } from "../manualRecord";
+import {
+  manualRecord,
+  manualWindow,
+  focusTimeLabel,
+} from "../manualRecord";
 
 // datetime-local 需要本地时区的 YYYY-MM-DDTHH:mm
 const localInputValue = (value: number) => {
@@ -35,6 +39,47 @@ export default function ManualEntry({
   const [count, setCount] = useState(initial?.completedCount ?? 1);
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   const [error, setError] = useState("");
+  const [adjusted, setAdjusted] = useState(false);
+  const timestamps = (startValue: string, endValue: string) => ({
+    startedAt:
+      initial && startValue === localInputValue(initial.startedAt)
+        ? initial.startedAt
+        : new Date(startValue).getTime(),
+    endedAt:
+      initial &&
+      endValue === localInputValue(initial.endedAt ?? initial.startedAt)
+        ? initial.endedAt!
+        : new Date(endValue).getTime(),
+  });
+  const current = timestamps(when, endWhen);
+  const available = manualWindow(
+    initial,
+    current.startedAt,
+    current.endedAt,
+    minutes * 60
+  ).availableSeconds;
+  const adjustWindow = (startValue: string, endValue: string) => {
+    setError("");
+    const { startedAt, endedAt } = timestamps(startValue, endValue);
+    if (
+      !initial ||
+      !Number.isFinite(startedAt) ||
+      !Number.isFinite(endedAt) ||
+      endedAt < startedAt
+    )
+      return;
+    const limit = manualWindow(
+      initial,
+      startedAt,
+      endedAt,
+      minutes * 60
+    ).availableSeconds;
+    if (minutes * 60 > limit) {
+      // 向下保留两位分钟，避免四舍五入后再次超过实际有效时间。
+      setMinutes(Math.floor((limit / 60) * 100) / 100);
+      setAdjusted(true);
+    }
+  };
   const maxWhen = useMemo(() => localInputValue(Date.now()), []);
   const groups = useMemo(
     () =>
@@ -56,8 +101,10 @@ export default function ManualEntry({
     [tasks, initial]
   );
   const changeMinutes = (value: number) => {
-    const mins = Math.round(value);
+    const mins = value;
     setMinutes(mins);
+    setError("");
+    setAdjusted(false);
     if (!initial && Number.isFinite(mins))
       setWhen(
         localInputValue(new Date(endWhen).getTime() - mins * 60000)
@@ -70,15 +117,7 @@ export default function ManualEntry({
     if (!initial && next > 0) changeMinutes(next * 25);
   };
   const save = () => {
-    const startedAt =
-      initial && when === localInputValue(initial.startedAt)
-        ? initial!.startedAt
-        : new Date(when).getTime();
-    const endedAt =
-      initial &&
-      endWhen === localInputValue(initial.endedAt ?? initial.startedAt)
-        ? initial.endedAt!
-        : new Date(endWhen).getTime();
+    const { startedAt, endedAt } = current;
     if (!when || !Number.isFinite(startedAt))
       return setError("请选择开始时间");
     if (startedAt > Date.now()) return setError("开始时间不能在未来");
@@ -202,7 +241,7 @@ export default function ManualEntry({
             type="number"
             min={initial ? 0 : 1}
             max="600"
-            step="1"
+            step="0.01"
             value={minutes}
             onChange={(e) => changeMinutes(Number(e.target.value))}
           />
@@ -219,6 +258,7 @@ export default function ManualEntry({
           step="1"
           onChange={(e) => {
             setWhen(e.target.value);
+            adjustWindow(e.target.value, endWhen);
             const at = new Date(e.target.value).getTime();
             if (!initial && Number.isFinite(at))
               setEndWhen(localInputValue(at + minutes * 60000));
@@ -235,6 +275,7 @@ export default function ManualEntry({
           max={maxWhen}
           onChange={(e) => {
             setEndWhen(e.target.value);
+            adjustWindow(when, e.target.value);
             if (!initial)
               setMinutes(
                 (new Date(e.target.value).getTime() -
@@ -244,6 +285,14 @@ export default function ManualEntry({
           }}
         />
       </div>
+      {initial &&
+        Number.isFinite(available) &&
+        current.endedAt >= current.startedAt && (
+          <div className="manual-time-hint" role="status">
+            此时段最多可计入 {focusTimeLabel(available)}（已扣除暂停）。
+            {adjusted && "时长已自动调小，番茄数保持不变；可继续微调。"}
+          </div>
+        )}
       <div className="manual-row">
         <label>感受</label>
         <MoodPicker value={mood} onChange={setMood} />

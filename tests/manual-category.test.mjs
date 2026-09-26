@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { manualRecord } from "../app/renderer/src/focus/manualRecord.ts";
+import {
+  manualRecord,
+  manualWindow,
+} from "../app/renderer/src/focus/manualRecord.ts";
 import {
   recolorSession,
   recordCategory,
@@ -46,6 +49,40 @@ const edit = (changes) =>
     now,
     ...changes,
   });
+test("edit window exposes pause-aware maximum, seconds precision and legacy bounds", () => {
+  const endedAt = start + 3600000;
+  assert.equal(
+    manualWindow(initial, start, endedAt, 3600).availableSeconds,
+    1800
+  );
+  assert.throws(() => edit({ endedAt }), /30 分 0 秒/);
+  const r = edit({ endedAt, seconds: 1800 });
+  assert.equal(r.completedCount, 2);
+  assert.equal(r.acceptedSeconds, 1800);
+  assert.equal(
+    manualWindow(initial, start, start + 905000, 3600).availableSeconds,
+    905
+  );
+  assert.equal(
+    edit({ endedAt: start + 905000, seconds: 15.08 * 60 })
+      .completedCount,
+    2
+  );
+  assert.equal(
+    manualWindow(initial, start, initial.endedAt + 3600000, 3600)
+      .availableSeconds,
+    initial.elapsedSeconds
+  );
+  assert.equal(
+    manualWindow(
+      { ...initial, segments: undefined },
+      start,
+      endedAt,
+      3600
+    ).availableSeconds,
+    3600
+  );
+});
 test("overnight end correction clips active spans, keeps pauses and identity; rejected time cannot fabricate focus", () => {
   const r = edit({ endedAt: start + 2 * 3600000 });
   assert.equal(r.endedAt, start + 7200000);

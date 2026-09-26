@@ -222,7 +222,51 @@ app.whenReady().then(async () => {
         start + 1800000
       });d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)})()`
     );
+    const shorter = await js(
+      `(()=>{const d=new Date(${
+        start + 900000
+      });d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)})()`
+    );
+    await input("#manual-end", shorter);
+    assert.equal(
+      await js(
+        "Number(document.querySelector('#manual-minutes').value)"
+      ),
+      15
+    );
+    assert.equal(
+      await js(
+        "Number(document.querySelector('[aria-label=补记番茄数]').value)"
+      ),
+      1
+    );
+    assert.ok(
+      await js(
+        "document.querySelector('.manual-time-hint').textContent.includes('自动调小')"
+      )
+    );
     await input("#manual-end", local);
+    assert.equal(
+      await js(
+        "Number(document.querySelector('#manual-minutes').value)"
+      ),
+      15
+    );
+    await input("#manual-minutes", "31");
+    await click("保存修改");
+    assert.ok(
+      await js(
+        "document.querySelector('.manual-error').textContent.includes('30 分 0 秒')"
+      )
+    );
+    await input("#manual-minutes", "30");
+    assert.equal(
+      await js("Boolean(document.querySelector('.manual-error'))"),
+      false
+    );
+    checks.push(
+      "shorter end clamps duration without changing count; extending does not inflate focus; explicit maximum and correction work"
+    );
     await click("保存修改");
     await until(
       async () =>

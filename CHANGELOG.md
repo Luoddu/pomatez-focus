@@ -1,5 +1,11 @@
 # Changelog
 
+## 番茄农场 0.1.0-preview.60 (2026-09-26)
+
+- 编辑结束时间时，自动缩减超过有效时间窗口的专注时长，保留手动确认的番茄数。
+- 显示扣除暂停后的可计入上限，支持小数分钟微调；延长结束时间不会自动增加专注时长。
+- 修正输入后清除旧校验提示，沿用原有记录纠正与同步流程。
+
 ## 番茄农场 0.1.0-preview.36 (2026-09-17)
 
 - Read optional task details from the linked Feishu task table (`详细`, with `详情` fallback).
