@@ -39,8 +39,8 @@ const seedRecord = (daysAgo, hour, title, quadrant, projectType) => ({
     quadrant,
     projectType,
   },
-  startedAt: Date.now() - daysAgo * dayMs - hour * 3600000,
-  endedAt: Date.now() - daysAgo * dayMs - hour * 3600000 + 1500000,
+  startedAt: new Date().setHours(hour, 0, 0, 0) - daysAgo * dayMs,
+  endedAt: new Date().setHours(hour, 0, 0, 0) - daysAgo * dayMs + 1500000,
   plannedSeconds: 1500,
   elapsedSeconds: 1500,
   acceptedSeconds: 1500,
@@ -131,9 +131,9 @@ app
       const r=sections.map(s=>s.getBoundingClientRect());
       const rcRect=rc.getBoundingClientRect();
       const days=[...document.querySelectorAll('.record-day')];
-      const lastH4=days[days.length-1].querySelector('h4').textContent;
-      const previousH4=days[days.length-2].querySelector('h4').textContent;
-      const invite=days[days.length-1].querySelector('.record-invite');
+      const firstH4=days[0].querySelector('h4').textContent;
+      const previousH4=days[1].querySelector('h4').textContent;
+      const invite=days[0].querySelector('.record-invite');
       const categoryRecord=document.querySelector('.record .r-icon[title^="所属项目：项目交付"]');
       const pileFruit=document.querySelector('.farm-pile ellipse[fill="url(#farm-tomato-delivery)"]');
       const quadrantChip=document.querySelector('.quad-iu .chip:not(.selected)');
@@ -143,12 +143,12 @@ app
         statHeights,statAlign,fonts:[...new Set(fonts)],
         cellSize:Math.round(cell.width),
         hmFill:hm.width/sc.width,
-        recordColumns:Math.round((recEl.clientWidth-24+14)/(days[0].getBoundingClientRect().width+14)),
+        recordDisplay:recs.display, noHorizontalOverflow:recEl.scrollWidth<=recEl.clientWidth+2,
         recordDays:days.length,
-        recordScrollable:recEl.scrollWidth>recEl.clientWidth,
-        recordAtRight:Math.abs(recEl.scrollLeft-(recEl.scrollWidth-recEl.clientWidth))<=16,
+        recordScrollable:getComputedStyle(recEl).overflowY === "auto",
+        recordAtTop:recEl.scrollTop===0, verticallyOrdered:days.every((d,i)=>i===0||d.getBoundingClientRect().top>=days[i-1].getBoundingClientRect().bottom-1), sameDayTitles:[...days[1].querySelectorAll(".r-task")].map(e=>e.textContent),
         recordScrollLeft:recEl.scrollLeft,recordScrollMax:recEl.scrollWidth-recEl.clientWidth,
-        lastIsToday:days[days.length-1].classList.contains('is-today'),
+        firstIsToday:days[0].classList.contains('is-today'),
         rightDisplay:getComputedStyle(rc).display,
         sideBySide:Math.abs(r[0].top-r[1].top)<=2&&r[1].left>r[0].left+50,
         recordsFullWidth:Math.abs(r[2].width-rcRect.width)<=2&&r[2].top>r[0].top+50,
@@ -158,8 +158,8 @@ app
         categoryRecordTone:categoryRecord?.querySelector('stop')?.getAttribute('stop-color')||null,
         pileShowsDelivery:!!pileFruit,
         quadrantChipTone:quadrantChip?getComputedStyle(quadrantChip).backgroundColor:null,
-        lastH4,previousH4,inviteText:invite?invite.textContent:null,
-        todayEmpty:days[days.length-1].querySelectorAll('.record').length===0};
+        firstH4,previousH4,inviteText:invite?invite.textContent:null,
+        todayEmpty:days[0].querySelectorAll('.record').length===0};
     })()`);
     check(
       "portrait stacks panels in one column with paired overview and heatmap",
@@ -219,8 +219,11 @@ app
       assert.ok(portrait.cellSize >= 20, JSON.stringify(portrait));
       assert.ok(portrait.hmFill >= 0.8, JSON.stringify(portrait));
     });
-    check("portrait records flow into three day-card columns", () => {
-      assert.equal(portrait.recordColumns, 3);
+    check("portrait records stack newest day first", () => {
+      assert.equal(portrait.recordDisplay, "block");
+      assert.equal(portrait.noHorizontalOverflow, true);
+      assert.equal(portrait.verticallyOrdered, true);
+      assert.deepEqual(portrait.sameDayTitles, ['规划下一周任务', '整理待办事项']);
       assert.ok(portrait.recordDays >= 4, JSON.stringify(portrait));
       assert.equal(
         portrait.recordScrollable,
@@ -228,20 +231,20 @@ app
         JSON.stringify(portrait)
       );
       assert.equal(
-        portrait.recordAtRight,
+        portrait.recordAtTop,
         true,
         JSON.stringify(portrait)
       );
       assert.equal(
-        portrait.lastIsToday,
+        portrait.firstIsToday,
         true,
         JSON.stringify(portrait)
       );
     });
-    check("today card is at the right with a seeded invite", () => {
+    check("today card is at the top with a seeded invite", () => {
       assert.ok(
-        portrait.lastH4.startsWith("今天 · 周"),
-        portrait.lastH4
+        portrait.firstH4.startsWith("今天 · 周"),
+        portrait.firstH4
       );
       assert.equal(portrait.todayEmpty, true);
       assert.ok(
@@ -334,9 +337,9 @@ app
         taskFont:getComputedStyle(document.querySelector('.task:not(.complete) .task-name')).fontSize,
         doneFont:(document.querySelector('.task.complete .task-name')?getComputedStyle(document.querySelector('.task.complete .task-name')).fontSize:null),
         chipHeight:Math.round(document.querySelector('.chip').getBoundingClientRect().height),
-        lastH4:days[days.length-1].querySelector('h4').textContent,
-        previousH4:days[days.length-2].querySelector('h4').textContent,
-        todayInvite:Boolean(days[days.length-1].querySelector('.record-invite'))};
+        firstH4:days[0].querySelector('h4').textContent,
+        previousH4:days[1].querySelector('h4').textContent,
+        todayInvite:Boolean(days[0].querySelector('.record-invite'))};
     })()`);
     check("landscape keeps the original side-by-side layout", () => {
       assert.equal(landscape.direction, "row");
@@ -381,8 +384,8 @@ app
       "landscape also shows today invite, weekday and day totals",
       () => {
         assert.ok(
-          landscape.lastH4.startsWith("今天 · 周"),
-          landscape.lastH4
+          landscape.firstH4.startsWith("今天 · 周"),
+          landscape.firstH4
         );
         assert.equal(landscape.todayInvite, true);
         assert.ok(

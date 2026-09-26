@@ -207,7 +207,6 @@ export default function HistoryPanel({
   const [editRecord, setEditRecord] = useState<FocusSession | null>(
     null
   );
-  const recordScrollRef = useRef<HTMLDivElement>(null);
   const [openDays, setOpenDays] = useState<string[]>([]);
   const [colorMenu, setColorMenu] = useState<{
     id: string;
@@ -355,17 +354,6 @@ export default function HistoryPanel({
   const todayKey = dayLabel(Date.now());
   if (!groups.length || groups[0].date !== todayKey)
     groups.unshift({ date: todayKey, records: [] });
-  // 历史在左、今天在右；默认定位到最右，继续翻旧记录时不强行拉回。
-  const latestDay = groups[0]?.date;
-  useEffect(() => {
-    const alignLatest = () => {
-      const el = recordScrollRef.current;
-      if (el) el.scrollLeft = el.scrollWidth - el.clientWidth;
-    };
-    alignLatest();
-    window.addEventListener("resize", alignLatest);
-    return () => window.removeEventListener("resize", alignLatest);
-  }, [groups.length, latestDay]);
   return (
     <div className="right-col">
       <div className="side-section">
@@ -649,10 +637,8 @@ export default function HistoryPanel({
             onCancel={() => setEditRecord(null)}
           />
         )}
-        <div className="card records" ref={recordScrollRef}>
+        <div className="card records">
           {groups
-            .slice()
-            .reverse()
             .map((group) => (
               <section
                 className={`record-day${
