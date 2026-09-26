@@ -1,6 +1,6 @@
 # P0-POMO-024 专注积累最新在上
 
-- 状态：IN_PROGRESS；隔离模块实现者与本卡负责人 Codex。用户授权调整展示顺序。
+- 状态：REVIEW（实现、回归与 preview.59 发布已验证）；隔离模块实现者与本卡负责人 Codex。用户授权调整展示顺序。
 - 基线 ad4bb55（origin/codex/feishu-focus）；独立 task/p0-pomo-024-history-order 工作树。开工已核对干净状态、worktree 列表与实时 fetch，无重叠未提交写集。
 - 目标：日期倒序，同日记录倒序，今天首先显示；横竖屏均从上往下查看。保留历史遮罩、展开、补记、编辑、同步及统计。
 - 允许：HistoryPanel.tsx、focus.css、已有 portrait-desktop 测试、本卡及验收文档；交付时既有版本文件、CHANGELOG。独占本任务工作树和合成测试 profile。
