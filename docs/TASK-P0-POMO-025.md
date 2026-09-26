@@ -1,6 +1,6 @@
 # P0-POMO-025 编辑结束时间联动时长
 
-- 状态：IN_PROGRESS；隔离模块实现者/上下文负责人 Codex，用户已明确授权执行。
+- 状态：REVIEW（实现、回归、preview.60 安装包发布已验证）；隔离模块实现者/上下文负责人 Codex，用户已明确授权执行。
 - 基线：264f7791f27e4df55ff9c159da12423f3c0fdd14；task/p0-pomo-025-end-time，独占本工作树与合成测试 profile。已 fetch 并核对工作树，无重叠写入。
 - 目标：缩短结束时间时自动将超出的已认可时长调到可用范围，显示扣除暂停后的可计入上限；番茄数保持用户选择。延长结束时间不自动增加认可时长，仍可手动微调。
 - 允许写集：manualRecord.ts、ManualEntry.tsx、manual-category.test.mjs、category-review-desktop.cjs，本任务卡/验收、CHANGELOG、既有两个版本文件。禁止真实记录/飞书写入、凭证、用户 App 重启、根控制文件、新依赖和协议改造。
