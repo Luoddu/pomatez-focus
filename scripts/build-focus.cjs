@@ -85,13 +85,14 @@ const licenses = [...bundledPackages].sort().map((dir) => {
   return `${pkg.name} ${pkg.version}\n${names.map((n) => fs.readFileSync(path.join(dir, n), "utf8")).join("\n")}`;
 });
 fs.writeFileSync(path.join(root, "app/electron/build/LICENSE.updater-dependencies.txt"), licenses.join("\n\n----------------\n\n"));
-run("node_modules/esbuild/bin/esbuild", [
-  "app/electron/src/preload.ts",
-  "--bundle",
-  "--platform=node",
-  "--external:electron",
-  "--outfile=app/electron/build/preload.js",
-]);
+// esbuild replaces its CLI with a native executable on macOS/Linux. Use its
+// public JS API on every platform, as for the updater bundle above.
+require("esbuild").buildSync({
+  absWorkingDir: root,
+  entryPoints: ["app/electron/src/preload.ts"],
+  bundle: true, platform: "node", external: ["electron"],
+  outfile: "app/electron/build/preload.js",
+});
 run(
   "node_modules/react-scripts/scripts/build.js",
   [],
