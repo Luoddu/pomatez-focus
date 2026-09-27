@@ -5,4 +5,6 @@
 - 1040×580 与 760×580 内容尺寸下，滚动到保存/取消，验证矩形在视口内且 elementFromPoint 命中真实按钮；实际保存纠正、补记取消和保存通过。窄窗堆叠时需同时滚动外层页面，测试已按真实滚动链验证。表单关闭后历史恢复。
 - 初次测试未滚动窄窗外层，出现误报；加入完整祖先滚动后通过。一次直接执行 portrait fixture 因缺少隔离环境被护栏拒绝，已停止该测试进程并改用原 runner（仅内存追加静音参数），14/14 通过。
 - 隐藏窗口 capturePage 对本机滚动重绘存在滞后，截图不作为按钮可达的单独证据；以稳定后 DOM 几何/命中与真实保存取消为验收。
-- Learning none：局部布局缺陷，未形成新通用机制。没有真实飞书写入、修改用户记录/配置或重启用户 App。回滚独立提交，无迁移。发布证据待补。
+- Learning none：局部布局缺陷，未形成新通用机制。没有真实飞书写入、修改用户记录/配置或重启用户 App。回滚独立提交，无迁移。
+- preview.62 已发布于 2026-09-27T01:51:44Z，源码和 tag 核对 af04593378a1f3fbbcf1ad8072e4f367f0b9b7c7；干净提交重新构建打包，asar source-version 匹配，包内无测试 profile/日志/凭证，静音隐藏启动退出 0。
+- 六个 GitHub 附件 uploaded、大小与 SHA256 digest 匹配；preview.yml SHA512 匹配 setup。发布页 https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.62 。未安装用户 App；无独立 reviewer，状态维持 REVIEW。
