@@ -29,5 +29,6 @@ yarn-error.log*
 focus-records-*.json
 feishu-credentials*
 dist-preview*/
+dist-mac-personal/
 scripts/__pycache__/
 shot*.log

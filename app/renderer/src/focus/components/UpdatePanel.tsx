@@ -22,10 +22,10 @@ export default function UpdatePanel() {
     </div>}
     {state.message && <p role="status">{state.message}</p>}
     <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
-      <button className="secondary" disabled={busy || state.phase === "downloaded"} onClick={() => call("checkUpdate")}>{state.phase === "checking" ? "正在检查…" : "检查更新"}</button>
+      <button className="secondary" disabled={busy || state.phase === "downloaded"} onClick={() => call("checkUpdate")}>{state.manual ? "查看 Mac 月度版本" : state.phase === "checking" ? "正在检查…" : "检查更新"}</button>
       {state.phase === "available" && <button className="primary" onClick={() => call("downloadUpdate")}>下载更新并重启</button>}
       {state.phase === "downloaded" && <button className="primary" onClick={() => call("installUpdate")}>安装并重启</button>}
     </div>
-    <p className="conn-sub">手动检查和下载，下载进度实时显示。当前有专注时会等待你结束后再安装。</p>
+    <p className="conn-sub">{state.manual ? "个人试用版未公证，采用手动安装；与 Windows 更新通道独立。更新前请先保存当前专注。" : "手动检查和下载，下载进度实时显示。当前有专注时会等待你结束后再安装。"}</p>
   </div>;
 }

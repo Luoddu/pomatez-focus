@@ -58,7 +58,10 @@ const handler = (name: string, fn: (value: any) => any) =>
   });
 if (!single) app.quit();
 else {
-  Menu.setApplicationMenu(null);
+  // Native roles preserve Command+C/V/Q on macOS; Windows keeps its existing UI.
+  Menu.setApplicationMenu(process.platform === "darwin" ? Menu.buildFromTemplate([
+    { role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" },
+  ]) : null);
   app.on("second-instance", show);
   app
     .whenReady()
@@ -88,7 +91,7 @@ else {
         frame: true,
         alwaysOnTop: false,
         backgroundColor: "#f8faff",
-        icon: path.join(__dirname, "assets/logo-dark.ico"),
+        icon: path.join(__dirname, process.platform === "darwin" ? "assets/logo-dark@2x.png" : "assets/logo-dark.ico"),
         webPreferences: {
           preload: path.join(__dirname, "preload.js"),
           contextIsolation: true,

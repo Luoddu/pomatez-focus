@@ -12,3 +12,7 @@
 7. `npm run dev:setup` 安装仓库自带 pre-push 检查（已有其他 hooks 时先整合，禁止覆盖）。每台电脑各运行一次；新 clone 的 Git hook 不会自动启用。
 
 验证命令与换机步骤见 `docs/DEVELOPMENT.md`；本轮整合证据见 `docs/ACCEPTANCE-integration.md`。
+
+## Mac 个人版独立发布
+
+用户要求 Mac 按月汇总。Mac 使用 `v0.1.0-mac.N` prerelease 和 `scripts/package-mac-personal.cjs`，详见 `docs/MAC-PERSONAL.md`。以上第5条 Windows 版本递增与打包流程不用于 Mac；其他干净源码、实时远端、授权、数据审查规则照常。Mac 不修改 Windows preview 计数/更新文件，不设 Latest，不替换旧资产，不建立定时发布。

@@ -1,0 +1,49 @@
+name: Mac personal snapshot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mac-personal-snapshot
+  cancel-in-progress: false
+jobs:
+  mac:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.23.2'
+      - name: Verify native runner and install locked dependencies
+        run: |
+          test "$(uname -m)" = arm64
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile --ignore-scripts --network-timeout 120000
+          node node_modules/electron/install.js
+          node node_modules/esbuild/install.js
+      - name: Offline regression and channel isolation
+        run: npm run test:focus:all
+      - name: Build independent Mac DMG and ZIP
+        env:
+          CI: 'false'
+        run: node scripts/package-mac-personal.cjs
+      - name: Verify real packaged application
+        run: node scripts/test-mac-package.cjs
+      - name: Hidden and muted desktop regression
+        run: |
+          POMATEZ_HEADLESS=1 POMATEZ_PROFILE="$RUNNER_TEMP/mac-desktop-test" node_modules/.bin/electron --mute-audio tests/desktop.cjs
+          POMATEZ_HEADLESS=1 POMATEZ_PROFILE="$RUNNER_TEMP/mac-restart-test" POMATEZ_TEST_PHASE=start node_modules/.bin/electron --mute-audio tests/restart.cjs
+          POMATEZ_HEADLESS=1 POMATEZ_PROFILE="$RUNNER_TEMP/mac-restart-test" POMATEZ_TEST_PHASE=restore node_modules/.bin/electron --mute-audio tests/restart.cjs
+      - uses: actions/upload-artifact@v6
+        with:
+          name: mac-personal-arm64
+          if-no-files-found: error
+          path: |
+            app/electron/dist-mac-personal/*.dmg
+            app/electron/dist-mac-personal/*.zip
+            app/electron/dist-mac-personal/SHA256SUMS.txt
+            app/electron/dist-mac-personal/mac-build-verification.json

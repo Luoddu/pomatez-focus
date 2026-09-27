@@ -2,13 +2,15 @@
 
 **把今天的任务变成番茄，把每一次专注种进自己的农场。**
 
-一个面向 Windows 的桌面番茄钟：从四象限中选择任务，用可置顶的小窗专注，结束后确认实际投入，并把结果写回飞书的今日番茄。支持自由专注、手动补记、专注月历和随收获生长的农场。
+一个面向 Windows 的桌面番茄钟，同时提供 Apple Silicon Mac 个人版：从四象限中选择任务，用可置顶的小窗专注，结束后确认实际投入，并把结果写回飞书的今日番茄。支持自由专注、手动补记、专注月历和随收获生长的农场。
 
 基于 [Pomatez](https://github.com/zidoro/pomatez) v1.11.0 薄改，保留上游 MIT 许可证与历史。
 
 [功能](#功能) · [开始使用](#开始使用) · [飞书联动](#飞书联动) · [本地开发](#本地开发) · [许可证](#许可证)
 
 > **版本状态（2026-09-19）**：`0.1.0-preview.41` 为“生成今日番茄”加入按钮内步骤进度条，后台刷新也有即时反馈，完成显示“已更新／已是最新”，失败可重试；保留本地优先追加、任务详情和跨机成果同步。[下载安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.41/Pomatez-Focus-v0.1.0-preview.41-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.41)。当前仅验证 Windows x64，不标记为稳定版。
+
+**Mac 用户：** [Mac 安装与月度更新说明](docs/MAC-PERSONAL.md) · [Mac 独立发布列表](https://github.com/Luoddu/pomatez-focus/releases?q=mac&expanded=true)。M 系列芯片个人试用包，与 Windows 更新分开；未做 Apple 公证。
 
 ![番茄农场：四象限任务、收获农场、番茄月历和专注记录](docs/images/desktop.png)
 
