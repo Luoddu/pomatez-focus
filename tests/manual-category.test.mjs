@@ -18,7 +18,26 @@ import { EditQueue } from "../app/renderer/src/focus/editQueue.ts";
 import {
   saveReviews,
   loadReviews,
+  reviewTheme,
 } from "../app/renderer/src/focus/reviewCache.ts";
+test("history theme excludes review headings and progress while keeping source untouched", () => {
+  const raw =
+    "当日主题：设备维护与临时协调，晚间推进测试大纲。\n代表进展：模拟不应展示内容\n下一步：继续";
+  assert.equal(
+    reviewTheme(raw),
+    "设备维护与临时协调，晚间推进测试大纲。"
+  );
+  assert.equal(
+    reviewTheme(
+      "**当日主题：**科研整理\n继续完成图示\n**代表进展：**正文"
+    ),
+    "科研整理 继续完成图示"
+  );
+  assert.equal(reviewTheme("当日主题: 科研 代表进展：正文"), "科研");
+  assert.equal(reviewTheme("只有旧复盘正文，没有主题"), "");
+  assert.equal(reviewTheme(), "");
+  assert.ok(raw.includes("代表进展"));
+});
 const start = Date.parse("2026-09-25T22:00:00+08:00"),
   now = start + 12 * 3600000;
 const initial = {

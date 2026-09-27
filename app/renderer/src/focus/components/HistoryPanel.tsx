@@ -41,7 +41,7 @@ import HeatmapCalendar from "./HeatmapCalendar";
 import ManualEntry from "./ManualEntry";
 import { dailyFocusTheme } from "../stats";
 import { PROJECT_TYPES, recordCategory } from "../classification.js";
-import { reviewDayKey } from "../reviewCache";
+import { reviewDayKey, reviewTheme } from "../reviewCache";
 
 const WEEK_CHARS = "日一二三四五六";
 const dayLabel = (value: number) => {
@@ -707,16 +707,15 @@ export default function HistoryPanel({
                       setOpenDays((days) => [...days, group.date])
                     }
                   >
-                    <span className="day-review-label">当日复盘</span>
                     <span className="day-review-text">
-                      {dayReviews[
+                      {reviewTheme(dayReviews[
                         reviewDayKey(group.records[0].startedAt)
-                      ] ||
+                      ]) ||
                         (reviewState === "loading"
-                          ? "正在读取复盘…"
+                          ? "正在读取当日主题…"
                           : reviewState === "error"
-                          ? "复盘暂未读取"
-                          : "暂无复盘摘要")}
+                          ? "当日主题暂未读取"
+                          : "暂无当日主题")}
                     </span>
                     <span className="day-review-footer">
                       {durationText(

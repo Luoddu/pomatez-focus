@@ -53,7 +53,10 @@ FocusService.prototype.recolorRecord = (v) => client.recolorRecord(v);
 FocusService.prototype.correctRecord = (v) => client.correctRecord(v);
 FocusService.prototype.dailyReviews = async () => ({
   sourceKey: source,
-  summaries: { [day]: "模拟复盘摘要：完成关键进展，明日继续。" },
+  summaries: {
+    [day]:
+      "当日主题：设备维护与临时协调，晚间推进测试大纲。\n代表进展：模拟进展正文不应展示。\n下一步：模拟计划不应展示。",
+  },
 });
 require("../app/electron/build/main.js");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -132,7 +135,7 @@ app.whenReady().then(async () => {
     win.webContents.debugger.detach();
     await until(() =>
       js(
-        "document.querySelector('.day-review-text')?.textContent.includes('模拟复盘摘要')"
+        "document.querySelector('.day-review-text')?.textContent.includes('设备维护与临时协调')"
       )
     );
     assert.equal(
@@ -145,7 +148,26 @@ app.whenReady().then(async () => {
       ),
       false
     );
+    assert.equal(
+      await js(
+        "document.querySelector('.day-review-text').textContent"
+      ),
+      "设备维护与临时协调，晚间推进测试大纲。"
+    );
+    assert.equal(
+      await js(
+        "Boolean(document.querySelector('.day-review-label')) || document.querySelector('.day-glass').textContent.includes('模拟进展正文')"
+      ),
+      false
+    );
+    await js("document.querySelector('.day-glass').scrollIntoView({block:'center'})");
+    await wait(200);
+    fs.writeFileSync(
+      path.join(__dirname, "../artifacts/history-theme-card.png"),
+      (await win.capturePage()).toPNG()
+    );
     const checks = [
+      "folded history shows only daily theme, no review heading or progress prose",
       "past default glass shows read-only review and contains no hidden task names or tooltips",
     ];
     await js("document.querySelector('.day-glass').click()");
