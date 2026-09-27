@@ -1,6 +1,6 @@
 # P0-POMO-029 科研收获与持续投入
 
-- REVIEW（实现/合成回归通过，待发布验证）；隔离实现者/上下文负责人 Codex。用户授权科研周目标、趋势、农场和象限视觉增强；既有源码及安装包发布授权延续。基线 032317872ea6c57c260e5babacf95c052f899f5b；独占 task/p0-pomo-029-research 工作树与合成测试 profile。P0-POMO-028 已由 Mac 独立任务使用，本轮不触碰其路径/资源。
+- REVIEW（实现/合成回归及preview.63发布验证通过）；隔离实现者/上下文负责人 Codex。用户授权科研周目标、趋势、农场和象限视觉增强；既有源码及安装包发布授权延续。基线 032317872ea6c57c260e5babacf95c052f899f5b；独占 task/p0-pomo-029-research 工作树与合成测试 profile。P0-POMO-028 已由 Mac 独立任务使用，本轮不触碰其路径/资源。
 - 写集：renderer focus 的 weekgoal、research 纯函数、ResearchGoal/ResearchProgress、HistoryPanel、StatsPanel、QuadrantBoard、FarmField、focus.css；对应测试/runner；本卡、验收、CHANGELOG、既有版本文件。禁止真实凭证/记录/飞书写入、用户 App 安装重启、根共享控制、新依赖、分类或同步协议变更。
 - 四源预检：① 分类真相为 recordCategory（历史颜色覆盖优先），任务用 projectType；现有周目标以北京时间周一为界，默认60且覆盖仅该周；复用这些口径。② 项目自有 UI/聚合，不改变第三方运行语义，不适用额外第三方调研。③ 搜索 focus/weekgoal、classification、week、scripts 和既有 Learning 结论；复用存储校验、统计、静音隐藏桌面 runner，无新机制教训。④ weekgoal/week 单元和 category-review/portrait 桌面验收提供回归基线。
 - 默认科研目标40，仅本周覆盖；总目标独立不变。科研数依据已保存完成数，不由时长折算或标题猜测；分类修正后随记录重算。四象限内科研优先，稳定保留同类顺序，不跨象限。科研视觉有文字标识，农场红果描边突出，统计展示最近8周真实收获与投入天数，当前周明确未结束。

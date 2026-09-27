@@ -1,6 +1,6 @@
 # P0-POMO-029 验收
 
-状态 REVIEW：实现与本机合成回归已验证，独立复核未执行，发布结果待补。
+状态 REVIEW：实现与本机合成回归已验证，独立复核未执行，preview.63 发布及远端资产校验已通过。
 
 - 源基线：032317872ea6c57c260e5babacf95c052f899f5b；发布前纳入4b976a40534f87f1134cc3fbc5c44d1d88d3bdd9的Mac独立发布路径，没有改写其他分支。允许写集及四源检查见 TASK-P0-POMO-029.md。
 - 科研目标默认40、同北京时间周一归周、只覆盖所选当前周；本机存储方式与既有总周目标相同。总目标和历史分类、同步协议保持。
@@ -12,3 +12,11 @@
 - 测试修正：测试最初将开始按钮写为不存在的btn-primary，查明实际为btn-begin后修正；追加科研选择检查在现有看板执行，避免异步刷新竞态。产品未为测试改同步/计时逻辑。
 - 不包含真实任务名、凭证、运行配置、用户数据或截图；无新增依赖/声音。回滚本次独立功能提交即可，独立科研目标键可保留。
 - Learning-Review none：复用既有分类、周目标及测试设施，没有新跨任务机制；不写根Learning。
+
+
+## 发布验证
+
+- 实际构建源码 d942d3e267810f82af98d87d7a1c36b7d031ea3d；包内source-version记录preview.63、dirty=false，ASAR检查无测试profile/凭证/日志，实际Windows包静音隐藏启动退出0。
+- [preview.63 Release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.63) 于2026-09-27 04:24:28 UTC正式公开（prerelease，非draft）；setup、portable、blockmap、preview.yml、source-version.json、SHA256SUMS.txt六资产上传成功，逐项远端size与SHA256 digest匹配本地。
+- preview.yml的setup SHA512/size与实际安装包匹配，tag精确指向d942d3e。已非强制推送源码，未替换旧tag/安装包，未安装或重启用户App。
+- 上传期间公开主线前进至475b7dc14bd752a0cbf96451db823ee54199478b，仅Mac文档验收，无产品差异；在补交本回执前显式fast-forward纳入。已发布tag继续固定实际构建源码，未因文档HEAD前进重打包。
