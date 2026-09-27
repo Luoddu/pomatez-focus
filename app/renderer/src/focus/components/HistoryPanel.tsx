@@ -1,3 +1,4 @@
+import ResearchGoal from "./ResearchGoal";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -496,7 +497,7 @@ export default function HistoryPanel({
         </div>
       </div>
       <div className="side-section">
-        <div className="side-title">
+        <div className="side-title research-goals-title">
           番茄月历
           <span
             className="weekgoal"
@@ -577,6 +578,7 @@ export default function HistoryPanel({
               </div>
             )}
           </span>
+          <ResearchGoal records={records} />
         </div>
         <HeatmapCalendar records={records} goals={goals} />
       </div>

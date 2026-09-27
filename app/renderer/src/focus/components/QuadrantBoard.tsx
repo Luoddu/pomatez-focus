@@ -1,3 +1,4 @@
+import { researchFirst } from "../research";
 import React, { useState } from "react";
 import { FocusTask, FocusQuadrant } from "../session";
 import QuickTaskEntry from "./QuickTaskEntry";
@@ -43,8 +44,9 @@ const GroupList = ({
     task.kind !== "pending";
   return (
     <div className="task-list">
-      {groupTasks(tasks).map((group) => {
+      {researchFirst(groupTasks(tasks)).map((group) => {
         // 占位行（done）只贡献已收数据，不渲染 chip；pending 是乐观临时 chip
+        const research = group.tasks.some(t => t.projectType === "research");
         const rows = group.tasks.filter((t) => t.kind !== "done");
         const info = group.tasks.find((t) => t.plannedToday != null);
         const done = info?.doneToday ?? 0;
@@ -62,7 +64,7 @@ const GroupList = ({
         const timing = !!activeTaskId && activeTaskId === taskId;
         return (
           <div
-            className={`task${complete ? " complete" : ""}`}
+            className={`task${complete ? " complete" : ""}${research ? " is-research" : ""}`}
             key={group.key}
             onMouseOver={() => setHover(group.key)}
             onMouseOut={(e) => {
@@ -74,6 +76,7 @@ const GroupList = ({
           >
             <div className="task-main">
               <div className="task-name">
+                {research && <span className="research-task-badge">科研</span>}
                 <TaskTitle
                   taskKey={group.key}
                   title={group.name}

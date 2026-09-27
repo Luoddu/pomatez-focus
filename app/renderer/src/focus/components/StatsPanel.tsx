@@ -1,3 +1,4 @@
+import ResearchProgress from "./ResearchProgress";
 import React, { useMemo, useState } from "react";
 import { FocusSession } from "../session";
 import {
@@ -204,6 +205,9 @@ export default function StatsPanel({
           onToggleCompact={onToggleCompact}
         />
       </div>
+      <ResearchProgress records={records} now={now} onTrend={() => {
+        setCategory("research"); setAnchor(Date.now()); setRangeKey("week");
+      }} />
       {summary.count === 0 && summary.seconds === 0 ? (
         <div className="card stats-empty">所选区间暂无专注记录</div>
       ) : (

@@ -91,7 +91,8 @@ const Tomato = ({
   seed?: number;
   pop?: boolean; // 新入筐时播放一次弹跳（靠 key 重挂载触发）
 }) => {
-  const rr = r * (0.87 + rand(seed, 1) * 0.28);
+  const research = tone === TOMATO_TONES.research;
+  const rr = r * (research ? 1.08 : 1) * (0.87 + rand(seed, 1) * 0.28);
   const ratio = 0.92 + rand(seed, 2) * 0.16;
   const rx = rr * Math.sqrt(ratio);
   const ry = rr / Math.sqrt(ratio);
@@ -121,6 +122,9 @@ const Tomato = ({
         cy={y}
         rx={rx.toFixed(2)}
         ry={ry.toFixed(2)}
+        data-research-fruit={research || undefined}
+        stroke={research ? "#b83d35" : undefined}
+        strokeWidth={research ? 0.7 : undefined}
         fill={GRAD_BY_TONE[tone] ? `url(#${GRAD_BY_TONE[tone]})` : tone}
       />
     </g>
@@ -1000,6 +1004,7 @@ export default function FarmField({
       : `${harvest.stage} · 本周收获 ${week} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${total}`;
   const toneFrom = (list: string[]) => (k: number) =>
     list.length ? list[k % list.length] : UNCLASSIFIED_TOMATO_TONE;
+  const researchCount = tones.filter(tone => tone === TOMATO_TONES.research).length;
   const fieldTone = toneFrom(tones);
   const pileTone = toneFrom(pileTones);
   // 成熟后超出的番茄摊成各株额外果实，靠前株优先
@@ -1022,6 +1027,9 @@ export default function FarmField({
           {term.emoji} {term.name} · 第 {term.dayOfTerm} 天
         </span>
         {caption}
+        <span className="research-harvest" title="按本周保存记录的科研分类统计，红果描边突出">
+          <span aria-hidden="true">🍅</span> 科研红番茄 {researchCount} 个
+        </span>
       </div>
       {/* 分层场景：天空层随卡片高度舒展，地面层保持 720:150 比例锚底，
           窗口拉高时空白被天空有机吃掉而不拉伸变形 */}

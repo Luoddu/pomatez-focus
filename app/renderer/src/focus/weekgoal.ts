@@ -20,9 +20,9 @@ export function weekKeyOf(now: number): string {
 }
 
 // 读取全部覆盖；损坏内容、非对象、越界值一律按无覆盖处理
-export function loadWeekGoals(): Record<string, number> {
+export function loadWeekGoals(storageKey = STORAGE_KEY): Record<string, number> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
@@ -59,15 +59,16 @@ export function isValidGoal(value: any): boolean {
 // 仅写入该周键，其他周覆盖原样保留；返回完整覆盖表供 state 更新
 export function saveWeekGoal(
   now: number,
-  goal: number
+  goal: number,
+  storageKey = STORAGE_KEY
 ): Record<string, number> {
   if (!isValidGoal(goal))
     throw new Error(
       `周目标必须是 ${WEEK_GOAL_MIN}–${WEEK_GOAL_MAX} 的整数`
     );
-  const goals = { ...loadWeekGoals(), [weekKeyOf(now)]: goal };
+  const goals = { ...loadWeekGoals(storageKey), [weekKeyOf(now)]: goal };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+    localStorage.setItem(storageKey, JSON.stringify(goals));
   } catch {
     /* 私密模式等写入失败时按当次内存态处理 */
   }
