@@ -239,6 +239,33 @@ app.whenReady().then(async () => {
     await until(() =>
       js("Boolean(document.querySelector('#manual-end'))")
     );
+    const assertEditorReachable = async () => {
+      await wait(120);
+      const geometry = await js(`(()=>{
+        const p=document.querySelector('.right-col');
+        p.scrollTop=p.scrollHeight;
+        document.querySelector('.manual-actions').scrollIntoView({block:'end'});
+        return {scroll: getComputedStyle(p).overflowY, hidden:getComputedStyle(document.querySelector('.records')).display};
+      })()`);
+      assert.equal(geometry.scroll, "auto");
+      assert.equal(geometry.hidden, "none");
+      const buttonGeometry = await js(`(()=>{
+        const p=document.querySelector('.right-col').getBoundingClientRect();
+        return [...document.querySelectorAll('.manual-actions button')].map(b=>{
+          const r=b.getBoundingClientRect();
+          return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,pTop:p.top,pBottom:p.bottom,height:innerHeight,width:innerWidth,hit:b.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))};
+        });
+      })()`);
+      assert.ok(buttonGeometry.every(r=>r.top>=Math.max(0,r.pTop)&&r.bottom<=Math.min(r.height,r.pBottom)+1&&r.left>=0&&r.right<=r.width&&r.hit), JSON.stringify(buttonGeometry));
+    };
+    win.setContentSize(1040, 580);
+    await assertEditorReachable();
+    await wait(250);
+    assert.ok(await js(`(()=>{const b=document.querySelector('.manual-actions button'),r=b.getBoundingClientRect();return r.bottom<=innerHeight&&b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))})()`));
+    fs.writeFileSync(path.join(__dirname, "../artifacts/small-editor.png"), (await win.capturePage()).toPNG());
+    win.setContentSize(760, 580);
+    await assertEditorReachable();
+    checks.push("small landscape and minimum-width edit forms scroll to visible clickable save/cancel buttons");
     const local = await js(
       `(()=>{const d=new Date(${
         start + 1800000
@@ -297,6 +324,7 @@ app.whenReady().then(async () => {
             (start + 1800000)
         ) < 1000
     );
+    assert.equal(await js("Boolean(document.querySelector('.is-editing-record'))"), false);
     assert.equal(
       (await client.history()).records[0].acceptedSeconds,
       1800
@@ -316,6 +344,11 @@ app.whenReady().then(async () => {
     await until(() =>
       js("Boolean(document.querySelector('#manual-name'))")
     );
+    await assertEditorReachable();
+    await click("取消");
+    assert.equal(await js("Boolean(document.querySelector('.manual-form'))"), false);
+    await click("补记");
+    await until(() => js("Boolean(document.querySelector('#manual-name'))"));
     await input("#manual-name", "模拟临时命名番茄");
     await click("保存补记");
     await until(() =>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FocusSession, FocusTask, Mood } from "../session";
 import { MoodPicker, parseTitle } from "./shared";
 import {
@@ -25,6 +25,10 @@ export default function ManualEntry({
   onCancel: () => void;
   initial?: FocusSession;
 }) {
+  const formRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    formRef.current?.scrollIntoView({ block: "nearest" });
+  }, []);
   const [taskId, setTaskId] = useState(initial?.task.id || "free");
   const [when, setWhen] = useState(() =>
     localInputValue(initial?.startedAt ?? Date.now() - 25 * 60000)
@@ -166,7 +170,7 @@ export default function ManualEntry({
     }
   };
   return (
-    <div className="card manual-form">
+    <div className="card manual-form" ref={formRef}>
       <div className="manual-row">
         <label htmlFor="manual-task">任务</label>
         <select

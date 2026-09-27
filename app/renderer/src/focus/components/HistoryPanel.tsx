@@ -355,7 +355,7 @@ export default function HistoryPanel({
   if (!groups.length || groups[0].date !== todayKey)
     groups.unshift({ date: todayKey, records: [] });
   return (
-    <div className="right-col">
+    <div className={`right-col${entryOpen || editRecord ? " is-editing-record" : ""}`}>
       <div className="side-section">
         <div className="side-title">
           概览

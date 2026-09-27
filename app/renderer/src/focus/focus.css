@@ -3744,3 +3744,29 @@ button.stats-range-label:hover {
 .stat-totalbar .stb-main {
   padding-top: 12px;
 }
+
+/* 小屏补记/编辑：整个右栏提供滚动，避免表单被固定高度裁掉。 */
+.right-col.is-editing-record {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100vh - 64px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.right-col.is-editing-record > .side-section {
+  flex: none;
+}
+.right-col.is-editing-record .manual-form {
+  flex: none;
+}
+.right-col.is-editing-record .records {
+  display: none;
+}
+.right-col.is-editing-record .manual-row {
+  flex-wrap: wrap;
+}
+.right-col.is-editing-record .manual-actions {
+  flex-wrap: wrap;
+}

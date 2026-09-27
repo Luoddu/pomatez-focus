@@ -15,7 +15,7 @@ const env = {
 delete env.ELECTRON_RUN_AS_NODE;
 const result = spawnSync(
   require("electron"),
-  [path.join(root, "tests/category-review-desktop.cjs")],
+  ["--mute-audio", path.join(root, "tests/category-review-desktop.cjs")],
   {
     cwd: root,
     env,
