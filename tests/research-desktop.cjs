@@ -167,12 +167,8 @@ app.whenReady().then(async () => {
       ),
       true
     );
-    assert.match(
-      await js(
-        "document.querySelector('.research-harvest').textContent"
-      ),
-      /3 个/
-    );
+    assert.equal(await js("document.querySelector('.research-harvest, .research-task-badge') === null"), true);
+    assert.equal(await js("(()=>{const c=getComputedStyle(document.querySelector('.is-research'));return c.borderLeftWidth==='0px'&&c.backgroundImage.includes('linear-gradient')})()"), true);
     for (const size of [
       [760, 650],
       [1080, 1840],
@@ -257,7 +253,7 @@ app.whenReady().then(async () => {
           "default goal",
           "save/reload/total unchanged",
           "stable quadrant priority",
-          "research farm fruit",
+          "research fruit and subtle background without badge or count",
           "small and portrait goal access",
           "8 week research trend",
           "normal task starts focus",

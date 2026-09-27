@@ -76,7 +76,6 @@ const GroupList = ({
           >
             <div className="task-main">
               <div className="task-name">
-                {research && <span className="research-task-badge">科研</span>}
                 <TaskTitle
                   taskKey={group.key}
                   title={group.name}

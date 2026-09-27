@@ -3778,9 +3778,7 @@ button.stats-range-label:hover {
 .research-goal .wg-fill { background: #cf5145; }
 .research-weekgoal .weekgoal-hint { color: #67707d; line-height: 1.5; }
 .research-weekgoal::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
-.task.is-research { border-left: 3px solid #d9675c; padding-left: 9px; background: linear-gradient(90deg, #fff6f3, transparent 65%); }
-.research-task-badge { display: inline-block; padding: 1px 5px; margin-right: 5px; border-radius: 5px; color: #a9332a; background: #fde8e3; font-size: 11px; line-height: 1.6; vertical-align: 2px; white-space: nowrap; }
-.research-harvest { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border: 1px solid #efc4ba; border-radius: 999px; color: #a63c32; background: #fff1ed; font-size: 12px; white-space: nowrap; }
+.task.is-research { background: linear-gradient(90deg, #fff6f3, transparent 65%); }
 .research-progress { padding: 18px 22px; border-color: #eed5ce; }
 .research-heading, .research-metrics { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .research-heading { justify-content: space-between; color: #97392f; }
