@@ -8,7 +8,7 @@
 
 [功能](#功能) · [开始使用](#开始使用) · [飞书联动](#飞书联动) · [本地开发](#本地开发) · [许可证](#许可证)
 
-> **版本状态（2026-09-19）**：`0.1.0-preview.41` 为“生成今日番茄”加入按钮内步骤进度条，后台刷新也有即时反馈，完成显示“已更新／已是最新”，失败可重试；保留本地优先追加、任务详情和跨机成果同步。[下载安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.41/Pomatez-Focus-v0.1.0-preview.41-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.41)。当前仅验证 Windows x64，不标记为稳定版。
+> **Windows 版本（2026-09-27）**：`0.1.0-preview.62`，包含小屏补记/编辑表单滚动修复。[Windows x64 安装包](https://github.com/Luoddu/pomatez-focus/releases/download/v0.1.0-preview.62/Pomatez-Focus-v0.1.0-preview.62-win-x64-setup.exe) · [更新说明与校验文件](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.62)。仍为预览版；Mac 使用下方独立入口。
 
 **Mac 用户：** [Mac 安装与月度更新说明](docs/MAC-PERSONAL.md) · [Mac 独立发布列表](https://github.com/Luoddu/pomatez-focus/releases?q=mac&expanded=true)。M 系列芯片个人试用包，与 Windows 更新分开；未做 Apple 公证。
 
