@@ -69,12 +69,15 @@ export default function MiniView({
       {active && !reviewing && (
         <div className="mini-buttons">
           <button
-            className="btn-outline"
+            className={active.status === "paused" ? "btn-primary" : "btn-outline"}
             onClick={active.status === "active" ? onPause : onResume}
           >
             {active.status === "active" ? "暂停" : "继续"}
           </button>
-          <button className="btn-primary" onClick={onFinish}>
+          <button
+            className={active.status === "paused" ? "btn-outline" : "btn-primary"}
+            onClick={onFinish}
+          >
             结束
           </button>
         </div>

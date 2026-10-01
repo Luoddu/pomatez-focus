@@ -177,14 +177,18 @@ export default function FocusTimer({
         </Ring>
         <div className="timing-buttons">
           <button
-            className="btn-outline"
+            className={active.status === "paused" ? "btn-primary" : "btn-outline"}
             onClick={active.status === "active" ? onPause : onResume}
           >
             {active.status === "active" ? "暂停" : "继续"}
           </button>
           <button
             className={
-              confirming ? "btn-danger-confirm" : "btn-primary"
+              confirming
+                ? "btn-danger-confirm"
+                : active.status === "paused"
+                  ? "btn-outline"
+                  : "btn-primary"
             }
             aria-label={confirming ? "确认结束" : "结束"}
             onClick={() =>
