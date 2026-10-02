@@ -1,5 +1,5 @@
 import type { FocusTask, FocusSession } from "./session";
-import type { OutboxItem, QuickTask } from "./editQueue";
+import type { OutboxItem, QuickTask, RemovePlan } from "./editQueue";
 
 export function quickRows(q: QuickTask): FocusTask[] {
   return Array.from({ length: q.count }, (_, i) => ({
@@ -12,6 +12,7 @@ export function quickRows(q: QuickTask): FocusTask[] {
     source: "feishu",
     sourceKey: q.sourceKey,
     quadrant: q.quadrant,
+    ...(q.projectType ? { projectType: q.projectType } : {}),
     quickTask: { id: q.id, sequence: i + 1 },
     doneToday: q.append?.doneToday || 0,
     plannedToday: q.append?.plannedToday || q.count,
@@ -84,14 +85,91 @@ export function projectQuickTasks(
       e.sourceKey === key &&
       (e.payload as QuickTask).day === day
   );
-  const projected = queued.flatMap(
+  let projected = queued.flatMap(
     (e) => e.taskRows || quickRows(e.payload as QuickTask)
   );
+  // Each local append adds one slot to the unprojected snapshot. Its captured
+  // total may already include earlier reductions, so do not subtract twice.
+  const appended = new Set(
+    queued
+      .filter((e) => (e.payload as QuickTask).append)
+      .map((e) => (e.payload as QuickTask).append!.taskId)
+  );
+  projected = projected.map((row) => {
+    if (!appended.has(row.taskId || "")) return row;
+    const base = tasks.filter(
+      (t) => t.taskId === row.taskId && t.sourceKey === row.sourceKey
+    );
+    const extra = projected.filter(
+      (t) =>
+        t.taskId === row.taskId &&
+        t.sourceKey === row.sourceKey &&
+        !base.some((b) => b.id === t.id)
+    ).length;
+    const planned = Math.max(
+      0,
+      ...base.map((t) => t.plannedToday || 0)
+    );
+    return { ...row, plannedToday: planned + extra };
+  });
   const ids = new Set(projected.map((r) => r.id));
-  return mergeQuickRows(
+  const merged = mergeQuickRows(
     tasks.filter((r) => !ids.has(r.id)),
     projected
   );
+  return removePlanRows(
+    merged,
+    entries
+      .filter(
+        (e) =>
+          e.kind === "remove" &&
+          e.sourceKey === key &&
+          (e.payload as RemovePlan).day === day
+      )
+      .map((e) => (e.payload as RemovePlan).task)
+  );
+}
+
+// Count only rows still present in the snapshot; acknowledged removals must
+// not decrement the group a second time while later intents are pending.
+export function removePlanRows(
+  rows: FocusTask[],
+  removed: FocusTask[]
+): FocusTask[] {
+  const ids = new Set(
+    removed.map((t) => `${t.sourceKey}|${t.planId || t.id}`)
+  );
+  const hidden = rows.filter(
+    (t) =>
+      t.kind !== "done" &&
+      !t.creditedSeconds &&
+      !t.appliedSessionIds?.length &&
+      ids.has(`${t.sourceKey}|${t.planId || t.id}`)
+  );
+  const counts = new Map<string, number>();
+  hidden.forEach((t) =>
+    counts.set(
+      `${t.sourceKey}|${t.taskId}`,
+      (counts.get(`${t.sourceKey}|${t.taskId}`) || 0) + 1
+    )
+  );
+  const hiddenIds = new Set(
+    hidden.map((t) => `${t.sourceKey}|${t.id}`)
+  );
+  return rows
+    .filter((t) => !hiddenIds.has(`${t.sourceKey}|${t.id}`))
+    .map((t) => {
+      const count = counts.get(`${t.sourceKey}|${t.taskId}`) || 0;
+      return count && t.plannedToday != null
+        ? {
+            ...t,
+            plannedToday: Math.max(
+              t.doneToday || 0,
+              t.plannedToday - count
+            ),
+          }
+        : t;
+    });
 }
 
 // Keep sibling plans and normalize group totals before the server refresh arrives.

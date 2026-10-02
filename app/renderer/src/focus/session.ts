@@ -6,6 +6,11 @@ export type ProjectType =
   | "software"
   | "personal"
   | "misc";
+export type FocusProject = {
+  id: string;
+  name: string;
+  projectType?: ProjectType;
+};
 export type FocusTask = {
   id: string;
   title: string;

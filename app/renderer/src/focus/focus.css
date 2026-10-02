@@ -2448,6 +2448,31 @@ input:focus-visible {
   gap: 10px;
   padding: 12px 0;
 }
+.quick-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #697586;
+  font-size: 13px;
+}
+.quick-project > span:first-child {
+  flex-shrink: 0;
+}
+.quick-project select {
+  min-width: 0;
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #dce1eb;
+  border-radius: 8px;
+  background: white;
+  color: #344054;
+}
+.quick-project-swatch {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
 .quick-task-form > input {
   width: 100%;
   padding: 8px;

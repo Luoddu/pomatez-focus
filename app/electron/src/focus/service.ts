@@ -118,6 +118,19 @@ export class FocusService {
   today() {
     return this.connected().today();
   }
+  projects() {
+    return this.connected().projects();
+  }
+  async removePlan(value: any) {
+    if (this.planWriting)
+      throw Error("飞书正在同步，减少操作已保留，可稍后重试");
+    this.planWriting = true;
+    try {
+      return await this.connected().removeQueuedPlan(value);
+    } finally {
+      this.planWriting = false;
+    }
+  }
   async createQuickTask(value: any) {
     if (this.planWriting)
       throw Error("飞书正在同步，任务已保留，可稍后重试");

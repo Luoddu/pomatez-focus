@@ -1,6 +1,6 @@
 import { researchFirst } from "../research";
 import React, { useState } from "react";
-import { FocusTask, FocusQuadrant } from "../session";
+import { FocusTask, FocusQuadrant, FocusProject } from "../session";
 import QuickTaskEntry from "./QuickTaskEntry";
 import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import { chipWindow } from "../chipWindow";
@@ -15,7 +15,6 @@ const GroupList = ({
   selected,
   onSelect,
   onAdjust,
-  adjusting,
   activeTaskId,
   onComplete,
   completing,
@@ -24,7 +23,6 @@ const GroupList = ({
   selected: string;
   onSelect: (id: string) => void;
   onAdjust?: (taskId: string, delta: 1 | -1) => void;
-  adjusting: string;
   activeTaskId: string;
   onComplete?: (task: FocusTask) => void;
   completing: string;
@@ -46,12 +44,19 @@ const GroupList = ({
     <div className="task-list">
       {researchFirst(groupTasks(tasks)).map((group) => {
         // 占位行（done）只贡献已收数据，不渲染 chip；pending 是乐观临时 chip
-        const research = group.tasks.some(t => t.projectType === "research");
+        const research = group.tasks.some(
+          (t) => t.projectType === "research"
+        );
         const rows = group.tasks.filter((t) => t.kind !== "done");
         const info = group.tasks.find((t) => t.plannedToday != null);
         const done = info?.doneToday ?? 0;
         const planned = info?.plannedToday ?? rows.length;
-        const pending = rows.filter((t) => t.kind !== "pending").length;
+        const pending = rows.filter(
+          (t) =>
+            t.kind !== "pending" &&
+            !t.creditedSeconds &&
+            !t.appliedSessionIds?.length
+        ).length;
         const complete = planned > 0 && done >= planned;
         const taskId = group.tasks[0]?.taskId || "";
         const canAdjust =
@@ -59,12 +64,13 @@ const GroupList = ({
           !!taskId &&
           !taskId.startsWith("quick-") &&
           !group.tasks.some((t) => t.kind === "free");
-        const busy = adjusting === group.key;
         // 计时中的任务不允许减：该行可能已有未同步的专注分钟
         const timing = !!activeTaskId && activeTaskId === taskId;
         return (
           <div
-            className={`task${complete ? " complete" : ""}${research ? " is-research" : ""}`}
+            className={`task${complete ? " complete" : ""}${
+              research ? " is-research" : ""
+            }`}
             key={group.key}
             onMouseOver={() => setHover(group.key)}
             onMouseOut={(e) => {
@@ -149,7 +155,7 @@ const GroupList = ({
               </div>
             </div>
             <div className="task-side">
-              {canAdjust && (hover === group.key || busy) && (
+              {canAdjust && hover === group.key && (
                 <span className="adjust-btns">
                   <button
                     className="adjust-btn"
@@ -161,12 +167,7 @@ const GroupList = ({
                         ? "没有可减的待办番茄"
                         : "减去一个待办番茄"
                     }
-                    disabled={
-                      busy ||
-                      pending === 0 ||
-                      timing ||
-                      rows.some((t) => t.quickTask)
-                    }
+                    disabled={pending === 0 || timing}
                     onClick={() => onAdjust!(taskId, -1)}
                   >
                     −
@@ -175,7 +176,6 @@ const GroupList = ({
                     className="adjust-btn"
                     aria-label={`增加番茄：${group.name}`}
                     title="增加一个今日番茄"
-                    disabled={busy}
                     onClick={() => onAdjust!(taskId, 1)}
                   >
                     ＋
@@ -264,11 +264,11 @@ export default function QuadrantBoard({
   pileTones,
   farmNow,
   onAdjust,
-  adjusting,
   activeTaskId,
   onComplete,
   completing,
   onAddTask,
+  loadProjects,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -287,15 +287,16 @@ export default function QuadrantBoard({
   pileTones: string[];
   farmNow?: number;
   onAdjust?: (taskId: string, delta: 1 | -1) => void;
-  adjusting: string;
   activeTaskId: string;
   onComplete?: (task: FocusTask) => void;
   completing: string;
   onAddTask?: (
     title: string,
     quadrant: FocusQuadrant,
-    count: number
+    count: number,
+    project?: FocusProject
   ) => void;
+  loadProjects?: () => Promise<FocusProject[]>;
 }) {
   const [adding, setAdding] = useState<FocusQuadrant | null>(null);
   const selectedRow = tasks.find((t) => t.id === selected);
@@ -349,6 +350,7 @@ export default function QuadrantBoard({
                       <QuickTaskEntry
                         quadrant={q.key}
                         onAdd={onAddTask}
+                        loadProjects={loadProjects}
                         onClose={() => setAdding(null)}
                       />
                     )}
@@ -357,7 +359,6 @@ export default function QuadrantBoard({
                       selected={selected}
                       onSelect={onSelect}
                       onAdjust={onAdjust}
-                      adjusting={adjusting}
                       activeTaskId={activeTaskId}
                       onComplete={onComplete}
                       completing={completing}

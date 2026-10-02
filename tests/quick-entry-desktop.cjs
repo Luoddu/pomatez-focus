@@ -264,14 +264,14 @@ app.whenReady().then(async () => {
     });
     await until(() =>
       js(
-        "!![...document.querySelectorAll('button')].find(b=>b.textContent==='重试修改与新增任务')"
+        "!![...document.querySelectorAll('button')].find(b=>b.textContent==='重试待同步操作')"
       )
     );
     assert.equal(creates, 1);
     await until(
       async () => (await stored()).active?.status === "paused"
     );
-    await click("重试修改与新增任务");
+    await click("重试待同步操作");
     await until(async () => (await outbox()).length === 0);
     assert.equal(creates, 2);
     assert.equal((await stored()).active.id, startedId);

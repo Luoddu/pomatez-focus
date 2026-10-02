@@ -1,4 +1,9 @@
-import type { FocusSession, FocusQuadrant, FocusTask } from "./session";
+import type {
+  FocusSession,
+  FocusQuadrant,
+  FocusTask,
+  ProjectType,
+} from "./session";
 
 export type QuickTask = {
   id: string;
@@ -7,6 +12,8 @@ export type QuickTask = {
   quadrant?: FocusQuadrant;
   count: number;
   day: number;
+  projectId?: string;
+  projectType?: ProjectType;
   // Additional slot for an existing task; stable across retries/restarts.
   append?: {
     taskId: string;
@@ -22,11 +29,17 @@ export type PendingEdit = {
   before: FocusSession;
   after: FocusSession;
 };
+export type RemovePlan = {
+  id: string;
+  sourceKey: string;
+  task: FocusTask;
+  day: number;
+};
 export type OutboxItem = {
   id: string;
   sourceKey: string;
-  kind: "task" | "edit" | "color";
-  payload: QuickTask | PendingEdit;
+  kind: "task" | "edit" | "color" | "remove";
+  payload: QuickTask | PendingEdit | RemovePlan;
   state: "pending" | "failed";
   error?: string;
   taskRows?: FocusTask[];
@@ -50,10 +63,13 @@ export class EditQueue {
             !r.id ||
             !r.sourceKey ||
             !r.payload ||
-            (r.kind !== "task" &&
+            (r.kind === "remove" &&
+              (!r.payload.task?.id ||
+                !Number.isFinite(r.payload.day))) ||
+            ((r.kind === "edit" || r.kind === "color") &&
               (!r.payload.before?.id ||
                 r.payload.before.id !== r.payload.after?.id)) ||
-            !["task", "edit", "color"].includes(r.kind) ||
+            !["task", "edit", "color", "remove"].includes(r.kind) ||
             !["pending", "failed"].includes(r.state)
         )
       )
@@ -84,8 +100,8 @@ export class EditQueue {
       this.entries.some(
         (e) =>
           e.id === item.id ||
-          (e.kind !== "task" &&
-            item.kind !== "task" &&
+          ((e.kind === "edit" || e.kind === "color") &&
+            (item.kind === "edit" || item.kind === "color") &&
             (e.payload as PendingEdit).before.id ===
               (item.payload as PendingEdit).before.id)
       )
@@ -117,6 +133,10 @@ export class EditQueue {
       this.entries.map((e) => {
         if (e.id === id) return { ...e, taskRows: rows };
         if (e.kind === "task" || e.sourceKey !== q.sourceKey) return e;
+        if (e.kind === "remove") {
+          const p = e.payload as RemovePlan;
+          return { ...e, payload: { ...p, task: bind(p.task) } };
+        }
         const p = e.payload as PendingEdit;
         return {
           ...e,

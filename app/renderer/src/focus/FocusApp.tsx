@@ -1,5 +1,6 @@
 import React, {
   useContext,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -10,11 +11,17 @@ import {
   FocusSession,
   FocusTask,
   FocusQuadrant,
+  FocusProject,
   Mood,
   ProjectType,
   timeParts,
 } from "./session";
-import { EditQueue, PendingEdit, QuickTask } from "./editQueue";
+import {
+  EditQueue,
+  PendingEdit,
+  QuickTask,
+  RemovePlan,
+} from "./editQueue";
 import { recolorSession } from "./classification.js";
 import { loadReviews, saveReviews } from "./reviewCache";
 import {
@@ -23,6 +30,7 @@ import {
   bindQuickTask,
   mergeQuickRows,
   validateQuickReceipt,
+  removePlanRows,
 } from "./quickTasks";
 import {
   readTaskSnapshot,
@@ -248,7 +256,6 @@ export default function FocusApp() {
   const [busy, setBusy] = useState(false),
     [generating, setGenerating] = useState(false),
     [silentGenerating, setSilentGenerating] = useState(false),
-    [adjusting, setAdjusting] = useState(""),
     [accepted, setAccepted] = useState("25"),
     [completed, setCompleted] = useState(0),
     [completedTouched, setCompletedTouched] = useState(false),
@@ -296,7 +303,7 @@ export default function FocusApp() {
     sourceKey
   );
   const editingIds = outbox
-    .filter((e) => e.kind !== "task")
+    .filter((e) => e.kind === "edit" || e.kind === "color")
     .map((e) => (e.payload as PendingEdit).before.id);
   const [demoSeed, setDemoSeed] = useState(demoHistory);
   const [dayReviews, setDayReviews] = useState<Record<string, string>>(
@@ -726,7 +733,8 @@ export default function FocusApp() {
   const addQuickTask = (
     title: string,
     quadrant: FocusQuadrant,
-    count: number
+    count: number,
+    project?: FocusProject
   ) => {
     if (!connected || !sourceKey || !api())
       throw Error("请先在设置中连接飞书");
@@ -738,6 +746,8 @@ export default function FocusApp() {
       title,
       quadrant,
       count,
+      projectId: project?.id,
+      projectType: project?.projectType,
       day: new Date(
         now.getFullYear(),
         now.getMonth(),
@@ -752,6 +762,15 @@ export default function FocusApp() {
       state: "pending",
     });
   };
+  const loadProjects = useCallback(async (): Promise<
+    FocusProject[]
+  > => {
+    if (!sourceKey || !api()) return [];
+    const result = await api().projects();
+    if (result.sourceKey !== sourceKey)
+      throw Error("飞书连接已变化，请重新打开新增任务");
+    return result.projects;
+  }, [sourceKey]);
   const editRecord = (before: FocusSession, after: FocusSession) => {
     if (!connected || !sourceKey || !api()) {
       if (before.task.source !== "local" || before.cloudSynced)
@@ -817,7 +836,6 @@ export default function FocusApp() {
     !busy &&
     !generating &&
     !silentGenerating &&
-    !adjusting &&
     !completionQueue.running &&
     !timer.blocked;
   useEffect(() => {
@@ -873,6 +891,23 @@ export default function FocusApp() {
               );
               return i < 0 ? previous : rows[i].id;
             });
+          } else if (item.kind === "remove") {
+            const removal = item.payload as RemovePlan;
+            if (removal.task.quickTask)
+              throw Error(
+                "新增番茄尚未同步，减少操作已保留，请先重试新增"
+              );
+            await api().removePlan(removal);
+            ++refreshSequence.current;
+            setLoadingTasks(false);
+            const fresh = removePlanRows(tasksRef.current, [
+              removal.task,
+            ]);
+            if (!writeTaskSnapshot(localStorage, sourceKey, fresh))
+              throw Error("减少已同步，启动缓存待重试保存");
+            tasksRef.current = fresh;
+            setTasks(fresh);
+            setTodayCount(fresh.length);
           } else {
             const edit = item.payload as PendingEdit;
             let latest = timer
@@ -960,7 +995,6 @@ export default function FocusApp() {
     busy,
     generating,
     silentGenerating,
-    adjusting,
     queueRevision,
   ]);
   const windowMode = async (small: boolean, pin: boolean) => {
@@ -1091,7 +1125,7 @@ export default function FocusApp() {
       }
     });
   };
-  // Plus is durable/local-first. Minus retains the existing guarded removal flow.
+  // Both directions persist exact intent before asynchronous Feishu writes.
   const adjust = (taskId: string, delta: 1 | -1) => {
     if (!api() || !connected) {
       notify("请先在设置中连接飞书，再调整番茄数。", "error");
@@ -1105,7 +1139,7 @@ export default function FocusApp() {
     const group = groupTasks(currentBoard).find(
       (g) => g.key === taskId
     );
-    if (!group || !sourceKey || adjusting) return;
+    if (!group || !sourceKey) return;
     if (delta === 1) {
       const info =
         group.tasks.find((t) => t.plannedToday != null) ||
@@ -1113,7 +1147,21 @@ export default function FocusApp() {
       const sequence =
         Math.max(
           info?.plannedToday || 0,
-          ...group.tasks.map((t) => parseTitle(t.title).pomodoro)
+          ...group.tasks.map((t) => parseTitle(t.title).pomodoro),
+          ...editQueue.entries
+            .filter(
+              (e) =>
+                e.sourceKey === sourceKey &&
+                e.kind === "remove" &&
+                (e.payload as RemovePlan).day ===
+                  new Date().setHours(0, 0, 0, 0) &&
+                (e.payload as RemovePlan).task.taskId === taskId
+            )
+            .map(
+              (e) =>
+                parseTitle((e.payload as RemovePlan).task.title)
+                  .pomodoro
+            )
         ) + 1;
       if (sequence > 50) {
         notify("单个任务每日最多 50 个番茄", "error");
@@ -1125,6 +1173,7 @@ export default function FocusApp() {
         sourceKey,
         title: group.name,
         quadrant: info.quadrant,
+        projectType: info.projectType,
         count: 1,
         day: new Date().setHours(0, 0, 0, 0),
         append: {
@@ -1151,69 +1200,54 @@ export default function FocusApp() {
       }
       return;
     }
-    if (group.tasks.some((t) => t.quickTask)) {
-      notify(
-        "新增番茄尚未同步，暂不能减少；可以立即开始专注。",
-        "error"
+    if (active?.task.taskId === taskId) return;
+    const victims = group.tasks.filter(
+      (t) =>
+        t.kind !== "done" &&
+        t.kind !== "pending" &&
+        !(t.creditedSeconds && t.creditedSeconds > 0) &&
+        !t.appliedSessionIds?.length &&
+        !timer
+          .getSnapshot()
+          .records.some(
+            (r) => r.task.id === t.id && r.sync === "pending"
+          )
+    );
+    const victim = victims.reduce<FocusTask | null>(
+      (top, t) =>
+        !top ||
+        parseTitle(t.title).pomodoro > parseTitle(top.title).pomodoro
+          ? t
+          : top,
+      null
+    );
+    if (!victim) return;
+    const id = crypto.randomUUID();
+    try {
+      editQueue.add({
+        id,
+        sourceKey,
+        kind: "remove",
+        state: "pending",
+        payload: {
+          id,
+          sourceKey,
+          task: victim,
+          day: new Date().setHours(0, 0, 0, 0),
+        },
+      });
+      setSelected((previous) =>
+        previous === victim.id ? "" : previous
       );
-      return;
+    } catch (e: any) {
+      notify(e.message || "减少番茄未能保存在本机", "error");
     }
-    if (
-      completionQueue.entries.some(
-        (e) =>
-          e.sourceKey === sourceKey &&
-          e.task.taskId === taskId &&
-          e.state !== "done"
-      )
-    ) {
-      notify(
-        "该任务还有待同步的完成标记，请同步后再调整番茄数；其他番茄仍可继续标记。",
-        "error"
-      );
-      return;
-    }
-    const rollback = tasks;
-    {
-      const victims = group.tasks.filter(
-        (t) =>
-          t.kind !== "done" &&
-          t.kind !== "pending" &&
-          t.id !== active?.task.id
-      );
-      const victim = victims.reduce<FocusTask | null>(
-        (top, t) =>
-          !top ||
-          parseTitle(t.title).pomodoro > parseTitle(top.title).pomodoro
-            ? t
-            : top,
-        null
-      );
-      if (!victim) return;
-      setTasks(tasks.filter((t) => t.id !== victim.id));
-    }
-    setAdjusting(taskId);
-    (async () => {
-      try {
-        await api().adjustToday({ taskId, delta });
-        await refresh();
-      } catch (e: any) {
-        setTasks(rollback);
-        notify(e.message || "番茄调整失败，请稍后重试", "error");
-      } finally {
-        setAdjusting("");
-      }
-    })();
   };
   // Accept many clicks immediately; durable per-row intent is independent of
   // the existing serialized Feishu write/readback and history synchronization.
   const queueReady = useRef(false);
   queueReady.current =
-    connected &&
-    !!sourceKey &&
-    !adjusting &&
-    !generating &&
-    !syncBusy &&
-    !busy;
+    connected && !!sourceKey && !generating && !syncBusy && !busy;
   useEffect(() => {
     if (
       !sourceKey ||
@@ -1254,7 +1288,6 @@ export default function FocusApp() {
     editRevision,
     sourceKey,
     connected,
-    adjusting,
     generating,
     syncBusy,
     busy,
@@ -1593,7 +1626,6 @@ export default function FocusApp() {
               pileTones={pileTones}
               farmNow={farmNow}
               onAdjust={adjust}
-              adjusting={adjusting}
               activeTaskId={
                 active && active.task.kind !== "free"
                   ? active.task.taskId || ""
@@ -1602,6 +1634,7 @@ export default function FocusApp() {
               onComplete={completeChip}
               completing={""}
               onAddTask={addQuickTask}
+              loadProjects={loadProjects}
             />
           )}
           <HistoryPanel
@@ -1646,6 +1679,8 @@ export default function FocusApp() {
             <span key={e.id}>
               {e.kind === "task"
                 ? (e.payload as QuickTask).title
+                : e.kind === "remove"
+                ? "减少番茄"
                 : "记录修改"}
               ：{e.state === "failed" ? e.error : "等待同步"}
             </span>
@@ -1657,7 +1692,7 @@ export default function FocusApp() {
                 if (sourceKey) editQueue.retry(sourceKey);
               }}
             >
-              重试修改与新增任务
+              重试待同步操作
             </button>
           )}
         </aside>

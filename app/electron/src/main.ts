@@ -59,9 +59,15 @@ const handler = (name: string, fn: (value: any) => any) =>
 if (!single) app.quit();
 else {
   // Native roles preserve Command+C/V/Q on macOS; Windows keeps its existing UI.
-  Menu.setApplicationMenu(process.platform === "darwin" ? Menu.buildFromTemplate([
-    { role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" },
-  ]) : null);
+  Menu.setApplicationMenu(
+    process.platform === "darwin"
+      ? Menu.buildFromTemplate([
+          { role: "appMenu" },
+          { role: "editMenu" },
+          { role: "windowMenu" },
+        ])
+      : null
+  );
   app.on("second-instance", show);
   app
     .whenReady()
@@ -91,7 +97,12 @@ else {
         frame: true,
         alwaysOnTop: false,
         backgroundColor: "#f8faff",
-        icon: path.join(__dirname, process.platform === "darwin" ? "assets/logo-dark@2x.png" : "assets/logo-dark.ico"),
+        icon: path.join(
+          __dirname,
+          process.platform === "darwin"
+            ? "assets/logo-dark@2x.png"
+            : "assets/logo-dark.ico"
+        ),
         webPreferences: {
           preload: path.join(__dirname, "preload.js"),
           contextIsolation: true,
@@ -126,6 +137,8 @@ else {
       handler("today", () => service.today());
       handler("generateToday", () => service.generateToday());
       handler("adjustToday", (value) => service.adjustToday(value));
+      handler("removePlan", (value) => service.removePlan(value));
+      handler("projects", () => service.projects());
       handler("createQuickTask", (value) =>
         service.createQuickTask(value)
       );

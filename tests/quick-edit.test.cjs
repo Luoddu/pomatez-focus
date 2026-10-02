@@ -67,7 +67,7 @@ function harness() {
     if (url.endsWith("/tables"))
       return items([{ name: "专注记录", table_id: "plans" }]);
     const m =
-      /\/tables\/(tasks|plans)\/(fields|records)(?:\/([^/]+))?$/.exec(
+      /\/tables\/(tasks|plans|projects)\/(fields|records)(?:\/([^/]+))?$/.exec(
         url
       );
     assert.ok(m, url);
@@ -99,6 +99,9 @@ function harness() {
         fields: structuredClone(body.fields),
       };
       state[table].push(row);
+    } else if (method === "DELETE") {
+      row = state[table].find((r) => r.record_id === id);
+      state[table] = state[table].filter((r) => r.record_id !== id);
     } else {
       row = state[table].find((r) => r.record_id === id);
       assert.ok(row);
@@ -117,29 +120,195 @@ function harness() {
     state,
   };
 }
+test("project affiliation uses existing link and server category, rejects unknown selection before writes", async () => {
+  const h = harness();
+  h.state.fields.tasks.push({
+    field_name: "所属项目",
+    type: 21,
+    property: { table_id: "projects" },
+  });
+  h.state.fields.projects = [
+    { field_name: "名称", type: 1, is_primary: true },
+    { field_name: "项目类型", type: 3 },
+  ];
+  h.state.projects = [
+    {
+      record_id: "research",
+      fields: { 名称: "Synthetic research", 项目类型: "科研" },
+    },
+    {
+      record_id: "delivery",
+      fields: { 名称: "Synthetic delivery", 项目类型: "项目交付" },
+    },
+  ];
+  const options = await h.client.projects();
+  assert.equal(options.sourceKey, h.key);
+  assert.equal(options.projects[0].projectType, "research");
+  const q = {
+    id: randomUUID(),
+    sourceKey: h.key,
+    title: "Synthetic",
+    quadrant: "inu",
+    count: 2,
+    day: new Date().setHours(0, 0, 0, 0),
+    projectId: "research",
+    projectType: "misc",
+  };
+  await assert.rejects(
+    h.client.createQuickTask({ ...q, projectId: "missing" }),
+    /项目/
+  );
+  assert.equal(h.state.writes.length, 0);
+  h.state.lose = "POST:tasks";
+  await assert.rejects(h.client.createQuickTask(q), /response lost/);
+  const result = await h.client.createQuickTask(q);
+  assert.equal(h.state.tasks.length, 1);
+  assert.deepEqual(h.state.tasks[0].fields.所属项目, ["research"]);
+  assert.ok(result.tasks.every((t) => t.projectType === "research"));
+  const appended = await h.client.createQuickTask({
+    ...q,
+    id: randomUUID(),
+    count: 1,
+    append: { taskId: result.taskId, sequence: 3 },
+  });
+  assert.equal(appended.tasks[0].projectType, "research");
+  await assert.rejects(
+    h.client.createQuickTask({ ...q, projectId: "delivery" }),
+    /不一致/
+  );
+  assert.equal(h.state.tasks.length, 1);
+});
+test("queued removals keep exact identity across response loss and day change, guard used/moved/wrong-Base rows", async () => {
+  const h = harness(),
+    day = new Date().setHours(0, 0, 0, 0) - 86400000;
+  for (let n = 1; n <= 3; n++)
+    h.state.plans.push({
+      record_id: `p${n}`,
+      fields: { 番茄: String(n), 任务: ["t"], 计划日: day },
+    });
+  const q = {
+    id: randomUUID(),
+    sourceKey: h.key,
+    day,
+    task: {
+      id: "p3",
+      planId: "p3",
+      taskId: "t",
+      source: "feishu",
+      sourceKey: h.key,
+      title: "Synthetic · 第 3 个番茄",
+    },
+  };
+  h.state.lose = "DELETE:plans";
+  await assert.rejects(h.client.removeQueuedPlan(q), /response lost/);
+  await h.client.removeQueuedPlan(q);
+  await h.client.removeQueuedPlan(q);
+  assert.deepEqual(
+    h.state.plans.map((r) => r.record_id),
+    ["p1", "p2"]
+  );
+  assert.equal(h.state.writes.length, 1);
+  const q2 = {
+    ...q,
+    id: randomUUID(),
+    task: {
+      ...q.task,
+      id: "p2",
+      planId: "p2",
+      title: "Synthetic · 第 2 个番茄",
+    },
+  };
+  const f = h.state.plans[1].fields;
+  for (const field of [
+    { 已完成: true },
+    { 实际分钟: 1 },
+    { 专注日期: day },
+    { 专注时间段: "synthetic" },
+    { [HISTORY_FIELD]: "malformed" },
+    { 专注同步明细: "malformed" },
+    { 任务: ["other"] },
+    { 番茄: "4" },
+  ]) {
+    const before = structuredClone(f);
+    Object.assign(f, field);
+    await assert.rejects(h.client.removeQueuedPlan(q2));
+    for (const k of Object.keys(f)) delete f[k];
+    Object.assign(f, before);
+  }
+  await assert.rejects(
+    h.client.removeQueuedPlan({ ...q2, sourceKey: "other" }),
+    /无效/
+  );
+  assert.equal(h.state.writes.length, 1);
+  await h.client.removeQueuedPlan(q2);
+  assert.deepEqual(
+    h.state.plans.map((r) => r.record_id),
+    ["p1"]
+  );
+});
 test("queued append uses original task/day/sequence; lost response retry neither adds a task nor repeats the plan", async () => {
-  const h=harness(), day=new Date().setHours(0,0,0,0)-86400000;
-  h.state.tasks.push({record_id:'existing',fields:{任务名称:'Synthetic'}});
-  h.state.plans.push({record_id:'p1',fields:{番茄:'1',任务:['existing'],计划日:day,已完成:true}});
-  const q={id:randomUUID(),sourceKey:h.key,title:'Synthetic',quadrant:'iu',count:1,day,append:{taskId:'existing',sequence:2,description:'Details'}};
-  h.state.lose='POST:plans';
-  await assert.rejects(h.client.createQuickTask(q),/response lost/);
-  const result=await h.client.createQuickTask(q);
+  const h = harness(),
+    day = new Date().setHours(0, 0, 0, 0) - 86400000;
+  h.state.tasks.push({
+    record_id: "existing",
+    fields: { 任务名称: "Synthetic" },
+  });
+  h.state.plans.push({
+    record_id: "p1",
+    fields: {
+      番茄: "1",
+      任务: ["existing"],
+      计划日: day,
+      已完成: true,
+    },
+  });
+  const q = {
+    id: randomUUID(),
+    sourceKey: h.key,
+    title: "Synthetic",
+    quadrant: "iu",
+    count: 1,
+    day,
+    append: { taskId: "existing", sequence: 2, description: "Details" },
+  };
+  h.state.lose = "POST:plans";
+  await assert.rejects(h.client.createQuickTask(q), /response lost/);
+  const result = await h.client.createQuickTask(q);
   await h.client.createQuickTask(q);
-  assert.equal(h.state.tasks.length,1); assert.equal(h.state.plans.length,2);
-  assert.equal(h.state.writes.length,1); assert.equal(h.state.plans[1].fields.计划日,day);
-  assert.equal(result.tasks[0].taskId,'existing'); assert.equal(result.tasks[0].quadrant,'iu');
-  assert.equal(result.tasks[0].description,'Details'); assert.match(result.tasks[0].title,/第 2 个/);
-  assert.equal(result.tasks[0].doneToday,1); assert.equal(result.tasks[0].plannedToday,2);
-  await assert.rejects(h.client.createQuickTask({...q,sourceKey:'other'}),/无效/);
-  await assert.rejects(h.client.createQuickTask({...q,append:{...q.append,sequence:51}}),/无效/);
-  await assert.rejects(h.client.createQuickTask({...q,append:{...q.append,taskId:'missing'}}),/不存在/);
-  h.state.plans[1].fields.已完成=true;
-  await assert.rejects(h.client.createQuickTask(q),/其他专注/);
-  h.state.plans[1].fields.已完成=false;
-  h.state.plans.push({...h.state.plans[1],record_id:'duplicate'});
-  await assert.rejects(h.client.createQuickTask(q),/序号重复/);
-  assert.equal(h.state.writes.length,1);
+  assert.equal(h.state.tasks.length, 1);
+  assert.equal(h.state.plans.length, 2);
+  assert.equal(h.state.writes.length, 1);
+  assert.equal(h.state.plans[1].fields.计划日, day);
+  assert.equal(result.tasks[0].taskId, "existing");
+  assert.equal(result.tasks[0].quadrant, "iu");
+  assert.equal(result.tasks[0].description, "Details");
+  assert.match(result.tasks[0].title, /第 2 个/);
+  assert.equal(result.tasks[0].doneToday, 1);
+  assert.equal(result.tasks[0].plannedToday, 2);
+  await assert.rejects(
+    h.client.createQuickTask({ ...q, sourceKey: "other" }),
+    /无效/
+  );
+  await assert.rejects(
+    h.client.createQuickTask({
+      ...q,
+      append: { ...q.append, sequence: 51 },
+    }),
+    /无效/
+  );
+  await assert.rejects(
+    h.client.createQuickTask({
+      ...q,
+      append: { ...q.append, taskId: "missing" },
+    }),
+    /不存在/
+  );
+  h.state.plans[1].fields.已完成 = true;
+  await assert.rejects(h.client.createQuickTask(q), /其他专注/);
+  h.state.plans[1].fields.已完成 = false;
+  h.state.plans.push({ ...h.state.plans[1], record_id: "duplicate" });
+  await assert.rejects(h.client.createQuickTask(q), /序号重复/);
+  assert.equal(h.state.writes.length, 1);
 });
 test("quick task writes correct quadrant/date/count and retries after lost task response without duplicates", async () => {
   const h = harness(),

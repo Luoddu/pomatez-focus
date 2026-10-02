@@ -1,21 +1,51 @@
-import React, { useState } from "react";
-import type { FocusQuadrant } from "../session";
+import React, { useEffect, useState } from "react";
+import type { FocusQuadrant, FocusProject } from "../session";
+import { PROJECT_LABELS, PROJECT_TONES } from "../week";
 export default function QuickTaskEntry({
   quadrant,
   onAdd,
   onClose,
+  loadProjects,
 }: {
   quadrant: FocusQuadrant;
   onAdd: (
     title: string,
     quadrant: FocusQuadrant,
-    count: number
+    count: number,
+    project?: FocusProject
   ) => void;
   onClose: () => void;
+  loadProjects?: () => Promise<FocusProject[]>;
 }) {
   const [title, setTitle] = useState("");
   const [count, setCount] = useState(1);
   const [error, setError] = useState("");
+  const [projects, setProjects] = useState<FocusProject[]>([]);
+  const [projectId, setProjectId] = useState("");
+  const [loading, setLoading] = useState(!!loadProjects);
+  const [projectError, setProjectError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    if (!loadProjects) return;
+    setLoading(true);
+    setProjectError("");
+    loadProjects()
+      .then((rows) => {
+        if (!cancelled) setProjects(rows);
+      })
+      .catch((e) => {
+        if (!cancelled)
+          setProjectError(e.message || "项目暂未加载，可以稍后重试");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadProjects, retry]);
+  const project = projects.find((p) => p.id === projectId);
   return (
     <form
       className="quick-task-form"
@@ -26,7 +56,7 @@ export default function QuickTaskEntry({
             throw Error("请输入 1–200 字的任务名称");
           if (!Number.isInteger(count) || count < 1 || count > 50)
             throw Error("计划番茄数应为 1–50");
-          onAdd(title.trim(), quadrant, count);
+          onAdd(title.trim(), quadrant, count, project);
           onClose();
         } catch (err: any) {
           setError(err.message);
@@ -41,6 +71,47 @@ export default function QuickTaskEntry({
         maxLength={200}
         onChange={(e) => setTitle(e.target.value)}
       />
+      <label className="quick-project">
+        <span>所属项目</span>
+        <span
+          className="quick-project-swatch"
+          style={{
+            background: project?.projectType
+              ? PROJECT_TONES[project.projectType]
+              : "#d5dce3",
+          }}
+        />
+        <select
+          aria-label="新增任务所属项目"
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+        >
+          <option value="">暂不归属（浅灰）</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+              {p.projectType
+                ? ` · ${PROJECT_LABELS[p.projectType]}`
+                : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {loading && (
+        <small role="status">正在读取飞书项目，仍可先添加任务</small>
+      )}
+      {projectError && (
+        <small role="status">
+          {projectError}{" "}
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() => setRetry((n) => n + 1)}
+          >
+            重试项目
+          </button>
+        </small>
+      )}
       <div className="manual-inline">
         <label>
           今日番茄{" "}

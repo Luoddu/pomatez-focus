@@ -431,6 +431,70 @@ export class Feishu {
     }
     return result;
   }
+  private async projectCatalog(taskTable: string, taskFields?: any[]) {
+    const fields =
+      taskFields ||
+      (await this.list(
+        `${this.root()}/tables/${id(taskTable)}/fields`
+      ));
+    const links = fields.filter((f) => f.field_name === "所属项目");
+    if (
+      links.length !== 1 ||
+      ![18, 21].includes(links[0].type) ||
+      !links[0].property?.table_id
+    )
+      return {
+        link: null,
+        projects: [] as {
+          id: string;
+          name: string;
+          projectType?: ProjectType;
+        }[],
+      };
+    const path = `${this.root()}/tables/${id(
+      links[0].property.table_id
+    )}`;
+    const projectFields = await this.list(`${path}/fields`);
+    const names = projectFields.filter(
+      (f) => f.is_primary && f.type === 1
+    );
+    const named = projectFields.filter(
+      (f) => f.field_name === "项目名称" && f.type === 1
+    );
+    const primary =
+      names.length === 1
+        ? names[0]
+        : named.length === 1
+        ? named[0]
+        : null;
+    if (!primary) throw Error("项目表缺少可识别的项目名称文本字段");
+    const types = projectFields.filter(
+      (f) => f.field_name === "项目类型" && f.type === 3
+    );
+    const projects = (await this.list(`${path}/records`))
+      .map((r) => ({
+        id: id(r.record_id),
+        name: textValue(r.fields?.[primary.field_name]).trim(),
+        projectType:
+          types.length === 1
+            ? projectTypeOf(plain(r.fields?.项目类型))
+            : undefined,
+      }))
+      .filter((p) => p.name);
+    return { link: links[0], projects };
+  }
+  async projects() {
+    const schema = await this.planSchema();
+    const linkedTable = schema.fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    if (!linkedTable) throw Error("原番茄表缺少任务关联");
+    const catalog = await this.projectCatalog(linkedTable);
+    return {
+      sourceKey: connectionKey(this.config),
+      projects: catalog.projects,
+    };
+  }
   async dailyReviews() {
     const key = connectionKey(this.config);
     const table = await this.findTable("安排与复盘", false);
@@ -1066,6 +1130,21 @@ export class Feishu {
       link.property.table_id
     )}`;
     const fields = await this.list(`${taskPath}/fields`);
+    let project:
+      | { id: string; name: string; projectType?: ProjectType }
+      | undefined;
+    let projectField: string | undefined;
+    if (input.projectId != null) {
+      id(input.projectId);
+      const catalog = await this.projectCatalog(
+        link.property.table_id,
+        fields
+      );
+      project = catalog.projects.find((p) => p.id === input.projectId);
+      if (!project || !catalog.link)
+        throw Error("所选项目已不存在或所属项目字段不匹配，未创建任务");
+      projectField = catalog.link.field_name;
+    }
     const countField = resolveTodayCountField(fields);
     const quadrant = await this.resolveQuadrantField(
       link.property.table_id
@@ -1120,13 +1199,26 @@ export class Feishu {
       await this.call(
         "POST",
         `${taskPath}/records?client_token=${input.id}`,
-        { fields: expected }
+        {
+          fields: {
+            ...expected,
+            ...(projectField ? { [projectField]: [project!.id] } : {}),
+          },
+        }
       );
       matches = await find();
     }
     if (
       matches.length !== 1 ||
-      !fieldsAgree(matches[0].fields, expected)
+      !fieldsAgree(matches[0].fields, expected) ||
+      (projectField &&
+        JSON.stringify(
+          linkedRecordIds(
+            matches[0].fields?.[projectField],
+            fields.find((f) => f.field_name === projectField)?.property
+              ?.table_id
+          )
+        ) !== JSON.stringify([project!.id]))
     )
       throw Error("新增任务回读不一致，已保留待核对，未重复创建");
     const taskId = matches[0].record_id;
@@ -1190,6 +1282,7 @@ export class Feishu {
         source: "feishu",
         sourceKey: input.sourceKey,
         quadrant: input.quadrant,
+        projectType: project?.projectType,
         doneToday,
         plannedToday: plans.length,
         ...(r.fields?.[this.config.completedField] === true
@@ -1249,6 +1342,9 @@ export class Feishu {
     ).data?.record;
     if (task?.record_id !== a.taskId)
       throw Error("原任务不存在，追加番茄仍保留本机");
+    const projectType = (
+      await this.projectTypesByTask(linkedTable, [task])
+    ).get(a.taskId);
     const day = dayStart(new Date(input.day));
     const mine = (r: any) =>
       localDayOf(r.fields?.[this.config.dateField]) === day &&
@@ -1269,9 +1365,7 @@ export class Feishu {
       await this.call(
         "POST",
         `${schema.path}/records?client_token=${clientToken(
-          `today-pomodoro-create|${this.config.appToken}|${
-            a.taskId
-          }|${dateKeyOf(day)}|${a.sequence}`
+          `append-pomodoro|${this.config.appToken}|${input.id}`
         )}`,
         {
           fields: {
@@ -1307,6 +1401,7 @@ export class Feishu {
           source: "feishu",
           sourceKey: input.sourceKey,
           quadrant: input.quadrant,
+          projectType,
           doneToday: plans.filter(
             (r) => r.fields?.[this.config.completedField] === true
           ).length,
@@ -1718,6 +1813,73 @@ export class Feishu {
   // （每行一个番茄），不是任务表的「今日计划番茄数」字段——因此加号按
   // 生成器同一幂等键规范（任务recordId|yyyy-MM-dd|序号）补建行，减号删除
   // 最高序号的未完成行；任务表计数字段保持不动
+  async removeQueuedPlan(input: any) {
+    const task = input?.task;
+    const sequence = Number(
+      / · 第 (\d+) 个番茄$/.exec(task?.title || "")?.[1]
+    );
+    if (
+      input?.sourceKey !== connectionKey(this.config) ||
+      task?.sourceKey !== input.sourceKey ||
+      task?.source !== "feishu" ||
+      task.quickTask ||
+      !/^[0-9a-f-]{36}$/i.test(input?.id || "") ||
+      !Number.isFinite(input.day) ||
+      input.day !== dayStart(new Date(input.day)) ||
+      input.day < 946684800000 ||
+      input.day > Date.now() + 86400000 ||
+      !Number.isInteger(sequence) ||
+      sequence < 1 ||
+      sequence > MAX_PER_TASK
+    )
+      throw Error("减少番茄参数或所属飞书表无效");
+    const recordId = id(task.planId || task.id);
+    id(task.taskId);
+    const schema = await this.planSchema();
+    await this.guardRecordMoves(schema);
+    const linkedTable = schema.fields.find(
+      (f) => f.field_name === this.config.taskField
+    )?.property?.table_id;
+    const row = (await this.list(`${schema.path}/records`)).find(
+      (r) => r.record_id === recordId
+    );
+    // An applied DELETE with a lost response is already complete, never select another row.
+    if (!row) return { action: "removed", recordId };
+    if (
+      !linkedTable ||
+      localDayOf(row.fields?.[this.config.dateField]) !== input.day ||
+      pomodoroSequence(textValue(row.fields?.番茄)) !== sequence ||
+      JSON.stringify(
+        linkedRecordIds(
+          row.fields?.[this.config.taskField],
+          linkedTable
+        )
+      ) !== JSON.stringify([task.taskId])
+    )
+      throw Error("原番茄的任务、日期或序号已变化，未删除");
+    const ledger = readLedger(row.fields);
+    const history = readHistory(
+      row.fields?.[HISTORY_FIELD],
+      input.sourceKey
+    );
+    if (
+      row.fields?.[this.config.completedField] === true ||
+      ledger?.entries.length ||
+      history.length ||
+      Number(row.fields?.实际分钟 || 0) !== 0 ||
+      row.fields?.专注日期 ||
+      textValue(row.fields?.专注时间段)
+    )
+      throw Error("该番茄已完成或已有专注记录，未删除；请刷新核对");
+    await this.call("DELETE", `${schema.path}/records/${recordId}`);
+    if (
+      (await this.list(`${schema.path}/records`)).some(
+        (r) => r.record_id === recordId
+      )
+    )
+      throw Error("减少番茄回读未通过，保留同一行等待重试");
+    return { action: "removed", recordId };
+  }
   async adjustToday(taskRecordId: any, delta: any, now = new Date()) {
     id(taskRecordId);
     if (delta !== 1 && delta !== -1)
