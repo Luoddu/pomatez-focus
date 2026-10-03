@@ -1,6 +1,11 @@
 import { researchFirst } from "../research";
 import React, { useState } from "react";
-import { FocusTask, FocusQuadrant, FocusProject } from "../session";
+import {
+  FocusTask,
+  FocusQuadrant,
+  FocusProject,
+  FocusSession,
+} from "../session";
 import QuickTaskEntry from "./QuickTaskEntry";
 import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import { chipWindow } from "../chipWindow";
@@ -269,6 +274,9 @@ export default function QuadrantBoard({
   completing,
   onAddTask,
   loadProjects,
+  records,
+  journalSource,
+  journalConnected,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -297,6 +305,9 @@ export default function QuadrantBoard({
     project?: FocusProject
   ) => void;
   loadProjects?: () => Promise<FocusProject[]>;
+  records: FocusSession[];
+  journalSource: string;
+  journalConnected: boolean;
 }) {
   const [adding, setAdding] = useState<FocusQuadrant | null>(null);
   const selectedRow = tasks.find((t) => t.id === selected);
@@ -376,6 +387,9 @@ export default function QuadrantBoard({
         tones={weekTones}
         pileTones={pileTones}
         now={farmNow}
+        records={records}
+        journalSource={journalSource}
+        journalConnected={journalConnected}
       />
       <div className="action-bar">
         <div className="action-side">

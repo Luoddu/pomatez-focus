@@ -5,12 +5,8 @@ import { register } from "node:module";
 // weekgoal.ts 按打包器惯例写 "./week"，node 需要补扩展名才能解析。
 register(new URL("./ts-extension-hook.mjs", import.meta.url));
 
-const {
-  COUNT_UP_MS,
-  easeOutCubic,
-  countUpValue,
-  countUpDuration,
-} = await import("../app/renderer/src/focus/countup.ts");
+const { COUNT_UP_MS, easeOutCubic, countUpValue, countUpDuration } =
+  await import("../app/renderer/src/focus/countup.ts");
 const { goalProgressRatio, goalFill } = await import(
   "../app/renderer/src/focus/weekgoal.ts"
 );
@@ -53,10 +49,10 @@ test("goal progress ratio is clamped and zero-safe", () => {
   assert.equal(goalProgressRatio(-3, 60), 0);
 });
 
-test("goal fill deepens from pale tomato to full red with the ratio", () => {
+test("overall goal fill deepens in gold, independent of research red", () => {
   const alphaOf = (s) => Number(s.match(/([\d.]+)\)$/)[1]);
-  assert.equal(goalFill(0), "rgba(194, 47, 31, 0.25)");
-  assert.equal(goalFill(1), "rgba(194, 47, 31, 0.9)");
+  assert.equal(goalFill(0), "rgba(209, 154, 34, 0.25)");
+  assert.equal(goalFill(1), "rgba(209, 154, 34, 0.9)");
   assert.ok(alphaOf(goalFill(0.8)) > alphaOf(goalFill(0.2)));
   assert.equal(goalFill(-1), goalFill(0));
   assert.equal(goalFill(7), goalFill(1));

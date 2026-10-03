@@ -8,6 +8,7 @@ import {
   weekTotals,
 } from "../weekgoal";
 import { LogoIcon } from "./shared";
+import { holidayDay, holidayMessage } from "../wellbeing.js";
 
 const GOLD_TONE = "#e8a917";
 
@@ -28,6 +29,13 @@ const mondayOf = (day: Date) => {
 };
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const holidayOf = (d: Date) =>
+  holidayDay(
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`
+  );
 // 番茄红色系分档：0/1/2-3/4-5/6-8/9+，不走线性插值
 const tier = (count: number) =>
   count <= 0
@@ -117,12 +125,19 @@ export default function HeatmapCalendar({
   ) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const date = `${day.getMonth() + 1}月${day.getDate()}日`;
-    const text =
+    const detail =
       stat && stat.count > 0
         ? `${date} · ${stat.count} 个番茄 · ${Math.round(
             stat.seconds / 60
           )} 分钟`
         : `${date} · 暂无收获`;
+    const holiday = holidayOf(day);
+    const text = holiday
+      ? `${date} · ${holiday.name} · ${holidayMessage(
+          holiday,
+          stat?.count || 0
+        )}`
+      : detail;
     setTip({
       text,
       x: rect.left + rect.width / 2,
@@ -159,6 +174,7 @@ export default function HeatmapCalendar({
                 const stat = byDay.get(dayKey(day));
                 const count = stat?.count || 0;
                 const future = day.getTime() > todayTs;
+                const holiday = holidayOf(day);
                 const wk = weekKeyOf(week.days[0].getTime());
                 const met = goalMet(
                   byWeek.get(wk) || 0,
@@ -171,7 +187,22 @@ export default function HeatmapCalendar({
                       future ? 0 : tier(count)
                     }${future ? " future" : ""}${
                       day.getTime() === todayTs ? " today" : ""
-                    }${met && !future ? " hm-goal-met" : ""}`}
+                    }${met && !future ? " hm-goal-met" : ""}${
+                      holiday?.rest
+                        ? " hm-holiday"
+                        : holiday
+                        ? " hm-makeup"
+                        : ""
+                    }`}
+                    data-holiday={holiday?.name}
+                    title={
+                      holiday
+                        ? `${holiday.name} · ${holidayMessage(
+                            holiday,
+                            count
+                          )}${count > 0 ? ` · ${count} 个番茄` : ""}`
+                        : undefined
+                    }
                     data-count={future ? "" : count}
                     onMouseEnter={
                       future ? undefined : (e) => showTip(e, day, stat)
@@ -192,7 +223,10 @@ export default function HeatmapCalendar({
             return (
               <span className="hm-badge-slot" key={`badge-${week.key}`}>
                 {total > 0 && (
-                  <span className="hm-week-total" title={`本周共 ${total} 个番茄`}>
+                  <span
+                    className="hm-week-total"
+                    title={`本周共 ${total} 个番茄`}
+                  >
                     {total}
                   </span>
                 )}
@@ -208,6 +242,9 @@ export default function HeatmapCalendar({
             );
           })}
         </div>
+      </div>
+      <div className="holiday-legend">
+        ○ 官方假日，安心休息 · ▪ 调休上班 <small>2026 已核对</small>
       </div>
       {tip && (
         <div

@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+import type { FocusSession } from "../session";
+import FarmCompanion from "./FarmCompanion";
+import { holidayDay } from "../wellbeing.js";
 import {
   PLANT_STAGES,
   TOMATO_TONES,
@@ -354,12 +357,21 @@ const Sky = ({ now }: { now: number }) => {
 const Scarecrow = ({
   x,
   scarf = false,
+  season = "spring",
+  night = false,
+  festive = false,
 }: {
   x: number;
   scarf?: boolean;
+  season?: Season;
+  night?: boolean;
+  festive?: boolean;
 }) => (
   <g
     className="farm-scarecrow"
+    data-season={season}
+    data-night={night}
+    data-festive={festive}
     transform={`translate(${x} 18) scale(.85)`}
   >
     <rect x="-2.5" y="86" width="5" height="34" rx="2" fill="#a9763f" />
@@ -394,14 +406,37 @@ const Scarecrow = ({
     {/* 衣服 */}
     <path
       d="M-11 78 L-9 100 L9 100 L11 78 Q0 73 -11 78 Z"
-      fill="#ec9bb6"
+      fill={
+        night
+          ? "#8593bb"
+          : festive
+          ? "#e88468"
+          : {
+              spring: "#b0cda2",
+              summer: "#8bc5c2",
+              autumn: "#e4b57d",
+              winter: "#a69ec6",
+            }[season]
+      }
     />
     <circle cx="0" cy="86" r="1.6" fill="#fff" opacity=".8" />
     <circle cx="0" cy="93" r="1.6" fill="#fff" opacity=".8" />
     {/* 脑袋 */}
     <circle cx="0" cy="64" r="10" fill="#f7d154" />
-    <circle cx="-3.2" cy="63" r="1.2" fill="#7a4f21" />
-    <circle cx="3.2" cy="63" r="1.2" fill="#7a4f21" />
+    {!night && (
+      <>
+        <circle cx="-3.2" cy="63" r="1.2" fill="#7a4f21" />
+        <circle cx="3.2" cy="63" r="1.2" fill="#7a4f21" />
+      </>
+    )}
+    {night && (
+      <path
+        d="M-5 62 q2 3 4 0 M1 62 q2 3 4 0"
+        stroke="#7a4f21"
+        strokeWidth="1.4"
+        fill="none"
+      />
+    )}
     <path
       d="M-3 67.5 Q0 70.5 3 67.5"
       stroke="#7a4f21"
@@ -412,6 +447,28 @@ const Scarecrow = ({
     {/* 草帽 */}
     <ellipse cx="0" cy="55.5" rx="12.5" ry="3.4" fill="#e8a13d" />
     <path d="M-7 55.5 Q0 41 7 55.5 Z" fill="#e8a13d" />
+    <path
+      d="M-6 54 H6"
+      stroke={festive ? "#c34b3f" : "#6b9772"}
+      strokeWidth="3"
+    />
+    {festive && (
+      <>
+        <path d="M10 70 V82" stroke="#ab743c" />
+        <ellipse cx="10" cy="85" rx="4" ry="5" fill="#d85746" />
+        <path d="M10 90 V94" stroke="#efb54d" />
+      </>
+    )}
+    {season === "spring" && (
+      <text x="6" y="54" fontSize="8">
+        ✿
+      </text>
+    )}
+    {night && (
+      <text x="14" y="43" fontSize="10" fill="#a8b7d0">
+        ☾
+      </text>
+    )}
   </g>
 );
 
@@ -956,12 +1013,18 @@ export default function FarmField({
   tones,
   pileTones,
   now,
+  records = [],
+  journalSource = "",
+  journalConnected = false,
 }: {
   total: number;
   week: number;
   tones: string[]; // 本周保存记录的颜色序列
   pileTones: string[]; // 最近至多 21 个已保存番茄的颜色序列
   now?: number;
+  records?: FocusSession[];
+  journalSource?: string;
+  journalConnected?: boolean;
 }) {
   // 天空实时性：无 ?farmNow mock 时每 60s（及窗口重新聚焦/恢复可见时）
   // 重算一次北京时间，只触发本卡片子树更新；mock 模式冻结时刻不起定时器
@@ -1142,7 +1205,13 @@ export default function FarmField({
           {/* 猫头鹰夜晚上栅栏守田（会眨眼），白天飞走 */}
           {owlOut && <Owl x={136} y={97} />}
           {/* 稻草人守在土壤带右缘；入冬戴上红围巾 */}
-          <Scarecrow x={648} scarf={season === "winter"} />
+          <Scarecrow
+            x={648}
+            scarf={season === "winter"}
+            season={season}
+            night={bh >= 22 || bh < 8}
+            festive={holidayDay(at)?.rest === true}
+          />
           {Array.from({ length: harvest.plants }, (_, i) => {
             const scale = 0.85 + rand(i, 1) * 0.35;
             const tilt = (rand(i, 2) - 0.5) * 6;
@@ -1238,6 +1307,12 @@ export default function FarmField({
           <Pile total={total} toneAt={pileTone} />
         </svg>
       </div>
+      <FarmCompanion
+        records={records}
+        now={at}
+        sourceKey={journalSource}
+        connected={journalConnected}
+      />
     </div>
   );
 }

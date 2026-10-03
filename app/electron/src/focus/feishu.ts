@@ -1,4 +1,9 @@
 import { createHash } from "crypto";
+import {
+  JOURNAL_TABLE,
+  JOURNAL_FIELDS,
+  validateJournal,
+} from "./journal";
 import { projectTypeOf, ProjectType } from "./project";
 import { dailyReviews as parseDailyReviews } from "./reviews";
 import {
@@ -2027,6 +2032,106 @@ export class Feishu {
           "专注会话表字段不匹配，请按文档检查；未修改现有字段"
         );
     return { ready: true };
+  }
+  private async journalTable(create = false) {
+    let table = await this.findTable(JOURNAL_TABLE, false);
+    if (!table && create) {
+      // Never blindly replay table creation after a lost response.
+      try {
+        await this.call("POST", `${this.root()}/tables`, {
+          table: {
+            name: JOURNAL_TABLE,
+            default_view_name: "日记与对话",
+            fields: JOURNAL_FIELDS,
+          },
+        });
+      } catch (error) {
+        table = await this.findTable(JOURNAL_TABLE, false);
+        if (!table) throw error;
+      }
+      table = await this.findTable(JOURNAL_TABLE);
+    }
+    if (!table) return null;
+    const path = `${this.root()}/tables/${id(table.table_id)}`;
+    const fields = await this.list(`${path}/fields`);
+    for (const expected of JOURNAL_FIELDS) {
+      const matches = fields.filter(
+        (f) => f.field_name === expected.field_name
+      );
+      if (matches.length !== 1 || matches[0].type !== expected.type)
+        throw Error("农场日记字段不匹配，未覆盖；请检查同名表");
+    }
+    return path;
+  }
+  private journalFromRow(row: any) {
+    const f = row.fields || {};
+    return {
+      ...validateJournal(
+        {
+          id: textValue(f["日记 ID"]),
+          sourceKey: connectionKey(this.config),
+          at: f["记录时间"],
+          author: textValue(f["说话人"]),
+          text: textValue(f["内容"]),
+          ...(textValue(f["回应话题"])
+            ? { replyTo: textValue(f["回应话题"]) }
+            : {}),
+        },
+        connectionKey(this.config)
+      ),
+      synced: true,
+    };
+  }
+  async journal() {
+    const path = await this.journalTable();
+    const notes = path
+      ? (await this.list(`${path}/records`)).map((r) =>
+          this.journalFromRow(r)
+        )
+      : [];
+    if (new Set(notes.map((n) => n.id)).size !== notes.length)
+      throw Error("飞书日记存在重复 ID，请核对，未自动合并");
+    return { sourceKey: connectionKey(this.config), notes };
+  }
+  async saveJournal(input: any) {
+    const key = connectionKey(this.config);
+    const note = validateJournal(input, key); // Before any external write.
+    if (note.author !== "我")
+      throw Error("App只写入本人日记，澄提示由未来接入方提供");
+    const path = await this.journalTable(true);
+    const existing = (await this.list(`${path}/records`)).filter(
+      (r) => textValue(r.fields?.["日记 ID"]) === note.id
+    );
+    const same = (row: any) => {
+      const remote = this.journalFromRow(row);
+      return ["id", "at", "author", "text", "replyTo"].every(
+        (k) => (remote as any)[k] === (note as any)[k]
+      );
+    };
+    if (existing.length > 1 || (existing.length && !same(existing[0])))
+      throw Error("同一条日记已存在不同内容，未覆盖");
+    if (!existing.length)
+      await this.call(
+        "POST",
+        `${path}/records?client_token=${clientToken(
+          `farm-journal|${key}|${note.id}`
+        )}`,
+        {
+          fields: {
+            "日记 ID": note.id,
+            记录时间: note.at,
+            说话人: note.author,
+            内容: note.text,
+            回应话题: note.replyTo || "",
+          },
+        }
+      );
+    const actual = (await this.list(`${path}/records`)).filter(
+      (r) => textValue(r.fields?.["日记 ID"]) === note.id
+    );
+    if (actual.length !== 1 || !same(actual[0]))
+      throw Error("日记回读核对未完成，本机内容保留");
+    return { ...note, synced: true };
   }
   // Metadata migration never replays minute accounting or completion writes.
   async archiveHistory(input: any) {

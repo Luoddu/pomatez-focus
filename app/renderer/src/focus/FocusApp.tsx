@@ -44,6 +44,7 @@ import SettingsPanel, { FocusConfig } from "./components/SettingsPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import MiniView from "./components/MiniView";
 import StatsPanel from "./components/StatsPanel";
+import HarvestSync, { HarvestProgress } from "./components/HarvestSync";
 import {
   api,
   clock,
@@ -287,6 +288,13 @@ export default function FocusApp() {
   const refreshSequence = useRef(0);
   const syncing = useRef(false);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [harvestProgress, setHarvestProgress] =
+    useState<HarvestProgress | null>(null);
+  useEffect(() => {
+    if (harvestProgress?.state !== "done") return;
+    const t = setTimeout(() => setHarvestProgress(null), 3000);
+    return () => clearTimeout(t);
+  }, [harvestProgress]);
   const [editQueue] = useState(() => new EditQueue(localStorage));
   const [editRevision, setEditRevision] = useState(0);
   useEffect(
@@ -621,6 +629,11 @@ export default function FocusApp() {
       return;
     syncing.current = true;
     setSyncBusy(true);
+    setHarvestProgress({
+      percent: 3,
+      text: "正在核对本机成果",
+      state: "busy",
+    });
     try {
       const eligible = (r: FocusSession) =>
         !r.task.quickTask &&
@@ -630,6 +643,18 @@ export default function FocusApp() {
         await api().backupHistory(timer.getSnapshot());
       const failures: string[] = [];
       const attempted = new Set<string>();
+      let complete = 0;
+      const progress = (text: string, phase: number) => {
+        const total = Math.max(
+          1,
+          complete + timer.getSnapshot().records.filter(eligible).length
+        );
+        setHarvestProgress({
+          percent: Math.min(82, 5 + (77 * (complete + phase)) / total),
+          text,
+          state: "busy",
+        });
+      };
       do {
         for (let record of [...timer.getSnapshot().records]
           .filter(eligible)
@@ -639,6 +664,7 @@ export default function FocusApp() {
           try {
             let receipt: any;
             if (record.sync === "pending") {
+              progress("正在写回原番茄 · 已收成果保留本机", 0.1);
               receipt = await api().sync(record);
               timer.markSynced(record.id, receipt);
               record = {
@@ -655,8 +681,11 @@ export default function FocusApp() {
                   : {}),
               };
             }
+            progress("正在共享专注明细", 0.55);
             const archived = await api().archiveHistory(record);
             timer.mergeCloud([archived], sourceKey);
+            complete++;
+            progress(`已共享 ${complete} 条 · 正在核对下一步`, 0);
             // 确认 N 个番茄的多行完成可能部分失败：会话本体已同步，
             // 未成的行号单独提示，可右键 chip 补标或到飞书核对
             const failedRows = receipt?.completion?.failed;
@@ -692,11 +721,21 @@ export default function FocusApp() {
           failures.push(`旧番茄分类未完成：${e.message || "请重试"}`);
         }
       }
+      setHarvestProgress({
+        percent: 85,
+        text: "正在回读飞书成果",
+        state: "busy",
+      });
       const remote = await api().history();
       if (remote.sourceKey !== sourceKey)
         throw Error("飞书连接已变化，请重新同步");
       timer.mergeCloud(remote.records, sourceKey);
       await refreshReviews();
+      setHarvestProgress({
+        percent: 93,
+        text: "成果已回读 · 正在刷新看板",
+        state: "busy",
+      });
       await refresh();
       if (remote.missing)
         failures.push(
@@ -710,7 +749,27 @@ export default function FocusApp() {
           : "专注成果已同步，其他电脑同步后即可查看。",
         failures.length ? "error" : "info"
       );
+      setHarvestProgress(
+        failures.length
+          ? {
+              percent: 93,
+              text: "部分成果待处理 · 本机记录保留",
+              state: "error",
+            }
+          : {
+              percent: 100,
+              text: complete
+                ? "成果已收篮 · 已核对飞书"
+                : "云端成果已核对",
+              state: "done",
+            }
+      );
     } catch (e: any) {
+      setHarvestProgress({
+        percent: 0,
+        text: "暂未完成同步 · 本机成果保留",
+        state: "error",
+      });
       notify(`记录已保存在本机，待同步：${e.message}`, "error");
     } finally {
       syncing.current = false;
@@ -1635,6 +1694,9 @@ export default function FocusApp() {
               completing={""}
               onAddTask={addQuickTask}
               loadProjects={loadProjects}
+              records={shownRecords}
+              journalSource={sourceKey || ""}
+              journalConnected={connected}
             />
           )}
           <HistoryPanel
@@ -1669,6 +1731,14 @@ export default function FocusApp() {
           />
         </main>
       )}
+      <HarvestSync
+        progress={harvestProgress}
+        pending={historyPending.length}
+        onRetry={() => {
+          if (sourceKey) editQueue.retry(sourceKey);
+          sync();
+        }}
+      />
       {(outbox.length > 0 || editQueue.storageError) && (
         <aside className="outbox-status" role="status">
           <span>

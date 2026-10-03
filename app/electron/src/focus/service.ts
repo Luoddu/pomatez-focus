@@ -228,6 +228,19 @@ export class FocusService {
   history() {
     return this.connected().history();
   }
+  journal() {
+    return this.connected().journal();
+  }
+  private journalWriting = false;
+  async saveJournal(value: any) {
+    if (this.journalWriting) throw Error("正在保存日记，请稍后重试");
+    this.journalWriting = true;
+    try {
+      return await this.connected().saveJournal(value);
+    } finally {
+      this.journalWriting = false;
+    }
+  }
   async classifyHistory() {
     if (this.planWriting) throw Error("正在写入番茄计划，请稍候");
     this.planWriting = true;

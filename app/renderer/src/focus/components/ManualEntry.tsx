@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FocusSession, FocusTask, Mood } from "../session";
+import { FocusSession, FocusTask, Mood, ProjectType } from "../session";
+import { PROJECT_TYPES } from "../classification.js";
+import { PROJECT_LABELS } from "../week";
 import { MoodPicker, parseTitle } from "./shared";
 import {
   manualRecord,
@@ -43,6 +45,7 @@ export default function ManualEntry({
   const [count, setCount] = useState(initial?.completedCount ?? 1);
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   const [error, setError] = useState("");
+  const [category, setCategory] = useState<ProjectType | "">("");
   const [adjusted, setAdjusted] = useState(false);
   const timestamps = (startValue: string, endValue: string) => ({
     startedAt:
@@ -160,6 +163,9 @@ export default function ManualEntry({
         }),
         // 感受只留本机；undefined 会被 JSON 序列化丢弃，等于清除
         mood: mood ?? undefined,
+        ...(!initial && category
+          ? { colorOverride: category, colorRevision: 1 }
+          : {}),
         status: "saved",
         syncTarget: "plan",
         // 飞书任务走既有待同步队列；本地任务与自由专注只留本机
@@ -237,6 +243,25 @@ export default function ManualEntry({
           </button>
         </span>
       </div>
+      {!initial && (
+        <div className="manual-row">
+          <label htmlFor="manual-category">番茄分类</label>
+          <select
+            id="manual-category"
+            value={category}
+            onChange={(e) =>
+              setCategory(e.target.value as ProjectType | "")
+            }
+          >
+            <option value="">跟随任务项目</option>
+            {PROJECT_TYPES.map((type: ProjectType) => (
+              <option key={type} value={type}>
+                {PROJECT_LABELS[type]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="manual-row">
         <label htmlFor="manual-minutes">时长</label>
         <span className="manual-inline">

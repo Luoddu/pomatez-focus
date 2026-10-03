@@ -1,4 +1,5 @@
 import ResearchGoal from "./ResearchGoal";
+import { companionGreeting } from "../wellbeing.js";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -76,6 +77,8 @@ const TODAY_INVITES = [
   "攒番茄的好天气，别浪费啦 ☀️",
 ];
 const todayInvite = () => {
+  const guidance = companionGreeting(Date.now(), 0);
+  if (guidance.kind !== "day") return guidance.text;
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 0);
   const dayOfYear = Math.floor(
@@ -499,6 +502,7 @@ export default function HistoryPanel({
       <div className="side-section">
         <div className="side-title research-goals-title">
           番茄月历
+          <ResearchGoal records={records} />
           <span
             className="weekgoal"
             onMouseEnter={() => {
@@ -578,7 +582,6 @@ export default function HistoryPanel({
               </div>
             )}
           </span>
-          <ResearchGoal records={records} />
         </div>
         <HeatmapCalendar records={records} goals={goals} />
       </div>

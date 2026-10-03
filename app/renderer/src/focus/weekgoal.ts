@@ -90,7 +90,7 @@ export function goalProgressRatio(total: number, goal: number): number {
 export function goalFill(ratio: number): string {
   const r = Math.min(1, Math.max(0, ratio));
   const alpha = Math.round((0.25 + 0.65 * r) * 100) / 100;
-  return `rgba(194, 47, 31, ${alpha})`;
+  return `rgba(209, 154, 34, ${alpha})`;
 }
 
 // 按北京周聚合番茄总数（月历周合计标注用）；只含 saved 记录，

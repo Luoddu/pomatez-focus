@@ -1,4 +1,6 @@
 import ResearchProgress from "./ResearchProgress";
+import RoutinePanel from "./RoutinePanel";
+import { timeZoneKind } from "../wellbeing.js";
 import React, { useMemo, useState } from "react";
 import { FocusSession } from "../session";
 import {
@@ -205,9 +207,16 @@ export default function StatsPanel({
           onToggleCompact={onToggleCompact}
         />
       </div>
-      <ResearchProgress records={records} now={now} onTrend={() => {
-        setCategory("research"); setAnchor(Date.now()); setRangeKey("week");
-      }} />
+      <ResearchProgress
+        records={records}
+        now={now}
+        onTrend={() => {
+          setCategory("research");
+          setAnchor(Date.now());
+          setRangeKey("week");
+        }}
+      />
+      <RoutinePanel records={scoped} range={range} now={now} />
       {summary.count === 0 && summary.seconds === 0 ? (
         <div className="card stats-empty">所选区间暂无专注记录</div>
       ) : (
@@ -393,6 +402,10 @@ export default function StatsPanel({
             </div>
             <section className="card stats-card stats-heat">
               <h3>时段热力</h3>
+              <div className="routine-zone-legend">
+                <span>☀ 08:00–09:30 晨间起步</span>
+                <span>☾ 23:30–08:00 休息区</span>
+              </div>
               <div className="sh-grid">
                 <span className="sh-corner" />
                 {WEEK_CHARS.split("").map((w) => (
@@ -415,7 +428,10 @@ export default function StatsPanel({
                       return (
                         <span
                           key={row}
-                          className={`sh-cell hm-t${heatTier(value)}${
+                          data-zone={timeZoneKind(col)}
+                          className={`sh-cell zone-${timeZoneKind(
+                            col
+                          )} hm-t${heatTier(value)}${
                             nowSlot &&
                             nowSlot.row === row &&
                             nowSlot.col === col
@@ -425,7 +441,11 @@ export default function StatsPanel({
                           title={
                             value > 0
                               ? `${tip} · ${countText(value)} 个番茄`
-                              : `${tip} · 暂无收获`
+                              : `${tip} · ${
+                                  timeZoneKind(col) === "rest"
+                                    ? "安心休息"
+                                    : "暂无收获"
+                                }`
                           }
                         />
                       );

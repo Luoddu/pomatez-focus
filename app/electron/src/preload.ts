@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("focusApi", {
   history: () => invoke("history"),
   classifyHistory: () => invoke("classifyHistory"),
   archiveHistory: (value: any) => invoke("archiveHistory", value),
+  journal: () => invoke("journal"),
+  saveJournal: (value: any) => invoke("saveJournal", value),
   backupHistory: (value: any) => invoke("backupHistory", value),
   windowMode: (value: any) => invoke("windowMode", value),
   windowState: () => invoke("windowState"),

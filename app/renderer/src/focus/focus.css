@@ -3823,3 +3823,309 @@ button.stats-range-label:hover {
   .research-progress { padding: 14px; }
   .research-weeks { gap: 6px; }
 }
+
+.research-goal.met .wg-fill { background: #cf5145; }
+.research-goals-title .research-weekgoal { margin-left: auto; }
+.research-goals-title > .weekgoal:not(.research-weekgoal) { margin-left: 0; }
+/* Quiet companion, real receipts, and permission to rest. */
+.hm-cell.hm-holiday {
+  outline: 1px solid #63a6a0;
+  outline-offset: 1px;
+}
+.hm-cell.hm-makeup {
+  border-bottom: 2px solid #8c8172;
+}
+.holiday-legend {
+  font-size: 10px;
+  color: #52817e;
+  padding-top: 9px;
+  line-height: 1.5;
+}
+.holiday-legend small {
+  color: #889093;
+}
+.routine-panel {
+  padding: 18px 22px;
+  margin: 16px 0;
+  background: #fffdfa;
+}
+.routine-panel > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: baseline;
+}
+.routine-panel strong {
+  color: #755d33;
+  font-size: 16px;
+}
+.routine-panel span,
+.routine-panel p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #6a706e;
+}
+.routine-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 12px;
+}
+.routine-metrics b {
+  color: #b68127;
+}
+.routine-panel p {
+  margin: 8px 0;
+}
+.routine-panel small {
+  display: block;
+  font-size: 11px;
+  color: #838b88;
+  line-height: 1.6;
+}
+.routine-holidays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.routine-holidays .rest-day {
+  background: #eef7f3;
+  color: #487c68;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.routine-holidays .makeup-day {
+  background: #f3f0eb;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.routine-zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  margin-bottom: 9px;
+}
+.routine-zone-legend span:first-child {
+  color: #9b762d;
+}
+.routine-zone-legend span:last-child {
+  color: #798698;
+}
+.sh-cell.zone-morning {
+  outline: 1px solid #ddb756;
+  outline-offset: 1px;
+}
+.sh-cell.zone-rest {
+  filter: saturate(0.2);
+  box-shadow: inset 0 0 0 1px #cbd1db;
+}
+.sh-cell.zone-rest.hm-t0 {
+  background: #e8ebf2;
+}
+.scarecrow-speech {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 15px;
+  border: 1px solid #e4ddca;
+  border-radius: 12px;
+  background: #fffdf7;
+  color: #70634f;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.scarecrow-speech > span:nth-child(2) {
+  flex: 1 1 240px;
+  overflow-wrap: anywhere;
+}
+.companion-name {
+  color: #a28753;
+  font-size: 11px;
+}
+.scarecrow-speech small {
+  margin-left: auto;
+  color: #867653;
+}
+.farm-companion {
+  margin-top: 12px;
+}
+.farm-companion.rest .scarecrow-speech,
+.farm-companion.evening .scarecrow-speech {
+  background: #f5f6fb;
+  color: #69718b;
+  border-color: #dfe3ee;
+}
+.farm-companion.holiday .scarecrow-speech {
+  background: #f4faf6;
+  border-color: #d9e9df;
+}
+.farm-journal {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.farm-journal .hint {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.farm-journal textarea {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  max-height: 240px;
+  padding: 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+.journal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #7b827d;
+}
+.journal-notes {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+.journal-notes article {
+  padding: 10px 4px;
+  border-top: 1px solid var(--border);
+}
+.journal-notes small {
+  color: #8b918b;
+  font-size: 11px;
+}
+.journal-notes p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 6px 0;
+}
+.harvest-sync {
+  position: fixed;
+  left: 20px;
+  bottom: 48px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(420px, calc(100vw - 40px));
+  padding: 12px 16px;
+  border: 1px solid #e6dfd2;
+  border-radius: 14px;
+  box-shadow: 0 4px 22px #483b2212;
+  background: #fffef9;
+  color: #76654e;
+  font-size: 12px;
+  pointer-events: none;
+}
+.harvest-sync.error {
+  background: #fff7f0;
+}
+.harvest-sync button {
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.harvest-sync-body {
+  flex: 1;
+  min-width: 0;
+}
+.harvest-sync-track {
+  height: 4px;
+  border-radius: 4px;
+  background: #f0eadf;
+  overflow: hidden;
+  margin-top: 7px;
+}
+.harvest-sync-track i {
+  display: block;
+  height: 100%;
+  background: #d4a441;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.harvest-basket {
+  position: relative;
+  display: inline-block;
+  font-size: 25px;
+  width: 48px;
+  text-align: center;
+  padding-top: 8px;
+}
+.harvest-fruit {
+  position: absolute;
+  top: -9px;
+  left: 18px;
+  font-style: normal;
+  font-size: 16px;
+}
+.harvest-sync.done .harvest-fruit {
+  animation: collect-tomato 0.8s ease-out forwards;
+}
+.harvest-sync.done .harvest-basket {
+  animation: basket-settle 0.9s ease;
+}
+@keyframes collect-tomato {
+  0% {
+    transform: translate(22px, -14px) rotate(-15deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(0, 19px) rotate(12deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 22px) scale(0.6);
+    opacity: 0;
+  }
+}
+@keyframes basket-settle {
+  70% {
+    transform: rotate(0);
+  }
+  85% {
+    transform: rotate(7deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .harvest-sync *,
+  .harvest-sync.done .harvest-fruit,
+  .harvest-sync.done .harvest-basket {
+    animation: none;
+    transition: none;
+  }
+}
+@media (max-width: 620px) {
+  .routine-panel {
+    padding: 14px;
+  }
+  .harvest-sync {
+    bottom: 12px;
+  }
+  .scarecrow-speech {
+    font-size: 12px;
+  }
+}

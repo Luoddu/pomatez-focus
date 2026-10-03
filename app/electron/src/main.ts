@@ -153,6 +153,8 @@ else {
       handler("archiveHistory", (value) =>
         service.archiveHistory(value)
       );
+      handler("journal", () => service.journal());
+      handler("saveJournal", (value) => service.saveJournal(value));
       handler("backupHistory", (value) => service.backupHistory(value));
       const installUpdate = async () => {
         if (updater.status().phase !== "downloaded")
