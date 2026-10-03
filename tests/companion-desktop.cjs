@@ -111,6 +111,15 @@ app.whenReady().then(async () => {
     win.on("show", () => (shown = true));
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand("Page.enable");
+    // Fixed-clock prompt checks emulate a visible document, while the native
+    // test window stays hidden and muted throughout.
+    await win.webContents.debugger.sendCommand(
+      "Page.addScriptToEvaluateOnNewDocument",
+      {
+        source:
+          "Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'})",
+      }
+    );
     const capture = async (name) => {
       await delay(400);
       const shot = await win.webContents.debugger.sendCommand(
@@ -176,8 +185,21 @@ app.whenReady().then(async () => {
       await js(
         "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('放弃')).click()"
       );
-      await until("!!document.querySelector('.scarecrow-speech')");
+      await until("!!document.querySelector('.farm-scarecrow')");
     };
+    const talk = async () => {
+      const point = await js("(()=>{const e=document.querySelector('.farm-scarecrow');e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect(),x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2);return {x,y,reachable:e.contains(document.elementFromPoint(x,y))}})()");
+      assert.equal(point.reachable,true,'scarecrow must accept actual pointer input');
+      win.webContents.sendInputEvent({type:'mouseDown',x:point.x,y:point.y,button:'left',clickCount:1});
+      win.webContents.sendInputEvent({type:'mouseUp',x:point.x,y:point.y,button:'left',clickCount:1});
+      await until("!!document.querySelector('.farm-journal')");
+    };
+    const initialUrl = new URL(win.webContents.getURL());
+    initialUrl.searchParams.set(
+      "farmNow",
+      String(Date.parse("2026-09-16T05:00:00Z"))
+    );
+    await win.loadURL(initialUrl.href);
     await until(
       "!!document.querySelector('.research-goal') && document.querySelector('.research-goal').textContent.includes('2/')"
     );
@@ -202,7 +224,28 @@ app.whenReady().then(async () => {
     );
     checks.push("calendar holiday and makeup distinguish");
     // Failed upload keeps the locally saved note and waits for an explicit retry.
-    await js("document.querySelector('.scarecrow-speech').click()");
+    assert.equal(
+      await js("document.querySelector('.farm-companion')===null"),
+      true
+    );
+    const fieldSize = () =>
+      js(
+        "(()=>{const r=document.querySelector('.farm-field').getBoundingClientRect();return {width:r.width,height:r.height}})()"
+      );
+    const sizeBefore = await fieldSize();
+    await talk();
+    assert.deepEqual(await fieldSize(), sizeBefore);
+    await js(
+      "document.querySelector('.farm-scarecrow').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))"
+    );
+    await until("!document.querySelector('.farm-companion')");
+    await js(
+      "document.querySelector('.farm-scarecrow').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))"
+    );
+    await until("!!document.querySelector('.farm-journal')");
+    checks.push(
+      "default zero-space companion; clickable and keyboard scarecrow; Escape restores trigger"
+    );
     await set(
       '[aria-label="随手记内容"]',
       "<img src=x onerror=alert(1)> Synthetic diary"
@@ -249,7 +292,7 @@ app.whenReady().then(async () => {
     await until(async () => (await journal()).every((n) => n.synced));
     journalMode = "instant";
     await abandon();
-    await js("document.querySelector('.scarecrow-speech').click()");
+    await talk();
     await until(
       "document.querySelectorAll('.journal-notes article').length===2"
     );
@@ -264,7 +307,53 @@ app.whenReady().then(async () => {
     // Supplement classification is local immediately and travels in the existing snapshot.
     await click("补记");
     await set("#manual-task", task.id, "change");
-    await set("#manual-category", "research", "change");
+    await click("收起稻草人气泡");
+    await js("document.querySelector('#manual-category').click()");
+    assert.deepEqual(
+      await js(
+        "[...document.querySelectorAll('.category-options i:not(.category-inherit)')].map(e=>getComputedStyle(e).backgroundColor)"
+      ),
+      [
+        "rgb(229, 115, 104)",
+        "rgb(242, 205, 115)",
+        "rgb(120, 189, 130)",
+        "rgb(174, 144, 216)",
+        "rgb(112, 165, 233)",
+        "rgb(170, 179, 189)",
+      ]
+    );
+    await capture("bubble-category");
+    await js(
+      "document.querySelector('.category-options').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}))"
+    );
+    await until(
+      "document.querySelector('.category-options').getAttribute('aria-activedescendant')==='category-option-0'"
+    );
+    await js(
+      "document.querySelector('.category-options').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}))"
+    );
+    await until(
+      "document.querySelector('.category-options').getAttribute('aria-activedescendant')==='category-option-1'"
+    );
+    await js(
+      "document.querySelector('.category-options').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))"
+    );
+    await until("!document.querySelector('.category-options')");
+    assert.match(
+      await js(
+        "document.querySelector('#manual-category').textContent"
+      ),
+      /科研/
+    );
+    assert.equal(
+      await js(
+        "getComputedStyle(document.querySelector('#manual-category i')).backgroundColor"
+      ),
+      "rgb(229, 115, 104)"
+    );
+    checks.push(
+      "supplement category six dots match history; selected dot and keyboard selection"
+    );
     await click("保存补记");
     await until(() => !!releaseSync);
     const saved = (await stored()).records.find((r) => !r.cloudSynced);
@@ -428,6 +517,7 @@ app.whenReady().then(async () => {
     await until(
       "document.querySelector('.farm-scarecrow')?.getAttribute('data-night')==='true'"
     );
+    await talk();
     assert.match(
       await js(
         "document.querySelector('.scarecrow-speech').textContent"
@@ -443,21 +533,143 @@ app.whenReady().then(async () => {
     await until("document.querySelector('.farm-companion')!==null");
     await delay(400);
     checks.push("night sleep guidance");
-    await js("document.querySelector('.scarecrow-speech').click()");
     journalMode = "fail";
-    await set('[aria-label="随手记内容"]', 'Synthetic offline note one');
-    await click('记下来'); await until(() => !!releaseJournal);
-    await set('[aria-label="随手记内容"]', 'Synthetic offline note two');
-    await click('记下来');
+    await set(
+      '[aria-label="随手记内容"]',
+      "Synthetic offline note one"
+    );
+    await click("记下来");
+    await until(() => !!releaseJournal);
+    await set(
+      '[aria-label="随手记内容"]',
+      "Synthetic offline note two"
+    );
+    await click("记下来");
     const callsBeforeFailure = journalCalls;
-    releaseJournal(); releaseJournal = null;
-    await until("document.querySelector('.farm-journal [role=alert]')?.textContent.includes('Synthetic diary offline')");
-    await delay(400); assert.equal(journalCalls, callsBeforeFailure);
-    assert.equal((await journal()).filter(n => !n.synced).length, 2);
-    journalMode = 'instant'; await click('同步日记 (2)');
-    await until(async () => (await journal()).every(n => n.synced));
-    assert.equal(new Set(notes.map(n => n.id)).size, notes.length);
-    checks.push('multiple pending notes do not cause a failed-first-row retry loop; explicit retry drains once');
+    releaseJournal();
+    releaseJournal = null;
+    await until(
+      "document.querySelector('.farm-journal [role=alert]')?.textContent.includes('Synthetic diary offline')"
+    );
+    await delay(400);
+    assert.equal(journalCalls, callsBeforeFailure);
+    assert.equal((await journal()).filter((n) => !n.synced).length, 2);
+    journalMode = "instant";
+    await click("同步日记 (2)");
+    await until(async () => (await journal()).every((n) => n.synced));
+    assert.equal(new Set(notes.map((n) => n.id)).size, notes.length);
+    checks.push(
+      "multiple pending notes do not cause a failed-first-row retry loop; explicit retry drains once"
+    );
+    url.searchParams.set(
+      "farmNow",
+      String(Date.parse("2026-09-16T01:00:00Z"))
+    );
+    await win.loadURL(url.href);
+    await until(
+      "document.querySelector('.farm-companion[data-automatic=true]')!==null"
+    );
+    assert.match(
+      await js(
+        "document.querySelector('.scarecrow-speech').textContent"
+      ),
+      /早上好/
+    );
+    await capture("bubble-morning");
+    await delay(30500);
+    await until("!document.querySelector('.farm-companion')");
+    await win.loadURL(url.href);
+    await until("!!document.querySelector('.farm-scarecrow')");
+    await delay(400);
+    assert.equal(
+      await js("document.querySelector('.farm-companion')===null"),
+      true
+    );
+    checks.push(
+      "morning once per day survives reload; no permanent row"
+    );
+    const contact = {
+      id: randomUUID(),
+      sourceKey,
+      at: Date.parse("2026-09-16T01:10:00Z"),
+      author: "澄",
+      text: "Synthetic new contact from Cheng",
+      synced: true,
+    };
+    notes.push(contact);
+    await js(
+      "(()=>{const original=Date.now;Date.now=()=>original()+61000;window.dispatchEvent(new Event('focus'));Date.now=original})()"
+    );
+    await until(
+      "document.querySelector('.scarecrow-speech')?.textContent.includes('Synthetic new contact')"
+    );
+    await click("收起稻草人气泡");
+    await js(
+      "(()=>{const original=Date.now;Date.now=()=>original()+122000;window.dispatchEvent(new Event('focus'));Date.now=original})()"
+    );
+    await delay(200);
+    assert.equal(
+      await js("document.querySelector('.farm-companion')===null"),
+      true
+    );
+    checks.push(
+      "automatic bubble expires at 30 seconds; focus read detects new Cheng UUID once without upload"
+    );
+    url.searchParams.set(
+      "farmNow",
+      String(Date.parse("2026-09-16T14:00:00Z"))
+    );
+    await win.loadURL(url.href);
+    await until(
+      "document.querySelector('.farm-companion[data-automatic=true]')!==null"
+    );
+    assert.match(
+      await js(
+        "document.querySelector('.scarecrow-speech').textContent"
+      ),
+      /22点|收尾/
+    );
+    await js(
+      "document.querySelector('.farm-caption').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))"
+    );
+    await until("!document.querySelector('.farm-companion')");
+    url.searchParams.set(
+      "farmNow",
+      String(Date.parse("2026-09-16T15:00:00Z"))
+    );
+    await win.loadURL(url.href);
+    await until(
+      "document.querySelector('.farm-companion[data-automatic=true]')!==null"
+    );
+    assert.match(
+      await js(
+        "document.querySelector('.scarecrow-speech').textContent"
+      ),
+      /23点.*睡/
+    );
+    await click("收起稻草人气泡");
+    await talk();
+    win.setContentSize(480, 640);
+    await delay(200);
+    assert.equal(
+      await js(
+        "(()=>{const r=document.querySelector('.farm-companion').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()"
+      ),
+      true
+    );
+    await capture("bubble-journal-small");
+    await set('[aria-label="随手记内容"]', "Synthetic preserved draft");
+    await click("收起稻草人气泡");
+    await talk();
+    assert.equal(
+      await js(
+        "document.querySelector('[aria-label=随手记内容]').value"
+      ),
+      "Synthetic preserved draft"
+    );
+    checks.push(
+      "22 and 23 separate quiet prompts; outside dismissal; narrow journal and draft retained"
+    );
     assert.equal(shown, false);
     const result = {
       passed: checks.length,

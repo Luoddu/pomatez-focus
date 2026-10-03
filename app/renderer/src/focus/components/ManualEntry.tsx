@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FocusSession, FocusTask, Mood, ProjectType } from "../session";
-import { PROJECT_TYPES } from "../classification.js";
-import { PROJECT_LABELS } from "../week";
+import CategorySelect from "./CategorySelect";
 import { MoodPicker, parseTitle } from "./shared";
 import {
   manualRecord,
@@ -245,21 +244,10 @@ export default function ManualEntry({
       </div>
       {!initial && (
         <div className="manual-row">
-          <label htmlFor="manual-category">番茄分类</label>
-          <select
-            id="manual-category"
-            value={category}
-            onChange={(e) =>
-              setCategory(e.target.value as ProjectType | "")
-            }
-          >
-            <option value="">跟随任务项目</option>
-            {PROJECT_TYPES.map((type: ProjectType) => (
-              <option key={type} value={type}>
-                {PROJECT_LABELS[type]}
-              </option>
-            ))}
-          </select>
+          <label id="manual-category-label" htmlFor="manual-category">
+            番茄分类
+          </label>
+          <CategorySelect value={category} onChange={setCategory} />
         </div>
       )}
       <div className="manual-row">

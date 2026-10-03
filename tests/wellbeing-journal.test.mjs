@@ -6,6 +6,7 @@ import {
   holidayMessage,
   routineSummary,
   companionGreeting,
+  companionPromptSlot,
   timeZoneKind,
 } from "../app/renderer/src/focus/wellbeing.js";
 import {
@@ -15,6 +16,38 @@ import {
   mergeJournal,
 } from "../app/renderer/src/focus/journal.js";
 const at = (s) => Date.parse(s + "+08:00");
+test("companion slots separate morning, 22 and 23; daytime and pre-8 never encourage work", () => {
+  assert.equal(companionPromptSlot(at("2026-09-15T07:59:00")), null);
+  assert.equal(
+    companionPromptSlot(at("2026-09-15T08:00:00")),
+    "morning"
+  );
+  assert.equal(
+    companionPromptSlot(at("2026-09-15T09:29:59")),
+    "morning"
+  );
+  assert.equal(companionPromptSlot(at("2026-09-15T09:30:00")), null);
+  assert.equal(companionPromptSlot(at("2026-09-15T21:59:00")), null);
+  assert.equal(companionPromptSlot(at("2026-09-15T22:00:00")), "22");
+  assert.equal(companionPromptSlot(at("2026-09-15T23:00:00")), "23");
+  assert.equal(companionPromptSlot(at("2026-09-15T23:59:00")), "23");
+  assert.match(
+    companionGreeting(at("2026-10-03T23:00:00"), 0).text,
+    /23点|睡/
+  );
+  assert.match(
+    companionGreeting(at("2026-10-03T23:30:00"), 0).text,
+    /休息/
+  );
+  assert.match(
+    companionGreeting(at("2026-10-03T09:00:00"), 0).text,
+    /休息/
+  );
+  assert.doesNotMatch(
+    companionGreeting(at("2026-10-03T09:00:00"), 0).text,
+    /先种/
+  );
+});
 const rec = (start, end, extra = {}) => ({
   status: "saved",
   startedAt: at(start),

@@ -1,9 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import type { FocusSession } from "../session";
 import { api } from "./shared";
 import {
   beijingDate,
   companionGreeting,
+  companionPromptSlot,
   routineSummary,
 } from "../wellbeing.js";
 import { loadJournal, mergeJournal, saveJournal } from "../journal.js";
@@ -25,13 +32,29 @@ export default function FarmCompanion({
   now,
   sourceKey,
   connected,
+  anchor,
+  open,
+  onOpenChange,
 }: {
   records: FocusSession[];
   now: number;
   sourceKey: string;
   connected: boolean;
+  anchor: React.RefObject<SVGGElement>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [automatic, setAutomatic] = useState<{
+    key: string;
+    text: string;
+  } | null>(null);
+  const bubble = useRef<HTMLDivElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState({
+    left: 8,
+    top: 8,
+    arrow: 40,
+  });
   const [draft, setDraft] = useState("");
   const [notes, setNotes] = useState<Note[]>([]);
   const [error, setError] = useState("");
@@ -141,12 +164,13 @@ export default function FarmCompanion({
         if (
           mounted.current &&
           (scopeRef.current !== sourceKey ||
-            (!failed && entries.current.some(
-              (n) =>
-                n.sourceKey === sourceKey &&
-                !n.synced &&
-                !attempted.has(n.id)
-            )))
+            (!failed &&
+              entries.current.some(
+                (n) =>
+                  n.sourceKey === sourceKey &&
+                  !n.synced &&
+                  !attempted.has(n.id)
+              )))
         )
           setRevision((v) => v + 1);
       }
@@ -155,6 +179,53 @@ export default function FarmCompanion({
     // Retry only on explicit save/sync/reconnect, never poll a failed request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, sourceKey, revision]);
+  useEffect(() => {
+    if (!connected || !sourceKey || !api()?.journal) return;
+    let lastRead = Date.now();
+    let disposed = false;
+    const refresh = () => {
+      if (
+        document.visibilityState !== "visible" ||
+        !healthy.current ||
+        Date.now() - lastRead < 60000
+      )
+        return;
+      lastRead = Date.now();
+      const read = async () => {
+        if (disposed || scopeRef.current !== sourceKey) return;
+        try {
+          // Focus refresh is read-only: it must never replay a failed upload.
+          const remote = await api().journal();
+          if (
+            remote.sourceKey !== sourceKey ||
+            remote.notes.some(
+              (n: Note) => n.sourceKey !== sourceKey || !n.synced
+            )
+          )
+            throw Error("日记来源不一致，未合入");
+          persist(
+            mergeJournal(
+              loadJournal(localStorage),
+              remote.notes
+            ) as Note[]
+          );
+        } catch (e) {
+          if (!disposed && scopeRef.current === sourceKey)
+            setError(`日记保留本机 · ${(e as Error).message}`);
+        }
+      };
+      journalTail = journalTail.then(read, read);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+    // Same UUID merge/serialization as regular sync; no timer or upload here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, sourceKey]);
   const today = beijingDate(now);
   const todayRecords = records.filter(
     (r) => beijingDate(r.startedAt) === today
@@ -182,6 +253,122 @@ export default function FarmCompanion({
       : greeting.text;
   const visible = notes.filter((n) => n.sourceKey === scope);
   const pending = visible.filter((n) => !n.synced).length;
+  const slot = companionPromptSlot(now);
+  useEffect(() => {
+    setAutomatic(null);
+  }, [scope]);
+  const promptKey =
+    dailyPrompt && ["day", "morning"].includes(greeting.kind)
+      ? `cheng:${dailyPrompt.id}`
+      : slot
+      ? `${today}:${slot}`
+      : "";
+  const reminderText =
+    slot === "morning" && greeting.kind === "holiday"
+      ? `早上好。${greeting.text}`
+      : speech;
+  useEffect(() => {
+    if (!promptKey || document.visibilityState !== "visible") return;
+    try {
+      const key = `pomatez-companion-seen-${scope}`;
+      const old = JSON.parse(localStorage.getItem(key) || "[]");
+      const seen: string[] = Array.isArray(old)
+        ? old.filter((v) => typeof v === "string")
+        : [];
+      if (seen.includes(promptKey)) return;
+      // Persist before showing: board remounts/restarts must not nag again.
+      const next = [...seen, promptKey];
+      if (slot) next.push(`${today}:${slot}`);
+      localStorage.setItem(
+        key,
+        JSON.stringify(Array.from(new Set(next)).slice(-120))
+      );
+      if (!open) setAutomatic({ key: promptKey, text: reminderText });
+    } catch {
+      /* A failed reminder receipt must not cause repeated popups. */
+    }
+  }, [scope, today, slot, promptKey, reminderText, open, now]);
+  useEffect(() => {
+    if (open) {
+      setAutomatic(null);
+      closeButton.current?.focus();
+      return;
+    }
+    if (!automatic) return;
+    const timer = setTimeout(() => setAutomatic(null), 30000);
+    return () => clearTimeout(timer);
+  }, [open, automatic]);
+  const showing = open || !!automatic;
+  useLayoutEffect(() => {
+    if (!showing) return;
+    const place = () => {
+      const rect = anchor.current?.getBoundingClientRect();
+      const panel = bubble.current;
+      if (!rect || !panel) return;
+      const left = Math.max(
+        8,
+        Math.min(
+          rect.left + rect.width / 2 - panel.offsetWidth + 48,
+          window.innerWidth - panel.offsetWidth - 8
+        )
+      );
+      const top = Math.max(
+        8,
+        Math.min(
+          rect.top - panel.offsetHeight - 14,
+          window.innerHeight - panel.offsetHeight - 8
+        )
+      );
+      setPosition({
+        left,
+        top,
+        arrow: Math.max(
+          20,
+          Math.min(
+            panel.offsetWidth - 20,
+            rect.left + rect.width / 2 - left
+          )
+        ),
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    const observer = new ResizeObserver(place);
+    if (bubble.current) observer.observe(bubble.current);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [showing, open, anchor]);
+  useEffect(() => {
+    if (!showing) return;
+    const dismiss = () => {
+      setAutomatic(null);
+      onOpenChange(false);
+    };
+    const outside = (e: PointerEvent) => {
+      if (
+        !anchor.current?.contains(e.target as Node) &&
+        !bubble.current?.contains(e.target as Node)
+      )
+        dismiss();
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        dismiss();
+        anchor.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [showing, anchor, onOpenChange]);
   const save = () => {
     if (!healthy.current) return;
     try {
@@ -207,12 +394,39 @@ export default function FarmCompanion({
       setError((e as Error).message || "未能保存，请保留文字再试");
     }
   };
-  return (
-    <div className={`farm-companion ${greeting.kind}`}>
+  if (!showing) return null;
+  return createPortal(
+    <div
+      ref={bubble}
+      className={`farm-companion ${greeting.kind}`}
+      role={open ? "dialog" : undefined}
+      aria-label={open ? "稻草人：聊聊与随手记" : undefined}
+      data-automatic={!open}
+      style={
+        {
+          left: position.left,
+          top: position.top,
+          "--speech-arrow": `${position.arrow}px`,
+        } as React.CSSProperties
+      }
+    >
+      <button
+        type="button"
+        ref={closeButton}
+        className="companion-close"
+        aria-label="收起稻草人气泡"
+        onClick={() => {
+          setAutomatic(null);
+          onOpenChange(false);
+          anchor.current?.focus();
+        }}
+      >
+        ×
+      </button>
       <button
         className="scarecrow-speech"
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+        onClick={() => onOpenChange(!open)}
       >
         <span className="companion-name">
           田间伙伴
@@ -220,7 +434,9 @@ export default function FarmCompanion({
             ? " · 澄的留言"
             : ""}
         </span>
-        <span>{speech}</span>
+        <span role={!open ? "status" : undefined}>
+          {open ? speech : automatic?.text}
+        </span>
         <small>{open ? "收起" : "聊聊 / 随手记"}</small>
       </button>
       {open && (
@@ -281,6 +497,7 @@ export default function FarmCompanion({
           </div>
         </section>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

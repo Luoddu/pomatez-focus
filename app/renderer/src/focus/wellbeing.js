@@ -122,6 +122,16 @@ export function companionGreeting(now, todayCount, morningSeconds = 0) {
       kind: "rest",
       text: "田里交给我。现在是休息时间，随手记下想法，安心去睡吧。",
     };
+  if (minute >= 1380)
+    return {
+      kind: "evening",
+      text: "已经23点了，今天就到这里吧。把想法留下，安心睡觉，明天再接着来。",
+    };
+  if (minute >= 1320)
+    return {
+      kind: "evening",
+      text: "快到休息时间了。慢慢收尾，22点后的这一会儿，留给放松和睡眠吧。",
+    };
   const holiday = holidayDay(now);
   if (holiday?.rest)
     return {
@@ -136,11 +146,6 @@ export function companionGreeting(now, todayCount, morningSeconds = 0) {
           ? "今天的早晨已经有了收获，稳稳地往前走就好。"
           : "早上好，昨晚睡得怎么样？先种一颗小番茄，让今天轻轻开始。",
     };
-  if (minute >= 1320)
-    return {
-      kind: "evening",
-      text: "今天的努力已经记下了。慢慢收尾，给睡眠留足时间。",
-    };
   return {
     kind: "day",
     text:
@@ -148,4 +153,14 @@ export function companionGreeting(now, todayCount, morningSeconds = 0) {
         ? "收获已经在田里了。歇一会儿，再按自己的节奏来。"
         : "准备好时，选一件小事种下今天的第一颗番茄。也可以先和我说说想法。",
   };
+}
+
+// App-local, once-per-day slots. No work prompts during 23:30–08:00.
+export function companionPromptSlot(now) {
+  const d = new Date(now + 8 * 3600000);
+  const minute = d.getUTCHours() * 60 + d.getUTCMinutes();
+  if (minute >= 480 && minute < 570) return "morning";
+  if (minute >= 1320 && minute < 1380) return "22";
+  if (minute >= 1380) return "23";
+  return null;
 }

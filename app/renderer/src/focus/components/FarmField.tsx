@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { FocusSession } from "../session";
 import FarmCompanion from "./FarmCompanion";
 import { holidayDay } from "../wellbeing.js";
@@ -360,20 +360,49 @@ const Scarecrow = ({
   season = "spring",
   night = false,
   festive = false,
+  anchor,
+  open,
+  onTalk,
 }: {
   x: number;
   scarf?: boolean;
   season?: Season;
   night?: boolean;
   festive?: boolean;
+  anchor: React.RefObject<SVGGElement>;
+  open: boolean;
+  onTalk: () => void;
 }) => (
   <g
     className="farm-scarecrow"
+    ref={anchor}
+    role="button"
+    tabIndex={0}
+    aria-label="稻草人：聊聊 / 随手记"
+    aria-expanded={open}
+    aria-haspopup="dialog"
+    onClick={onTalk}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onTalk();
+      }
+    }}
     data-season={season}
     data-night={night}
     data-festive={festive}
     transform={`translate(${x} 18) scale(.85)`}
   >
+    <title>点我聊聊，也可以记下随时的想法</title>
+    <rect
+      className="scarecrow-hit"
+      x="-33"
+      y="35"
+      width="66"
+      height="90"
+      rx="10"
+      fill="transparent"
+    />
     <rect x="-2.5" y="86" width="5" height="34" rx="2" fill="#a9763f" />
     {scarf && (
       <>
@@ -1029,6 +1058,8 @@ export default function FarmField({
   // 天空实时性：无 ?farmNow mock 时每 60s（及窗口重新聚焦/恢复可见时）
   // 重算一次北京时间，只触发本卡片子树更新；mock 模式冻结时刻不起定时器
   const [liveNow, setLiveNow] = useState(() => Date.now());
+  const [talkOpen, setTalkOpen] = useState(false);
+  const scarecrow = useRef<SVGGElement>(null);
   useEffect(() => {
     if (now !== undefined) return;
     const refresh = () => setLiveNow(Date.now());
@@ -1206,6 +1237,9 @@ export default function FarmField({
           {owlOut && <Owl x={136} y={97} />}
           {/* 稻草人守在土壤带右缘；入冬戴上红围巾 */}
           <Scarecrow
+            anchor={scarecrow}
+            open={talkOpen}
+            onTalk={() => setTalkOpen((v) => !v)}
             x={648}
             scarf={season === "winter"}
             season={season}
@@ -1308,6 +1342,9 @@ export default function FarmField({
         </svg>
       </div>
       <FarmCompanion
+        anchor={scarecrow}
+        open={talkOpen}
+        onOpenChange={setTalkOpen}
         records={records}
         now={at}
         sourceKey={journalSource}
