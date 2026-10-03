@@ -9,4 +9,4 @@
 - 截图均为合成任务，通过隐藏窗口CDP实拍：artifacts/bubble-category.png、bubble-morning.png、bubble-journal-small.png；人工查看色点、气泡位置、窄屏编辑，私人用户截图不进入仓库。
 - Learning判断：none。复用既有UUID、同步队列和本地优先交互；React事件快照是固定版本常规正确用法，本次没有新增根架构/权限治理教训。根Learning不写。
 - 未完成/限制：真实澄服务未接入，实际飞书业务数据未用于测试；预留接口只有安全纯文本留言和日记。App退出不发系统提醒；进行中的计时保留当前计时界面，不弹日记打断。
-- 发布证据待补：干净源码构建、Windows包、六资产及公开更新feed；不安装/重启用户App。
+- 已发布：源码5b9abc31e1c03aec3ca57d3e02cd097f19bc1ab7，固定tag v0.1.0-preview.68。干净构建及package通过，包内source-version和外部清单同源，隔离隐藏静音启动通过；six assets size/SHA256、preview.yml SHA512正确。公开Release：https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.68 。同款FocusUpdater/NsisUpdater以合成旧版preview.67实读公开GitHub feed，phase=available/version=68，autoDownload及autoInstallOnAppQuit均false。用户App未安装/重启。

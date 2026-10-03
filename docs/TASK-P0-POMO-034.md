@@ -1,6 +1,6 @@
 # P0-POMO-034 分类色点与稻草人气泡
 
-- REVIEW；角色/上下文负责人：隔离模块实现者 Codex，状态源本卡。用户要求补记分类色点、取消常驻伙伴横栏、点稻草人对话、早晨及22/23点短暂主动提醒；沿用 Windows Release 发布授权。
+- DONE；角色/上下文负责人：隔离模块实现者 Codex，状态源本卡。用户要求补记分类色点、取消常驻伙伴横栏、点稻草人对话、早晨及22/23点短暂主动提醒；沿用 Windows Release 发布授权。
 - 基线 def621e2b5d15450fbfcde3f6ff8edff1d15e56b；origin/codex/feishu-focus 实时 fetch/check:sync 一致、工作树干净，preview.67。独占 task/p0-pomo-034-scarecrow-bubble 及独立合成测试 profile；旧 worktree 无重叠活动修改证据，绿灯。
 - 目标：颜色与已有分类一致；默认农田零额外占位、SVG稻草人支持点击/键盘；浮动气泡与本地优先日记；同连接当天澄留言读回后短暂提示；08:00–09:30早安、22/23点分开提醒，每日每段最多一次、不发声。非目标：真实澄接入、外部AI、后台服务、新身份或飞书拓扑、自动安装用户App。
 - 允许写：ManualEntry/新分类选择组件、FarmField/FarmCompanion、wellbeing与focus.css；命中合成tests；本卡、验收、FARM-COMPANION、CHANGELOG与版本文件。禁止根共享控制面、真实凭证/任务/用户运行目录/用户App控制、新依赖、后台轮询或根跨组件写入。
@@ -11,4 +11,5 @@
 - 固定版本证据补充：现有React 16合成事件在处理后回收，node_modules/react-dom/cjs/react-dom.development.js L3280、L8583；键盘值在处理器内先复制再交状态更新，不保留已回收事件。
 - 回滚本任务提交/旧包，保留新增提醒已读键和日记，旧版忽略；Learning检查点判断是否新增可复用教训，当前预期none（既有模式薄适配）。
 
-- 已验证：ACCEPTANCE-scarecrow-bubble.md；逻辑241/241、桌面80组及真实进程重启、完整构建成功；稻草人通过真实鼠标输入和elementFromPoint命中，提示真实等待30.5秒收起。提交前远端仍为基线，允许写集无冲突，绿灯。Learning none：复用已验证机制，无新增根治理候选。等待干净源码包及公开更新feed核验。
+- 已验证：ACCEPTANCE-scarecrow-bubble.md；逻辑241/241、桌面80组及真实进程重启、完整构建成功；稻草人通过真实鼠标输入和elementFromPoint命中，提示真实等待30.5秒收起。提交前远端仍为基线，允许写集无冲突，绿灯。Learning none：复用已验证机制，无新增根治理候选。
+- 已发布源码5b9abc31e1c03aec3ca57d3e02cd097f19bc1ab7、Windows preview.68，tag固定源commit。干净源码build/package及包内来源一致，隔离静音打包程序启动通过；六资产大小/SHA256和feed SHA512正确。同款FocusUpdater/NsisUpdater实读公开feed：preview.67发现68，available，无下载/安装。用户App未安装重启，实际澄服务未连接；飞书日记测试仅合成。
