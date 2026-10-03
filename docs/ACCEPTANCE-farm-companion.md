@@ -1,6 +1,6 @@
 # P0-POMO-033 验收与交接
 
-状态：已验证产品实现；Windows 发布回执在封包核验后补入。本卡对应 `TASK-P0-POMO-033.md`，基线 `fbeb3d4b406987886995ad49ed58cb775b81790c`。修改范围仅番茄农场模块；无真实凭证读取、真实飞书业务写入或用户 App 安装/重启。
+状态：DONE，已验证产品实现与 Windows 发布。本卡对应 `TASK-P0-POMO-033.md`，基线 `fbeb3d4b406987886995ad49ed58cb775b81790c`。修改范围仅番茄农场模块；无真实凭证读取、真实飞书业务写入或用户 App 安装/重启。
 
 ## 四源及并发
 
@@ -40,3 +40,12 @@ Learning-Review：none。复用 LEARN-P1-UI-123-01 的固定意图/UUID和回执
 接口和字段见 `FARM-COMPANION.md`。首次真实保存时才创建“农场日记”；本轮 API 测试是模拟，**尚未在用户真实表执行创建或日记同步验收**。已有连接缺权限时保留本机并显示错误。澄尚未接入，留言读取契约不代表根系统已可用。2026 以外假日未维护；未连接记录不自动绑定新 Base。
 
 回滚到旧包或回滚本任务源码提交；不删除私人日记键/日记表，旧版忽略新增内容。计时和成果格式兼容。下一步由用户安装新版、在已有连接中记录一条日记，观察本机保存与飞书回读；跨机沿用相同 Base。
+
+## Windows 发布回执
+
+- 源码 `0ea360ed6615824af7baa7ed608dc312d54c4e03` 已非强制推送公开主线；版本 `0.1.0-preview.67`。
+- 干净源码重新完整构建，再 `npm run package:focus`，包内来源 dirty=false/version/head 与实际源码完全一致。隐藏静音、独立 profile 启动打包后的可执行程序，返回0且输出 `Pomatez Focus ready (hidden)`。
+- [preview.67 Release](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.67) 六资产全部上传；远端 state=uploaded、大小及 SHA-256 digest 与本机一致。更新 `preview.yml` 的版本、setup SHA-512和大小均对应本次安装包。
+- 发布 tag 经 `git ls-remote` 确认固定源码 commit；未重写旧 tag 或资产。
+- 使用实际 FocusUpdater 与官方 NsisUpdater 同一配置，在独立 profile 模拟当前 preview.66，对公开 GitHub feed 执行只读检查：phase=available、detected=preview.67，未下载或安装。本机原始结果 `artifacts/companion-public-update.log`。
+- 打包、推送和发布前实际远端仍包含基线；未见活动写集重叠。后续验收文档提交不移动发布 tag。用户从 App“检查更新”即可手动安装。

@@ -1,6 +1,6 @@
 # P0-POMO-033 晨间引导、假日休息与稻草人日记
 
-- REVIEW；隔离模块实现者/上下文负责人 Codex；唯一状态源本卡。用户明确要求六项体验增强，并选择日记本地保存后同步飞书。沿用源码和 Windows Release 发布授权。
+- DONE；隔离模块实现者/上下文负责人 Codex；唯一状态源本卡。用户明确要求六项体验增强，并选择日记本地保存后同步飞书。沿用源码和 Windows Release 发布授权。
 - 目标：补记分类；科研目标在前、红/金区分；官方假日标记及无压力休息；08:00–09:30 晨间鼓励、23:30–08:00 休息分区；成果同步真实阶段与收篮动画；季节/日夜稻草人、轻量对话和日记云同步。非目标：接入真实澄服务、引入 AI 供应商、增加计时奖金或改历史账目、移动运行数据库、Mac 发布。
 - 基线 fbeb3d4b406987886995ad49ed58cb775b81790c；协调 ref origin/codex/feishu-focus。fetch/check:sync 实时一致，干净，preview.66。独占当前工作树 task/p0-pomo-033-farm-companion 与隔离合成测试 profile；无用户服务/端口/数据库控制权。开工/测试/提交/发布核对 status、worktree、基线至协调 ref 差异，非重叠绿灯继续。
 - 允许写：app/renderer/src/focus 内本任务组件、wellbeing/journal 与样式；app/electron/src/focus 的 journal、feishu/service 和 main/preload 的模块内桥；命中 tests/scripts runner；版本、CHANGELOG、本卡、验收和接口文档。禁止根共享控制文件、真实账号/凭证/记录、用户 App 安装重启、新依赖与真实澄跨组件写入。飞书新日记表仅由用户在新版首次保存时使用现有连接创建；本轮测试全为模拟。
@@ -10,4 +10,5 @@
 - 预算：6 小时一个工作周期；无子 Agent/长期后台/新依赖；只读瞬时故障最多重试一次，外部副作用复核回执，不盲重放。测试静音隐藏，不触用户 App。日记局部追加式存储，限长和 UUID 去重，首次表创建冲突停止不覆盖现有字段。
 - Learning：复用已验证幂等原则；交接判断新候选，无候选必须给原因。回滚独立提交或旧包；不删除新增私有日记表/本地键，旧版本忽略它们，原计时和历史格式兼容。
 
-- 实现和正反验收：`ACCEPTANCE-farm-companion.md`，逻辑240/240、桌面75组及真实进程重启、构建通过。Learning判断none，复用既有UUID/本地优先机制，没有新增根治理候选。实时远端仍与基线一致；preview.67已分配，等待干净源码封包/发布。真实用户表创建/日记同步尚未执行，澄服务未接入。
+- 实现和正反验收：`ACCEPTANCE-farm-companion.md`，逻辑240/240、桌面75组及真实进程重启、构建通过。Learning判断none，复用既有UUID/本地优先机制，没有新增根治理候选。
+- 交付源码 `0ea360ed6615824af7baa7ed608dc312d54c4e03`，Windows preview.67 Release 已公开；六资产大小与SHA-256、更新feed SHA-512/大小、包内干净源码来源均一致，打包程序隐藏静音启动成功。App同款FocusUpdater/NsisUpdater实测preview.66通过公开GitHub feed发现preview.67，available且无下载/安装。发布前实时远端与写集无活动冲突，绿灯。真实用户表创建/日记同步尚未执行，澄服务未接入；安装后首次保存日记触发已有连接中的实际写入。
