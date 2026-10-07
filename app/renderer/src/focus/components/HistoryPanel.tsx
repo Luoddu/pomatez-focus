@@ -1,4 +1,5 @@
 import ResearchGoal from "./ResearchGoal";
+import ScientificRest, { RestState } from "./ScientificRest";
 import { companionGreeting } from "../wellbeing.js";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -181,6 +182,7 @@ export default function HistoryPanel({
   onWeekGoalMet,
   onOpenStats,
   onMilestone,
+  restState,
 }: {
   records: FocusSession[];
   pendingCount: number;
@@ -206,6 +208,7 @@ export default function HistoryPanel({
   onWeekGoalMet?: (total: number, goal: number) => void;
   onOpenStats?: () => void;
   onMilestone?: (milestone: number) => void;
+  restState: RestState;
 }) {
   const [entryOpen, setEntryOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<FocusSession | null>(
@@ -499,6 +502,8 @@ export default function HistoryPanel({
           <span className="stb-to">{totalMs.next}</span>
         </div>
       </div>
+      <div className="rest-calendar-group">
+      <ScientificRest state={restState} />
       <div className="side-section">
         <div className="side-title research-goals-title">
           番茄月历
@@ -584,6 +589,7 @@ export default function HistoryPanel({
           </span>
         </div>
         <HeatmapCalendar records={records} goals={goals} />
+      </div>
       </div>
       <div className="side-section records-section">
         <div className="side-title">

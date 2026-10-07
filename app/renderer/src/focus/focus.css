@@ -848,6 +848,66 @@ input:focus-visible {
   flex: 1;
   min-height: 0;
 }
+/* Local ActivityWatch mirror, kept in the calendar column. */
+.rest-calendar-group { display: flex; flex-direction: column; gap: 18px; min-width: 0; flex: none; }
+.scientific-rest { gap: 8px; flex: none; }
+.rest-back { margin-left: auto; font-size: 11px; }
+.rest-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface, #fff); padding: 10px 12px 8px; min-width: 0; }
+.rest-quota { display: grid; grid-template-columns: minmax(88px, 42%) minmax(0, 1fr); gap: 12px; height: 128px; align-items: center; }
+.rest-ring { position: relative; width: 100%; max-width: 128px; aspect-ratio: 1; justify-self: center; }
+.rest-ring svg { width: 100%; height: 100%; display: block; }
+.rest-ring circle { fill: none; stroke-width: 9; }
+.rest-ring-track { stroke: #edf0f8; }
+.rest-ring-value { stroke: #5867ff; transition: stroke-dasharray .3s; }
+.rest-ring.over .rest-ring-track { stroke: #f8e4d9; }
+.rest-ring-label { position: absolute; inset: 0; display: flex; align-items: baseline; align-content: center; justify-content: center; flex-wrap: wrap; padding: 30% 12%; color: var(--text); gap: 0 3px; }
+.rest-ring-label strong { font-size: clamp(23px, 2.8vw, 32px); font-weight: 650; line-height: 1; }
+.rest-ring-label span { font-size: 12px; }
+.rest-ring-label small { flex-basis: 100%; text-align: center; font-size: 11px; color: var(--muted); margin-top: 7px; }
+.rest-controls { display: flex; flex-direction: column; min-width: 0; align-self: stretch; padding: 7px 0; }
+.rest-supervise { display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 6px; }
+.rest-supervise input { accent-color: #5867ff; width: 17px; height: 17px; margin: 0; cursor: pointer; }
+.rest-links { display: flex; gap: 8px; justify-content: space-between; margin-top: 8px; }
+.rest-links .btn-text { font-size: 11px; white-space: nowrap; padding: 0; }
+.rest-links .rest-stat-link { color: var(--text); font-weight: 650; }
+.rest-sites { margin-top: auto; font-size: 12px; display: flex; flex-direction: column; gap: 10px; }
+.rest-sites > div { display: flex; align-items: center; white-space: nowrap; gap: 5px; }
+.rest-sites strong { margin-left: auto; font-weight: 600; font-size: 12px; }
+.rest-dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.bili { background: #209eb0; }
+.xhs { background: #df6285; }
+.rest-health { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 10px; line-height: 14px; margin-top: 7px; }
+.rest-health span { width: 5px; height: 5px; border-radius: 50%; background: #7daa91; }
+.rest-health.interrupted { color: #b97b41; }
+.rest-health.interrupted span { background: #b97b41; }
+.rest-error { color: var(--red); font-size: 11px; margin-top: 4px; }
+.rest-settings { min-height: 128px; display: flex; flex-direction: column; gap: 12px; justify-content: center; font-size: 12px; }
+.rest-settings input { width: 55px; padding: 5px; border-radius: 5px; border: 1px solid var(--border); color: var(--text); background: var(--bg, #fff); font: inherit; }
+.rest-settings p { color: var(--muted); font-size: 11px; margin: 0; }
+.rest-settings .btn-small { align-self: flex-start; }
+.rest-stats { height: 128px; overflow-y: auto; }
+.rest-chart-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 11px; }
+.rest-chart-head > div { display: flex; gap: 6px; }
+.rest-chart-head button { padding: 2px 4px; font-size: 10px; color: var(--muted); border-radius: 4px; }
+.rest-chart-head button.selected { color: #5867ff; background: #f0f2ff; }
+.rest-chart { height: 77px; padding-top: 7px; padding-bottom: 15px; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; }
+.rest-hour { height: 100%; position: relative; min-width: 0; }
+.rest-hour-bars { height: 100%; display: flex; flex-direction: column-reverse; justify-content: flex-start; border-bottom: 2px solid #edf0f8; }
+.rest-hour-bars span { display: block; width: 100%; flex: none; min-height: 0; }
+.rest-hour small { position: absolute; top: calc(100% + 2px); font-size: 9px; color: var(--muted); }
+.rest-chart-foot { display: flex; justify-content: space-between; gap: 6px; font-size: 9px; color: var(--muted); line-height: 16px; white-space: nowrap; }
+.rest-chart-foot i { width: 5px; height: 5px; margin-right: 3px; }
+.rest-chart-foot i.xhs { margin-left: 5px; }
+.rest-sessions { font-size: 10px; margin-top: 2px; color: var(--muted); }
+.rest-sessions summary { cursor: pointer; line-height: 16px; }
+.rest-sessions > div { max-height: 85px; overflow-y: auto; margin-top: 4px; }
+.rest-sessions > div > div { display: flex; justify-content: space-between; gap: 6px; line-height: 20px; }
+.rest-reminder-backdrop { position: fixed; inset: 0; background: rgba(37, 47, 68, .32); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10000; }
+.rest-reminder { width: 490px; max-width: 100%; background: var(--surface, #fff); border-radius: 20px; padding: 28px; box-shadow: 0 14px 70px #30394a26; color: var(--text); }
+.rest-reminder h2 { margin: 0 0 14px; font-size: 25px; font-weight: 600; }
+.rest-reminder p { margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.rest-reminder > div { display: flex; gap: 12px; }
+.rest-reminder .btn-small { flex: 1; height: 42px; font-size: 13px; white-space: nowrap; }
 .side-title {
   font-size: 17px;
   font-weight: 600;

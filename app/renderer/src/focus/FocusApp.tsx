@@ -42,6 +42,7 @@ import FocusTimer from "./components/FocusTimer";
 import ReviewPanel from "./components/ReviewPanel";
 import SettingsPanel, { FocusConfig } from "./components/SettingsPanel";
 import HistoryPanel from "./components/HistoryPanel";
+import { useScientificRest, ScientificRestReminder } from "./components/ScientificRest";
 import MiniView from "./components/MiniView";
 import StatsPanel from "./components/StatsPanel";
 import HarvestSync, { HarvestProgress } from "./components/HarvestSync";
@@ -1528,9 +1529,24 @@ export default function FocusApp() {
       : active
       ? "timing"
       : "board";
+  const restState = useScientificRest();
+  const restReminder = <ScientificRestReminder state={restState} onSleep={() => {
+    timer.pause();
+    if (timer.getSnapshot().active?.status === "active") throw Error("暂停未完成");
+  }} onFocus={() => {
+    setSettingsOpen(false); setStatsOpen(false);
+    const current = timer.getSnapshot().active;
+    if (current) {
+      if (current.status === "paused") { timer.resume(); if (timer.getSnapshot().active?.status !== "active") throw Error("恢复未完成"); }
+      return;
+    }
+    beginTask(boardTasks.find(t => t.id === selected && t.kind !== "done" && t.kind !== "pending") || boardTasks.find(t => t.kind !== "done" && t.kind !== "pending") || makeFreeTask());
+    if (!timer.getSnapshot().active) throw Error("番茄未开始");
+  }} />;
   if (compact)
     return (
       <div className="focus-app compact">
+        {restReminder}
         <MiniView
           active={active}
           taskTitle={
@@ -1555,6 +1571,7 @@ export default function FocusApp() {
   };
   return (
     <div className="focus-app">
+      {restReminder}
       {settingsOpen ? (
         <SettingsPanel
           config={config}
@@ -1700,6 +1717,7 @@ export default function FocusApp() {
             />
           )}
           <HistoryPanel
+            restState={restState}
             records={shownRecords}
             pendingCount={historyPending.length}
             canSync={connected && !!api()}

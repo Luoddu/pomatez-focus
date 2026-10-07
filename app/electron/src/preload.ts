@@ -6,6 +6,15 @@ const invoke = async (name: string, value?: any) => {
 };
 contextBridge.exposeInMainWorld("focusApi", {
   status: () => invoke("status"),
+  restState: () => invoke("restState"),
+  restSettings: (value: any) => invoke("restSettings", value),
+  restStatistics: (value: "today" | "week") => invoke("restStatistics", value),
+  restAcknowledge: (value: string) => invoke("restAcknowledge", value),
+  onRestState: (callback: (state: any) => void) => {
+    const listener = (_event: any, state: any) => callback(state);
+    ipcRenderer.on("focus:rest-state", listener);
+    return () => ipcRenderer.removeListener("focus:rest-state", listener);
+  },
   updateStatus: () => invoke("updateStatus"),
   checkUpdate: () => invoke("checkUpdate"),
   downloadUpdate: () => invoke("downloadUpdate"),
