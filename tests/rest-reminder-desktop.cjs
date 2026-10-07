@@ -37,6 +37,7 @@ app.whenReady().then(async () => {
     await until(() => js("document.querySelector('p').textContent.includes('10 分钟')"));
     assert.equal(popup(), alert);
     checks.push("threshold updates reuse one window instead of stacking");
+    assert.notEqual(alert.webContents.getOSProcessId(), farm.webContents.getOSProcessId());
     await assert.rejects(js("window.restReminderApi.act({key:'stale',action:'focus'})"));
     await assert.rejects(js("window.restReminderApi.act({key:'test/one',action:'quit'})"));
     assert.equal(popup(), alert);
@@ -82,6 +83,22 @@ app.whenReady().then(async () => {
       await until(() => popup() && !popup().webContents.isLoadingMainFrame());
     }
     checks.push("supervision off, interruption and cleared reminder destroy alert; subsequent threshold can open again");
+    const crashed = popup(), farmProcess = farm.webContents.getOSProcessId();
+    assert.equal(crashed.webContents.session.listenerCount('will-download'), 1);
+    farm.webContents.send = (channel, ...values) => { if (channel !== 'focus:rest-action') send(channel, ...values); };
+    const interruptedAction = assert.rejects(restPopup.act({ key: 'test/one', action: 'focus' }));
+    crashed.webContents.forcefullyCrashRenderer();
+    await until(() => crashed.isDestroyed());
+    await interruptedAction;
+    farm.webContents.send = send;
+    assert.equal(popup(), undefined);
+    assert.equal(farm.webContents.getOSProcessId(), farmProcess);
+    assert.equal(await farm.webContents.executeJavaScript("!!document.querySelector('.focus-app')"), true);
+    restPopup.update(state);
+    await until(() => popup() && !popup().webContents.isLoadingMainFrame());
+    await until(() => popup().webContents.executeJavaScript("Array.from(document.querySelectorAll('button')).every(b=>!b.disabled)"));
+    assert.equal(await popup().webContents.executeJavaScript("document.querySelectorAll('button').length"), 2);
+    checks.push("actual reminder renderer crash disposes topmost window, leaves farm renderer alive and fresh update rebuilds both actions");
     const closed = popup();
     closed.close();
     assert.equal(closed.isDestroyed(), true);

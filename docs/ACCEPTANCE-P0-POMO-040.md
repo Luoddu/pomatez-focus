@@ -29,4 +29,10 @@ Learning判断：本检查点是固定官方置顶API的项目适配及正确等
 
 ## 封版与交付
 
-待冻结commit、独立复核、干净重建、包源比对、安装版五资产及真实71客户端更新检测后补充。版本72准备完成；不以此表示已发布或安装。
+独立review_scientific_rest发现a15234b的提醒自身renderer-gone清理缺失（P2），先停止发布再补本范围修复；未以首轮复核当PASS。提醒使用独立非persist内存partition，仅首次设置权限及下载拒绝，避免反复窗口累积session监听。自己的render-process-gone销毁原生窗并取消pending，monitor阈值保留供下次健康状态重建。
+
+固定Electron34.5.8本机electron.d.ts SHA2561851a826e19af8767fa1060ae59fbc5d027778634aea65387a2099f414b03055：L15693–15705是renderer-gone事件，L16324–16334是forcefullyCrashRenderer且提醒进程共享风险，L17522–17530明确无persist前缀为内存session。实际验证两个窗口OSProcessId不同；终止提醒进程后native窗销毁，在途操作失败回收，farm PID不变且DOM仍可执行，新update重新展示两按钮。监听计数为1，反复开窗不累积。新8组证据p040-native-crash.txt SHA2568052df2150a27c39db117587057767df636f45a897c529d579da14bc83092b25；18组UI p040-ui-release.txt和3模式p040-zorder-release.txt与上表结果/hash一致，原269/21/14不涉及本次新增session代码，沿用既有结果。
+
+Learning判断仍为none：窗口崩溃清理与独立内存session属于固定版官方生命周期的正确适配，本次没有新的跨任务验证教训；复核未提出Learning候选。
+
+本地72未发布产物保留；版本工具根据实际占用选择73，不覆盖72同号产物。待修复冻结commit、独立复核、干净重建、包源比对、安装版五资产及真实71客户端更新检测后补充，不以版本准备表示已发布或安装。

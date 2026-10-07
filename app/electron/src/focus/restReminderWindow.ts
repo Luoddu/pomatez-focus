@@ -10,6 +10,7 @@ export class RestReminderWindow {
   private window: BrowserWindow | null = null;
   private current: Presentation | null = null;
   private serial = 0;
+  private securedSessions = new WeakSet<Electron.Session>();
   private pending: { id: number; key: string; action: RestAction; resolve: (ok: boolean) => void; timeout: NodeJS.Timeout } | null = null;
   constructor(private directory: string, private headless: boolean,
     private dispatch: (request: { id: number; key: string; action: RestAction }) => void,
@@ -39,11 +40,24 @@ export class RestReminderWindow {
       show: false, frame: false, resizable: false, maximizable: false, minimizable: false,
       skipTaskbar: true, backgroundColor: "#ffffff",
       webPreferences: { preload: path.join(this.directory, "rest-reminder-preload.js"),
-        contextIsolation: true, nodeIntegration: false, sandbox: true },
+        contextIsolation: true, nodeIntegration: false, sandbox: true,
+        partition: "rest-reminder" },
     });
     popup.setAlwaysOnTop(true, process.platform === "win32" ? "pop-up-menu" : "floating");
     popup.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     popup.webContents.on("will-navigate", event => event.preventDefault());
+    const session = popup.webContents.session;
+    if (!this.securedSessions.has(session)) {
+      session.setPermissionRequestHandler((_web, _permission, callback) => callback(false));
+      session.setPermissionCheckHandler(() => false);
+      session.on("will-download", (_event, item) => item.cancel());
+      this.securedSessions.add(session);
+    }
+    popup.webContents.on("render-process-gone", () => {
+      // Keep the monitor's threshold, dispose the broken native surface. A
+      // subsequent healthy state update creates a fresh renderer/window.
+      if (this.window === popup) this.close();
+    });
     popup.on("close", () => {
       // Alt+F4 dismisses this threshold, without hiding/exiting the farm.
       const key = this.current?.key;
