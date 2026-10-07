@@ -3,7 +3,12 @@ import fs from "fs";
 import path from "path";
 
 type Site = "bilibili" | "xiaohongshu";
-export type RestSettings = { quotaMinutes: number; supervise: boolean };
+export type RestSettings = {
+  quotaMinutes: number;
+  supervise: boolean;
+  pomodoroGoal: number;
+  reminderMinutes: number;
+};
 type Interval = { start: number; end: number; site: Site };
 export type Usage = {
   day: string;
@@ -62,13 +67,31 @@ export function validSettings(value: any): RestSettings {
     typeof value.supervise !== "boolean" ||
     !Number.isInteger(value.quotaMinutes) ||
     value.quotaMinutes < 5 ||
-    value.quotaMinutes > 60 ||
+    value.quotaMinutes > 480 ||
     value.quotaMinutes % 5
   )
-    throw Error("额度须为 5–60 分钟，按 5 分钟调整");
+    throw Error("额度须为 5–480 分钟，按 5 分钟调整");
+  const pomodoroGoal =
+    value.pomodoroGoal === undefined ? 12 : value.pomodoroGoal;
+  const reminderMinutes =
+    value.reminderMinutes === undefined ? 5 : value.reminderMinutes;
+  if (
+    !Number.isInteger(pomodoroGoal) ||
+    pomodoroGoal < 0 ||
+    pomodoroGoal > 60
+  )
+    throw Error("番茄目标须为 0–60 个整数，0 表示仅按额度提醒");
+  if (
+    !Number.isInteger(reminderMinutes) ||
+    reminderMinutes < 1 ||
+    reminderMinutes > 60
+  )
+    throw Error("提醒间隔须为 1–60 分钟的整数");
   return {
     quotaMinutes: value.quotaMinutes,
     supervise: value.supervise,
+    pomodoroGoal,
+    reminderMinutes,
   };
 }
 function siteOf(data: any): Site | null {
@@ -258,6 +281,7 @@ export class ActivityWatchRest {
   private ledger = {
     day: "",
     quota: 60,
+    interval: 5,
     step: 0,
     focusStep: 0,
     quotaCrossed: false,
@@ -272,7 +296,12 @@ export class ActivityWatchRest {
   } | null = null;
   private coverageStart: number | null = null;
   private state: RestState = {
-    settings: { quotaMinutes: 60, supervise: true },
+    settings: {
+      quotaMinutes: 60,
+      supervise: true,
+      pomodoroGoal: 12,
+      reminderMinutes: 5,
+    },
     progress: null,
     usage: null,
     status: "connecting",
@@ -302,7 +331,7 @@ export class ActivityWatchRest {
           throw Error("旧额度无效");
         this.state.settings = validSettings({
           ...stored.settings,
-          quotaMinutes: Math.min(60, oldQuota),
+          quotaMinutes: oldQuota,
         });
         if (
           typeof stored.ledger?.day === "string" &&
@@ -315,6 +344,14 @@ export class ActivityWatchRest {
           stored.ledger.quota % 5 === 0
         ) {
           const old = stored.ledger;
+          const oldInterval =
+            old.interval === undefined ? 5 : old.interval;
+          if (
+            !Number.isInteger(oldInterval) ||
+            oldInterval < 1 ||
+            oldInterval > 60
+          )
+            throw Error("提醒间隔账本无效");
           const legacy =
             old.focusStep === undefined &&
             old.quotaCrossed === undefined;
@@ -332,16 +369,25 @@ export class ActivityWatchRest {
               ? stored.last.totalSeconds
               : 0;
           const quota = this.state.settings.quotaMinutes;
+          const interval = this.state.settings.reminderMinutes;
+          const rebase =
+            old.quota !== quota || oldInterval !== interval;
           this.ledger = {
             day: old.day,
             quota,
-            step:
-              old.quota === quota
-                ? old.step
-                : Math.max(0, Math.floor((total - quota * 60) / 300)),
-            focusStep: legacy ? Math.floor(total / 300) : old.focusStep,
+            interval,
+            step: !rebase
+              ? old.step
+              : Math.max(
+                  0,
+                  Math.floor((total - quota * 60) / (interval * 60))
+                ),
+            focusStep:
+              legacy || rebase
+                ? Math.floor(total / (interval * 60))
+                : old.focusStep,
             quotaCrossed:
-              legacy || old.quota !== quota
+              legacy || rebase
                 ? old.step > 0 || total > quota * 60
                 : old.quotaCrossed,
           };
@@ -405,9 +451,10 @@ export class ActivityWatchRest {
     this.ledger = {
       day: dayKey(this.now()),
       quota: settings.quotaMinutes,
+      interval: settings.reminderMinutes,
       focusStep:
         u?.day === dayKey(this.now())
-          ? Math.floor(u.totalSeconds / 300)
+          ? Math.floor(u.totalSeconds / (settings.reminderMinutes * 60))
           : 0,
       quotaCrossed:
         u?.day === dayKey(this.now()) &&
@@ -417,7 +464,8 @@ export class ActivityWatchRest {
           ? Math.max(
               0,
               Math.floor(
-                (u.totalSeconds - settings.quotaMinutes * 60) / 300
+                (u.totalSeconds - settings.quotaMinutes * 60) /
+                  (settings.reminderMinutes * 60)
               )
             )
           : 0,
@@ -466,7 +514,7 @@ export class ActivityWatchRest {
       completedCount: value.completedCount,
     };
     if (
-      value.completedCount >= 12 &&
+      value.completedCount >= this.state.settings.pomodoroGoal &&
       this.state.reminder?.kind === "focus"
     )
       this.state.reminder = null;
@@ -663,19 +711,30 @@ export class ActivityWatchRest {
         ? "本机记录 · 每 30 秒更新"
         : "额度设置读取失败或未保存，请重新保存设置以恢复督促";
       const quota = this.state.settings.quotaMinutes;
-      if (this.ledger.day !== day || this.ledger.quota !== quota)
+      const interval = this.state.settings.reminderMinutes;
+      const stepSeconds = interval * 60;
+      if (
+        this.ledger.day !== day ||
+        this.ledger.quota !== quota ||
+        this.ledger.interval !== interval
+      )
         this.ledger = {
           day,
           quota,
+          interval,
           step: 0,
           focusStep: 0,
           quotaCrossed: false,
         };
       const step = Math.max(
         0,
-        Math.floor((u.totalSeconds - quota * 60 + 0.000001) / 300)
+        Math.floor(
+          (u.totalSeconds - quota * 60 + 0.000001) / stepSeconds
+        )
       );
-      const focusStep = Math.floor((u.totalSeconds + 0.000001) / 300);
+      const focusStep = Math.floor(
+        (u.totalSeconds + 0.000001) / stepSeconds
+      );
       const quotaCrossed = u.totalSeconds > quota * 60 + 0.000001;
       const count =
         this.state.progress?.day === day
@@ -688,7 +747,7 @@ export class ActivityWatchRest {
             (!this.ledger.quotaCrossed || step > this.ledger.step),
           focusReminder =
             count !== null &&
-            count < 12 &&
+            count < this.state.settings.pomodoroGoal &&
             focusStep > this.ledger.focusStep,
           newReminder =
             this.state.settings.supervise &&
@@ -714,7 +773,7 @@ export class ActivityWatchRest {
         if (newReminder) {
           const wasPending = !!this.state.reminder;
           this.state.reminder = {
-            key: `${day}/${quota}/${focusStep}/${step}/${
+            key: `${day}/${quota}/${interval}/${focusStep}/${step}/${
               quotaCrossed ? 1 : 0
             }`,
             excessMinutes: Math.max(

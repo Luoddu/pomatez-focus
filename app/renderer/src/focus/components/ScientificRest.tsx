@@ -20,7 +20,12 @@ type Usage = {
   }[];
 };
 export type RestState = {
-  settings: { quotaMinutes: number; supervise: boolean };
+  settings: {
+    quotaMinutes: number;
+    supervise: boolean;
+    pomodoroGoal: number;
+    reminderMinutes: number;
+  };
   progress: { day: string; completedCount: number } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
@@ -35,7 +40,12 @@ export type RestState = {
   } | null;
 };
 const initial: RestState = {
-  settings: { quotaMinutes: 60, supervise: true },
+  settings: {
+    quotaMinutes: 60,
+    supervise: true,
+    pomodoroGoal: 12,
+    reminderMinutes: 5,
+  },
   progress: null,
   usage: null,
   status: "connecting",
@@ -122,6 +132,8 @@ export default function ScientificRest({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState("60");
+  const [draftGoal, setDraftGoal] = useState("12");
+  const [draftReminder, setDraftReminder] = useState("5");
   const [busy, setBusy] = useState(false);
   const requestId = useRef(0);
   useEffect(
@@ -150,11 +162,21 @@ export default function ScientificRest({
         b.bilibili + b.xiaohongshu - (a.bilibili + a.xiaohongshu)
     )
     .slice(0, 2);
-  async function configure(quotaMinutes: number, supervise: boolean) {
+  async function configure(
+    quotaMinutes: number,
+    supervise: boolean,
+    pomodoroGoal = state.settings.pomodoroGoal,
+    reminderMinutes = state.settings.reminderMinutes
+  ) {
     setBusy(true);
     setError("");
     try {
-      await api().restSettings({ quotaMinutes, supervise });
+      await api().restSettings({
+        quotaMinutes,
+        supervise,
+        pomodoroGoal,
+        reminderMinutes,
+      });
       return true;
     } catch (e: any) {
       setError(e.message || "设置未保存");
@@ -268,11 +290,15 @@ export default function ScientificRest({
                   className="btn-text"
                   onClick={() => {
                     setDraft(String(state.settings.quotaMinutes));
+                    setDraftGoal(String(state.settings.pomodoroGoal));
+                    setDraftReminder(
+                      String(state.settings.reminderMinutes)
+                    );
                     setError("");
                     setView("settings");
                   }}
                 >
-                  设置额度
+                  设置策略
                 </button>
               </div>
               <div className="rest-sites">
@@ -301,16 +327,40 @@ export default function ScientificRest({
                 type="number"
                 aria-label="每日摸鱼额度（分钟）"
                 min={5}
-                max={60}
+                max={480}
                 step={5}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
               />{" "}
               分钟
             </label>
-            <p>
-              未满12番茄时每看5分钟督促；每日最多60分钟，超额继续提醒。
-            </p>
+            <label>
+              每日番茄目标{" "}
+              <input
+                type="number"
+                aria-label="每日番茄目标（个）"
+                min={0}
+                max={60}
+                step={1}
+                value={draftGoal}
+                onChange={(e) => setDraftGoal(e.target.value)}
+              />{" "}
+              个
+            </label>
+            <label>
+              每看多久提醒{" "}
+              <input
+                type="number"
+                aria-label="提醒间隔（分钟）"
+                min={1}
+                max={60}
+                step={1}
+                value={draftReminder}
+                onChange={(e) => setDraftReminder(e.target.value)}
+              />{" "}
+              分钟
+            </label>
+            <p>未达目标时督促，超额继续提醒；目标设0则仅按额度提醒。</p>
             <button
               className="btn-small"
               disabled={busy}
@@ -318,13 +368,15 @@ export default function ScientificRest({
                 if (
                   await configure(
                     Number(draft),
-                    state.settings.supervise
+                    state.settings.supervise,
+                    draftGoal.trim() ? Number(draftGoal) : NaN,
+                    Number(draftReminder)
                   )
                 )
                   setView("quota");
               }}
             >
-              保存额度
+              保存策略
             </button>
           </div>
         ) : (
@@ -445,8 +497,10 @@ export default function ScientificRest({
           title={state.message}
         >
           {state.status === "recording"
-            ? state.progress && state.progress.completedCount < 12
-              ? `今日 ${state.progress.completedCount}/12 番茄 · 每看 5 分钟督促`
+            ? state.progress &&
+              state.progress.completedCount <
+                state.settings.pomodoroGoal
+              ? `今日 ${state.progress.completedCount}/${state.settings.pomodoroGoal} 番茄 · 每看 ${state.settings.reminderMinutes} 分钟督促`
               : `今日额度 ${state.settings.quotaMinutes} 分钟 · 已记录`
             : state.usage
             ? "采集已中断 · 保留上次记录"
@@ -538,7 +592,9 @@ export function ScientificRestReminder({
               ? `已看 ${reminder.watchedMinutes} 分钟，番茄 ${
                   state.progress?.completedCount ??
                   reminder.completedCount
-                }/12：去睡觉，或回到科研主线。`
+                }/${
+                  state.settings.pomodoroGoal
+                }：去睡觉，或回到科研主线。`
               : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。`)}
         </p>
         <div>

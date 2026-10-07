@@ -326,20 +326,101 @@ app.whenReady().then(async () => {
     checks.push(
       "same-place statistics and today/week hourly distribution"
     );
-    await click("设置额度");
+    await click("设置策略");
     await js(
       `(()=>{const e=document.querySelector('.rest-settings input');const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;set.call(e,'7');e.dispatchEvent(new Event('input',{bubbles:true}))})()`
     );
-    await click("保存额度");
+    await click("保存策略");
     await until(() => js(`!!document.querySelector('.rest-error')`));
     assert.equal(restMonitor.snapshot().settings.quotaMinutes, 60);
     await js(
       `(()=>{const e=document.querySelector('.rest-settings input');const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;set.call(e,'60');e.dispatchEvent(new Event('input',{bubbles:true}))})()`
     );
-    await click("保存额度");
+    await click("保存策略");
     await until(() => js(`!!document.querySelector('.rest-quota')`));
     checks.push(
       "quota validation leaves old settings usable and valid save works"
+    );
+    await click("设置策略");
+    assert.equal(
+      await js(
+        `document.querySelectorAll('.rest-settings input').length`
+      ),
+      3
+    );
+    const strategyGeometry = await js(
+      `(()=>{const r=document.querySelector('.rest-card').getBoundingClientRect(), m=document.querySelector('.heatmap').getBoundingClientRect();return {height:r.height,calendar:m.height,right:r.right,viewport:innerWidth}})()`
+    );
+    assert.ok(
+      strategyGeometry.height <= strategyGeometry.calendar + 15
+    );
+    assert.ok(strategyGeometry.right <= strategyGeometry.viewport + 1);
+    await setInput('[aria-label="每日摸鱼额度（分钟）"]', 90);
+    await setInput('[aria-label="每日番茄目标（个）"]', 15);
+    await setInput('[aria-label="提醒间隔（分钟）"]', 3);
+    await click("保存策略");
+    await until(() => js(`!!document.querySelector('.rest-quota')`));
+    assert.deepEqual(restMonitor.snapshot().settings, {
+      quotaMinutes: 90,
+      supervise: true,
+      pomodoroGoal: 15,
+      reminderMinutes: 3,
+    });
+    assert.equal(restMonitor.snapshot().reminder, null);
+    bSeconds = 2820; // Total57: custom three-minute threshold, goal still12/15.
+    await restMonitor.refresh();
+    await until(() => js(`!!document.querySelector('.rest-reminder')`));
+    assert.equal(restMonitor.snapshot().reminder.kind, "focus");
+    assert.ok(
+      await js(
+        `document.querySelector('.rest-reminder').textContent.includes('12/15')`
+      )
+    );
+    await click("去睡觉");
+    await js(`document.querySelector('.rest-supervise input').click()`);
+    await until(
+      () => restMonitor.snapshot().settings.supervise === false
+    );
+    const customReload = new Promise((r) =>
+      win.webContents.once("did-finish-load", r)
+    );
+    win.reload();
+    await customReload;
+    await until(() =>
+      js(
+        `document.querySelector('.rest-supervise input')?.checked===false`
+      )
+    );
+    assert.deepEqual(restMonitor.snapshot().settings, {
+      quotaMinutes: 90,
+      supervise: false,
+      pomodoroGoal: 15,
+      reminderMinutes: 3,
+    });
+    await click("设置策略");
+    assert.equal(
+      await js(
+        `document.querySelector('[aria-label="每日番茄目标（个）"]').value`
+      ),
+      "15"
+    );
+    assert.equal(
+      await js(
+        `document.querySelector('[aria-label="提醒间隔（分钟）"]').value`
+      ),
+      "3"
+    );
+    await setInput('[aria-label="每日摸鱼额度（分钟）"]', 60);
+    await setInput('[aria-label="每日番茄目标（个）"]', 12);
+    await setInput('[aria-label="提醒间隔（分钟）"]', 5);
+    await click("保存策略");
+    await until(() => js(`!!document.querySelector('.rest-quota')`));
+    await js(`document.querySelector('.rest-supervise input').click()`);
+    await until(
+      () => restMonitor.snapshot().settings.supervise === true
+    );
+    checks.push(
+      "three real settings save, custom threshold/goal works, switch preserves strategy, reload restores inputs, layout remains compact"
     );
     // Start through the normal existing task flow.
     await click("开始专注");

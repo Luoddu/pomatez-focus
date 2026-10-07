@@ -129,9 +129,14 @@ test("bounded settings reject renderer URL, invalid quota and nonboolean switch"
       supervise: true,
       url: "https://evil.invalid",
     }),
-    { quotaMinutes: 60, supervise: true }
+    {
+      quotaMinutes: 60,
+      supervise: true,
+      pomodoroGoal: 12,
+      reminderMinutes: 5,
+    }
   );
-  for (const q of [0, 7, 65, 480, 481, NaN, "60"])
+  for (const q of [0, 7, 481, NaN, "60"])
     assert.throws(() =>
       validSettings({ quotaMinutes: q, supervise: true })
     );
@@ -217,6 +222,138 @@ test("daily and seven-day bounds follow local calendar, not fixed UTC offset", (
   assert.equal(dayKey(at()), "2026-10-07");
   assert.equal(dayKey(dayBounds(at(), 7).start), "2026-10-01");
   assert.equal(new Date(dayBounds(at()).start).getHours(), 0);
+});
+
+test("custom goal, interval and quota govern actual thresholds and survive restart", async () => {
+  const f = fixture(),
+    directory = dir();
+  let alerts = 0;
+  const create = () =>
+    new ActivityWatchRest(
+      directory,
+      () => {},
+      () => alerts++,
+      f.request,
+      f.now
+    );
+  let m = create();
+  const settings = {
+    quotaMinutes: 45,
+    supervise: true,
+    pomodoroGoal: 8,
+    reminderMinutes: 3,
+  };
+  m.configure(settings);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 7 });
+  f.seconds(179.99);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(180);
+  let s = await m.refresh();
+  assert.equal(s.reminder.kind, "focus");
+  assert.equal(alerts, 1);
+  m.acknowledge(s.reminder.key);
+  m = create();
+  assert.deepEqual(m.snapshot().settings, settings);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 7 });
+  assert.equal((await m.refresh()).reminder, null);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 8 });
+  f.seconds(360);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(2700);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(2700.01);
+  s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  assert.equal(alerts, 2);
+  m.acknowledge(s.reminder.key);
+  f.seconds(2879.99);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(2880);
+  s = await m.refresh();
+  assert.equal(s.reminder.excessMinutes, 3);
+  assert.equal(alerts, 3);
+});
+
+test("zero goal disables early prompts; changing interval rebases and invalid input preserves strategy", async () => {
+  const f = fixture(),
+    m = new ActivityWatchRest(
+      dir(),
+      () => {},
+      () => {},
+      f.request,
+      f.now
+    );
+  const zero = {
+    quotaMinutes: 60,
+    supervise: true,
+    pomodoroGoal: 0,
+    reminderMinutes: 2,
+  };
+  m.configure(zero);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  f.seconds(1200);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(3601);
+  assert.equal((await m.refresh()).reminder.kind, "quota");
+  m.configure({ ...zero, pomodoroGoal: 8, reminderMinutes: 7 });
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(4020);
+  assert.equal((await m.refresh()).reminder.kind, "quota");
+  for (const bad of [
+    { pomodoroGoal: -1 },
+    { pomodoroGoal: 61 },
+    { pomodoroGoal: 1.5 },
+    { pomodoroGoal: null },
+    { pomodoroGoal: "8" },
+    { reminderMinutes: 0 },
+    { reminderMinutes: 61 },
+    { reminderMinutes: 2.5 },
+    { reminderMinutes: null },
+  ])
+    assert.throws(() => m.configure({ ...zero, ...bad }));
+  assert.equal(m.snapshot().settings.reminderMinutes, 7);
+  assert.equal(m.snapshot().settings.pomodoroGoal, 8);
+  assert.deepEqual(
+    validSettings({ quotaMinutes: 480, supervise: true }),
+    {
+      quotaMinutes: 480,
+      supervise: true,
+      pomodoroGoal: 12,
+      reminderMinutes: 5,
+    }
+  );
+});
+
+test("public70 schema receives default strategy with same-day usage consumed, not replayed", async () => {
+  const f = fixture(),
+    directory = dir();
+  fs.writeFileSync(
+    path.join(directory, "aw-rest-settings.json"),
+    JSON.stringify({
+      settings: { quotaMinutes: 60, supervise: true },
+      ledger: { day: dayKey(f.now()), quota: 60, step: 0 },
+      last: {
+        day: dayKey(f.now()),
+        totalSeconds: 900,
+        bilibili: 900,
+        xiaohongshu: 0,
+      },
+    })
+  );
+  const m = new ActivityWatchRest(
+    directory,
+    () => {},
+    () => {},
+    f.request,
+    f.now
+  );
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  f.seconds(900);
+  assert.equal((await m.refresh()).reminder, null);
+  assert.equal(m.snapshot().settings.pomodoroGoal, 12);
+  assert.equal(m.snapshot().settings.reminderMinutes, 5);
+  f.seconds(1200);
+  assert.equal((await m.refresh()).reminder.kind, "focus");
 });
 
 test("before 12 confirmed tomatoes: each five recorded minutes, no wall-time alerts", async () => {
@@ -402,7 +539,7 @@ test("a quota prompt consumes its overlapping focus threshold even before progre
   assert.equal(alerts, 3); // Restoration uncertainty never disables the daily cap.
 });
 
-test("valid old ledger migrates without retroactive focus prompts; old >60 quota clamps, corrupt new ledger fails closed", async () => {
+test("valid old ledger migrates without retroactive focus prompts; old configurable quota survives, corrupt new ledger fails closed", async () => {
   const f = fixture();
   for (const quota of [60, 120]) {
     const directory = dir();
@@ -429,7 +566,7 @@ test("valid old ledger migrates without retroactive focus prompts; old >60 quota
     m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
     f.seconds(900);
     assert.equal((await m.refresh()).reminder, null);
-    assert.equal(m.snapshot().settings.quotaMinutes, 60);
+    assert.equal(m.snapshot().settings.quotaMinutes, quota);
     f.seconds(1200);
     assert.equal((await m.refresh()).reminder.kind, "focus");
     m.acknowledge(m.snapshot().reminder.key);
@@ -629,7 +766,12 @@ test("disabled supervision still records; settings survive restart; invalid sett
       f.request,
       f.now
     ).snapshot().settings,
-    { quotaMinutes: 10, supervise: false }
+    {
+      quotaMinutes: 10,
+      supervise: false,
+      pomodoroGoal: 12,
+      reminderMinutes: 5,
+    }
   );
   monitor.configure({ quotaMinutes: 10, supervise: true });
   await monitor.refresh();
