@@ -536,6 +536,24 @@ export function ScientificRestReminder({
     state.settings.supervise && state.status === "recording"
       ? state.reminder
       : null;
+  const callbacks = useRef({ onSleep, onFocus, reminder });
+  callbacks.current = { onSleep, onFocus, reminder };
+  useEffect(() => {
+    const bridge = api();
+    if (!bridge?.nativeRestReminder) return;
+    return bridge.onRestAction((request: { id: number; key: string; action: string }) => {
+      let ok = false;
+      try {
+        const current = callbacks.current;
+        if (request.key !== current.reminder?.key) throw Error("Stale reminder");
+        if (request.action === "sleep") current.onSleep();
+        else if (request.action === "focus") current.onFocus();
+        else throw Error("Invalid action");
+        ok = true;
+      } catch (_) { /* Native reminder retains its retry affordance. */ }
+      void bridge.restActionResult({ id: request.id, key: request.key, ok }).catch(() => {});
+    });
+  }, []);
   useEffect(() => {
     if (!reminder) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -544,7 +562,7 @@ export function ScientificRestReminder({
     // Focus once when the dialog opens, not every time the amount changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!reminder]);
-  if (!reminder) return null;
+  if (!reminder || api()?.nativeRestReminder) return null;
   async function act(action: () => void, hide = false) {
     setBusy(true);
     setError("");

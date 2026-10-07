@@ -93,6 +93,12 @@ require("esbuild").buildSync({
   bundle: true, platform: "node", external: ["electron"],
   outfile: "app/electron/build/preload.js",
 });
+require("esbuild").buildSync({
+  absWorkingDir: root,
+  entryPoints: ["app/electron/src/rest-reminder-preload.ts"],
+  bundle: true, platform: "node", external: ["electron"],
+  outfile: "app/electron/build/rest-reminder-preload.js",
+});
 run(
   "node_modules/react-scripts/scripts/build.js",
   [],

@@ -5,6 +5,13 @@ const invoke = async (name: string, value?: any) => {
   return reply.value;
 };
 contextBridge.exposeInMainWorld("focusApi", {
+  nativeRestReminder: true,
+  restActionResult: (value: any) => invoke("restActionResult", value),
+  onRestAction: (callback: (request: any) => void) => {
+    const listener = (_event: any, request: any) => callback(request);
+    ipcRenderer.on("focus:rest-action", listener);
+    return () => ipcRenderer.removeListener("focus:rest-action", listener);
+  },
   status: () => invoke("status"),
   restState: () => invoke("restState"),
   restSettings: (value: any) => invoke("restSettings", value),

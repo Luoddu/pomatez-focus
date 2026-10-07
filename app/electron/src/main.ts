@@ -14,6 +14,7 @@ import fs from "fs";
 import { FocusService } from "./focus/service";
 import { FocusUpdater } from "./focus/updater";
 import { ActivityWatchRest } from "./focus/activitywatch";
+import { RestReminderWindow } from "./focus/restReminderWindow";
 const headless = process.env.POMATEZ_HEADLESS === "1";
 app.setName("Pomatez Focus");
 app.setPath(
@@ -30,7 +31,8 @@ app.commandLine.appendSwitch(
 const single = app.requestSingleInstanceLock();
 let win: BrowserWindow | null = null,
   tray: Tray | null = null,
-  quitting = false;
+  quitting = false,
+  farmReady = false;
 const service = new FocusService();
 // 生成进度：真实阶段事件从 service 转发到渲染层（窗口未就绪时丢弃即可，
 // 渲染层的初始「正在连接飞书…」不依赖该通道）
@@ -43,10 +45,23 @@ const show = () => {
     win.focus();
   }
 };
+export const restPopup = new RestReminderWindow(__dirname, headless,
+  request => {
+    if (!win || win.isDestroyed() || win.webContents.isLoadingMainFrame()) throw Error("Farm unavailable");
+    win.webContents.send("focus:rest-action", request);
+  },
+  (key, action) => {
+    restMonitor.acknowledge(key);
+    if (action === "sleep") win?.hide(); else show();
+  },
+  key => restMonitor.acknowledge(key)
+);
 export const restMonitor = new ActivityWatchRest(
   app.getPath("userData"),
-  (state) => { if (win && !win.isDestroyed()) win.webContents.send("focus:rest-state", state); },
-  () => { if (!quitting) show(); }
+  (state) => {
+    if (win && !win.isDestroyed()) win.webContents.send("focus:rest-state", state);
+    if (!quitting && farmReady) restPopup.update(state);
+  }
 );
 const handler = (name: string, fn: (value: any) => any) =>
   ipcMain.handle(`focus:${name}`, async (event, value) => {
@@ -165,6 +180,21 @@ else {
       handler("restProgress", (value) => restMonitor.reportProgress(value));
       handler("restStatistics", (value) => restMonitor.statistics(value));
       handler("restAcknowledge", (value) => restMonitor.acknowledge(value));
+      handler("restActionResult", (value) => restPopup.complete(value));
+      ipcMain.handle("rest-reminder:state", event => {
+        if (!restPopup.owns(event)) throw Error("Untrusted sender");
+        return restPopup.snapshot();
+      });
+      ipcMain.handle("rest-reminder:act", (event, value) => {
+        if (!restPopup.owns(event)) throw Error("Untrusted sender");
+        return restPopup.act(value);
+      });
+      win.webContents.on("render-process-gone", () => { farmReady = false; restPopup.close(); });
+      win.webContents.on("did-start-loading", () => { farmReady = false; restPopup.close(); });
+      win.webContents.on("did-finish-load", () => {
+        farmReady = true;
+        if (!quitting) restPopup.update(restMonitor.snapshot());
+      });
       handler("saveJournal", (value) => service.saveJournal(value));
       handler("backupHistory", (value) => service.backupHistory(value));
       const installUpdate = async () => {
@@ -327,6 +357,7 @@ else {
 app.on("before-quit", () => {
   quitting = true;
   restMonitor.stop();
+  restPopup.close();
 });
 app.on("window-all-closed", () => app.quit());
 app.on("activate", show);

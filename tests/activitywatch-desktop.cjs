@@ -131,11 +131,12 @@ app.whenReady().then(async () => {
     win.webContents.on("console-message", (_e, level, message) => {
       if (level >= 3) errors.push(message);
     });
-    const js = async (code) => {
+    const popup = () => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('/assets/rest-reminder.html'));
+    const js = async (code, target = code.includes('.rest-reminder') ? popup() || win : win) => {
       let timeout;
       try {
         return await Promise.race([
-          win.webContents.executeJavaScript(code, true),
+          target.webContents.executeJavaScript(code, true),
           new Promise((_, reject) => {
             timeout = setTimeout(
               () =>
@@ -159,18 +160,23 @@ app.whenReady().then(async () => {
       }
       throw Error("UI wait failed");
     };
-    const click = (text) => (
-      console.log("UI click:", text),
-      js(
+    const click = async (text) => {
+      console.log("UI click:", text);
+      if (text === "去睡觉" || text === "开始下一个番茄")
+        await until(() => popup() && !popup().webContents.isLoadingMainFrame() &&
+          js("Array.from(document.querySelectorAll('button')).every(b=>!b.disabled)", popup()));
+      await js(
         `(()=>{const e=Array.from(document.querySelectorAll('button')).find(e=>e.getAttribute('aria-label')===${JSON.stringify(
           text
         )}||e.textContent.trim()===${JSON.stringify(
           text
         )});if(!e)throw Error('Missing '+${JSON.stringify(
           text
-        )});e.click()})()`
-      )
-    );
+        )});if(e.disabled)throw Error('Disabled '+${JSON.stringify(text)});e.click()})()`,
+        text === "去睡觉" || text === "开始下一个番茄" ? popup() : win
+      );
+      if (text === "去睡觉" || text === "开始下一个番茄") await until(() => !popup());
+    };
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand("Page.enable");
     const capture = async (name) => {
@@ -235,6 +241,9 @@ app.whenReady().then(async () => {
     checks.push(
       "production confirmed-record hook: 0/12 and combined 5/10/15 minute reminders, no prompt at 299 seconds"
     );
+    assert.equal(await js(`document.querySelector('.rest-reminder')===null`, win), true);
+    assert.equal(win.isAlwaysOnTop(), false);
+    checks.push("farm has no in-page reminder and remains unpinned after native reminders");
     const setInput = (selector, value) =>
       js(
         `(()=>{const e=document.querySelector(${JSON.stringify(
@@ -576,8 +585,7 @@ app.whenReady().then(async () => {
     );
     console.log("Portrait card geometry verified");
     checks.push("portrait-width card stays within viewport");
-    // Although no quota card is added to the mini window, supervision stays
-    // reachable there and both actions must fit inside its existing bounds.
+    // The independent reminder remains reachable even with a compact farm.
     await js(
       `document.querySelector('[aria-label="切换小窗"]').click()`
     );
