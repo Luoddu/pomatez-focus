@@ -12,3 +12,6 @@
 - 预算/停止：一次前台有界纵切，无新后台scheduler/系统service/OS自启动注册项。允许既有review_scientific_rest冻结源码+证据独立只读复核，不写文件、不启动App、不再分派；精确问题修正后复验。真实冷启动全链若需打断现有用户采集则不用强杀，只如实报告可做测试边界。同因未知失败两次停止对应修补；根因明确有公开路径可在预算内继续。
 - 回滚：基线显式文件可恢复，无用户数据迁移；固定新版本发布五安装资产及真实前一73检测，禁止替换旧tag/安装包，不自动安装。P041界面随本次最终安装版一起交付，不额外发布仅中间源码的74。
 - Learning判断：暂无新可复用已验证教训；检查点审视，发布沿用LEARN-P0-POMO-039-01。只有实现、实测、独立复核和实际发布回执齐备才DONE。
+- 复核修正范围：明确允许tests/activitywatch.test.cjs新增deferred交错正反验收；refreshNow必须单飞、排空最新daily/week在途请求后同步清cache+启动新daily，不清空旧readUsage仍在用的coverageStart。只改原monitor刷新，不新增poll/状态源；修正冻结版本后再次只读复核。官方snapshot manager.py实际server-first autostart L267–286（此前卡245–263为Web规范化行号，不作原文行号）。
+
+- 修正检查点新增允许Learning.md模块条目；已证实缓存失效竞态，正反原始证据见验收与artifacts/p042-old-race.txt、p042-refresh-race.txt，登记LEARN-P0-POMO-042-01。根Learning仍禁止写。

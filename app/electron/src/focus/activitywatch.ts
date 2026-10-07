@@ -277,6 +277,8 @@ export class ActivityWatchRest {
   private running = false;
   private generation = 0;
   private busy: Promise<RestState> | null = null;
+  private manualBusy: Promise<RestState> | null = null;
+  private manualGeneration = 0;
   private busyGeneration = 0;
   private failures = 0;
   private ledger = {
@@ -640,12 +642,26 @@ export class ActivityWatchRest {
         });
     return this.weekBusy;
   }
-  async refreshNow(): Promise<RestState> {
-    // Join an in-flight poll before discarding discovery/statistics caches.
-    const generation = this.generation;
-    if (this.busy) await this.busy;
-    if (this.weekBusy) await this.weekBusy.catch(() => {});
+  refreshNow(): Promise<RestState> {
+    if (this.manualBusy)
+      return this.manualGeneration === this.generation
+        ? this.manualBusy
+        : this.manualBusy.then(() => this.refreshNow());
+    this.manualGeneration = this.generation;
+    this.manualBusy = this.refreshAfterQueries(this.generation).finally(() => {
+      this.manualBusy = null;
+    });
+    return this.manualBusy;
+  }
+  private async refreshAfterQueries(generation: number): Promise<RestState> {
+    // A timer may start a new day query while a week query is being awaited.
+    // Drain the latest requests, not only those present at entry.
+    while (this.busy || this.weekBusy) {
+      await Promise.all([this.busy, this.weekBusy].map(p => p?.catch(() => {})));
+      if (generation !== this.generation) return this.snapshot();
+    }
     if (generation !== this.generation) return this.snapshot();
+    // No await between invalidation and starting the new single-flight query.
     this.bucketIds = null;
     this.coverageStart = null;
     this.week = null;

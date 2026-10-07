@@ -850,6 +850,115 @@ test("freshness checks latest event end rather than a long merged start", async 
   );
   assert.equal((await stale.refresh()).status, "interrupted");
 });
+test("manual refresh drains a day poll started during a week query and rediscovers once", async () => {
+  const f = fixture();
+  f.seconds(60);
+  const deferred = () => {
+    let resolve;
+    const promise = new Promise((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  };
+  const weekGate = deferred(),
+    dayGate = deferred(),
+    weekEntered = deferred(),
+    dayEntered = deferred();
+  let holdWeek = true,
+    holdDay = false,
+    discoveries = 0;
+  const request = async (endpoint, body) => {
+    if (endpoint === "/buckets/") discoveries++;
+    if (endpoint === "/query/") {
+      const [start, end] = body.timeperiods[0].split("/");
+      const isWeek = new Date(end) - new Date(start) > 86400000;
+      if (isWeek && holdWeek) {
+        weekEntered.resolve();
+        await weekGate.promise;
+      }
+      if (!isWeek && holdDay) {
+        dayEntered.resolve();
+        await dayGate.promise;
+      }
+    }
+    return f.request(endpoint, body);
+  };
+  const monitor = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => {},
+    request,
+    f.now
+  );
+  await monitor.refresh();
+  const before = discoveries;
+  const week = monitor.statistics("week");
+  await weekEntered.promise;
+  const manual = monitor.refreshNow();
+  assert.equal(monitor.refreshNow(), manual);
+  holdDay = true;
+  const day = monitor.refresh();
+  await dayEntered.promise;
+  holdWeek = false;
+  weekGate.resolve();
+  await week;
+  assert.equal(discoveries, before);
+  holdDay = false;
+  dayGate.resolve();
+  const dayResult = await day;
+  assert.equal(dayResult.usage.coverageStart, at(0));
+  const refreshed = await manual;
+  assert.equal(refreshed.status, "recording");
+  assert.equal(refreshed.usage.coverageStart, at(0));
+  assert.equal(discoveries, before + 1);
+  assert.equal(f.queries(), 4);
+  await monitor.statistics("week");
+  assert.equal(f.queries(), 5);
+  monitor.stop();
+});
+test("suspending a waiting manual refresh leaves cancelled generation and future refresh usable", async () => {
+  const f = fixture();
+  let release, entered;
+  const enteredPromise = new Promise((r) => {
+      entered = r;
+    }),
+    gate = new Promise((r) => {
+      release = r;
+    });
+  let hold = false,
+    discoveries = 0;
+  const request = async (endpoint, body) => {
+    if (endpoint === "/buckets/") discoveries++;
+    if (endpoint === "/query/" && hold) {
+      entered();
+      await gate;
+    }
+    return f.request(endpoint, body);
+  };
+  const monitor = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => {},
+    request,
+    f.now
+  );
+  await monitor.refresh();
+  const before = discoveries;
+  hold = true;
+  const poll = monitor.refresh();
+  await enteredPromise;
+  const manual = monitor.refreshNow();
+  monitor.suspend();
+  hold = false;
+  release();
+  await poll;
+  const cancelled = await manual;
+  assert.equal(cancelled.status, "interrupted");
+  assert.equal(discoveries, before);
+  assert.equal((await monitor.refreshNow()).status, "recording");
+  assert.equal(discoveries, before + 1);
+  monitor.stop();
+});
 test("concurrent polling uses one query; no arbitrary statistics scope", async () => {
   const f = fixture(),
     monitor = new ActivityWatchRest(
