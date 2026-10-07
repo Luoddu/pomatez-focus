@@ -218,6 +218,152 @@ test("daily and seven-day bounds follow local calendar, not fixed UTC offset", (
   assert.equal(dayKey(dayBounds(at(), 7).start), "2026-10-01");
   assert.equal(new Date(dayBounds(at()).start).getHours(), 0);
 });
+test("an in-flight midnight result is discarded and retried once for today's usage", async () => {
+  const f = fixture(),
+    directory = dir();
+  f.advance(at(23, 59) + 59000 - f.now());
+  let queries = 0,
+    reminders = 0;
+  const request = async (endpoint, body) => {
+    if (endpoint !== "/query/") return f.request(endpoint, body);
+    queries++;
+    if (queries === 1) {
+      const yesterday = f.now();
+      f.advance(2000);
+      return [[event(yesterday - 3900000, 3900)]];
+    }
+    return [[event(f.now() - 1000, 1)]];
+  };
+  const monitor = new ActivityWatchRest(
+    directory,
+    () => {},
+    () => reminders++,
+    request,
+    f.now
+  );
+  const s = await monitor.refresh();
+  assert.equal(queries, 2);
+  assert.equal(s.status, "recording");
+  assert.equal(s.usage.day, "2026-10-08");
+  assert.equal(s.usage.totalSeconds, 1);
+  assert.equal(s.reminder, null);
+  assert.equal(reminders, 0);
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(path.join(directory, "aw-rest-settings.json"))
+    ).ledger.day,
+    "2026-10-08"
+  );
+  // Repeated clock jumps remain bounded and publish no stale day.
+  let jumps = 0;
+  const unstable = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => reminders++,
+    async (endpoint, body) => {
+      if (endpoint !== "/query/") return f.request(endpoint, body);
+      jumps++;
+      const end = f.now();
+      f.advance(24 * 3600000);
+      return [[event(end - 3900000, 3900)]];
+    },
+    f.now
+  );
+  const interrupted = await unstable.refresh();
+  assert.equal(jumps, 2);
+  assert.equal(interrupted.status, "interrupted");
+  assert.equal(interrupted.usage, null);
+  assert.equal(interrupted.reminder, null);
+  assert.equal(reminders, 0);
+});
+test("existing invalid ledgers suppress supervision until explicitly repaired; fresh profiles still alert", async () => {
+  for (const ledger of [
+    undefined,
+    { day: "2026-10-07", quota: 60, step: "bad" },
+    { day: "bad", quota: 60, step: 1 },
+    { day: "2026-10-07", quota: 7, step: 1 },
+  ]) {
+    const directory = dir(),
+      f = fixture();
+    fs.writeFileSync(
+      path.join(directory, "aw-rest-settings.json"),
+      JSON.stringify({
+        settings: { quotaMinutes: 60, supervise: true },
+        ledger,
+      })
+    );
+    let alerts = 0;
+    const monitor = new ActivityWatchRest(
+      directory,
+      () => {},
+      () => alerts++,
+      f.request,
+      f.now
+    );
+    f.seconds(3900);
+    let s = await monitor.refresh();
+    assert.equal(alerts, 0);
+    assert.equal(s.reminder, null);
+    assert.equal(s.usage.totalSeconds, 3900);
+    assert.match(s.message, /重新保存设置/);
+    monitor.configure({ quotaMinutes: 60, supervise: true });
+    f.seconds(4200);
+    s = await monitor.refresh();
+    assert.equal(alerts, 1);
+    assert.equal(s.reminder.excessMinutes, 10);
+  }
+  const f = fixture();
+  f.seconds(3900);
+  const fresh = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => {},
+    f.request,
+    f.now
+  );
+  assert.equal((await fresh.refresh()).reminder.excessMinutes, 5);
+});
+test("failed persistence clears pending reminders across subsequent polls and explicit repair resumes supervision", async (t) => {
+  const directory = dir(),
+    f = fixture(),
+    temp = path.join(directory, "aw-rest-settings.json.tmp");
+  let alerts = 0;
+  const monitor = new ActivityWatchRest(
+    directory,
+    () => {},
+    () => alerts++,
+    f.request,
+    f.now
+  );
+  f.seconds(3900);
+  assert.ok((await monitor.refresh()).reminder);
+  fs.mkdirSync(temp);
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  f.seconds(4200);
+  let s = await monitor.refresh();
+  assert.equal(s.status, "interrupted");
+  assert.equal(s.reminder, null);
+  s = await monitor.refresh();
+  assert.equal(s.status, "recording");
+  assert.equal(s.reminder, null);
+  assert.match(s.message, /恢复督促/);
+  assert.equal(alerts, 1);
+  fs.rmSync(temp, { recursive: true });
+  monitor.configure({ quotaMinutes: 60, supervise: true });
+  f.seconds(4500);
+  s = await monitor.refresh();
+  assert.equal(alerts, 2);
+  assert.equal(s.reminder.excessMinutes, 15);
+  // A failed explicit settings save also clears a pending reminder.
+  fs.mkdirSync(temp);
+  assert.throws(() =>
+    monitor.configure({ quotaMinutes: 55, supervise: true })
+  );
+  s = await monitor.refresh();
+  assert.equal(s.settings.quotaMinutes, 60);
+  assert.equal(s.reminder, null);
+  assert.equal(alerts, 2);
+});
 test("disabled supervision still records; settings survive restart; invalid settings leave state", async () => {
   const f = fixture(),
     directory = dir();

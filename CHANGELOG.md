@@ -1,5 +1,12 @@
 # Changelog
 
+# 0.1.0-preview.69 (local test build)
+
+- Add the compact “科学休息” card above the calendar, with a shared daily Bilibili/Xiaohongshu quota ring and in-place hourly statistics.
+- Read the existing local ActivityWatch API using URL, foreground and AFK/audio records; retain previous totals on disconnection.
+- Enable reminders by default after each additional five minutes over quota; pause for sleep or return to the existing pomodoro without duplicate timers.
+- Persist settings and consumed reminder thresholds locally; no browser history upload or ActivityWatch modification.
+
 ## 番茄农场 0.1.0-preview.68 (2026-10-03)
 
 - 补记分类菜单和已选分类显示对应色点，与专注积累使用相同六种颜色；支持鼠标、键盘和窄屏浮动菜单。

@@ -280,11 +280,16 @@ export class ActivityWatchRest {
         this.state.settings = validSettings(stored.settings);
         if (
           typeof stored.ledger?.day === "string" &&
-          Number.isInteger(stored.ledger.step) &&
+          /^\d{4}-\d{2}-\d{2}$/.test(stored.ledger.day) &&
+          Number.isSafeInteger(stored.ledger.step) &&
           stored.ledger.step >= 0 &&
-          Number.isInteger(stored.ledger.quota)
+          Number.isInteger(stored.ledger.quota) &&
+          stored.ledger.quota >= 5 &&
+          stored.ledger.quota <= 480 &&
+          stored.ledger.quota % 5 === 0
         )
           this.ledger = stored.ledger;
+        else throw Error("提醒账本无效");
         // Only aggregate daily totals are retained, never browser URLs/titles.
         if (
           stored.last?.day === dayKey(this.now()) &&
@@ -359,6 +364,10 @@ export class ActivityWatchRest {
     } catch (_) {
       this.state = before;
       this.ledger = ledger;
+      this.storageOk = false;
+      this.state.reminder = null;
+      this.state.message = "提醒状态保存失败，请重新保存设置以恢复督促";
+      this.emit();
       throw Error("额度设置未保存，请重试");
     }
     this.emit();
@@ -500,12 +509,16 @@ export class ActivityWatchRest {
     });
     return this.busy;
   }
-  private async update(generation: number) {
+  private async update(
+    generation: number,
+    rollover = false
+  ): Promise<RestState> {
     const now = this.now(),
       day = dayKey(now);
     if (this.state.usage && this.state.usage.day !== day) {
       this.state.usage = null;
       this.state.reminder = null;
+      this.state.updatedAt = null;
       this.emit();
     }
     try {
@@ -536,13 +549,25 @@ export class ActivityWatchRest {
         );
       const u = await this.readUsage(1, now);
       if (generation !== this.generation) return this.snapshot();
+      // A request may finish after midnight. Never publish or persist yesterday's
+      // usage/threshold; make one bounded retry with the new local day.
+      if (dayKey(this.now()) !== day) {
+        this.state.usage = null;
+        this.state.reminder = null;
+        this.state.updatedAt = null;
+        this.state.status = "connecting";
+        this.state.message = "日期已切换，正在核对今日记录";
+        this.emit();
+        if (!rollover) return this.update(generation, true);
+        throw Error("日期持续变化，稍后重新核对今日记录");
+      }
       this.state.usage = u;
       this.state.updatedAt = now;
       this.failures = 0;
       this.state.status = "recording";
       this.state.message = this.storageOk
         ? "本机记录 · 每 30 秒更新"
-        : "额度设置读取失败，请重新保存设置";
+        : "额度设置读取失败或未保存，请重新保存设置以恢复督促";
       const quota = this.state.settings.quotaMinutes;
       if (this.ledger.day !== day || this.ledger.quota !== quota)
         this.ledger = { day, quota, step: 0 };
@@ -560,6 +585,7 @@ export class ActivityWatchRest {
         } catch (_) {
           this.ledger = before;
           this.storageOk = false;
+          this.state.reminder = null;
           throw Error("提醒状态保存失败，暂停督促以避免重复");
         }
         if (newReminder) {
@@ -574,6 +600,11 @@ export class ActivityWatchRest {
       }
     } catch (error: any) {
       if (generation !== this.generation) return this.snapshot();
+      if (dayKey(this.now()) !== day) {
+        this.state.usage = null;
+        this.state.reminder = null;
+        this.state.updatedAt = null;
+      }
       this.failures++;
       this.bucketIds = null;
       this.state.status = "interrupted";

@@ -150,8 +150,21 @@ app.whenReady().then(async () => {
         )});e.click()})()`
       );
     win.webContents.debugger.attach("1.3");
+    await win.webContents.debugger.sendCommand("Page.enable");
     const capture = async (name) => {
+      win.webContents.invalidate();
       await wait(250);
+      if (name === "scientific-rest-compact-reminder") {
+        const shot = await win.capturePage(undefined, {
+          stayHidden: true,
+          stayAwake: true,
+        });
+        fs.writeFileSync(
+          path.join(root, "artifacts", name + ".png"),
+          shot.toPNG()
+        );
+        return;
+      }
       const screenshot = await win.webContents.debugger.sendCommand(
         "Page.captureScreenshot",
         {
@@ -352,8 +365,51 @@ app.whenReady().then(async () => {
     );
     assert.ok(small.right <= small.viewport + 2);
     assert.ok(small.overflow <= 2);
+    await js(
+      `document.querySelector('.rest-card').scrollIntoView({block:'center'})`
+    );
+    assert.ok(
+      await js(
+        `(()=>{const r=document.querySelector('.rest-card').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight})()`
+      )
+    );
     await capture("scientific-rest-small");
+    console.log("Portrait card screenshot captured");
     checks.push("portrait-width card stays within viewport");
+    // Although no quota card is added to the mini window, supervision stays
+    // reachable there and both actions must fit inside its existing bounds.
+    await js(
+      `document.querySelector('[aria-label="切换小窗"]').click()`
+    );
+    await until(() =>
+      js(
+        `document.querySelector('.focus-app').classList.contains('compact')`
+      )
+    );
+    await js(
+      `window.focusApi.restSettings({quotaMinutes:60,supervise:true})`
+    );
+    bSeconds = 5400;
+    await restMonitor.refresh();
+    await until(() => js(`!!document.querySelector('.rest-reminder')`));
+    const compact = await js(
+      `(()=>{const r=document.querySelector('.rest-reminder').getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:innerWidth,height:innerHeight,buttons:document.querySelectorAll('.rest-reminder button').length}})()`
+    );
+    assert.ok(
+      compact.top >= 0 &&
+        compact.bottom <= compact.height + 1 &&
+        compact.left >= 0 &&
+        compact.right <= compact.width + 1,
+      JSON.stringify(compact)
+    );
+    assert.equal(compact.buttons, 2);
+    console.log("Compact reminder geometry", JSON.stringify(compact));
+    await capture("scientific-rest-compact-reminder");
+    await click("开始下一个番茄");
+    assert.equal(restMonitor.snapshot().reminder, null);
+    checks.push(
+      "compact reminder fits both actions and returns to existing focus"
+    );
     assert.ok(
       requests.every(
         (r) => r.startsWith("GET /api/0/") || r === "POST /api/0/query/"
@@ -374,6 +430,7 @@ app.whenReady().then(async () => {
           checks,
           geometry,
           small,
+          compact,
           requests: requests.length,
           visible: win.isVisible(),
         },

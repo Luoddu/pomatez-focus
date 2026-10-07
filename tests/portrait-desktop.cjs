@@ -127,7 +127,7 @@ app
       const recs=getComputedStyle(document.querySelector('.records'));
       const recEl=document.querySelector('.records');
       const rc=document.querySelector('.right-col');
-      const sections=[...rc.querySelectorAll(':scope > .side-section')];
+      const sections=[...rc.querySelectorAll(':scope > .side-section, :scope > .rest-calendar-group')];
       const r=sections.map(s=>s.getBoundingClientRect());
       const rcRect=rc.getBoundingClientRect();
       const days=[...document.querySelectorAll('.record-day')];
@@ -324,7 +324,7 @@ app
       const recs=getComputedStyle(document.querySelector('.records'));
       const stats=[...document.querySelectorAll('.stat strong')];
       const rc=getComputedStyle(document.querySelector('.right-col'));
-      const sections=[...document.querySelectorAll('.right-col > .side-section')].map(s=>s.getBoundingClientRect());
+      const sections=[...document.querySelectorAll('.right-col > .side-section, .right-col > .rest-calendar-group')].map(s=>s.getBoundingClientRect());
       const days=[...document.querySelectorAll('.record-day')];
       return {direction:cs.flexDirection,
         columns:grid.gridTemplateColumns.split(' ').length,

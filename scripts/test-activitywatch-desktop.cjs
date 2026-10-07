@@ -13,7 +13,7 @@ const env = {
 delete env.ELECTRON_RUN_AS_NODE;
 const result = spawnSync(
   require("electron"),
-  [path.join(root, "tests/activitywatch-desktop.cjs")],
+  [path.join(root, "tests/activitywatch-desktop.cjs"), "--mute-audio"],
   {
     cwd: root,
     env,

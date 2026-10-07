@@ -35,6 +35,7 @@
     "test:focus": "node --test tests/session.test.mjs tests/feishu.test.cjs tests/plan.test.cjs",
     "test:desktop": "node scripts/test-desktop.cjs && node scripts/test-portrait-desktop.cjs && node scripts/test-category-review-desktop.cjs",
     "test:quick-entry": "node scripts/test-quick-entry.cjs",
+    "test:activitywatch": "node scripts/test-activitywatch-desktop.cjs",
     "package:focus": "node scripts/package-focus.cjs",
     "check:sync": "node scripts/repo-sync.cjs",
     "version:prepare": "node scripts/next-version.cjs --bump",
