@@ -1,13 +1,19 @@
 # P0-POMO-035 本机监督验收
 
-- 状态：REVIEW；最终包待完成。范围、四源、正反定义与回滚唯一见 TASK-P0-POMO-035.md。
+- 状态：DONE。范围、四源、正反定义与回滚唯一见 TASK-P0-POMO-035.md。
 - 已验证：从公开preview.68 `bac95785a949fac2a03c81a4bf87d738f16feafa` 建立独立任务clone；实时fetch证据同SHA，旧源码保全。当前根其他任务的修改无重叠，本模块未写根共享状态、用户任务或AW设置。
 - 已验证：真实AW v0.13.2只读官方REST、Edge/窗口/AFK桶存在且新鲜；冻结查询在2026-10-07 09:45–10:05返回B站826.056秒（约13分46秒）。当前当天取数873.426秒B站、0小红书；这些是当次快照，之后会变化，未补造用户估计的20/30分钟。没有保存真实网址、标题或原始events。
 - 已验证：新增逻辑测试16项，全套 `node scripts/test-focus-all.cjs` 257/257（artifacts/aw-all-tests.txt）；包括域名伪装/重叠去重、跨日/小时、5分钟步进、重启去重、断连保留/重连合并、设置验证、配置损坏、安全本机HTTP、响应上限、挂起在途取消、跨午夜在途请求丢弃与有界重查、非法账本/写盘失败暂停督促并显式恢复。
 - 已验证：生产构建成功。真实main/preload/renderer与隔离loopback REST fixture共12组（artifacts/aw-desktop-tests.txt、activitywatch-desktop.json）：卡片宽380DIP、高168.14DIP，月历192.14DIP；在其上方；原位24小时统计与近7天、额度正反保存、最简提醒、睡觉暂停专注并隐藏、回到同一番茄、断连/重连、真实30秒轮询关闭到托盘仍运行、关闭督促仍计数、窄屏不横向溢出、IPC聚合与范围验证。已有小窗的提醒上下31–153DIP、视口347×184DIP、两按钮完整可达；不添加小窗额度UI。截图已回读：quota/statistics/reminder/small/compact-reminder。数据都是合成，不接飞书，不显示测试窗口。
-- 已验证：既有真实桌面21组和实际进程退出/重启通过，包括暂停不累计、退出空隙不计、确认/丢弃、原小窗、最小窗口、导出隐藏、系统挂起保持暂停与安全桥。后续涉及UI恢复保护改动需再跑命中项。
+- 已验证：既有真实桌面21组和实际进程退出/重启通过，包括暂停不累计、退出空隙不计、确认/丢弃、原小窗、最小窗口、导出隐藏、系统挂起保持暂停与安全桥。竖屏14组、分类8组、快捷录入12组、科研8项、伙伴17组全部通过；证据在artifacts/aw-regression-test-*.txt。无真实外部写入。
 - 测试环境事实：受限进程不能读取目录祖先导致esbuild失败，同因已定位，受信隔离仓进程运行相同脚本通过；Electron子进程在受限环境直接退出，标准获准本地测试进程通过。未降级sandbox/contextIsolation，未改全局Git信任。隐藏窗口旧画面通过仓内已有CDP截图机制更新；原生小窗缩放后CDP等待surface超时，使用固定Electron34.5.8官方capturePage的stayHidden/stayAwake选项完整捕获，测试断言无显示。旧portrait测试仅直接查side-section而新增月历group，导致r[2]未定义；补选择group后保持原验收且14组通过。
-- 独立复核：`/root/review_scientific_rest` 对2bf3b86冻结diff只读复现3个P2；已修复午夜返回前复核、非法账本暂停督促、保存失败清pending。16项命中测试与257全套通过；修复冻结SHA和复核最终结论将在交付段绑定。
+- 独立复核：`/root/review_scientific_rest` 对2bf3b86冻结diff只读复现3个P2；已修复午夜返回前复核、非法账本暂停督促、保存失败清pending。最终冻结提交 `b72011b96703395055b541747452d5c33e634221` 获独立PASS；复核读取源码、原始测试产物及截图，未独立重启应用或读私人AW，真实读取和包验收由实施者提供。
 - 真实读取再验：2026-10-07 11:42左右，新适配器正式localRequest读取recording，B站994.645秒、小红书0、18个处理后区间；只输出聚合，临时隔离profile禁用督促，不干扰用户农场或AW。
 - Learning判断：none。复用已验证的官方区间交集、窄IPC与既有timer/隐藏窗口模式，没有新增已验证且跨任务可复用的根工程教训。上述环境限制只是本次事实，不另存根Learning；不写当前状态进第二任务源。
 - 回滚：退出新开发/测试版，保留用户数据并返回preview.68；新增本地聚合/提醒设置旧版忽略。未Push、发布、覆盖安装或操作其他电脑。
+
+- 交付：preview.69从干净 `b72011b96703395055b541747452d5c33e634221` 构建，build/source-version.json和artifacts/focus-build.json一致；官方electron-builder portable/nsis `--publish never` 完成。asar的main/preload/activitywatch/index与该构建逐文件SHA256一致，打包后真实exe使用隐藏、静音、独立临时profile启动退出0，并输出ready。未启动用户实际profile或替换当前App。
+- 便携包：`app/electron/dist/Pomatez-Focus-v0.1.0-preview.69-win-x64-portable.exe`，75291704字节，SHA256 `bf47cc8b8d277e6cd8c3ed609f4ad03dcd52bb38c2e09b3777ac9020f3fd9ded`。
+- 安装包：`app/electron/dist/Pomatez-Focus-v0.1.0-preview.69-win-x64-setup.exe`，75443030字节，SHA256 `7ddf0e42c20f12d0e28a1f1461f4d0197a0d09d72bcdb8286e557f74d4035b39`。包验收原始摘要artifacts/aw-package-acceptance.json。没有运行setup安装。
+- 接受源码：同revision的 `pomatez-focus-aw-accepted` main与外部`pomatez-focus-aw-accepted-review`任务工作树，零remote、干净、Learning基线已吸收、禁同步根0，当前根P1-GOV-102交接守卫PASS（artifacts/aw-accepted-handoff.txt）。开发源仍保留此前已授权的public origin；接受clone只作固定源码证据，不是第二活动任务源。本次最后提交只更新任务/验收文档，不改变已验收包的源SHA或运行代码。
+- 使用：从托盘退出旧农场，再打开便携版即可使用原农场用户目录；AW另行保持运行。默认60分钟和督促开启，设置额度可调；统计只查原始AW库，最近7日不足7天时注明采集起点。当前退出新包后回到旧版即可回滚。
