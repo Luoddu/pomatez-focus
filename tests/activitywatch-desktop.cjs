@@ -13,6 +13,19 @@ if (
 const {
   localRequest,
 } = require("../app/electron/build/focus/activitywatch");
+// Keep production main and renderer on the same advancing noon test clock.
+// Synthetic AW already uses noon; real 00:xx backfills otherwise cross yesterday.
+function installNoonClock() {
+  const RealDate = Date;
+  const now = RealDate.now();
+  const noon = new RealDate(now); noon.setHours(12, 0, 0, 0);
+  const offset = noon.getTime() - now;
+  globalThis.Date = class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [RealDate.now() + offset])); }
+    static now() { return RealDate.now() + offset; }
+  };
+}
+installNoonClock();
 const root = path.resolve(__dirname, "..");
 fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 let clock = new Date().setHours(12, 0, 0, 0),
@@ -193,6 +206,7 @@ app.whenReady().then(async () => {
       if (text === "去睡觉" || text === "开始下一个番茄")
         await until(() => !popup());
     };
+    await js(`(${installNoonClock.toString()})()`, win);
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand("Page.enable");
     const capture = async (name) => {
