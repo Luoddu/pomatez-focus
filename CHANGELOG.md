@@ -1,5 +1,12 @@
 # Changelog
 
+## 番茄农场 0.1.0-preview.70 (2026-10-07)
+
+- 正式发布“科学休息”：月历上方的每日摸鱼额度圆环、B站/小红书累计时间，以及原位切换的浏览时段统计。
+- 默认共享60分钟额度、督促开启；超额后每新增5分钟浏览提醒去睡觉或回到已有番茄。
+- 通过本机ActivityWatch官方API读取前台浏览记录，处理可听音频、空闲、重叠、跨午夜和断连；保存失败暂停督促，避免重复弹窗。
+- 明确“推送”默认完成源码同步、Windows更新发布和客户端可检测验收；“只推源码”仍可单独指定。
+
 # 0.1.0-preview.69 (local test build)
 
 - Add the compact “科学休息” card above the calendar, with a shared daily Bilibili/Xiaohongshu quota ring and in-place hourly statistics.
