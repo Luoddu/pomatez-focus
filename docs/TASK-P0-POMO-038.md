@@ -1,6 +1,6 @@
 # P0-POMO-038 十二番茄前的浏览督促
 
-- IN_PROGRESS；状态源本模块执行卡。负责人/实施者及模块协调 Codex /root。用户2026-10-07明确要求：当天完成12番茄前每累计看5分钟提醒，全天总额度不超过60分钟，超过后提醒。授权本地可回滚实施与验收；本轮没有新的推送/发布/安装指令，不操作用户App或其他设备，不改根共享控制。
+- DONE；状态源本模块执行卡。负责人/实施者及模块协调 Codex /root。用户2026-10-07明确要求：当天完成12番茄前每累计看5分钟提醒，全天总额度不超过60分钟，超过后提醒。授权本地可回滚实施与验收；本轮没有新的推送/发布/安装指令，不操作用户App或其他设备，不改根共享控制。
 - 基线203d19b9e3245f2c764dab1fafc22589baa01571；实时fetch/check:sync确认公开主线同SHA、干净。独立分支task/p0-pomo-038-rest-supervision；同clone单写，无额外worktree或重叠写者，绿灯。检查点/提交前重查status、worktree、baseline至origin/codex/feishu-focus差异。
 - 目标：B站＋小红书共享累计，12番茄前5/10/15…分钟提醒；12及以上额度内停止早期督促。超过额度当即提醒，之后新增5分钟继续；同次命中合并、墙钟等待不提醒。额度仍可调低至5分钟，最大60；默认60、督促开启。已确认saved记录按本地开始日期计数，与月历统计同口径，本地待同步也计入，active/review及演示不计入。复用现有真实记录，不另存番茄历史/联网取数；旧额度大于60迁为60。
 - 写集：本卡、docs/ACCEPTANCE-P0-POMO-038.md、docs/ACTIVITYWATCH.md、CHANGELOG.md；app/electron/src/focus/activitywatch.ts、app/electron/src/main.ts、app/electron/src/preload.ts；app/renderer/src/focus/components/ScientificRest.tsx、app/renderer/src/focus/FocusApp.tsx、app/renderer/src/focus/restProgress.ts；tests/activitywatch.test.cjs、tests/activitywatch-desktop.cjs、tests/restProgress.test.cjs。不改飞书写入/计时核心、AW配置/数据、现有发布物/版本或根文件。不新增依赖/系统服务/计划任务。
@@ -13,3 +13,5 @@
 - Learning判断：none，现有累计阈值/常驻owner/窄IPC模式复用；如测试形成可跨任务新证据再提交候选，当前无新增教训。
 
 - 复核命中范围补充：允许app/renderer/src/contexts/CounterContext.tsx仅公开已有存储恢复ready状态，不改计时/持久数据结构；ScientificRest在ready且未blocked时投影完成数，未ready仅清空进度。Reviewer复现“未知进度时65分钟额度提醒→确认→报0→同值重复”P2，修复为超额提醒同时消费对应早期档位，新增正反验收。264逻辑/生产build已通过，冻结94df132；本机UI前两轮CDP截图在去睡觉隐藏后卡住，8秒有界executeJavaScript未超时，110秒deadline使未完成的debugger截图target closed；改用现有官方BrowserWindow.capturePage(stayHidden/stayAwake)全路径并加独立超时，不改产品窗口生命周期。日志保留，不把旧UI证据算本轮PASS。
+
+- 收口：源码冻结295775e2421719a6e8f2cd81b65e5b460847aa84独立复核PASS，重复提醒P2关闭；265逻辑、16生产DOM/IPC/行为、21计时＋真实进程重启均PASS。新PNG不作视觉完成证据，未发布/打包/安装；完整限制及回滚见ACCEPTANCE-P0-POMO-038.md。最后回执提交不改变冻结运行源码。Learning none沿用现有模式。
