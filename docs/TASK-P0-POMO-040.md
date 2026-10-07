@@ -1,6 +1,6 @@
 # P0-POMO-040 科学休息桌面置顶提醒
 
-- IN_PROGRESS；本模块卡是唯一状态源。模块实现/协调/root；用户2026-10-07要求督促弹到正在看的B站窗口前。沿用本会话安装更新与公开源码交付授权，完成后提供更高preview安装版；不自动安装或重启用户App。
+- DONE；本模块卡是唯一状态源。模块实现/协调/root；用户2026-10-07要求督促弹到正在看的B站窗口前。沿用本会话安装更新与公开源码交付授权，已完成preview.73安装版公开、真实旧版检测与源码同步；不自动安装或重启用户App。
 - 基线32b7f00561ef1c8e51ff990adbd4a5ce8e559982，实时fetch/check:sync同SHA，任务分支task/p0-pomo-040-native-rest-reminder，单worktree干净，绿灯。独占本clone、P040临时合成profile与临时测试端口；不操作用户浏览器、AW数据库或个人profile。
 - 目标：独立原生alwaysOnTop提醒窗，标题、一行说明、两按钮；主农场隐藏/最小化时仍可显示，按光标所在屏幕居中。两个按钮复用既有计时所有者；睡觉暂停并隐藏，科研恢复/选择番茄并显示主界面；提醒处理后销毁，关闭督促/采集中断/暂停/日期切换不能残留。不会使主界面永久置顶，无第二计时器/数据源。
 - 写集：本卡、docs/ACCEPTANCE-P0-POMO-040.md、CHANGELOG.md、docs/ACTIVITYWATCH.md；app/electron/src/main.ts、preload.ts、rest-reminder-preload.ts、focus/restReminderWindow.ts、assets/rest-reminder.html、assets/rest-reminder.js；app/renderer/src/focus/components/ScientificRest.tsx；scripts/build-focus.cjs；tests/activitywatch-desktop.cjs、tests/rest-reminder-desktop.cjs、scripts/test-rest-reminder-desktop.cjs；版本工具生成app/electron/package.json、app/renderer/src/focus/components/SettingsPanel.tsx。忽略artifacts只含合成测试/官方证据及暂存安装包。根仓、共享控制、计时核心、AW插件、飞书、系统启动、代理/凭证不改。
@@ -12,3 +12,5 @@
 - Learning判断：开工暂无新的跨任务实测教训；验收检查点再判断。最终状态需代码、原始测试、独立复核及交付证据，不以设计或自述收口。
 - 验收补充写集：scripts/test-rest-reminder-visible.cjs、tests/rest-reminder-visible.cjs。一次有界真实层级测试，合成普通/最大化/全屏视频窗口短时显示，读取仅窗口句柄的Win32 GetWindow关系，不获取用户浏览器/桌面图片或标题；仅截图自身提醒。固定官方Electron34.5.8 browser-window.md本地原文L639–643、L971–1005，SHA256 ae7aeb1ed91fcbd963b1abbd3c23424a169d5f5b0b3378ca4981a4ef3714442f（此前Web解析行号为规范化行号）；Windows GetWindow官方GW_HWNDPREV=3，https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow，采用最多200次且重复/NULL停止的只读遍历。
 - 独立复核修正：a15234b自身提醒renderer-gone清理缺失（P2），发布暂停；仅本卡窗口生命周期范围内修复，增加真实forcefullyCrashRenderer负例及正常重建正例。采用Electron34.5.8固定本机electron.d.ts forcefullyCrashRenderer L16324–16334原文；提醒使用非persist的独立内存session partition，权限/下载全部拒绝，验证进程不同且crash后farm PID/DOM仍可用；不形成新的持久数据源。旧72本地构建留存，按版本工具分配更高号，禁止覆盖同号产物。既有只读reviewer对修复冻结diff与新增原始证据再次复核，仍不写文件、不启动App、不分派。
+- 交付：preview.73于2026-10-07T14:37:06Z公开non-draft prerelease，未设Stable Latest；包源64c9ff898b4cedd255dfe2c399bbd1a229fc041d、annotated tag对象32445b0213f5f7087f68043eb7945f377bea8b16。五安装资产ID/size/digest与草稿和本地一致、旧71不变；真实71→73 available/errors[]、setup SHA512/75452962精确匹配、下载安装0。76文件ASAR及真实包隐藏启动PASS；8原生/18UI/269逻辑/21计时及restart/14窄屏/3真实Win32模式PASS。详情唯一验收见ACCEPTANCE-P0-POMO-040.md。
+- 独立review_scientific_rest修复、包源及公开交付均PASS；reviewer独立重算本地ASAR和五资产，再比较发布前后回执；其sandbox实时联网失败明确记录，不声称其独立实时联网成功。协调者正常权限的最新gh/ls-remote公开验证PASS。本任务无未关闭问题；最后卡/验收文档安全提交后非force同步，不更改固定tag/已发布包。用户实际安装由其手动操作，未声称已安装。
