@@ -162,6 +162,7 @@ else {
       handler("journal", () => service.journal());
       handler("restState", () => restMonitor.snapshot());
       handler("restSettings", (value) => restMonitor.configure(value));
+      handler("restProgress", (value) => restMonitor.reportProgress(value));
       handler("restStatistics", (value) => restMonitor.statistics(value));
       handler("restAcknowledge", (value) => restMonitor.acknowledge(value));
       handler("saveJournal", (value) => service.saveJournal(value));

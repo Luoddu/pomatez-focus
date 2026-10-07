@@ -1529,7 +1529,7 @@ export default function FocusApp() {
       : active
       ? "timing"
       : "board";
-  const restState = useScientificRest();
+  const restState = useScientificRest(timer.records);
   const restReminder = <ScientificRestReminder state={restState} onSleep={() => {
     timer.pause();
     if (timer.getSnapshot().active?.status === "active") throw Error("暂停未完成");

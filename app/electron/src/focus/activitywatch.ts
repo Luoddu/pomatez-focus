@@ -18,11 +18,18 @@ export type Usage = {
 };
 export type RestState = {
   settings: RestSettings;
+  progress: { day: string; completedCount: number } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
   message: string;
   updatedAt: number | null;
-  reminder: { key: string; excessMinutes: number } | null;
+  reminder: {
+    key: string;
+    excessMinutes: number;
+    kind: "focus" | "quota";
+    watchedMinutes: number;
+    completedCount: number | null;
+  } | null;
 };
 export const POLL_MS = 30000;
 const MAX_RESPONSE = 4 * 1024 * 1024;
@@ -55,10 +62,10 @@ export function validSettings(value: any): RestSettings {
     typeof value.supervise !== "boolean" ||
     !Number.isInteger(value.quotaMinutes) ||
     value.quotaMinutes < 5 ||
-    value.quotaMinutes > 480 ||
+    value.quotaMinutes > 60 ||
     value.quotaMinutes % 5
   )
-    throw Error("额度须为 5–480 分钟，按 5 分钟调整");
+    throw Error("额度须为 5–60 分钟，按 5 分钟调整");
   return {
     quotaMinutes: value.quotaMinutes,
     supervise: value.supervise,
@@ -248,7 +255,13 @@ export class ActivityWatchRest {
   private busy: Promise<RestState> | null = null;
   private busyGeneration = 0;
   private failures = 0;
-  private ledger = { day: "", quota: 60, step: 0 };
+  private ledger = {
+    day: "",
+    quota: 60,
+    step: 0,
+    focusStep: 0,
+    quotaCrossed: false,
+  };
   private storageOk = true;
   private week: Usage | null = null;
   private weekBusy: Promise<Usage> | null = null;
@@ -260,6 +273,7 @@ export class ActivityWatchRest {
   private coverageStart: number | null = null;
   private state: RestState = {
     settings: { quotaMinutes: 60, supervise: true },
+    progress: null,
     usage: null,
     status: "connecting",
     message: "正在连接本机 ActivityWatch",
@@ -277,7 +291,19 @@ export class ActivityWatchRest {
     if (fs.existsSync(this.file)) {
       try {
         const stored = JSON.parse(fs.readFileSync(this.file, "utf8"));
-        this.state.settings = validSettings(stored.settings);
+        const oldQuota = stored.settings?.quotaMinutes;
+        // Previous releases allowed up to 480; only valid old settings migrate.
+        if (
+          !Number.isInteger(oldQuota) ||
+          oldQuota < 5 ||
+          oldQuota > 480 ||
+          oldQuota % 5
+        )
+          throw Error("旧额度无效");
+        this.state.settings = validSettings({
+          ...stored.settings,
+          quotaMinutes: Math.min(60, oldQuota),
+        });
         if (
           typeof stored.ledger?.day === "string" &&
           /^\d{4}-\d{2}-\d{2}$/.test(stored.ledger.day) &&
@@ -287,9 +313,39 @@ export class ActivityWatchRest {
           stored.ledger.quota >= 5 &&
           stored.ledger.quota <= 480 &&
           stored.ledger.quota % 5 === 0
-        )
-          this.ledger = stored.ledger;
-        else throw Error("提醒账本无效");
+        ) {
+          const old = stored.ledger;
+          const legacy =
+            old.focusStep === undefined &&
+            old.quotaCrossed === undefined;
+          if (
+            !legacy &&
+            (!Number.isSafeInteger(old.focusStep) ||
+              old.focusStep < 0 ||
+              typeof old.quotaCrossed !== "boolean")
+          )
+            throw Error("提醒账本无效");
+          const total =
+            stored.last?.day === old.day &&
+            Number.isFinite(stored.last.totalSeconds) &&
+            stored.last.totalSeconds >= 0
+              ? stored.last.totalSeconds
+              : 0;
+          const quota = this.state.settings.quotaMinutes;
+          this.ledger = {
+            day: old.day,
+            quota,
+            step:
+              old.quota === quota
+                ? old.step
+                : Math.max(0, Math.floor((total - quota * 60) / 300)),
+            focusStep: legacy ? Math.floor(total / 300) : old.focusStep,
+            quotaCrossed:
+              legacy || old.quota !== quota
+                ? old.step > 0 || total > quota * 60
+                : old.quotaCrossed,
+          };
+        } else throw Error("提醒账本无效");
         // Only aggregate daily totals are retained, never browser URLs/titles.
         if (
           stored.last?.day === dayKey(this.now()) &&
@@ -349,6 +405,13 @@ export class ActivityWatchRest {
     this.ledger = {
       day: dayKey(this.now()),
       quota: settings.quotaMinutes,
+      focusStep:
+        u?.day === dayKey(this.now())
+          ? Math.floor(u.totalSeconds / 300)
+          : 0,
+      quotaCrossed:
+        u?.day === dayKey(this.now()) &&
+        u.totalSeconds > settings.quotaMinutes * 60,
       step:
         u?.day === dayKey(this.now())
           ? Math.max(
@@ -377,6 +440,28 @@ export class ActivityWatchRest {
     if (typeof key !== "string" || key.length > 100)
       throw Error("提醒标识无效");
     if (this.state.reminder?.key === key) this.state.reminder = null;
+    this.emit();
+    return this.snapshot();
+  }
+  reportProgress(value: any) {
+    if (
+      !value ||
+      value.day !== dayKey(this.now()) ||
+      !Number.isSafeInteger(value.completedCount) ||
+      value.completedCount < 0 ||
+      value.completedCount > 100000
+    )
+      throw Error("今日番茄进度无效");
+    // The existing renderer record store owns this count. Never persist a copy.
+    this.state.progress = {
+      day: value.day,
+      completedCount: value.completedCount,
+    };
+    if (
+      value.completedCount >= 12 &&
+      this.state.reminder?.kind === "focus"
+    )
+      this.state.reminder = null;
     this.emit();
     return this.snapshot();
   }
@@ -515,6 +600,7 @@ export class ActivityWatchRest {
   ): Promise<RestState> {
     const now = this.now(),
       day = dayKey(now);
+    if (this.state.progress?.day !== day) this.state.progress = null;
     if (this.state.usage && this.state.usage.day !== day) {
       this.state.usage = null;
       this.state.reminder = null;
@@ -570,16 +656,45 @@ export class ActivityWatchRest {
         : "额度设置读取失败或未保存，请重新保存设置以恢复督促";
       const quota = this.state.settings.quotaMinutes;
       if (this.ledger.day !== day || this.ledger.quota !== quota)
-        this.ledger = { day, quota, step: 0 };
+        this.ledger = {
+          day,
+          quota,
+          step: 0,
+          focusStep: 0,
+          quotaCrossed: false,
+        };
       const step = Math.max(
         0,
         Math.floor((u.totalSeconds - quota * 60 + 0.000001) / 300)
       );
+      const focusStep = Math.floor((u.totalSeconds + 0.000001) / 300);
+      const quotaCrossed = u.totalSeconds > quota * 60 + 0.000001;
+      const count =
+        this.state.progress?.day === day
+          ? this.state.progress.completedCount
+          : null;
       if (this.storageOk) {
         const before = { ...this.ledger },
+          quotaReminder =
+            quotaCrossed &&
+            (!this.ledger.quotaCrossed || step > this.ledger.step),
+          focusReminder =
+            count !== null &&
+            count < 12 &&
+            focusStep > this.ledger.focusStep,
           newReminder =
-            this.state.settings.supervise && step > this.ledger.step;
+            this.state.settings.supervise &&
+            (quotaReminder || focusReminder);
         this.ledger.step = Math.max(step, this.ledger.step);
+        // Observe both counters even after 12 tomatoes or while supervision is off.
+        // Returning to the stricter policy must not replay past thresholds.
+        if (count !== null)
+          this.ledger.focusStep = Math.max(
+            focusStep,
+            this.ledger.focusStep
+          );
+        this.ledger.quotaCrossed =
+          this.ledger.quotaCrossed || quotaCrossed;
         try {
           this.save();
         } catch (_) {
@@ -591,8 +706,16 @@ export class ActivityWatchRest {
         if (newReminder) {
           const wasPending = !!this.state.reminder;
           this.state.reminder = {
-            key: `${day}/${quota}/${step}`,
-            excessMinutes: step * 5,
+            key: `${day}/${quota}/${focusStep}/${step}/${
+              quotaCrossed ? 1 : 0
+            }`,
+            excessMinutes: Math.max(
+              0,
+              Math.ceil((u.totalSeconds - quota * 60) / 60)
+            ),
+            kind: quotaCrossed ? "quota" : "focus",
+            watchedMinutes: Math.floor(u.totalSeconds / 60),
+            completedCount: count,
           };
           this.emit();
           if (!wasPending) this.onReminder();

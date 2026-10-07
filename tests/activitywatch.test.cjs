@@ -131,7 +131,7 @@ test("bounded settings reject renderer URL, invalid quota and nonboolean switch"
     }),
     { quotaMinutes: 60, supervise: true }
   );
-  for (const q of [0, 7, 481, NaN, "60"])
+  for (const q of [0, 7, 65, 480, 481, NaN, "60"])
     assert.throws(() =>
       validSettings({ quotaMinutes: q, supervise: true })
     );
@@ -150,7 +150,7 @@ test("recorded five-minute thresholds, silent wall time, restart dedup and recon
     f.request,
     f.now
   );
-  f.seconds(3900 - 0.01);
+  f.seconds(3600);
   await monitor.refresh();
   assert.equal(reminders, 0);
   f.seconds(3900);
@@ -217,6 +217,214 @@ test("daily and seven-day bounds follow local calendar, not fixed UTC offset", (
   assert.equal(dayKey(at()), "2026-10-07");
   assert.equal(dayKey(dayBounds(at(), 7).start), "2026-10-01");
   assert.equal(new Date(dayBounds(at()).start).getHours(), 0);
+});
+
+test("before 12 confirmed tomatoes: each five recorded minutes, no wall-time alerts", async () => {
+  const f = fixture();
+  let alerts = 0;
+  const m = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => alerts++,
+    f.request,
+    f.now
+  );
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 11 });
+  f.seconds(299.99);
+  assert.equal((await m.refresh()).reminder, null);
+  for (const seconds of [300, 600, 900]) {
+    f.seconds(seconds);
+    const s = await m.refresh();
+    assert.equal(s.reminder.kind, "focus");
+    assert.equal(s.reminder.watchedMinutes, seconds / 60);
+    assert.equal(s.reminder.completedCount, 11);
+    m.acknowledge(s.reminder.key);
+  }
+  assert.equal(alerts, 3);
+  f.advance(600000);
+  await m.refresh();
+  assert.equal(alerts, 3);
+  f.seconds(1200);
+  await m.refresh();
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 12 });
+  assert.equal(m.snapshot().reminder, null);
+  f.seconds(1500);
+  await m.refresh();
+  assert.equal(alerts, 4);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 11 });
+  await m.refresh();
+  assert.equal(alerts, 4); // Goal edits do not replay the observed 25-minute step.
+  f.seconds(1800);
+  assert.equal((await m.refresh()).reminder.kind, "focus");
+  assert.equal(alerts, 5);
+});
+
+test("12 tomatoes allow quota time; exceed immediately, then 65/70, never duplicate overlapping reasons", async () => {
+  const f = fixture();
+  let alerts = 0;
+  const m = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => alerts++,
+    f.request,
+    f.now
+  );
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 12 });
+  f.seconds(3600);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(3600.01);
+  let s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  assert.equal(alerts, 1);
+  m.acknowledge(s.reminder.key);
+  f.seconds(3899.99);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(3900);
+  s = await m.refresh();
+  assert.equal(s.reminder.excessMinutes, 5);
+  assert.equal(alerts, 2);
+  m.acknowledge(s.reminder.key);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 11 });
+  f.seconds(4200);
+  s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  assert.equal(alerts, 3); // Focus + quota same poll is one prompt.
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 12 });
+  assert.equal(m.snapshot().reminder.key, s.reminder.key); // Still over quota.
+});
+
+test("startup waits for genuine progress; rejects invalid/day-stale progress and clears yesterday's goal", async () => {
+  const f = fixture();
+  const m = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => {},
+    f.request,
+    f.now
+  );
+  f.seconds(300);
+  assert.equal((await m.refresh()).reminder, null);
+  for (const value of [
+    null,
+    { day: "2026-10-06", completedCount: 12 },
+    { day: dayKey(f.now()), completedCount: -1 },
+    { day: dayKey(f.now()), completedCount: 11.5 },
+    { day: dayKey(f.now()), completedCount: "12" },
+  ])
+    assert.throws(() => m.reportProgress(value));
+  m.reportProgress({
+    day: dayKey(f.now()),
+    completedCount: 0,
+    url: "https://evil.invalid",
+  });
+  let s = await m.refresh();
+  assert.equal(s.reminder.kind, "focus");
+  assert.ok(!JSON.stringify(s.progress).includes("url"));
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 12 });
+  f.advance(24 * 3600000);
+  s = await m.refresh();
+  assert.equal(s.progress, null);
+  assert.equal(s.reminder, null);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  assert.equal((await m.refresh()).reminder.kind, "focus");
+});
+
+test("new focus ledger persists, offline reconnect coalesces, disabling/re-enabling rebases", async () => {
+  const f = fixture(),
+    directory = dir();
+  let alerts = 0;
+  const create = () =>
+    new ActivityWatchRest(
+      directory,
+      () => {},
+      () => alerts++,
+      f.request,
+      f.now
+    );
+  let m = create();
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  f.seconds(300);
+  let s = await m.refresh();
+  m.acknowledge(s.reminder.key);
+  m = create();
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  assert.equal((await m.refresh()).reminder, null);
+  assert.equal(alerts, 1);
+  f.disconnect(true);
+  f.seconds(1200);
+  assert.equal((await m.refresh()).status, "interrupted");
+  assert.equal(m.snapshot().reminder, null);
+  f.disconnect(false);
+  s = await m.refresh();
+  assert.equal(alerts, 2);
+  assert.equal(s.reminder.watchedMinutes, 20);
+  m.configure({ quotaMinutes: 60, supervise: false });
+  f.seconds(1500);
+  assert.equal((await m.refresh()).reminder, null);
+  m.configure({ quotaMinutes: 60, supervise: true });
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(1800);
+  assert.equal((await m.refresh()).reminder.kind, "focus");
+  assert.equal(alerts, 3);
+  const disk = fs.readFileSync(
+    path.join(directory, "aw-rest-settings.json"),
+    "utf8"
+  );
+  assert.ok(!disk.includes("completedCount"));
+});
+
+test("valid old ledger migrates without retroactive focus prompts; old >60 quota clamps, corrupt new ledger fails closed", async () => {
+  const f = fixture();
+  for (const quota of [60, 120]) {
+    const directory = dir();
+    fs.writeFileSync(
+      path.join(directory, "aw-rest-settings.json"),
+      JSON.stringify({
+        settings: { quotaMinutes: quota, supervise: true },
+        ledger: { day: dayKey(f.now()), quota, step: 0 },
+        last: {
+          day: dayKey(f.now()),
+          totalSeconds: 900,
+          bilibili: 900,
+          xiaohongshu: 0,
+        },
+      })
+    );
+    const m = new ActivityWatchRest(
+      directory,
+      () => {},
+      () => {},
+      f.request,
+      f.now
+    );
+    m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+    f.seconds(900);
+    assert.equal((await m.refresh()).reminder, null);
+    assert.equal(m.snapshot().settings.quotaMinutes, 60);
+    f.seconds(1200);
+    assert.equal((await m.refresh()).reminder.kind, "focus");
+    m.acknowledge(m.snapshot().reminder.key);
+    const stored = JSON.parse(
+      fs.readFileSync(path.join(directory, "aw-rest-settings.json"))
+    );
+    stored.ledger.focusStep = "corrupt";
+    fs.writeFileSync(
+      path.join(directory, "aw-rest-settings.json"),
+      JSON.stringify(stored)
+    );
+    const broken = new ActivityWatchRest(
+      directory,
+      () => {},
+      () => {},
+      f.request,
+      f.now
+    );
+    broken.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+    f.seconds(1500);
+    const s = await broken.refresh();
+    assert.equal(s.reminder, null);
+    assert.match(s.message, /重新保存设置/);
+  }
 });
 test("an in-flight midnight result is discarded and retried once for today's usage", async () => {
   const f = fixture(),
@@ -509,7 +717,7 @@ test("malformed persisted configuration suppresses duplicate alerts and recovers
   f.seconds(4300);
   s = await monitor.refresh();
   assert.equal(n, 1);
-  assert.equal(s.reminder.excessMinutes, 10);
+  assert.equal(s.reminder.excessMinutes, 12); // Actual rounded-up excess, not the old five-minute bucket label.
 });
 test("fixed loopback transport accepts official JSON and refuses redirects/errors and excessive body", async (t) => {
   const server = http.createServer((req, res) => {

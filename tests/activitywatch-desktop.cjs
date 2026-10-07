@@ -16,8 +16,8 @@ const {
 const root = path.resolve(__dirname, "..");
 fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 let clock = new Date().setHours(12, 0, 0, 0),
-  bSeconds = 2700,
-  xSeconds = 600,
+  bSeconds = 240,
+  xSeconds = 0,
   down = false;
 const ids = [
   "aw-watcher-web-edge_TEST",
@@ -181,7 +181,67 @@ app.whenReady().then(async () => {
     await until(() =>
       js(`!!document.querySelector('.scientific-rest')`)
     );
+    await until(
+      () => restMonitor.snapshot().progress?.completedCount === 0
+    );
     restMonitor.start();
+    await until(() => restMonitor.snapshot().status === "recording");
+    bSeconds = 299;
+    await restMonitor.refresh();
+    assert.equal(restMonitor.snapshot().reminder, null);
+    for (const seconds of [300, 600, 900]) {
+      // Cross-site sum: three minutes B + two minutes X is already five.
+      bSeconds = seconds - 120;
+      xSeconds = 120;
+      await restMonitor.refresh();
+      await until(() =>
+        js(`!!document.querySelector('.rest-reminder')`)
+      );
+      assert.equal(restMonitor.snapshot().reminder.kind, "focus");
+      assert.ok(
+        await js(
+          `document.querySelector('.rest-reminder').textContent.includes('番茄 0/12')`
+        )
+      );
+      assert.equal(
+        await js(
+          `document.querySelectorAll('.rest-reminder button').length`
+        ),
+        2
+      );
+      if (seconds === 300) await capture("scientific-rest-before12");
+      await click("去睡觉");
+      await until(() =>
+        js(`!document.querySelector('.rest-reminder')`)
+      );
+    }
+    checks.push(
+      "production confirmed-record hook: 0/12 and combined 5/10/15 minute reminders, no prompt at 299 seconds"
+    );
+    const setInput = (selector, value) =>
+      js(
+        `(()=>{const e=document.querySelector(${JSON.stringify(
+          selector
+        )});const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;set.call(e,${JSON.stringify(
+          String(value)
+        )});e.dispatchEvent(new Event('input',{bubbles:true}))})()`
+      );
+    await click("补记");
+    await setInput('[aria-label="补记番茄数"]', 12);
+    await click("保存补记");
+    await until(
+      () => restMonitor.snapshot().progress?.completedCount === 12
+    );
+    bSeconds = 1200;
+    xSeconds = 0;
+    await restMonitor.refresh();
+    assert.equal(restMonitor.snapshot().reminder, null);
+    checks.push(
+      "real manual-confirmed twelve tomatoes propagate via narrow IPC and stop under-quota reminders"
+    );
+    bSeconds = 2700;
+    xSeconds = 600;
+    await restMonitor.refresh();
     await until(() =>
       js(
         `document.querySelector('.rest-ring-label strong')?.textContent==='5'`
@@ -251,6 +311,17 @@ app.whenReady().then(async () => {
       js(
         `JSON.parse(localStorage.getItem('pomatez-focus-v1')).active?.status==='active'`
       )
+    );
+    assert.equal(restMonitor.snapshot().progress.completedCount, 12); // Active session is not a completed tomato.
+    bSeconds = 3001;
+    await restMonitor.refresh();
+    await until(() => js(`!!document.querySelector('.rest-reminder')`));
+    assert.equal(restMonitor.snapshot().reminder.kind, "quota");
+    assert.equal(restMonitor.snapshot().reminder.excessMinutes, 1);
+    await click("去睡觉");
+    await until(() => js(`!document.querySelector('.rest-reminder')`));
+    checks.push(
+      "quota exceeded after twelve tomatoes prompts immediately, active timer does not count as a tomato"
     );
     bSeconds = 3300;
     await restMonitor.refresh();
@@ -344,6 +415,9 @@ app.whenReady().then(async () => {
     win.reload();
     await loaded;
     await wait(300);
+    await until(
+      () => restMonitor.snapshot().progress?.completedCount === 12
+    );
     assert.equal(
       await js(
         `document.querySelector('.rest-supervise input').checked`

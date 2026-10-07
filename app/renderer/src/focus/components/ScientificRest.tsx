@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./shared";
+import type { FocusSession } from "../session";
+import { dailyRestProgress } from "../restProgress";
 
 type Usage = {
   day: string;
@@ -19,21 +21,29 @@ type Usage = {
 };
 export type RestState = {
   settings: { quotaMinutes: number; supervise: boolean };
+  progress: { day: string; completedCount: number } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
   message: string;
   updatedAt: number | null;
-  reminder: { key: string; excessMinutes: number } | null;
+  reminder: {
+    key: string;
+    excessMinutes: number;
+    kind: "focus" | "quota";
+    watchedMinutes: number;
+    completedCount: number | null;
+  } | null;
 };
 const initial: RestState = {
   settings: { quotaMinutes: 60, supervise: true },
+  progress: null,
   usage: null,
   status: "connecting",
   message: "正在连接本机 ActivityWatch",
   updatedAt: null,
   reminder: null,
 };
-export function useScientificRest() {
+export function useScientificRest(records: FocusSession[]) {
   const [state, setState] = useState(initial);
   useEffect(() => {
     const bridge = api();
@@ -69,6 +79,19 @@ export function useScientificRest() {
       off();
     };
   }, []);
+  const { day: progressDay, completedCount } = dailyRestProgress(
+    records,
+    state.updatedAt || Date.now()
+  );
+  useEffect(() => {
+    const bridge = api();
+    if (bridge?.restProgress)
+      void bridge
+        .restProgress({ day: progressDay, completedCount })
+        .catch(() => {});
+    // Progress is a projection of the timer's confirmed records, including edits
+    // and cloud merges. No independent daily counter or polling timer is needed.
+  }, [progressDay, completedCount]);
   return state;
 }
 const minutes = (seconds: number) =>
@@ -271,14 +294,16 @@ export default function ScientificRest({
                 type="number"
                 aria-label="每日摸鱼额度（分钟）"
                 min={5}
-                max={480}
+                max={60}
                 step={5}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
               />{" "}
               分钟
             </label>
-            <p>B站与小红书共用；超额后每多看 5 分钟提醒一次。</p>
+            <p>
+              未满12番茄时每看5分钟督促；每日最多60分钟，超额继续提醒。
+            </p>
             <button
               className="btn-small"
               disabled={busy}
@@ -413,7 +438,9 @@ export default function ScientificRest({
           title={state.message}
         >
           {state.status === "recording"
-            ? `今日额度 ${state.settings.quotaMinutes} 分钟 · 已记录`
+            ? state.progress && state.progress.completedCount < 12
+              ? `今日 ${state.progress.completedCount}/12 番茄 · 每看 5 分钟督促`
+              : `今日额度 ${state.settings.quotaMinutes} 分钟 · 已记录`
             : state.usage
             ? "采集已中断 · 保留上次记录"
             : state.status === "connecting"
@@ -500,7 +527,12 @@ export function ScientificRestReminder({
         <h2 id="rest-reminder-title">把时间还给自己</h2>
         <p id="rest-reminder-line">
           {error ||
-            `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。`}
+            (reminder.kind === "focus"
+              ? `已看 ${reminder.watchedMinutes} 分钟，番茄 ${
+                  state.progress?.completedCount ??
+                  reminder.completedCount
+                }/12：去睡觉，或回到科研主线。`
+              : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。`)}
         </p>
         <div>
           <button
