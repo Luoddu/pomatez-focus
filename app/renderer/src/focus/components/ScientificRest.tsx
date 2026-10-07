@@ -230,13 +230,35 @@ export default function ScientificRest({
           <div className="rest-quota">
             <div
               className={`rest-ring${over ? " over" : ""}`}
-              role="img"
+              role="group"
               aria-label={
                 remaining === null
                   ? "暂无记录"
                   : `剩余额度 ${minutes(remaining * 60)}`
               }
             >
+              <div
+                className={`rest-health${
+                  state.status !== "recording" ? " interrupted" : ""
+                }`}
+                role="status"
+                title={
+                  state.status === "recording"
+                    ? "正在记录网站时间"
+                    : state.message
+                }
+              >
+                <span aria-hidden="true" />
+                <span className="rest-health-label">
+                  {state.status === "recording"
+                    ? "正在记录网站时间"
+                    : state.usage
+                    ? "采集已中断 · 保留上次记录"
+                    : state.status === "connecting"
+                    ? "正在连接采集…"
+                    : "采集未连接"}
+                </span>
+              </div>
               <svg viewBox="0 0 120 120" aria-hidden="true">
                 <circle
                   className="rest-ring-track"
@@ -489,26 +511,6 @@ export default function ScientificRest({
             </details>
           </div>
         )}
-        <div
-          className={`rest-health${
-            state.status !== "recording" ? " interrupted" : ""
-          }`}
-          role="status"
-          title={state.message}
-        >
-          {state.status === "recording"
-            ? state.progress &&
-              state.progress.completedCount <
-                state.settings.pomodoroGoal
-              ? `今日 ${state.progress.completedCount}/${state.settings.pomodoroGoal} 番茄 · 每看 ${state.settings.reminderMinutes} 分钟督促`
-              : `今日额度 ${state.settings.quotaMinutes} 分钟 · 已记录`
-            : state.usage
-            ? "采集已中断 · 保留上次记录"
-            : state.status === "connecting"
-            ? "正在连接采集…"
-            : "采集未连接"}
-          <span aria-hidden="true" />
-        </div>
         {error && (
           <div className="rest-error" role="alert">
             {error}
@@ -541,18 +543,25 @@ export function ScientificRestReminder({
   useEffect(() => {
     const bridge = api();
     if (!bridge?.nativeRestReminder) return;
-    return bridge.onRestAction((request: { id: number; key: string; action: string }) => {
-      let ok = false;
-      try {
-        const current = callbacks.current;
-        if (request.key !== current.reminder?.key) throw Error("Stale reminder");
-        if (request.action === "sleep") current.onSleep();
-        else if (request.action === "focus") current.onFocus();
-        else throw Error("Invalid action");
-        ok = true;
-      } catch (_) { /* Native reminder retains its retry affordance. */ }
-      void bridge.restActionResult({ id: request.id, key: request.key, ok }).catch(() => {});
-    });
+    return bridge.onRestAction(
+      (request: { id: number; key: string; action: string }) => {
+        let ok = false;
+        try {
+          const current = callbacks.current;
+          if (request.key !== current.reminder?.key)
+            throw Error("Stale reminder");
+          if (request.action === "sleep") current.onSleep();
+          else if (request.action === "focus") current.onFocus();
+          else throw Error("Invalid action");
+          ok = true;
+        } catch (_) {
+          /* Native reminder retains its retry affordance. */
+        }
+        void bridge
+          .restActionResult({ id: request.id, key: request.key, ok })
+          .catch(() => {});
+      }
+    );
   }, []);
   useEffect(() => {
     if (!reminder) return;

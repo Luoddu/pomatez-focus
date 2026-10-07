@@ -1,6 +1,6 @@
 # P0-POMO-041 概览精简与今日时段热力
 
-- IN_PROGRESS；本模块执行卡为唯一状态源。角色：模块实现/协调/root。用户2026-10-07要求隐藏概览两项总计、移位监控状态点、去掉指定月历说明并在原列内加入今日半小时热力；沿用本会话App手动更新与GitHub源码交付授权，不自动安装/重启用户App。
+- REVIEW；本模块执行卡为唯一状态源。角色：模块实现/协调/root。用户2026-10-07要求隐藏概览两项总计、移位监控状态点、去掉指定月历说明并在原列内加入今日半小时热力；沿用本会话App手动更新与GitHub源码交付授权，不自动安装/重启用户App。
 - 基线28a23b52527ca6e4855039db9371b72abd866380；实时fetch/check:sync已确认公开主线同SHA，preview.73；单worktree干净，绿灯。分支task/p0-pomo-041-overview-time-heat，串行单写；独占本clone、P041合成测试profile与临时端口，不读取用户AW/私人记录。
 - 目标：仅概览保留今日两卡；科学休息健康文本改为圈左上状态点及悬浮/无障碍说明；月历去掉holiday-legend，左对齐同卡右侧今日00–24半小时专注热力，采用既有统计半小时分摊口径与红色档位、悬浮时间和番茄数。保留月历日期/周目标与专注记录；四象限、概览宽度/布局媒体查询不改。不增加第二统计源、计时器、持久状态，不改AW或督促策略/原生提醒。
 - 允许写集：本卡、docs/ACCEPTANCE-P0-POMO-041.md、CHANGELOG.md；app/renderer/src/focus/components/HistoryPanel.tsx、ScientificRest.tsx、HeatmapCalendar.tsx、TodayTimeHeatmap.tsx；app/renderer/src/focus/focus.css；tests/overview-heat-desktop.cjs、scripts/test-overview-heat-desktop.cjs、必要的tests/portrait-desktop.cjs兼容断言；版本工具生成app/electron/package.json、app/renderer/src/focus/components/SettingsPanel.tsx。忽略artifacts只含合成测试、回执和发布暂存；禁止根仓、其他用户修改、系统设置、凭证与用户profile。

@@ -341,11 +341,6 @@ export default function HistoryPanel({
       tier: todayTier,
     },
     { label: "今日专注时长", value: durationText(shownTodaySeconds) },
-    { label: "总番茄", value: String(totalTomatoes) },
-    {
-      label: "总专注时长",
-      value: durationText(sum(records, (r) => r.acceptedSeconds || 0)),
-    },
   ];
   const groups = records
     .slice()

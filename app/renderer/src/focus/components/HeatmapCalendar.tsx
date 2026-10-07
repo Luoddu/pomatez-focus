@@ -9,6 +9,7 @@ import {
 } from "../weekgoal";
 import { LogoIcon } from "./shared";
 import { holidayDay, holidayMessage } from "../wellbeing.js";
+import TodayTimeHeatmap from "./TodayTimeHeatmap";
 
 const GOLD_TONE = "#e8a917";
 
@@ -147,104 +148,112 @@ export default function HeatmapCalendar({
   };
   return (
     <div className="card heatmap">
-      <div
-        className="hm-scroll"
-        ref={scrollRef}
-        onScroll={() => setTip(null)}
-      >
+      <div className="heatmap-content">
         <div
-          className="hm-grid"
-          style={{
-            gridTemplateColumns: `var(--hm-dow-w, 16px) repeat(${weeks.length}, var(--hm-cell, 13px))`,
-          }}
+          className="hm-scroll"
+          ref={scrollRef}
+          onScroll={() => setTip(null)}
         >
-          <span className="hm-corner" />
-          {weeks.map((week) => (
-            <span className="hm-month" key={week.key}>
-              {week.label}
-            </span>
-          ))}
-          {WEEKDAYS.map((_, dow) => (
-            <React.Fragment key={dow}>
-              <span className="hm-dow">
-                {dow % 2 === 0 ? WEEKDAYS[dow] : ""}
+          <div
+            className="hm-grid"
+            style={{
+              gridTemplateColumns: `var(--hm-dow-w, 16px) repeat(${weeks.length}, var(--hm-cell, 13px))`,
+            }}
+          >
+            <span className="hm-corner" />
+            {weeks.map((week) => (
+              <span className="hm-month" key={week.key}>
+                {week.label}
               </span>
-              {weeks.map((week) => {
-                const day = week.days[dow];
-                const stat = byDay.get(dayKey(day));
-                const count = stat?.count || 0;
-                const future = day.getTime() > todayTs;
-                const holiday = holidayOf(day);
-                const wk = weekKeyOf(week.days[0].getTime());
-                const met = goalMet(
-                  byWeek.get(wk) || 0,
-                  goals[wk] ?? WEEK_GOAL_DEFAULT
-                );
-                return (
-                  <span
-                    key={dayKey(day)}
-                    className={`hm-cell hm-t${
-                      future ? 0 : tier(count)
-                    }${future ? " future" : ""}${
-                      day.getTime() === todayTs ? " today" : ""
-                    }${met && !future ? " hm-goal-met" : ""}${
-                      holiday?.rest
-                        ? " hm-holiday"
-                        : holiday
-                        ? " hm-makeup"
-                        : ""
-                    }`}
-                    data-holiday={holiday?.name}
-                    title={
-                      holiday
-                        ? `${holiday.name} · ${holidayMessage(
-                            holiday,
-                            count
-                          )}${count > 0 ? ` · ${count} 个番茄` : ""}`
-                        : undefined
-                    }
-                    data-count={future ? "" : count}
-                    onMouseEnter={
-                      future ? undefined : (e) => showTip(e, day, stat)
-                    }
-                    onMouseLeave={() => setTip(null)}
-                  >
-                    {!future && count > 0 ? count : ""}
-                  </span>
-                );
-              })}
-            </React.Fragment>
-          ))}
-          <span className="hm-corner" />
-          {weeks.map((week) => {
-            const wk = weekKeyOf(week.days[0].getTime());
-            const total = byWeek.get(wk) || 0;
-            const met = goalMet(total, goals[wk] ?? WEEK_GOAL_DEFAULT);
-            return (
-              <span className="hm-badge-slot" key={`badge-${week.key}`}>
-                {total > 0 && (
-                  <span
-                    className="hm-week-total"
-                    title={`本周共 ${total} 个番茄`}
-                  >
-                    {total}
-                  </span>
-                )}
-                {met && (
-                  <span
-                    className="hm-badge"
-                    title={`本周目标已达成（${total} 个）`}
-                  >
-                    <LogoIcon size={12} tone={GOLD_TONE} />
-                  </span>
-                )}
-              </span>
-            );
-          })}
+            ))}
+            {WEEKDAYS.map((_, dow) => (
+              <React.Fragment key={dow}>
+                <span className="hm-dow">
+                  {dow % 2 === 0 ? WEEKDAYS[dow] : ""}
+                </span>
+                {weeks.map((week) => {
+                  const day = week.days[dow];
+                  const stat = byDay.get(dayKey(day));
+                  const count = stat?.count || 0;
+                  const future = day.getTime() > todayTs;
+                  const holiday = holidayOf(day);
+                  const wk = weekKeyOf(week.days[0].getTime());
+                  const met = goalMet(
+                    byWeek.get(wk) || 0,
+                    goals[wk] ?? WEEK_GOAL_DEFAULT
+                  );
+                  return (
+                    <span
+                      key={dayKey(day)}
+                      className={`hm-cell hm-t${
+                        future ? 0 : tier(count)
+                      }${future ? " future" : ""}${
+                        day.getTime() === todayTs ? " today" : ""
+                      }${met && !future ? " hm-goal-met" : ""}${
+                        holiday?.rest
+                          ? " hm-holiday"
+                          : holiday
+                          ? " hm-makeup"
+                          : ""
+                      }`}
+                      data-holiday={holiday?.name}
+                      title={
+                        holiday
+                          ? `${holiday.name} · ${holidayMessage(
+                              holiday,
+                              count
+                            )}${count > 0 ? ` · ${count} 个番茄` : ""}`
+                          : undefined
+                      }
+                      data-count={future ? "" : count}
+                      onMouseEnter={
+                        future
+                          ? undefined
+                          : (e) => showTip(e, day, stat)
+                      }
+                      onMouseLeave={() => setTip(null)}
+                    >
+                      {!future && count > 0 ? count : ""}
+                    </span>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+            <span className="hm-corner" />
+            {weeks.map((week) => {
+              const wk = weekKeyOf(week.days[0].getTime());
+              const total = byWeek.get(wk) || 0;
+              const met = goalMet(
+                total,
+                goals[wk] ?? WEEK_GOAL_DEFAULT
+              );
+              return (
+                <span
+                  className="hm-badge-slot"
+                  key={`badge-${week.key}`}
+                >
+                  {total > 0 && (
+                    <span
+                      className="hm-week-total"
+                      title={`本周共 ${total} 个番茄`}
+                    >
+                      {total}
+                    </span>
+                  )}
+                  {met && (
+                    <span
+                      className="hm-badge"
+                      title={`本周目标已达成（${total} 个）`}
+                    >
+                      <LogoIcon size={12} tone={GOLD_TONE} />
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
         </div>
-      </div>
-      <div className="holiday-legend">
-        ○ 官方假日，安心休息 · ▪ 调休上班 <small>2026 已核对</small>
+        <TodayTimeHeatmap records={records} />
       </div>
       {tip && (
         <div

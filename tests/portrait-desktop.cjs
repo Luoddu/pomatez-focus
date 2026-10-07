@@ -361,7 +361,7 @@ app
         );
         assert.deepEqual(
           landscape.fonts.sort(),
-          ["22px", "28px"],
+          ["28px"],
           JSON.stringify(landscape.fonts)
         );
       }

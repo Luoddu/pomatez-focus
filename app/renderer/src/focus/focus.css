@@ -876,10 +876,10 @@ input:focus-visible {
 .rest-dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .bili { background: #209eb0; }
 .xhs { background: #df6285; }
-.rest-health { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 10px; line-height: 14px; margin-top: 7px; }
-.rest-health span { width: 5px; height: 5px; border-radius: 50%; background: #7daa91; }
-.rest-health.interrupted { color: #b97b41; }
-.rest-health.interrupted span { background: #b97b41; }
+.rest-health { position: absolute; left: 2px; top: 2px; z-index: 1; display: flex; padding: 4px; }
+.rest-health > span:first-child { width: 6px; height: 6px; border-radius: 50%; background: #7daa91; }
+.rest-health.interrupted > span:first-child { background: #b97b41; }
+.rest-health-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .rest-error { color: var(--red); font-size: 11px; margin-top: 4px; }
 .rest-settings { height: 128px; overflow: auto; display: flex; flex-direction: column; gap: 5px; justify-content: flex-start; font-size: 12px; }
 .rest-settings > * { flex-shrink: 0; }
@@ -1815,6 +1815,7 @@ input:focus-visible {
   padding: 12px 14px;
 }
 .hm-scroll {
+  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -1823,8 +1824,17 @@ input:focus-visible {
   grid-auto-rows: max-content;
   gap: var(--hm-gap, 3px);
   width: max-content;
-  margin: 0 auto;
+  margin: 0;
 }
+.heatmap-content { display: grid; grid-template-columns: minmax(0, 1fr) 42px; gap: 10px; align-items: start; }
+.today-heatmap { min-width: 0; color: var(--muted); }
+.today-heatmap-title { display: block; font-size: 10px; line-height: 14px; margin-bottom: 5px; text-align: right; }
+.today-heatmap-body { position: relative; height: 168px; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 4px; margin-bottom: 4px; }
+.today-heatmap-labels { position: relative; font-size: 8px; line-height: 9px; }
+.today-heatmap-labels span { position: absolute; right: 0; transform: translateY(-50%); }
+.today-heatmap-slots { display: grid; grid-template-rows: repeat(48, minmax(0, 1fr)); gap: 1px; }
+.today-heatmap-cell { display: block; min-height: 0; border-radius: 1px; }
+.today-heatmap-cell:hover { outline: 1px solid var(--primary); outline-offset: 1px; }
 .hm-corner {
   width: var(--hm-dow-w, 16px);
 }
