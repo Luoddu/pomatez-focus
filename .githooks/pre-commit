@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+script="$repo_root/scripts/verify-staged.ps1"
+
+if command -v cygpath >/dev/null 2>&1; then
+  script="$(cygpath -w "$script")"
+fi
+
+if command -v powershell.exe >/dev/null 2>&1; then
+  exec powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$script"
+elif command -v pwsh >/dev/null 2>&1; then
+  exec pwsh -NoLogo -NoProfile -NonInteractive -File "$script"
+else
+  echo "BLOCKED: PowerShell is required for staged-file verification." >&2
+  exit 1
+fi
+

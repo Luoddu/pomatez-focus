@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+script="$repo_root/scripts/validate-commit-message.ps1"
+message_file="$1"
+
+if command -v cygpath >/dev/null 2>&1; then
+  script="$(cygpath -w "$script")"
+  message_file="$(cygpath -w "$message_file")"
+fi
+
+if command -v powershell.exe >/dev/null 2>&1; then
+  exec powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$script" -CommitMessageFile "$message_file"
+elif command -v pwsh >/dev/null 2>&1; then
+  exec pwsh -NoLogo -NoProfile -NonInteractive -File "$script" -CommitMessageFile "$message_file"
+else
+  echo "BLOCKED: PowerShell is required for commit-message validation." >&2
+  exit 1
+fi
+
