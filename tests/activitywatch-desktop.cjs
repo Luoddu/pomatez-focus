@@ -359,6 +359,16 @@ app.whenReady().then(async () => {
     await setInput('[aria-label="每日摸鱼额度（分钟）"]', 90);
     await setInput('[aria-label="每日番茄目标（个）"]', 15);
     await setInput('[aria-label="提醒间隔（分钟）"]', 3);
+    const saveGeometry = await js(
+      `(()=>{const box=document.querySelector('.rest-settings'),button=[...box.querySelectorAll('button')].find(b=>b.textContent==='保存策略');button.scrollIntoView({block:'nearest'});const r=button.getBoundingClientRect(),s=box.getBoundingClientRect();return {top:r.top,bottom:r.bottom,containerTop:s.top,containerBottom:s.bottom,viewport:innerHeight,scrollHeight:box.scrollHeight,clientHeight:box.clientHeight}})()`
+    );
+    console.log(
+      "Strategy save reachability:",
+      JSON.stringify(saveGeometry)
+    );
+    assert.ok(saveGeometry.top >= saveGeometry.containerTop - 1);
+    assert.ok(saveGeometry.bottom <= saveGeometry.containerBottom + 1);
+    assert.ok(saveGeometry.bottom <= saveGeometry.viewport + 1);
     await click("保存策略");
     await until(() => js(`!!document.querySelector('.rest-quota')`));
     assert.deepEqual(restMonitor.snapshot().settings, {
