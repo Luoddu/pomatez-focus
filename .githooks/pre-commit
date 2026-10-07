@@ -16,4 +16,3 @@ else
   echo "BLOCKED: PowerShell is required for staged-file verification." >&2
   exit 1
 fi
-
