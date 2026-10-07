@@ -274,6 +274,50 @@ test("custom goal, interval and quota govern actual thresholds and survive resta
   assert.equal(alerts, 3);
 });
 
+test("nondivisible quota uses only excess thresholds after crossing, while early prompts still work", async () => {
+  const f = fixture();
+  let alerts = 0;
+  const m = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => alerts++,
+    f.request,
+    f.now
+  );
+  m.configure({
+    quotaMinutes: 45,
+    supervise: true,
+    pomodoroGoal: 8,
+    reminderMinutes: 7,
+  });
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  f.seconds(2520);
+  let s = await m.refresh();
+  assert.equal(s.reminder.kind, "focus");
+  m.acknowledge(s.reminder.key);
+  f.seconds(2700);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(2700.01);
+  s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  m.acknowledge(s.reminder.key);
+  for (const seconds of [2940, 3119.99]) {
+    f.seconds(seconds);
+    assert.equal((await m.refresh()).reminder, null);
+  }
+  f.seconds(3120);
+  s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  assert.equal(s.reminder.excessMinutes, 7);
+  assert.equal(alerts, 3);
+  m.acknowledge(s.reminder.key);
+  f.seconds(3360);
+  assert.equal((await m.refresh()).reminder, null);
+  f.seconds(3540);
+  assert.equal((await m.refresh()).reminder.kind, "quota");
+  assert.equal(alerts, 4);
+});
+
 test("zero goal disables early prompts; changing interval rebases and invalid input preserves strategy", async () => {
   const f = fixture(),
     m = new ActivityWatchRest(

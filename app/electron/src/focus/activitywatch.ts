@@ -746,6 +746,7 @@ export class ActivityWatchRest {
             quotaCrossed &&
             (!this.ledger.quotaCrossed || step > this.ledger.step),
           focusReminder =
+            !quotaCrossed &&
             count !== null &&
             count < this.state.settings.pomodoroGoal &&
             focusStep > this.ledger.focusStep,
