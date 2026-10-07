@@ -218,7 +218,8 @@ export function usageQuery(
 export function localRequest(
   endpoint: string,
   body?: any,
-  port = 5600
+  port = 5600,
+  timeoutMs = 8000
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const payload =
@@ -263,7 +264,7 @@ export function localRequest(
     );
     const deadline = setTimeout(
       () => req.destroy(Error("ActivityWatch 连接超时")),
-      8000
+      timeoutMs
     );
     req.on("close", () => clearTimeout(deadline));
     req.on("error", () => reject(Error("ActivityWatch 未连接")));
@@ -638,6 +639,17 @@ export class ActivityWatchRest {
           this.weekBusy = null;
         });
     return this.weekBusy;
+  }
+  async refreshNow(): Promise<RestState> {
+    // Join an in-flight poll before discarding discovery/statistics caches.
+    const generation = this.generation;
+    if (this.busy) await this.busy;
+    if (this.weekBusy) await this.weekBusy.catch(() => {});
+    if (generation !== this.generation) return this.snapshot();
+    this.bucketIds = null;
+    this.coverageStart = null;
+    this.week = null;
+    return this.refresh();
   }
   refresh(): Promise<RestState> {
     if (this.busy)

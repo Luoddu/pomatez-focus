@@ -131,8 +131,14 @@ app.whenReady().then(async () => {
     win.webContents.on("console-message", (_e, level, message) => {
       if (level >= 3) errors.push(message);
     });
-    const popup = () => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('/assets/rest-reminder.html'));
-    const js = async (code, target = code.includes('.rest-reminder') ? popup() || win : win) => {
+    const popup = () =>
+      BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().endsWith("/assets/rest-reminder.html")
+      );
+    const js = async (
+      code,
+      target = code.includes(".rest-reminder") ? popup() || win : win
+    ) => {
       let timeout;
       try {
         return await Promise.race([
@@ -163,8 +169,15 @@ app.whenReady().then(async () => {
     const click = async (text) => {
       console.log("UI click:", text);
       if (text === "去睡觉" || text === "开始下一个番茄")
-        await until(() => popup() && !popup().webContents.isLoadingMainFrame() &&
-          js("Array.from(document.querySelectorAll('button')).every(b=>!b.disabled)", popup()));
+        await until(
+          () =>
+            popup() &&
+            !popup().webContents.isLoadingMainFrame() &&
+            js(
+              "Array.from(document.querySelectorAll('button')).every(b=>!b.disabled)",
+              popup()
+            )
+        );
       await js(
         `(()=>{const e=Array.from(document.querySelectorAll('button')).find(e=>e.getAttribute('aria-label')===${JSON.stringify(
           text
@@ -172,10 +185,13 @@ app.whenReady().then(async () => {
           text
         )});if(!e)throw Error('Missing '+${JSON.stringify(
           text
-        )});if(e.disabled)throw Error('Disabled '+${JSON.stringify(text)});e.click()})()`,
+        )});if(e.disabled)throw Error('Disabled '+${JSON.stringify(
+          text
+        )});e.click()})()`,
         text === "去睡觉" || text === "开始下一个番茄" ? popup() : win
       );
-      if (text === "去睡觉" || text === "开始下一个番茄") await until(() => !popup());
+      if (text === "去睡觉" || text === "开始下一个番茄")
+        await until(() => !popup());
     };
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand("Page.enable");
@@ -209,6 +225,60 @@ app.whenReady().then(async () => {
     );
     restMonitor.start();
     await until(() => restMonitor.snapshot().status === "recording");
+    const originalRefresh = restMonitor.refreshNow.bind(restMonitor);
+    let releaseRefresh,
+      refreshCalls = 0;
+    const refreshGate = new Promise((resolve) => {
+      releaseRefresh = resolve;
+    });
+    restMonitor.refreshNow = async () => {
+      refreshCalls++;
+      await refreshGate;
+      return originalRefresh();
+    };
+    const discoveryBefore = requests.filter((p) =>
+      p.endsWith("/buckets/")
+    ).length;
+    bSeconds = 260;
+    await js("document.querySelector('.rest-refresh').click()");
+    await until(() =>
+      js("document.querySelector('.rest-refresh').disabled")
+    );
+    await js("document.querySelector('.rest-refresh').click()");
+    releaseRefresh();
+    await until(() => restMonitor.snapshot().usage?.bilibili === 260);
+    await until(() =>
+      js("!document.querySelector('.rest-refresh').disabled")
+    );
+    assert.equal(refreshCalls, 1);
+    assert.equal(
+      requests.filter((p) => p.endsWith("/buckets/")).length,
+      discoveryBefore + 1
+    );
+    restMonitor.refreshNow = originalRefresh;
+    down = true;
+    await js("document.querySelector('.rest-refresh').click()");
+    await until(() => restMonitor.snapshot().status === "interrupted");
+    assert.equal(restMonitor.snapshot().usage.bilibili, 260);
+    await until(() =>
+      js("!document.querySelector('.rest-refresh').disabled")
+    );
+    assert.ok(
+      await js(
+        "document.querySelector('.rest-health').title.includes('ActivityWatch')"
+      )
+    );
+    down = false;
+    bSeconds = 270;
+    await js("document.querySelector('.rest-refresh').click()");
+    await until(
+      () =>
+        restMonitor.snapshot().status === "recording" &&
+        restMonitor.snapshot().usage?.bilibili === 270
+    );
+    checks.push(
+      "title refresh joins one request, rediscovers buckets, updates usage, retains outage totals and recovers"
+    );
     bSeconds = 299;
     await restMonitor.refresh();
     assert.equal(restMonitor.snapshot().reminder, null);
@@ -241,9 +311,14 @@ app.whenReady().then(async () => {
     checks.push(
       "production confirmed-record hook: 0/12 and combined 5/10/15 minute reminders, no prompt at 299 seconds"
     );
-    assert.equal(await js(`document.querySelector('.rest-reminder')===null`, win), true);
+    assert.equal(
+      await js(`document.querySelector('.rest-reminder')===null`, win),
+      true
+    );
     assert.equal(win.isAlwaysOnTop(), false);
-    checks.push("farm has no in-page reminder and remains unpinned after native reminders");
+    checks.push(
+      "farm has no in-page reminder and remains unpinned after native reminders"
+    );
     const setInput = (selector, value) =>
       js(
         `(()=>{const e=document.querySelector(${JSON.stringify(
@@ -330,6 +405,20 @@ app.whenReady().then(async () => {
       js(
         `document.querySelector('.rest-chart-head .selected')?.textContent==='近7天' && !document.querySelector('.rest-chart').hasAttribute('aria-busy') || document.querySelector('.rest-chart')?.getAttribute('aria-busy')==='false'`
       )
+    );
+    const weekQueryBefore = requests.filter((p) =>
+      p.endsWith("/query/")
+    ).length;
+    await js("document.querySelector('.rest-refresh').click()");
+    await until(() =>
+      js("!document.querySelector('.rest-refresh').disabled")
+    );
+    assert.ok(
+      requests.filter((p) => p.endsWith("/query/")).length >=
+        weekQueryBefore + 2
+    );
+    checks.push(
+      "refresh in weekly statistics invalidates cached week and retrieves both fresh day and week"
     );
     await click("返回额度");
     checks.push(
@@ -509,7 +598,7 @@ app.whenReady().then(async () => {
     await restMonitor.refresh();
     await until(() =>
       js(
-        `document.querySelector('.rest-health').textContent.includes('采集已中断')`
+        `document.querySelector('.rest-health').classList.contains('interrupted') && document.querySelector('.rest-health').title.includes('ActivityWatch')`
       )
     );
     assert.equal(restMonitor.snapshot().usage.totalSeconds, 4200);

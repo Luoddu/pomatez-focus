@@ -1,6 +1,6 @@
 # P0-POMO-042 ActivityWatch启动联动与手动刷新
 
-- IN_PROGRESS；模块唯一任务状态源，模块协调/实现/root。用户2026-10-07新增明确请求：随番茄App启动ActivityWatch、科学休息标题旁一键刷新。沿用现有本机运行与公开源码/安装更新授权，不自动安装/重启农场，不写根控制面或OS启动项。
+- REVIEW；模块唯一任务状态源，模块协调/实现/root。用户2026-10-07新增明确请求：随番茄App启动ActivityWatch、科学休息标题旁一键刷新。沿用现有本机运行与公开源码/安装更新授权，不自动安装/重启农场，不写根控制面或OS启动项。
 - 基线cada55e9b30088892a49f8970213b361732083f3，含P041本地复核PASS界面；公开主线仍28a23b5/preview.73，祖先已确认，单worktree干净，绿灯。分支task/p0-pomo-042-aw-launch-refresh；串行单写本clone，独占P042合成profile/临时loopback端口与自己启动的测试子进程。现有用户AW进程/数据库/Edge不重启、不强停。
 - T0：本机API v0.13.2可用，aw-qt/server/window/AFK进程均在，Edge有最近事件；无法由用户截图证明重启导致漏记。农场现只start轮询，无AW进程联动。手动统计只refresh当前cache，无单独刷新桥。目标不是补造漏记的过去时长。
 - 官方路径冻结：ActivityWatch根839d99ffabe8a0281d332a2fddfb78514266698b，aw-qt子模块43864b2f7ec3b71d5b181eafb47b4ded6c197b8f；官方main.py L18–31普通launcher、--autostart-modules/--no-gui，L65–95启动manager与自身退出时stop_all；config.py L6–13默认三个模块；manager.py L134–156避免控制台、L245–263服务器先启动。最小原始Git blob快照（main/manager/config/LICENSE）及SHA256 manifest在忽略artifacts/p042-official；不成为运行依赖。现有Electron/Node child_process公开spawn/execFile路径，无新依赖/自研watcher。

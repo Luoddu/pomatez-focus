@@ -204,13 +204,44 @@ export default function ScientificRest({
       if (requestId.current === id) setLoading(false);
     }
   }
+  const [refreshing, setRefreshing] = useState(false);
+  async function refreshStatus() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setError("");
+    try {
+      await api().restRefresh();
+      if (view === "stats" && range === "week")
+        await selectRange("week");
+    } catch (e: any) {
+      setError(e.message || "刷新失败，请稍后重试");
+    } finally {
+      setRefreshing(false);
+    }
+  }
   return (
     <section
       className="scientific-rest side-section"
       aria-label="科学休息"
     >
       <div className="side-title">
-        科学休息
+        <span className="rest-heading">
+          科学休息
+          <button
+            type="button"
+            className="rest-refresh"
+            aria-label="刷新采集状态"
+            title={
+              refreshing ? "正在核对 ActivityWatch…" : "刷新采集状态"
+            }
+            disabled={refreshing}
+            onClick={() => void refreshStatus()}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M16 8a6 6 0 1 0 0 4M16 3v5h-5" />
+            </svg>
+          </button>
+        </span>
         {view !== "quota" && (
           <button
             className="btn-text rest-back"
@@ -246,11 +277,12 @@ export default function ScientificRest({
               >
                 <span aria-hidden="true" />
                 <span className="rest-health-label">
-                  {state.message || (state.usage
-                    ? "采集已中断 · 保留上次记录"
-                    : state.status === "connecting"
-                    ? "正在连接采集…"
-                    : "采集未连接")}
+                  {state.message ||
+                    (state.usage
+                      ? "采集已中断 · 保留上次记录"
+                      : state.status === "connecting"
+                      ? "正在连接采集…"
+                      : "采集未连接")}
                 </span>
               </div>
               <svg viewBox="0 0 120 120" aria-hidden="true">

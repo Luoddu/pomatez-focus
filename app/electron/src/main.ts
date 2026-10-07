@@ -14,6 +14,7 @@ import fs from "fs";
 import { FocusService } from "./focus/service";
 import { FocusUpdater } from "./focus/updater";
 import { ActivityWatchRest } from "./focus/activitywatch";
+import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
 const headless = process.env.POMATEZ_HEADLESS === "1";
 app.setName("Pomatez Focus");
@@ -63,6 +64,11 @@ export const restMonitor = new ActivityWatchRest(
     if (!quitting && farmReady) restPopup.update(state);
   }
 );
+let restRuntimePaused = false;
+export const awRuntime = new ActivityWatchRuntime({ allowed: () => !quitting && !restRuntimePaused });
+const ensureRestRuntime = async () => {
+  if (!headless) await awRuntime.ensure();
+};
 const handler = (name: string, fn: (value: any) => any) =>
   ipcMain.handle(`focus:${name}`, async (event, value) => {
     if (
@@ -176,6 +182,14 @@ else {
       );
       handler("journal", () => service.journal());
       handler("restState", () => restMonitor.snapshot());
+      handler("restRefresh", async () => {
+        let failure: Error | null = null;
+        try { await ensureRestRuntime(); } catch (error: any) { failure = error; }
+        if (quitting || restRuntimePaused) throw Error("检测已暂停，恢复后再刷新");
+        const state = await restMonitor.refreshNow();
+        if (failure && state.status !== "recording") throw failure;
+        return state;
+      });
       handler("restSettings", (value) => restMonitor.configure(value));
       handler("restProgress", (value) => restMonitor.reportProgress(value));
       handler("restStatistics", (value) => restMonitor.statistics(value));
@@ -303,11 +317,15 @@ else {
       });
       let resumeRest = false;
       powerMonitor.on("suspend", () => {
+        restRuntimePaused = true;
         resumeRest = restMonitor.isRunning();
         win?.webContents.send("focus:suspend"); restMonitor.suspend();
       });
       powerMonitor.on("resume", () => {
-        win?.webContents.send("focus:suspend"); if (!headless || resumeRest) restMonitor.start();
+        restRuntimePaused = false;
+        win?.webContents.send("focus:suspend");
+        if (!headless) void ensureRestRuntime().catch(() => {}).finally(() => { if (!quitting && !restRuntimePaused) restMonitor.start(); });
+        else if (resumeRest) restMonitor.start();
       });
       if (!headless) {
         tray = new Tray(path.join(__dirname, "assets/tray-dark.png"));
@@ -333,7 +351,12 @@ else {
       // Existing hidden regressions stay independent of personal browser data.
       // ActivityWatch desktop tests explicitly start the same monitor with an
       // isolated loopback fixture; normal desktop starts it automatically.
-      if (!headless) restMonitor.start();
+      if (!headless) {
+        restMonitor.start();
+        void ensureRestRuntime().catch(() => {}).finally(() => {
+          if (!quitting && !restRuntimePaused && restMonitor.isRunning()) void restMonitor.refreshNow();
+        });
+      }
       if (headless && process.env.POMATEZ_SMOKE_TEST === "1") {
         if (
           win.isVisible() ||
