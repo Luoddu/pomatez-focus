@@ -242,21 +242,15 @@ export default function ScientificRest({
                   state.status !== "recording" ? " interrupted" : ""
                 }`}
                 role="status"
-                title={
-                  state.status === "recording"
-                    ? "正在记录网站时间"
-                    : state.message
-                }
+                title={state.message || "正在核对采集状态"}
               >
                 <span aria-hidden="true" />
                 <span className="rest-health-label">
-                  {state.status === "recording"
-                    ? "正在记录网站时间"
-                    : state.usage
+                  {state.message || (state.usage
                     ? "采集已中断 · 保留上次记录"
                     : state.status === "connecting"
                     ? "正在连接采集…"
-                    : "采集未连接"}
+                    : "采集未连接")}
                 </span>
               </div>
               <svg viewBox="0 0 120 120" aria-hidden="true">

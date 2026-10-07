@@ -123,19 +123,28 @@ app
     "48 half-hours use existing weighted counts, yesterday/unfinished excluded, late night and tooltip valid"
     );
     for (const [width, height] of [
-      [1440, 1000],
       [1040, 800],
       [1080, 1840],
+      [1440, 1000],
     ]) {
       win.setContentSize(width, height);
+      // A hidden Windows renderer can retain its previous viewport after a
+      // native resize. Reload at the actual new native size before measuring.
+      const resized = new Promise(r => win.webContents.once("did-finish-load",r));
+      win.webContents.reload();
+      await resized;
       await wait(250);
+      const contentSize = win.getContentSize();
+      assert.ok(Math.abs(contentSize[0]-width)<=2 && Math.abs(contentSize[1]-height)<=2, JSON.stringify(contentSize));
       const bounds = await js(`(()=>{
       const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
       const side=document.querySelector('.right-col');
-      return {width:innerWidth,side:rect('.right-col'),layout:getComputedStyle(document.querySelector('.content')).flexDirection,
+      return {width:innerWidth,height:innerHeight,side:rect('.right-col'),layout:getComputedStyle(document.querySelector('.content')).flexDirection,
         calendar:rect('.heatmap'),scroll:rect('.hm-scroll'),today:rect('.today-heatmap'),ring:rect('.rest-ring'),dot:rect('.rest-health'),
         overflow:side.scrollWidth>side.clientWidth+2};
     })()`);
+      assert.ok(Math.abs(bounds.width-width)<=2 && Math.abs(bounds.height-height)<=2, JSON.stringify({expected:[width,height],bounds}));
+      assert.equal(bounds.layout, width>height ? "row" : "column", JSON.stringify(bounds));
       assert.equal(bounds.overflow, false, JSON.stringify(bounds));
       assert.ok(
         bounds.today.right <= bounds.calendar.right - 8,
@@ -167,14 +176,23 @@ app
           JSON.stringify(bounds)
         );
       geometry.push(bounds);
-      if (width === 1440) {
-        fs.writeFileSync(path.join(root, "artifacts/overview-heat-preview.png"), (await win.capturePage()).toPNG());
-      }
       checks.push(
         `same column proportions, internal calendar/today fit and status top-left at ${width}×${height}`
       );
     }
     assert.equal(win.isVisible(), false);
+    fs.writeFileSync(path.join(root, "artifacts/overview-heat-preview.png"), (await win.capturePage()).toPNG());
+    const { restMonitor } = require("../app/electron/build/main.js");
+    const snapshot = restMonitor.snapshot();
+    for (const [status,message] of [["recording","本机记录 · 每 30 秒更新"],["recording","额度设置读取失败或未保存，请重新保存设置以恢复督促"],["interrupted","采集已中断：请确认 ActivityWatch 与 Edge 扩展运行中"]]) {
+      win.webContents.send("focus:rest-state", {...snapshot,status,message});
+      await wait(100);
+      const health=await js(`(()=>{const e=document.querySelector('.rest-health');return {title:e.title,text:e.textContent,interrupted:e.classList.contains('interrupted')}})()`);
+      assert.equal(health.title,message);
+      assert.equal(health.text,message);
+      assert.equal(health.interrupted,status!=="recording");
+    }
+    checks.push("healthy/storage failure/disconnection messages remain available on the compact status point");
     assert.deepEqual(errors, []);
     fs.writeFileSync(
       path.join(root, "artifacts/overview-heat-test.json"),
