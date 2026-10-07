@@ -351,6 +351,7 @@ app.whenReady().then(async () => {
     const strategyGeometry = await js(
       `(()=>{const r=document.querySelector('.rest-card').getBoundingClientRect(), m=document.querySelector('.heatmap').getBoundingClientRect();return {height:r.height,calendar:m.height,right:r.right,viewport:innerWidth}})()`
     );
+    console.log("Strategy geometry:", JSON.stringify(strategyGeometry));
     assert.ok(
       strategyGeometry.height <= strategyGeometry.calendar + 15
     );
