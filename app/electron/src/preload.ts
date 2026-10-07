@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld("focusApi", {
   status: () => invoke("status"),
   restState: () => invoke("restState"),
   restSettings: (value: any) => invoke("restSettings", value),
-  restProgress: (value: { day: string; completedCount: number }) => invoke("restProgress", value),
+  restProgress: (value: { day: string; completedCount: number | null }) => invoke("restProgress", value),
   restStatistics: (value: "today" | "week") => invoke("restStatistics", value),
   restAcknowledge: (value: string) => invoke("restAcknowledge", value),
   onRestState: (callback: (state: any) => void) => {

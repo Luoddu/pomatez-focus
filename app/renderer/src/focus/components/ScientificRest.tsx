@@ -43,7 +43,10 @@ const initial: RestState = {
   updatedAt: null,
   reminder: null,
 };
-export function useScientificRest(records: FocusSession[]) {
+export function useScientificRest(
+  records: FocusSession[],
+  ready: boolean
+) {
   const [state, setState] = useState(initial);
   useEffect(() => {
     const bridge = api();
@@ -83,15 +86,19 @@ export function useScientificRest(records: FocusSession[]) {
     records,
     state.updatedAt || Date.now()
   );
+  const reportedCount = ready ? completedCount : null;
   useEffect(() => {
     const bridge = api();
     if (bridge?.restProgress)
       void bridge
-        .restProgress({ day: progressDay, completedCount })
+        .restProgress({
+          day: progressDay,
+          completedCount: reportedCount,
+        })
         .catch(() => {});
     // Progress is a projection of the timer's confirmed records, including edits
     // and cloud merges. No independent daily counter or polling timer is needed.
-  }, [progressDay, completedCount]);
+  }, [progressDay, reportedCount]);
   return state;
 }
 const minutes = (seconds: number) =>

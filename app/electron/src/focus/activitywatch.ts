@@ -447,12 +447,20 @@ export class ActivityWatchRest {
     if (
       !value ||
       value.day !== dayKey(this.now()) ||
-      !Number.isSafeInteger(value.completedCount) ||
-      value.completedCount < 0 ||
-      value.completedCount > 100000
+      (value.completedCount !== null &&
+        (!Number.isSafeInteger(value.completedCount) ||
+          value.completedCount < 0 ||
+          value.completedCount > 100000))
     )
       throw Error("今日番茄进度无效");
     // The existing renderer record store owns this count. Never persist a copy.
+    if (value.completedCount === null) {
+      this.state.progress = null;
+      if (this.state.reminder?.kind === "focus")
+        this.state.reminder = null;
+      this.emit();
+      return this.snapshot();
+    }
     this.state.progress = {
       day: value.day,
       completedCount: value.completedCount,
@@ -688,7 +696,7 @@ export class ActivityWatchRest {
         this.ledger.step = Math.max(step, this.ledger.step);
         // Observe both counters even after 12 tomatoes or while supervision is off.
         // Returning to the stricter policy must not replay past thresholds.
-        if (count !== null)
+        if (count !== null || quotaCrossed)
           this.ledger.focusStep = Math.max(
             focusStep,
             this.ledger.focusStep

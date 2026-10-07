@@ -131,7 +131,27 @@ app.whenReady().then(async () => {
     win.webContents.on("console-message", (_e, level, message) => {
       if (level >= 3) errors.push(message);
     });
-    const js = (code) => win.webContents.executeJavaScript(code, true);
+    const js = async (code) => {
+      let timeout;
+      try {
+        return await Promise.race([
+          win.webContents.executeJavaScript(code, true),
+          new Promise((_, reject) => {
+            timeout = setTimeout(
+              () =>
+                reject(
+                  Error(
+                    "Renderer command stalled: " + code.slice(0, 120)
+                  )
+                ),
+              8000
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
     const until = async (fn) => {
       for (let i = 0; i < 150; i++) {
         if (await fn()) return;
@@ -139,7 +159,8 @@ app.whenReady().then(async () => {
       }
       throw Error("UI wait failed");
     };
-    const click = (text) =>
+    const click = (text) => (
+      console.log("UI click:", text),
       js(
         `(()=>{const e=Array.from(document.querySelectorAll('button')).find(e=>e.getAttribute('aria-label')===${JSON.stringify(
           text
@@ -148,34 +169,30 @@ app.whenReady().then(async () => {
         )});if(!e)throw Error('Missing '+${JSON.stringify(
           text
         )});e.click()})()`
-      );
+      )
+    );
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand("Page.enable");
     const capture = async (name) => {
+      console.log("Capture:", name);
       win.webContents.invalidate();
       await wait(250);
-      if (name === "scientific-rest-compact-reminder") {
-        const shot = await win.capturePage(undefined, {
+      let timeout;
+      const shot = await Promise.race([
+        win.capturePage(undefined, {
           stayHidden: true,
           stayAwake: true,
-        });
-        fs.writeFileSync(
-          path.join(root, "artifacts", name + ".png"),
-          shot.toPNG()
-        );
-        return;
-      }
-      const screenshot = await win.webContents.debugger.sendCommand(
-        "Page.captureScreenshot",
-        {
-          format: "png",
-          fromSurface: true,
-          captureBeyondViewport: false,
-        }
-      );
+        }),
+        new Promise((_, reject) => {
+          timeout = setTimeout(
+            () => reject(Error("Hidden screenshot stalled: " + name)),
+            8000
+          );
+        }),
+      ]).finally(() => clearTimeout(timeout));
       fs.writeFileSync(
         path.join(root, "artifacts", name + ".png"),
-        Buffer.from(screenshot.data, "base64")
+        shot.toPNG()
       );
     };
     await until(() =>
@@ -239,6 +256,27 @@ app.whenReady().then(async () => {
     checks.push(
       "real manual-confirmed twelve tomatoes propagate via narrow IPC and stop under-quota reminders"
     );
+    const progressReports = [],
+      originalProgress = restMonitor.reportProgress.bind(restMonitor);
+    restMonitor.reportProgress = (value) => {
+      progressReports.push(value.completedCount);
+      return originalProgress(value);
+    };
+    const restored = new Promise((r) =>
+      win.webContents.once("did-finish-load", r)
+    );
+    win.reload();
+    await restored;
+    await until(() => progressReports.includes(12));
+    assert.ok(
+      progressReports.every((count) => count === null || count === 12)
+    );
+    await restMonitor.refresh();
+    assert.equal(restMonitor.snapshot().reminder, null);
+    restMonitor.reportProgress = originalProgress;
+    checks.push(
+      "production reload waits for stored records: no transient zero or false early reminder for completed goal"
+    );
     bSeconds = 2700;
     xSeconds = 600;
     await restMonitor.refresh();
@@ -265,7 +303,6 @@ app.whenReady().then(async () => {
       Math.abs(geometry.ringWidth - geometry.calendarWidth) < 3
     );
     assert.ok(geometry.ringHeight <= geometry.calendarHeight + 15);
-    await capture("scientific-rest-quota");
     checks.push(
       "card above calendar, same width and comparable height"
     );
@@ -285,7 +322,6 @@ app.whenReady().then(async () => {
         `document.querySelector('.rest-chart-head .selected')?.textContent==='近7天' && !document.querySelector('.rest-chart').hasAttribute('aria-busy') || document.querySelector('.rest-chart')?.getAttribute('aria-busy')==='false'`
       )
     );
-    await capture("scientific-rest-statistics");
     await click("返回额度");
     checks.push(
       "same-place statistics and today/week hourly distribution"
@@ -341,7 +377,6 @@ app.whenReady().then(async () => {
         `document.querySelector('.rest-reminder').textContent.includes('超额 5 分钟')`
       )
     );
-    await capture("scientific-rest-reminder");
     await click("去睡觉");
     await until(() => js(`!document.querySelector('.rest-reminder')`));
     assert.equal(
@@ -447,8 +482,7 @@ app.whenReady().then(async () => {
         `(()=>{const r=document.querySelector('.rest-card').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight})()`
       )
     );
-    await capture("scientific-rest-small");
-    console.log("Portrait card screenshot captured");
+    console.log("Portrait card geometry verified");
     checks.push("portrait-width card stays within viewport");
     // Although no quota card is added to the mini window, supervision stays
     // reachable there and both actions must fit inside its existing bounds.
@@ -478,7 +512,6 @@ app.whenReady().then(async () => {
     );
     assert.equal(compact.buttons, 2);
     console.log("Compact reminder geometry", JSON.stringify(compact));
-    await capture("scientific-rest-compact-reminder");
     await click("开始下一个番茄");
     assert.equal(restMonitor.snapshot().reminder, null);
     checks.push(

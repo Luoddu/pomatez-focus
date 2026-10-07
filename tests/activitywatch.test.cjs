@@ -373,6 +373,35 @@ test("new focus ledger persists, offline reconnect coalesces, disabling/re-enabl
   assert.ok(!disk.includes("completedCount"));
 });
 
+test("a quota prompt consumes its overlapping focus threshold even before progress arrives", async () => {
+  const f = fixture();
+  let alerts = 0;
+  const m = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => alerts++,
+    f.request,
+    f.now
+  );
+  f.seconds(3900);
+  let s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  m.acknowledge(s.reminder.key);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: 0 });
+  assert.equal((await m.refresh()).reminder, null);
+  assert.equal(alerts, 1);
+  f.seconds(4200);
+  s = await m.refresh();
+  assert.equal(s.reminder.kind, "quota");
+  assert.equal(alerts, 2);
+  m.acknowledge(s.reminder.key);
+  m.reportProgress({ day: dayKey(f.now()), completedCount: null });
+  assert.equal(m.snapshot().progress, null);
+  f.seconds(4500);
+  assert.equal((await m.refresh()).reminder.kind, "quota");
+  assert.equal(alerts, 3); // Restoration uncertainty never disables the daily cap.
+});
+
 test("valid old ledger migrates without retroactive focus prompts; old >60 quota clamps, corrupt new ledger fails closed", async () => {
   const f = fixture();
   for (const quota of [60, 120]) {

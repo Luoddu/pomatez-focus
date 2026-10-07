@@ -27,6 +27,7 @@ type CounterProps = {
   timerType?: any;
   active: FocusSession | null;
   records: FocusSession[];
+  ready: boolean;
   mergeCloud: (records: FocusSession[], sourceKey: string) => void;
   getSnapshot: () => Data;
   bindQuick: (q: QuickTask, rows: FocusTask[]) => void;
@@ -61,6 +62,7 @@ const CounterContext = React.createContext<CounterProps>(
 );
 const CounterProvider: React.FC = ({ children }) => {
   const [data, setData] = useState<Data>({ active: null, records: [] });
+  const [ready, setReady] = useState(false);
   const dataRef = useRef(data);
   const [noticeText, setNoticeText] = useState("");
   // 相同文案的连续通知也要重新触发（React 同值 setState 会跳过重渲染）
@@ -124,6 +126,8 @@ const CounterProvider: React.FC = ({ children }) => {
       }
     } catch (e) {
       fail(e);
+    } finally {
+      setReady(!fatal.current);
     }
   }, [publish, fail, setNotice]);
   const settle = useCallback(() => {
@@ -459,6 +463,7 @@ const CounterProvider: React.FC = ({ children }) => {
         shouldFullscreen: false,
         active: data.active,
         records: data.records,
+        ready,
         mergeCloud,
         getSnapshot: () => dataRef.current,
         bindQuick: (q, rows) => {
