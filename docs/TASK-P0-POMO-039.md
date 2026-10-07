@@ -1,0 +1,11 @@
+# P0-POMO-039 自定义科学休息策略与完整推送
+
+- IN_PROGRESS；唯一状态源本模块卡，模块协调/实现Codex /root。用户2026-10-07明确“把这个调整的策略，让我能够之后自行设置 然后推送”，授权本地功能、普通源码Push、既有Luoddu/pomatez-focus Windows preview发布与真实更新检测；不授权自动安装/重启用户App、其他电脑或根共享写入。
+- 基线c558f217ca962ad9fada25475383f0d94ccab7e1包含038独立PASS未发布修改；实时fetch/check:sync确认已包含公开203d19b、最大已发布70，干净，独立task/p0-pomo-039-rest-settings-release、单写、无其他worktree，绿灯。第一次写、冻结、发布前复核status/worktree/baseline..origin与运行资源，不force。
+- 目标：在科学休息原位“设置策略”可调整每日番茄目标（0–60整数；0仅额度提醒）、每累计浏览多久提醒（1–60分钟整数，同时用于超额步进）、每日摸鱼额度（5–480分钟、5步进；用户本轮允许之后自行设置，原固定60变为默认60）。默认12/5/60、督促true；即时保存本机、重启保留。改变策略以现用量为基线，不补弹历史；额度超出首次即时提醒，叠加只一条，既有目标ready/迁移/午夜/去重继续。
+- 写集：本卡、docs/ACCEPTANCE-P0-POMO-039.md、docs/ACTIVITYWATCH.md、CHANGELOG.md；app/electron/src/focus/activitywatch.ts；app/renderer/src/focus/components/ScientificRest.tsx、focus.css；tests/activitywatch.test.cjs、tests/activitywatch-desktop.cjs；版本工具生成app/electron/package.json、SettingsPanel.tsx。不改AW/飞书/Counter计时核心/根文件，不新增依赖、数据库或服务。忽略artifacts用于合成验收/发布暂存，不进Git。
+- 必读：适用AGENTS、既读根version-control/context-loading、038/037卡与验收、ACTIVITYWATCH、DEVELOPMENT；设置/提醒源码和现有测试、官方固定updater与builder/gh路径。四源：①基线本地265逻辑/16生产UI/21计时restart独立PASS，公开70仍旧单额度；②AW13.2语义不变沿用冻结官方query；Electron34.5.8 IPC边界不变，发布使用固定updater6.8.3的GitHubProvider L39–140、gh2.97.0 release create/edit/assets官方帮助、builder25.1.8既有路径；③复用settings原子落盘、ready聚合、next-version/build/package/push与安全commit，根Learning定向预检沿用038无新候选；④扩展038真UI/逻辑迁移与阈值；复用037六资产及旧版native Nsis更新检测，不用历史无限重试脚本。
+- 正反验收：新设置目标8/间隔3/额度45实际生效，7→8额度内停止且额度超出仍提醒；0目标只按额度，非整数/越界拒绝而旧策略可用；设置后当前用量不倒放、新增档提醒；关监督仍记录且恢复保持三设置；70旧schema默认12/5并消费同日旧总量，不重复；午夜/未知进度/已知双条件/持久失败仍有正反覆盖。生产3输入、按钮、窄屏/卡尺寸、保存/reload和两动作真实验证；冻结源码干净构建/打包，六远端资产hash/size/state与源tag一致，70真实更新器发现新版，不自动下载/安装。
+- 资源预算：本clone独占；用户profile/AW仅只读保全；测试隐藏静音临时profile与合成REST独立端口。沿用1个只读独立reviewer20分钟复核冻结diff/卡/原始测试/最后发布证据，禁止写文件/启动进程/用户App/外部写入/再派Agent。本工作周期有界完成，上传逐项单次（瞬时失败先核远端幂等状态，最多一次已知瞬时重试），未知同因两次停止冲突步骤，不能盲重放副作用；无计划任务。
+- 发布：version:prepare选未用新preview；验证、独立review与本地安全commit后干净build/package；官方push:focus非force同步确切源、新annotated tag、先draft prerelease，上传六资产逐项远端hash/size核对后公开，不设Stable Latest；真实旧版本native ElectronHttpExecutor检查。旧70资产/hash不改；最后doc回执与源码分支同步，Release/tag固定实际包源。
+- 回滚：保留70资产与原用户历史，新Release公开前可留draft；不替换同号或旧tag，公开后修复用更高版本。配置保留旧字段与账本step，新字段旧版忽略；未来策略改变由用户在UI自己保存，不上传个人设置。Learning none：现有配置迁移、去重、官方发布模式复用，检查点再判断。
