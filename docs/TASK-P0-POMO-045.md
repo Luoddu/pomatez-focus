@@ -1,6 +1,6 @@
 # P0-POMO-045 图案旅程与可视化模板
 
-- REVIEW；隔离模块唯一状态源，owner/实现 /root。用户2026-10-08认可交互预览并明确“开始作战”；本轮本地实现/验证/独立复核/原子提交，不自动安装、重启用户App或外部发布。发布按后续明确“推送”执行模块约定。
+- DONE（本地源码）；隔离模块唯一状态源，owner/实现 /root。用户2026-10-08认可交互预览并明确“开始作战”；本轮本地实现/验证/独立复核/原子提交，不自动安装、重启用户App或外部发布。发布按后续明确“推送”执行模块约定。
 - 基线 c4fee83bb570ebe2a6fb008c5ed527e8d9afbd50，实时fetch + check:sync同canonical/preview.78/干净；独立任务分支task/p0-pomo-045-journey-templates，单worktree绿灯，无重叠活动写者。
 - 目标：概览全列宽图案旅程，番茄略大、碗/轮廓ZZZ/月亮略小并串在番茄之间，时间角标不独占线；完成色复用实际记录项目色。模板默认4/3/3/3/3共16：8点4→吃饭/小憩；12点3→小憩；3→小憩/健身/吃饭/小憩；20点3→小憩；3→小憩/下班睡觉，末24点。未指定中间钟点留空，时间仅参照。模板可可视化创建/编辑/复制/移除/设默认、预览计数/图案/参照时间、应用今天或明天；不由模板自动启动任务或强制钟点。累计条移至农场caption右侧，恢复100粒路段、25粒小旗，不改全局累计/徽章。
 - 模板只保存安排（名称/数量/参考小时/休息图案），按任务来源隔离、有界最多12模板/20阶段/100番茄，未来新日使用默认；今日既有安排不自动覆盖。应用复用resize保护已完成/活动轮廓、关联任务保留；活动时不应用，正常无活动且容量足够仍可应用，缩掉已完成/损坏存储须拒绝且原数据保留。模板不保存实际记录/session绑定，不新增历史真相源。
@@ -13,3 +13,4 @@
 - 用户追加：科学专注提醒加蓝色描边，当前旅程阶段有未经过的健身节点时提供“去健身”；暂停及旅程写入须有回执，失败不确认提醒、保留重试。扩展写集为ScientificRest.tsx、FocusApp.tsx仅旅程投影/健身操作，electron/focus/activitywatch.ts、restReminderWindow.ts、preload.ts、rest-reminder-preload.ts、assets/rest-reminder.html/.js、main.ts仅gym休息后隐藏；复用已鉴权restProgress与rest-action通道，只传当前日boolean，不新增权限/通道/计时器/后台。补充验收：有健身阶段显示并真实暂停/保存，无健身/已过/过期来源隐藏且伪造gym拒绝；正常sleep/focus、原提醒频率、回执失败重试仍通过。对应activitywatch单元/真实桌面测试纳入写集。
 - REVIEW检查点：本地preview.79；18组旅程/模板逻辑、全部304/304，实际旅程两进程20组、AW24组、overview7、portrait14、通用desktop21+两进程恢复通过。默认横条在既有380px概览列完整可见，真实科研填色；无外部发布/安装/用户进程操作。tests/desktop.cjs按已隐藏总卡预期改为读取迁移后累计条，属于原写集“必要overview预期”；固定证据与Learning none见ACCEPTANCE-P0-POMO-045.md，交既有reviewer只读复核。
 - 复核修复：4a9d8f8一项P2，今日投影须独立于明日/小窗展示；按既有允许FocusApp投影写集改为事件只读reconcile+memo，真实AW25（含明日页/冷compact/损坏恢复正反）及旅程20继续PASS；截图等待修正不改运行源。冻结修复交同一reviewer复核，Learning none，最终clean build后本地DONE。
+- 最终633ed8a独立源码PASS，原P2关闭；clean build来源633ed8a/dirty=false/preview.79，源码与原始合成验收完整，Learning none。工作树/允许写集/唯一worktree绿灯；仅本卡和验收回执收口，不改运行源。回滚和下次发布路径见上，用户App当前版本未更新；模板隐藏截图旧帧的限制明确记入验收，不作为视觉成功证据。
