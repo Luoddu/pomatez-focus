@@ -130,13 +130,15 @@ app
       "48 half-hours use existing weighted counts, yesterday/unfinished excluded, late night and tooltip valid"
     );
     const viewport = await js(
-      `(()=>{const v=document.querySelector('.today-heatmap-viewport');const r=v.getBoundingClientRect();const a=document.querySelector('[data-slot="16"]').getBoundingClientRect(),z=document.querySelector('[data-slot="0"]').getBoundingClientRect();return {top:v.scrollTop,height:v.clientHeight,scroll:v.scrollHeight,firstVisible:a.top>=r.top-2,zeroHidden:z.bottom<r.top}})()`
+      `(()=>{const v=document.querySelector('.today-heatmap-viewport');const r=v.getBoundingClientRect();const a=document.querySelector('[data-slot="16"]').getBoundingClientRect(),z=document.querySelector('[data-slot="0"]').getBoundingClientRect();return {top:v.scrollTop,height:v.clientHeight,scroll:v.scrollHeight,firstVisible:a.top>=r.top-2,zeroHidden:z.bottom<r.top,allEarlyHidden:[...document.querySelectorAll(".today-heatmap-cell")].slice(0,16).every(e=>e.getBoundingClientRect().bottom<=r.top+0.5),allDayVisible:[...document.querySelectorAll(".today-heatmap-cell")].slice(16).every(e=>{const c=e.getBoundingClientRect();return c.top>=r.top-0.5&&c.bottom<=r.bottom+0.5})}})()`
     );
     assert.ok(
       viewport.top > 40 &&
         viewport.scroll > viewport.height &&
         viewport.firstVisible &&
-        viewport.zeroHidden,
+        viewport.zeroHidden &&
+        viewport.allEarlyHidden &&
+        viewport.allDayVisible,
       JSON.stringify(viewport)
     );
     assert.equal(

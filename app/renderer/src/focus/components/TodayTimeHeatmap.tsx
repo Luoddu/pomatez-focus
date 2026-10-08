@@ -38,7 +38,14 @@ export default function TodayTimeHeatmap({
   const viewport = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = viewport.current;
-    if (el) el.scrollTop = el.scrollHeight - el.clientHeight;
+    const first = el?.querySelector('[data-slot="16"]');
+    if (el && first) {
+      const bounds = el.getBoundingClientRect();
+      const scale = bounds.height / el.clientHeight || 1;
+      // Align the actual 08:00 cell; gaps and page zoom affect the row boundary.
+      el.scrollTop +=
+        (first.getBoundingClientRect().top - bounds.top) / scale;
+    }
   }, [start]);
   return (
     <div className="today-heatmap" aria-label="今日半小时专注热力">
@@ -53,7 +60,16 @@ export default function TodayTimeHeatmap({
         <div className="today-heatmap-body">
           <div className="today-heatmap-labels" aria-hidden="true">
             {[0, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24].map((hour) => (
-              <span key={hour} style={{ top: `${(hour / 24) * 100}%` }}>
+              <span
+                key={hour}
+                style={{
+                  top:
+                    hour === 8
+                      ? "calc(100% / 3 + 1px)"
+                      : `${(hour / 24) * 100}%`,
+                  transform: hour === 8 ? "none" : undefined,
+                }}
+              >
                 {hour}
               </span>
             ))}

@@ -13,3 +13,5 @@
 - 有界测试分类：隐藏Windows renderer的CDP mouseMoved/wheel不进入DOM（原始p043-wheel-diagnostic.txt，hit为正确热力cell但wheel events=[]），不是热力滚动源错误；不继续同层输入试错。原生overflow:auto范围和DOM滚动可见性验证，明确不声称隐藏CDP真滚轮已通过。既有desktop frozen clock使周期全量校准永不到30秒；仅测试隐藏周期段推进合成clock，不修改生产日期或减断言。
 
 - 实现检查点：preview.76准备完成；默认逻辑全套284/284 PASS、真实生产隔离desktop23/23、overview7/7、portrait14/14。5秒短窗/30秒全日，单一原循环；同一快照触发界面渲染时读取当下时钟，防止两次秒tick之间出现暂时回退；跨日清空live。详细性能/负例/限制见ACCEPTANCE-P0-POMO-043.md。固定WebWatcher config.ts L4–7心跳60秒；heartbeat.ts活动切换/定时公开心跳；aw-server-api.py L339–349官方timeperiods query2。快照manifest逐blob/SHA固定，不是运行依赖。
+
+- REVIEW修正：7c6d177独立复核两项P2已旧版负例复现并修复；全逻辑285、desktop23、overview7 PASS。重新冻结后再只读复核，版本76未打包/公开，不替换旧版。Learning none，复用042的暂停/恢复缓存失效边界。

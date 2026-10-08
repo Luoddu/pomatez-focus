@@ -622,6 +622,8 @@ export class ActivityWatchRest {
     return this.running;
   }
   stop() {
+    // A resumed collector must reconcile the full day even after a short pause.
+    this.fullReadAt = 0;
     this.running = false;
     this.generation++;
     if (this.timer) clearTimeout(this.timer);

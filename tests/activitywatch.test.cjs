@@ -1195,3 +1195,49 @@ test("live signal requires real target tab, Edge foreground and active or audibl
   audible[1][0].data.app = "Other";
   assert.equal(liveSignal(audible, usage, now, now).site, null);
 });
+
+test("short suspend and duplicate resume reconcile full day once then return to recent polling", async (t) => {
+  const f = fixture(),
+    periods = [];
+  const monitor = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => {},
+    async (e, b) => {
+      if (e === "/query/") periods.push(b.timeperiods[0]);
+      return f.request(e, b);
+    },
+    f.now
+  );
+  t.after(() => monitor.stop());
+  f.seconds(600);
+  await monitor.refresh();
+  f.advance(5000);
+  f.seconds(605);
+  await monitor.refresh(true);
+  assert.equal(
+    Date.parse(periods.at(-1).split("/")[0]),
+    f.now() - 60000
+  );
+  monitor.suspend();
+  assert.equal(monitor.snapshot().live, null);
+  assert.equal(monitor.snapshot().usage.totalSeconds, 605);
+  f.advance(5000);
+  f.seconds(610);
+  const before = periods.length;
+  monitor.start();
+  monitor.start();
+  await monitor.refresh(true);
+  assert.equal(periods.length, before + 1);
+  assert.equal(Date.parse(periods.at(-1).split("/")[0]), at(0));
+  assert.equal(monitor.snapshot().usage.totalSeconds, 610);
+  assert.equal(monitor.isRunning(), true);
+  f.advance(5000);
+  f.seconds(615);
+  await monitor.refresh(true);
+  assert.equal(
+    Date.parse(periods.at(-1).split("/")[0]),
+    f.now() - 60000
+  );
+  assert.equal(monitor.snapshot().usage.totalSeconds, 615);
+});
