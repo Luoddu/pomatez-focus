@@ -9,3 +9,6 @@
 - 已验证：overview7（p045-overview.txt）、portrait14（portrait-test.json）、通用desktop21与两进程恢复（p045-desktop.txt）通过；旧desktop曾查已隐藏的总番茄卡导致null错误，原文定位后更新测试为读取迁移后累计条，未补回已隐藏产品UI。默认旅程条内部无横向溢出、实际科研填色、原外列等宽；农场累计条每25粒旗，既有任务区比例保持。原生蓝框三按钮截图scientific-focus-native-gym.png和journey-actual.png、journey-template-editor.png经目视检查；仅合成界面，截图不进Git。
 - 待完成：独立冻结复核、最终干净源构建和本地原子提交。
 - Learning判断none：复用已验证计时回执、本地有界配置和静音链路；本轮布局/模板/boolean投影为模块业务实现，未产生新的可跨任务工程教训。
+- 冻结4a9d8f8独立复核发现P2：今日gym投影只由展示的TodayJourney上报，明日页新增当天记录或冷启动compact没有当前投影。已改为FocusApp按ready/source/day/records/active-id事件只读reconcile当前日，gym判断memo；展示组件只传人工安排更新，仍无每秒存储或新计时器。真实AW新增正反：明日页补记7后gym出现；真实UI切小窗后reload保持可用；坏今日JSON使gym=false且字节保留，恢复配置再reload可用；原gym失败回执/结束隐藏继续通过，25/25（p045-aw-review-fix.txt）。旅程两进程20/20继续通过（p045-journey-review-fix.txt）。
+- 测试诊断：首次直接调用windowMode仅改变原生窗口而未调用前端状态setter，compact UI等待超时；精确定位失败行397与既有UI wrapper后改为实际“切换小窗”按钮，不改产品窗口机制。隐藏截图改为invalidate+250ms+公开capturePage stayHidden/stayAwake等待绘制；生产源不受影响。
+- 首冻结clean build source-version=4a9d8f8 / dirty=false / preview.79（p045-build-clean.txt）；修复后的独立复核与最终clean build待补。无新Learning候选。

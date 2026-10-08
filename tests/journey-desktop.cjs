@@ -159,7 +159,8 @@ app.whenReady().then(async () => {
       await change('[aria-label="模板名称"]', "合成15");
       await change('[aria-label="第1段番茄数量"]', "3");
       assert.equal(await js(`document.querySelectorAll('.journey-template-preview .journey-preview-tomato').length`),15);
-      fs.writeFileSync(path.join(root,"artifacts/journey-template-editor.png"),(await win.webContents.capturePage()).toPNG());
+      win.webContents.invalidate(); await wait(250);
+      fs.writeFileSync(path.join(root,"artifacts/journey-template-editor.png"),(await win.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
       await click("第1段添加健身", ".journey-dialog button");
       await js(`document.querySelector('[aria-label="设为默认模板"]').click()`);
       await click("保存模板", ".journey-dialog button");

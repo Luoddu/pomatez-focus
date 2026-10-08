@@ -386,10 +386,31 @@ app.whenReady().then(async () => {
           String(value)
         )});e.dispatchEvent(new Event('input',{bubbles:true}))})()`
       );
+    await click("明天");
     await click("补记");
     await setInput('[aria-label="补记番茄数"]', 7);
     await click("保存补记");
     await until(() => restMonitor.snapshot().progress?.gymAvailable === true);
+    assert.equal(await js(`document.querySelector('.journey-heading strong').textContent`,win),"明日旅程");
+    await click("切换小窗");
+    await until(()=>js(`document.querySelector('.focus-app').classList.contains('compact')`,win));
+    const compactReload = new Promise(resolve => win.webContents.once('did-finish-load',resolve));
+    restMonitor.reportProgress({day:restMonitor.snapshot().progress.day,completedCount:null});
+    win.reload(); await compactReload;
+    await until(()=>restMonitor.snapshot().progress?.gymAvailable === true);
+    assert.equal(await js(`document.querySelector('.journey-card')===null`,win),true);
+    const gymDayKey='pomatez-journey-v1:local:'+restMonitor.snapshot().progress.day;
+    const originalDayPlan=await js(`localStorage.getItem(${JSON.stringify(gymDayKey)})`,win);
+    await js(`localStorage.setItem(${JSON.stringify(gymDayKey)},'{bad')`,win);
+    const badCompactReload=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.reload();await badCompactReload;
+    await until(()=>restMonitor.snapshot().progress?.completedCount===7 && restMonitor.snapshot().progress?.gymAvailable===false);
+    assert.equal(await js(`localStorage.getItem(${JSON.stringify(gymDayKey)})`,win),'{bad');
+    await js(`localStorage.setItem(${JSON.stringify(gymDayKey)},${JSON.stringify(originalDayPlan)})`,win);
+    const goodCompactReload=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.reload();await goodCompactReload;
+    await until(()=>restMonitor.snapshot().progress?.gymAvailable===true);
+    await click("切换小窗");
+    await until(()=>js(`!!document.querySelector('.journey-card .journey-tomato')`,win));
+    checks.push("current-day gym projection updates on tomorrow view and cold compact reload; corrupt plan disables gym without reset, restored valid plan works");
     await click("开始专注");
     bSeconds = 1080; xSeconds = 120;
     await restMonitor.refresh();

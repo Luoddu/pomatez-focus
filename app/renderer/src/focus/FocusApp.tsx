@@ -1533,7 +1533,16 @@ export default function FocusApp() {
   const [journeyProjection, setJourneyProjection] = useState<Journey | null>(null);
   const [journeyRefresh, setJourneyRefresh] = useState(0);
   const reportJourney = useCallback((plan: Journey) => setJourneyProjection(prev => JSON.stringify(prev) === JSON.stringify(plan) ? prev : plan), []);
-  const gymAvailable = !!(connectionReady && journeyProjection && journeyProjection.day === journeyDay() && journeyProjection.scope === (sourceKey || "local") && gymRestTarget(journeyProjection, shownRecords));
+  const currentJourneyDay = journeyDay(), currentJourneyScope = sourceKey || "local";
+  useEffect(() => {
+    if (!connectionReady || !timer.ready || timer.blocked) { setJourneyProjection(null); return; }
+    try {
+      reportJourney(reconcileJourney(readJourney(localStorage, currentJourneyScope, currentJourneyDay), shownRecords, timer.getSnapshot().active));
+    } catch (_) { setJourneyProjection(null); }
+    // Projection remains available on tomorrow/compact views. No periodic I/O or new store.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionReady, timer.ready, timer.blocked, currentJourneyDay, currentJourneyScope, shownRecords, active?.id, reportJourney]);
+  const gymAvailable = useMemo(() => !!(connectionReady && journeyProjection && journeyProjection.day === currentJourneyDay && journeyProjection.scope === currentJourneyScope && gymRestTarget(journeyProjection, shownRecords)), [connectionReady, journeyProjection, currentJourneyDay, currentJourneyScope, shownRecords]);
   const restState = useScientificRest(timer.records, timer.ready && !timer.blocked, gymAvailable);
   const goGym = gymAvailable ? () => {
     if (!timer.ready || timer.blocked || !connectionReady) throw Error("旅程尚未就绪");
