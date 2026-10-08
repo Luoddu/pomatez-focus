@@ -7,3 +7,8 @@
 - 故障分类：隔离故障注入的executeJavaScript最后表达式返回函数，Electron IPC无法克隆；定位FAILED-JS原始表达式，改测试为void返回，不改IPC或权限。空值比较使无活动时下一轮廓入口缺失已由真实桌面复现并修正；保存失败提示被例行记录协调成功清掉、嵌套attempt清掉缺失任务错误均按精确调用链修正，真实正反通过。没有将测试IPC错误升级为系统产品补丁。
 - 性能边界：复用CounterProvider唯一计时器，旅程没有setInterval/新进程；完成关联和任务候选按plan/records/tasks做memo，秒tick不读写旅程存储，不扫描全部历史。记录事件、来源/日期变化、人工安排才有有界协调/写盘；单日最多20段100轮廓。短测试进程数记录在上述JSON，不等于长期各机性能保证。
 - Learning判断：none，复用现有计时、日期来源隔离和039不可变发布路径；本次业务空值/提示修复有局部测试但未形成需推广的新工程教训。
+
+- 独立复核1179bd8两项P2：恢复timer存储失败须检查实际同session已active再通过休息节点；同进程跨午夜须核对taskScope已刷新当日，不能用昨日planId。修复后的真实桌面17组PASS（p044-journey-fixed.txt），新增计时键故障仍paused/resting、有效重试同session恢复；同进程改日未刷新拒旧行、显式刷新后新planId启动。保留此前实际新进程次日恢复及缺失/坏数据场景。
+- 用户静音要求已落地到headless启动：固定Electron34.5.8官方electron.d.ts L879–884 web-contents-created、L16700–16703 setAudioMuted，注册早于创建任意窗口；Chromium启动mute-audio加公开contents静音，正常模式不执行。真实测试主窗口/新peer contents isAudioMuted=true，每阶段断言；测试launcher也传--mute-audio，未修改用户提示音偏好。
+- 固定构建布局回归overview7/7、portrait14/14、AW监督23/23 PASS（p044-overview.txt、p044-portrait.txt、p044-aw.txt）；右列380且四象限比例/月历半小时/原策略/原生两按钮保持，原真滚轮/真实用户拖动限制保持。
+- 77中间NSIS失败分类：输出Can't open output file，只有154204字节uninstaller生成器中间文件；同目录合成写探针和当前该文件独占ReadWrite打开均PASS，当前无77生成器进程。固定app-builder-lib25.1.8 NsisTarget.js computeScriptAndSignUninstaller公开机制先写同outfile生成器、执行生成卸载器后再正式makensis；瞬时占用具体owner unknown，不声称已确定根因，不修改依赖/安全工具。77不覆盖、不发布；按既有版本helper递增78，再做一次官方路径打包。若同类再次失败停止同层重试、完整链分析。

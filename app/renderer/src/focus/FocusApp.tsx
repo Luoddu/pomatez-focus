@@ -1730,6 +1730,8 @@ export default function FocusApp() {
                   loadingTasks
                 )
                   throw Error("任务和计时记录尚未就绪");
+                if (target && sourceKey && taskScope.current !== `${sourceKey}|${taskDay()}`)
+                  throw Error("日期已变化，请先生成今日番茄以刷新任务");
                 const task = target || {
                   id: crypto.randomUUID(),
                   title: "自由番茄",
@@ -1757,8 +1759,13 @@ export default function FocusApp() {
                   throw Error("暂停未保存，请检查存储");
               },
               resume: () => {
-                if (timer.getSnapshot().active?.status === "paused")
+                const paused = timer.getSnapshot().active;
+                if (paused?.status === "paused") {
                   timer.resume();
+                  const resumed = timer.getSnapshot().active;
+                  if (resumed?.id !== paused.id || resumed.status !== "active")
+                    throw Error("恢复未保存，请检查存储并重试");
+                }
               },
             }}
             records={shownRecords}

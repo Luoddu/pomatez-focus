@@ -13,7 +13,7 @@ for (const phase of ["plan", "resume"]) {
   delete env.ELECTRON_RUN_AS_NODE;
   const r = spawnSync(
     require("electron"),
-    [path.join(root, "tests/journey-desktop.cjs")],
+    [path.join(root, "tests/journey-desktop.cjs"), "--mute-audio"],
     {
       cwd: root,
       env,

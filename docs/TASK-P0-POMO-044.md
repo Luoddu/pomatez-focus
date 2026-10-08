@@ -13,3 +13,7 @@
 - Learning判断：none，当前为既有任务/计时/发布路径复用，未形成新的验证教训；工程检查点及复核后再判定。证据在本卡/验收回执，根路线图不写。
 
 - 实现检查点：preview.77已按version:prepare递增，预设/逐任务选择/原生拖动/实际确认/独立进程次日恢复完成。完整逻辑297/297 PASS；生产桌面旅程13组正反PASS。前端原型先交付，再接原计时；错误分类与原始回执在ACCEPTANCE。后续冻结源最终干净build、portrait/overview、原监督回归及独立review/五安装资产和旧76真实更新检查仍待完成。Learning none，局部修复不推广为新教训。
+
+- 授权变更：用户明确要求之后全部静默测试。写集追加app/electron/src/main.ts中POMATEZ_HEADLESS测试启动分支，只使用固定Electron34.5.8官方commandLine和webContents.setAudioMuted；正常用户模式不改。测试同时验证主窗口/新建contents静音，后续直接测试启动也加--mute-audio。既有只读review新增检查此分支与计时恢复回执P2修复。77若已生成本地中间包不覆盖，version helper继续递增，最终公开版本在交付证据中固定。
+
+- REVIEW修复：独立1179bd8复核发现恢复保存回执和同进程跨日任务P2，两处已修、静音真实旅程17组正反PASS。overview7、portrait14、AW23 PASS。77只作本地中间构建，原生打包outfile瞬时占用owner未知有界分类记录；version helper递增78，不覆盖旧产物，最终干净打包/新冻结复核/公开更新待完成。Learning none，复用既有恢复回执、官方静音和版本路径。

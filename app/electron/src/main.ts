@@ -17,6 +17,12 @@ import { ActivityWatchRest } from "./focus/activitywatch";
 import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
 const headless = process.env.POMATEZ_HEADLESS === "1";
+// Unattended tests must never play timer/reminder sounds on the user's desktop.
+// Set both Chromium's startup switch and the public per-contents audio mute.
+if (headless) {
+  app.commandLine.appendSwitch("mute-audio");
+  app.on("web-contents-created", (_event, contents) => contents.setAudioMuted(true));
+}
 app.setName("Pomatez Focus");
 app.setPath(
   "userData",

@@ -64,6 +64,12 @@ app.whenReady().then(async () => {
       await wait(70);
     }
     assert.ok(win);
+    assert.equal(win.webContents.isAudioMuted(), true);
+    assert.equal(app.commandLine.hasSwitch("mute-audio"), true);
+    const silentPeer = new BrowserWindow({show:false});
+    assert.equal(silentPeer.webContents.isAudioMuted(), true);
+    silentPeer.destroy();
+    checks.push("headless startup and every new webContents are muted before playback");
     const errors = [];
     win.webContents.on("console-message", (_e, l, m) => {
       if (l >= 3) errors.push(m);
@@ -72,7 +78,7 @@ app.whenReady().then(async () => {
         try {
           return await win.webContents.executeJavaScript(s, true);
         } catch (e) {
-          console.error("FAILED-JS", s);
+          console.error("FAILED-JS", s); console.error("RENDERER-ERRORS",errors);
           throw e;
         }
       },
@@ -330,6 +336,21 @@ app.whenReady().then(async () => {
       );
       await click("开始", ".journey-footer button");
       await until(async () => !!(await stored()).active);
+      await click("休息", ".journey-stage button");
+      const resting = await plan(), paused = (await stored()).active;
+      assert.equal(paused.status, "paused");
+      await js(`window.originalFocusSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='pomatez-focus-v1')throw Error('Synthetic timer quota');return window.originalFocusSet.call(this,k,v)};void 0`);
+      await click("继续", ".journey-stage button");
+      assert.equal((await stored()).active.status, "paused");
+      assert.equal((await plan()).resting, resting.resting);
+      assert.deepEqual((await plan()).passed, resting.passed);
+      assert.match(await js(`document.querySelector('.journey-error').textContent`), /恢复未保存/);
+      await js(`void (Storage.prototype.setItem=window.originalFocusSet)`);
+      await click("继续", ".journey-stage button");
+      assert.equal((await stored()).active.id, paused.id);
+      assert.equal((await stored()).active.status, "active");
+      assert.equal((await plan()).resting, null);
+      checks.push("timer write failure keeps rest node paused; successful retry resumes same session and continues");
       await wait(500);
       await click("结束");
       await click("确认结束");
@@ -354,6 +375,24 @@ app.whenReady().then(async () => {
         path.join(root, "artifacts/journey-actual.png"),
         (await win.webContents.capturePage()).toPNG()
       );
+      const midnight = new Date(); midnight.setDate(midnight.getDate()+1); midnight.setHours(12,0,0,0);
+      await js(`{const Base=Date,fixed=${midnight.getTime()};globalThis.Date=class extends Base{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}};void 0`);
+      await click("明天", ".journey-heading button");
+      await click("今天", ".journey-heading button");
+      await open(0); await click("开始这个番茄", ".journey-dialog button");
+      assert.equal((await stored()).active,null);
+      assert.match(await js(`document.querySelector('.journey-dialog .journey-error').textContent`),/日期已变化/);
+      await click("关闭旅程编辑");
+      tasks = tasks.map((t,i)=>({...t,id:`midnight-row${i+1}`,planId:`midnight-plan${i+1}`}));
+      await click("生成今日番茄");
+      await until(()=>js(`!!document.querySelector('[data-task-id="midnight-row1"]') || [...document.querySelectorAll('.chip')].some(b=>b.getAttribute('title')?.includes('合成科研任务1'))`));
+      await until(()=>js(`!document.querySelector('.gen-btn').disabled`));
+      await open(0); await click("开始这个番茄", ".journey-dialog button");
+      await until(async()=>!!(await stored()).active);
+      assert.equal((await stored()).active.task.planId,'midnight-plan1');
+      await click("结束");await click("确认结束");await click("放弃本次");
+      await until(async()=>(await stored()).active===null);
+      checks.push("same process day rollover rejects stale task snapshot, explicit refresh starts today's row");
     } else {
       const fixed = new Date();
       fixed.setDate(fixed.getDate() + 1);
