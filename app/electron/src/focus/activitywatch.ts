@@ -28,6 +28,14 @@ export type RestState = {
   status: "connecting" | "recording" | "interrupted";
   message: string;
   updatedAt: number | null;
+  live?: {
+    checkedAt: number;
+    startedAt: number;
+    site: Site | null;
+    estimateFrom: number | null;
+    expiresAt: number;
+    detail: string;
+  } | null;
   reminder: {
     key: string;
     excessMinutes: number;
@@ -36,7 +44,8 @@ export type RestState = {
     completedCount: number | null;
   } | null;
 };
-export const POLL_MS = 30000;
+export const POLL_MS = 5000;
+const FULL_MS = 30000;
 const MAX_RESPONSE = 4 * 1024 * 1024;
 const EDGE_APPS = [
   "msedge.exe",
@@ -192,6 +201,84 @@ export function summarize(
   }
   return result;
 }
+// Replace the authoritative recent window, rather than adding it twice.
+export function mergeRecentUsage(
+  previous: Usage,
+  recent: Usage
+): Usage {
+  if (
+    previous.day !== recent.day ||
+    recent.start < previous.start ||
+    recent.end < previous.end
+  )
+    return recent;
+  const sessions = [
+    ...previous.sessions
+      .map((s) => ({ ...s, end: Math.min(s.end, recent.start) }))
+      .filter((s) => s.end > s.start),
+    ...recent.sessions,
+  ];
+  return summarize(
+    sessions.map((s) => ({
+      timestamp: new Date(s.start).toISOString(),
+      duration: (s.end - s.start) / 1000,
+      data: { url: "https://" + s.site + ".com/" },
+    })),
+    previous.start,
+    recent.end,
+    recent.coverageStart
+  );
+}
+export function liveSignal(
+  health: any[][],
+  usage: Usage,
+  now: number,
+  startedAt: number
+) {
+  const [browser, window, afk] = health.map((list) => list[0]);
+  const end = (e: any) =>
+    Date.parse(e?.timestamp) + Number(e?.duration) * 1000;
+  const fresh = (e: any, age: number) =>
+    Number.isFinite(end(e)) &&
+    end(e) <= now + 1000 &&
+    now - end(e) <= age;
+  const edge = EDGE_APPS.includes(window?.data?.app);
+  const audible = browser?.data?.audible === true;
+  const active = afk?.data?.status === "not-afk";
+  const site =
+    fresh(browser, 75000) &&
+    fresh(window, 5000) &&
+    fresh(afk, 5000) &&
+    edge &&
+    (active || audible)
+      ? siteOf(browser?.data)
+      : null;
+  const from = site
+    ? Math.max(
+        usage.start,
+        end(browser),
+        Date.parse(window.timestamp),
+        audible ? 0 : Date.parse(afk.timestamp),
+        ...usage.sessions.map((s) => s.end)
+      )
+    : null;
+  return {
+    checkedAt: now,
+    startedAt,
+    site,
+    estimateFrom: from !== null && Number.isFinite(from) ? from : null,
+    expiresAt: now + 7000,
+    detail:
+      "Edge扩展：" +
+      (fresh(browser, 75000) ? "正常" : "等待心跳") +
+      " · 窗口：" +
+      (edge ? "Edge前台" : "其他应用") +
+      " · 空闲：" +
+      (active ? "活动" : "空闲") +
+      " · 音频：" +
+      (audible ? "有声" : "无声"),
+  };
+}
 export function usageQuery(
   browser: string,
   window: string,
@@ -281,6 +368,8 @@ export class ActivityWatchRest {
   private manualGeneration = 0;
   private busyGeneration = 0;
   private failures = 0;
+  private fullReadAt = 0;
+  private monitorStartedAt = 0;
   private ledger = {
     day: "",
     quota: 60,
@@ -540,7 +629,7 @@ export class ActivityWatchRest {
   }
   private async tick() {
     const generation = this.generation;
-    await this.refresh();
+    await this.refresh(true);
     if (this.running && generation === this.generation) {
       const midnight = new Date(this.now());
       midnight.setHours(24, 0, 0, 0);
@@ -560,6 +649,8 @@ export class ActivityWatchRest {
   suspend() {
     this.stop();
     this.state.status = "interrupted";
+    this.state.live = null;
+    this.monitorStartedAt = 0;
     this.state.message = "采集已暂停，恢复后继续核对";
     this.emit();
   }
@@ -603,10 +694,16 @@ export class ActivityWatchRest {
       .filter(Number.isFinite);
     this.coverageStart = starts.length ? Math.max(...starts) : null;
   }
-  private async readUsage(days: number, now: number) {
+  private async readUsage(
+    days: number,
+    now: number,
+    recentStart?: number
+  ) {
     if (!this.bucketIds) await this.discover();
     const { browser, window, afk } = this.bucketIds!,
       range = dayBounds(now, days);
+    if (recentStart !== undefined)
+      range.start = Math.max(range.start, recentStart);
     const response = await this.request("/query/", {
       timeperiods: [
         `${new Date(range.start).toISOString()}/${new Date(
@@ -648,39 +745,51 @@ export class ActivityWatchRest {
         ? this.manualBusy
         : this.manualBusy.then(() => this.refreshNow());
     this.manualGeneration = this.generation;
-    this.manualBusy = this.refreshAfterQueries(this.generation).finally(() => {
-      this.manualBusy = null;
-    });
+    this.manualBusy = this.refreshAfterQueries(this.generation).finally(
+      () => {
+        this.manualBusy = null;
+      }
+    );
     return this.manualBusy;
   }
-  private async refreshAfterQueries(generation: number): Promise<RestState> {
+  private async refreshAfterQueries(
+    generation: number
+  ): Promise<RestState> {
     // A timer may start a new day query while a week query is being awaited.
     // Drain the latest requests, not only those present at entry.
     while (this.busy || this.weekBusy) {
-      await Promise.all([this.busy, this.weekBusy].map(p => p?.catch(() => {})));
+      await Promise.all(
+        [this.busy, this.weekBusy].map((p) => p?.catch(() => {}))
+      );
       if (generation !== this.generation) return this.snapshot();
     }
     if (generation !== this.generation) return this.snapshot();
     // No await between invalidation and starting the new single-flight query.
     this.bucketIds = null;
     this.coverageStart = null;
+    this.fullReadAt = 0;
     this.week = null;
     return this.refresh();
   }
-  refresh(): Promise<RestState> {
+  refresh(incremental = false): Promise<RestState> {
     if (this.busy)
       return this.busyGeneration === this.generation
         ? this.busy
         : this.busy.then(() => this.refresh());
     this.busyGeneration = this.generation;
-    this.busy = this.update(this.generation).finally(() => {
+    this.busy = this.update(
+      this.generation,
+      false,
+      incremental
+    ).finally(() => {
       this.busy = null;
     });
     return this.busy;
   }
   private async update(
     generation: number,
-    rollover = false
+    rollover = false,
+    incremental = false
   ): Promise<RestState> {
     const now = this.now(),
       day = dayKey(now);
@@ -689,6 +798,7 @@ export class ActivityWatchRest {
       this.state.usage = null;
       this.state.reminder = null;
       this.state.updatedAt = null;
+      this.state.live = null;
       this.emit();
     }
     try {
@@ -717,7 +827,23 @@ export class ActivityWatchRest {
         throw Error(
           "采集已中断：请确认 ActivityWatch 与 Edge 扩展运行中"
         );
-      const u = await this.readUsage(1, now);
+      const previous = this.state.usage;
+      const recent =
+        incremental &&
+        previous?.day === day &&
+        this.failures === 0 &&
+        now >= previous.end &&
+        now - previous.end < FULL_MS &&
+        this.fullReadAt > 0 &&
+        now - this.fullReadAt < FULL_MS;
+      const tailStart = Math.max(dayBounds(now).start, now - 60000);
+      const tail = await this.readUsage(
+        1,
+        now,
+        recent ? tailStart : undefined
+      );
+      const u =
+        recent && previous ? mergeRecentUsage(previous, tail) : tail;
       if (generation !== this.generation) return this.snapshot();
       // A request may finish after midnight. Never publish or persist yesterday's
       // usage/threshold; make one bounded retry with the new local day.
@@ -725,18 +851,27 @@ export class ActivityWatchRest {
         this.state.usage = null;
         this.state.reminder = null;
         this.state.updatedAt = null;
+        this.state.live = null;
         this.state.status = "connecting";
         this.state.message = "日期已切换，正在核对今日记录";
         this.emit();
         if (!rollover) return this.update(generation, true);
         throw Error("日期持续变化，稍后重新核对今日记录");
       }
+      if (!recent) this.fullReadAt = now;
       this.state.usage = u;
       this.state.updatedAt = now;
+      if (!this.monitorStartedAt) this.monitorStartedAt = now;
+      this.state.live = liveSignal(
+        health,
+        u,
+        now,
+        this.monitorStartedAt
+      );
       this.failures = 0;
       this.state.status = "recording";
       this.state.message = this.storageOk
-        ? "本机记录 · 每 30 秒更新"
+        ? "本机监测正常 · 每5秒检测，30秒全日校准"
         : "额度设置读取失败或未保存，请重新保存设置以恢复督促";
       const quota = this.state.settings.quotaMinutes;
       const interval = this.state.settings.reminderMinutes;
@@ -792,7 +927,14 @@ export class ActivityWatchRest {
         this.ledger.quotaCrossed =
           this.ledger.quotaCrossed || quotaCrossed;
         try {
-          this.save();
+          if (
+            !recent ||
+            newReminder ||
+            before.step !== this.ledger.step ||
+            before.focusStep !== this.ledger.focusStep ||
+            before.quotaCrossed !== this.ledger.quotaCrossed
+          )
+            this.save();
         } catch (_) {
           this.ledger = before;
           this.storageOk = false;
@@ -823,10 +965,13 @@ export class ActivityWatchRest {
         this.state.usage = null;
         this.state.reminder = null;
         this.state.updatedAt = null;
+        this.state.live = null;
       }
       this.failures++;
       this.bucketIds = null;
       this.state.status = "interrupted";
+      this.state.live = null;
+      this.monitorStartedAt = 0;
       this.state.message = error.message || "ActivityWatch 未连接";
     }
     this.emit();

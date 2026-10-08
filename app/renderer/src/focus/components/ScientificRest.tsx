@@ -3,6 +3,11 @@ import { createPortal } from "react-dom";
 import { api } from "./shared";
 import type { FocusSession } from "../session";
 import { dailyRestProgress } from "../restProgress";
+import {
+  durationText,
+  displayUsage,
+  monitorDetail,
+} from "../restDisplay";
 
 type Usage = {
   day: string;
@@ -31,6 +36,14 @@ export type RestState = {
   status: "connecting" | "recording" | "interrupted";
   message: string;
   updatedAt: number | null;
+  live?: {
+    checkedAt: number;
+    startedAt: number;
+    site: "bilibili" | "xiaohongshu" | null;
+    estimateFrom: number | null;
+    expiresAt: number;
+    detail: string;
+  } | null;
   reminder: {
     key: string;
     excessMinutes: number;
@@ -142,7 +155,22 @@ export default function ScientificRest({
     },
     []
   );
-  const usage = state.usage;
+  const [showHealth, setShowHealth] = useState(false);
+  const [, setWallNow] = useState(Date.now());
+  useEffect(() => {
+    if (
+      state.status !== "recording" ||
+      (!state.live?.site && !showHealth)
+    )
+      return;
+    setWallNow(Date.now());
+    const timer = setInterval(() => setWallNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [state.status, state.live?.site, showHealth]);
+  // Read the clock on every render, including new detector snapshots between ticks.
+  const displayNow = Date.now();
+  const usage = displayUsage(state, displayNow);
+  const statusDetail = monitorDetail(state, displayNow);
   const remaining = usage
     ? Math.max(0, state.settings.quotaMinutes - usage.totalSeconds / 60)
     : null;
@@ -222,11 +250,11 @@ export default function ScientificRest({
   return (
     <section
       className="scientific-rest side-section"
-      aria-label="科学休息"
+      aria-label="科学专注"
     >
       <div className="side-title">
         <span className="rest-heading">
-          科学休息
+          科学专注
           <button
             type="button"
             className="rest-refresh"
@@ -273,16 +301,25 @@ export default function ScientificRest({
                   state.status !== "recording" ? " interrupted" : ""
                 }`}
                 role="status"
-                title={state.message || "正在核对采集状态"}
+                aria-live="off"
+                tabIndex={0}
+                aria-describedby="rest-monitor-detail"
+                onMouseEnter={() => setShowHealth(true)}
+                onMouseLeave={() => setShowHealth(false)}
+                onFocus={() => setShowHealth(true)}
+                onBlur={() => setShowHealth(false)}
+                title={statusDetail}
               >
                 <span aria-hidden="true" />
                 <span className="rest-health-label">
-                  {state.message ||
-                    (state.usage
-                      ? "采集已中断 · 保留上次记录"
-                      : state.status === "connecting"
-                      ? "正在连接采集…"
-                      : "采集未连接")}
+                  {statusDetail}
+                </span>
+                <span
+                  id="rest-monitor-detail"
+                  className="rest-health-tooltip"
+                  role="tooltip"
+                >
+                  {statusDetail}
                 </span>
               </div>
               <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -354,14 +391,14 @@ export default function ScientificRest({
                   <i className="rest-dot bili" />
                   B站
                   <strong>
-                    {usage ? minutes(usage.bilibili) : "—"}
+                    {usage ? durationText(usage.bilibili) : "—"}
                   </strong>
                 </div>
                 <div>
                   <i className="rest-dot xhs" />
                   小红书
                   <strong>
-                    {usage ? minutes(usage.xiaohongshu) : "—"}
+                    {usage ? durationText(usage.xiaohongshu) : "—"}
                   </strong>
                 </div>
               </div>

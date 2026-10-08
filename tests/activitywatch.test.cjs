@@ -6,6 +6,8 @@ const fs = require("node:fs"),
   http = require("node:http");
 const {
   ActivityWatchRest,
+  mergeRecentUsage,
+  liveSignal,
   summarize,
   usageQuery,
   validSettings,
@@ -1071,4 +1073,125 @@ test("fixed loopback transport accepts official JSON and refuses redirects/error
   await assert.rejects(localRequest("/redirect", undefined, port));
   await assert.rejects(localRequest("/large", undefined, port));
   await assert.rejects(localRequest("/invalid", undefined, port));
+});
+
+test("recent authoritative window replaces cached tail, preserving prefix without duplicate seconds", () => {
+  const base = at(10),
+    previous = summarize(
+      [event(base, 180)],
+      at(0),
+      base + 180000,
+      at(0)
+    );
+  const recent = summarize(
+    [event(base + 150000, 40, "xiaohongshu")],
+    base + 120000,
+    base + 190000,
+    at(0)
+  );
+  const joined = mergeRecentUsage(previous, recent);
+  const full = summarize(
+    [event(base, 120), event(base + 150000, 40, "xiaohongshu")],
+    at(0),
+    base + 190000,
+    at(0)
+  );
+  assert.deepEqual(joined, full);
+  assert.equal(joined.bilibili, 120);
+  assert.equal(joined.xiaohongshu, 40);
+  assert.deepEqual(mergeRecentUsage(joined, recent), joined);
+  assert.equal(
+    mergeRecentUsage(previous, { ...recent, day: "2026-10-08" }).day,
+    "2026-10-08"
+  );
+});
+test("single poll short-window reads replace usage and avoid one-second writes; manual and recovery read full day", async () => {
+  const f = fixture(),
+    periods = [];
+  const monitor = new ActivityWatchRest(
+    dir(),
+    () => {},
+    () => {},
+    async (e, b) => {
+      if (e === "/query/") periods.push(b.timeperiods[0]);
+      return f.request(e, b);
+    },
+    f.now
+  );
+  f.seconds(1200);
+  await monitor.refresh();
+  const file = path.join(monitor.file),
+    initial = fs.readFileSync(file, "utf8");
+  f.advance(1000);
+  f.seconds(1201);
+  const a = await monitor.refresh(true);
+  assert.equal(a.usage.totalSeconds, 1201);
+  assert.equal(Date.parse(periods[1].split("/")[0]), f.now() - 60000);
+  assert.equal(fs.readFileSync(file, "utf8"), initial);
+  f.advance(1000);
+  f.seconds(1202);
+  assert.equal((await monitor.refresh(true)).usage.totalSeconds, 1202);
+  f.advance(30000);
+  f.seconds(1232);
+  assert.equal((await monitor.refresh(true)).usage.totalSeconds, 1232);
+  assert.equal(Date.parse(periods.at(-1).split("/")[0]), at(0));
+  f.advance(1000);
+  await monitor.refreshNow();
+  assert.equal(Date.parse(periods.at(-1).split("/")[0]), at(0));
+  f.disconnect(true);
+  assert.equal((await monitor.refresh(true)).live, null);
+  f.disconnect(false);
+  f.advance(1000);
+  await monitor.refresh(true);
+  assert.equal(Date.parse(periods.at(-1).split("/")[0]), at(0));
+  monitor.stop();
+});
+test("live signal requires real target tab, Edge foreground and active or audible with bounded source freshness", () => {
+  const now = at(),
+    usage = summarize([event(now - 100000, 70)], at(0), now, at(0));
+  const sample = (start, seconds, data) => ({
+    timestamp: new Date(start).toISOString(),
+    duration: seconds,
+    data,
+  });
+  const health = [
+    [
+      sample(now - 100000, 70, {
+        url: "https://www.bilibili.com/video",
+        audible: false,
+      }),
+    ],
+    [sample(now - 100000, 99, { app: "msedge.exe" })],
+    [sample(now - 100000, 99, { status: "not-afk" })],
+  ];
+  const signal = liveSignal(health, usage, now, now - 5000);
+  assert.equal(signal.site, "bilibili");
+  assert.equal(signal.estimateFrom, now - 30000);
+  assert.equal(signal.expiresAt, now + 7000);
+  const changed = structuredClone(health);
+  changed[0][0] = sample(now - 1000, 0, {
+    url: "https://www.xiaohongshu.com/explore",
+    audible: true,
+  });
+  assert.equal(
+    liveSignal(changed, usage, now, now - 5000).site,
+    "xiaohongshu"
+  );
+  for (const modify of [
+    (h) => (h[1][0].data.app = "Other"),
+    (h) => (h[2][0].data.status = "afk"),
+    (h) => (h[0][0].data.url = "https://bilibili.com.evil.example/"),
+    (h) => (h[1][0].duration = 80),
+    (h) => (h[0][0].duration = 120),
+  ]) {
+    const h = structuredClone(health);
+    modify(h);
+    assert.equal(liveSignal(h, usage, now, now).site, null);
+  }
+  const audible = structuredClone(health);
+  audible[2][0].data.status = "afk";
+  audible[0][0].data.audible = true;
+  assert.equal(liveSignal(audible, usage, now, now).site, "bilibili");
+  audible[1][0].data.app = "Other";
+  assert.equal(liveSignal(audible, usage, now, now).site, null);
 });

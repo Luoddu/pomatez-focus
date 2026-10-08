@@ -18,11 +18,16 @@ const {
 function installNoonClock() {
   const RealDate = Date;
   const now = RealDate.now();
-  const noon = new RealDate(now); noon.setHours(12, 0, 0, 0);
+  const noon = new RealDate(now);
+  noon.setHours(12, 0, 0, 0);
   const offset = noon.getTime() - now;
   globalThis.Date = class extends RealDate {
-    constructor(...args) { super(...(args.length ? args : [RealDate.now() + offset])); }
-    static now() { return RealDate.now() + offset; }
+    constructor(...args) {
+      super(...(args.length ? args : [RealDate.now() + offset]));
+    }
+    static now() {
+      return RealDate.now() + offset;
+    }
   };
 }
 installNoonClock();
@@ -31,7 +36,9 @@ fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 let clock = new Date().setHours(12, 0, 0, 0),
   bSeconds = 240,
   xSeconds = 0,
-  down = false;
+  down = false,
+  liveMode = null,
+  liveEdge = true;
 const ids = [
   "aw-watcher-web-edge_TEST",
   "aw-watcher-window_TEST",
@@ -75,6 +82,27 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (/\/events\?limit=1$/.test(req.url)) {
+    if (liveMode) {
+      const browser = req.url.includes("web-edge"),
+        window = req.url.includes("window");
+      res.end(
+        JSON.stringify([
+          {
+            timestamp: new Date(clock - 100000).toISOString(),
+            duration: browser ? 80 : 99,
+            data: browser
+              ? {
+                  url: "https://www." + liveMode + ".com/synthetic",
+                  audible: true,
+                }
+              : window
+              ? { app: liveEdge ? "msedge.exe" : "Other" }
+              : { status: "not-afk" },
+          },
+        ])
+      );
+      return;
+    }
     res.end(
       JSON.stringify([
         {
@@ -103,8 +131,16 @@ const server = http.createServer((req, res) => {
       res.end(
         JSON.stringify([
           [
-            interval(bSeconds, clock - xSeconds * 1000, "bilibili"),
-            interval(xSeconds, clock, "xiaohongshu"),
+            interval(
+              bSeconds,
+              clock - xSeconds * 1000 - (liveMode ? 20000 : 0),
+              "bilibili"
+            ),
+            interval(
+              xSeconds,
+              clock - (liveMode ? 20000 : 0),
+              "xiaohongshu"
+            ),
           ],
         ])
       );
@@ -168,6 +204,15 @@ app.whenReady().then(async () => {
             );
           }),
         ]);
+      } catch (error) {
+        if (!code.includes("restStatistics('all')"))
+          console.error(
+            "Failed renderer command:",
+            code,
+            "console:",
+            errors
+          );
+        throw error;
       } finally {
         clearTimeout(timeout);
       }
@@ -387,7 +432,7 @@ app.whenReady().then(async () => {
     assert.equal(restMonitor.snapshot().settings.supervise, true);
     assert.ok(
       await js(
-        `document.querySelector('.rest-sites').textContent.includes('45 分钟')&&document.querySelector('.rest-sites').textContent.includes('10 分钟')`
+        `document.querySelector('.rest-sites').textContent.includes('0小时 45分钟 0秒')&&document.querySelector('.rest-sites').textContent.includes('0小时 10分钟 0秒')`
       )
     );
     checks.push(
@@ -635,6 +680,7 @@ app.whenReady().then(async () => {
     // Actual main-process poll keeps running after native close-to-tray.
     win.close();
     bSeconds = 4800;
+    clock += 30000; // Advance synthetic time to the full-day reconciliation.
     await until(() => js(`!!document.querySelector('.focus-app')`));
     for (let i = 0; i < 700 && !restMonitor.snapshot().reminder; i++)
       await wait(50);
@@ -642,7 +688,7 @@ app.whenReady().then(async () => {
     assert.equal(win.isVisible(), false);
     await click("开始下一个番茄");
     checks.push(
-      "real 30-second poll survives native close-to-tray with hidden renderer"
+      "real periodic poll survives native close-to-tray with hidden renderer"
     );
     // Restore renderer from the same profile, retaining settings/thresholds.
     await js(
@@ -732,6 +778,153 @@ app.whenReady().then(async () => {
     checks.push(
       "renderer receives aggregates only and cannot supply arbitrary queries"
     );
+    await js(
+      `document.querySelector('[aria-label="切换小窗"]').click()`
+    );
+    await until(() =>
+      js(`!!document.querySelector(".rest-sites strong")`)
+    );
+    restMonitor.stop();
+    await restMonitor.configure({
+      ...restMonitor.snapshot().settings,
+      supervise: false,
+    });
+    bSeconds = 600;
+    xSeconds = 0;
+    liveMode = "bilibili";
+    clock = Date.now();
+    await js(
+      `(()=>{const R=Date,shift=${clock}-R.now();window.Date=class extends R{constructor(...a){super(...(a.length?a:[R.now()+shift]))}static now(){return R.now()+shift}}})()`
+    );
+    await restMonitor.refresh();
+    await until(() =>
+      js(
+        `document.querySelector('.rest-heading').textContent.includes('科学专注') && /小时.+分钟.+秒/.test(document.querySelector('.rest-sites strong').textContent)`
+      )
+    );
+    const siteSeconds = () =>
+      js(
+        `[...document.querySelectorAll('.rest-sites strong')].map(e=>{const a=e.textContent.split('小时 '), b=a[1].split('分钟 '); return Number(a[0])*3600+Number(b[0])*60+Number(b[1].split('秒')[0])})`
+      );
+    await wait(200);
+    const a = await siteSeconds();
+    await wait(1100);
+    const b = await siteSeconds();
+    assert.ok(b[0] > a[0], JSON.stringify({ a, b }));
+    assert.equal(b[1], 0);
+    assert.equal(restMonitor.snapshot().usage.bilibili, 600);
+    checks.push(
+      "official active Bilibili context drives second display without mutating confirmed aggregate"
+    );
+    const cpuBefore = app.getAppMetrics();
+    const perfStart = process.hrtime.bigint();
+    for (let i = 0; i < 2; i++) {
+      await wait(5000);
+      clock = Date.now();
+      await restMonitor.refresh(true);
+    }
+    const cpuAfter = app.getAppMetrics(),
+      elapsedMs = Number(process.hrtime.bigint() - perfStart) / 1e6;
+    const processes = cpuAfter.map((p) => {
+      const prior = cpuBefore.find((b) => b.pid === p.pid);
+      const delta =
+        (p.cpu.cumulativeCPUUsage || 0) -
+        (prior?.cpu.cumulativeCPUUsage || 0);
+      return {
+        pid: p.pid,
+        type: p.type,
+        cpuSeconds: delta,
+        oneCorePercent: (delta * 100000) / elapsedMs,
+      };
+    });
+    const perf = {
+      elapsedMs,
+      processes,
+      processCountBefore: cpuBefore.length,
+      processCountAfter: cpuAfter.length,
+      samePids:
+        cpuBefore
+          .map((p) => p.pid)
+          .sort()
+          .join(",") ===
+        cpuAfter
+          .map((p) => p.pid)
+          .sort()
+          .join(","),
+      totalOneCorePercent: processes.reduce(
+        (sum, p) => sum + p.oneCorePercent,
+        0
+      ),
+      hiddenIsolated: true,
+      activeLocalSeconds: true,
+      newFeatureProcess: false,
+    };
+    assert.equal(perf.samePids, true, JSON.stringify(perf));
+    fs.writeFileSync(
+      path.join(root, "artifacts/p043-renderer-performance.json"),
+      JSON.stringify(perf, null, 2)
+    );
+    clock = Date.now();
+    liveMode = "xiaohongshu";
+    xSeconds = 30;
+    await restMonitor.refresh();
+    await wait(200);
+    const x1 = await siteSeconds();
+    await wait(1100);
+    const x2 = await siteSeconds();
+    assert.equal(x2[0], 600);
+    assert.ok(x2[1] > x1[1]);
+    checks.push(
+      "tab switch advances Xiaohongshu seconds and stops the Bilibili projection"
+    );
+    clock = Date.now();
+    await restMonitor.refresh();
+    const dom = await win.webContents.debugger.sendCommand(
+      "DOM.getDocument"
+    );
+    const dot = await win.webContents.debugger.sendCommand(
+      "DOM.querySelector",
+      { nodeId: dom.root.nodeId, selector: ".rest-health" }
+    );
+    await win.webContents.debugger.sendCommand("CSS.enable");
+    await win.webContents.debugger.sendCommand("CSS.forcePseudoState", {
+      nodeId: dot.nodeId,
+      forcedPseudoClasses: ["hover"],
+    });
+    await js(
+      `document.querySelector('.rest-health').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}))`
+    );
+    await wait(100);
+    const tooltip = await js(
+      `(()=>{const t=document.querySelector('.rest-health-tooltip');return {visible:getComputedStyle(t).display!=='none',text:t.textContent}})()`
+    );
+    assert.ok(
+      tooltip.visible &&
+        tooltip.text.includes("监测运行") &&
+        tooltip.text.includes("最近检测") &&
+        tooltip.text.includes("Edge前台") &&
+        tooltip.text.includes("估算"),
+      JSON.stringify(tooltip)
+    );
+    liveEdge = false;
+    clock = Date.now();
+    await restMonitor.refresh();
+    await wait(200);
+    const other1 = await siteSeconds();
+    await wait(1100);
+    assert.deepEqual(await siteSeconds(), other1);
+    down = true;
+    clock = Date.now();
+    await restMonitor.refresh();
+    await wait(200);
+    const lost1 = await siteSeconds();
+    await wait(1100);
+    assert.deepEqual(await siteSeconds(), lost1);
+    assert.equal(restMonitor.snapshot().live, null);
+    checks.push(
+      "detailed live hover is visible; other foreground application and connection loss freeze seconds"
+    );
+
     assert.deepEqual(errors, []);
     fs.writeFileSync(
       path.join(root, "artifacts/activitywatch-desktop.json"),
