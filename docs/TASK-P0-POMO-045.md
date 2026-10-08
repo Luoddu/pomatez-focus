@@ -1,0 +1,12 @@
+# P0-POMO-045 图案旅程与可视化模板
+
+- IN_PROGRESS；隔离模块唯一状态源，owner/实现 /root。用户2026-10-08认可交互预览并明确“开始作战”；本轮本地实现/验证/独立复核/原子提交，不自动安装、重启用户App或外部发布。发布按后续明确“推送”执行模块约定。
+- 基线 c4fee83bb570ebe2a6fb008c5ed527e8d9afbd50，实时fetch + check:sync同canonical/preview.78/干净；独立任务分支task/p0-pomo-045-journey-templates，单worktree绿灯，无重叠活动写者。
+- 目标：概览全列宽图案旅程，番茄略大、碗/轮廓ZZZ/月亮略小并串在番茄之间，时间角标不独占线；完成色复用实际记录项目色。模板默认4/3/3/3/3共16：8点4→吃饭/小憩；12点3→小憩；3→小憩/健身/吃饭/小憩；20点3→小憩；3→小憩/下班睡觉，末24点。未指定中间钟点留空，时间仅参照。模板可可视化创建/编辑/复制/移除/设默认、预览计数/图案/参照时间、应用今天或明天；不由模板自动启动任务或强制钟点。累计条移至农场caption右侧，恢复100粒路段、25粒小旗，不改全局累计/徽章。
+- 模板只保存安排（名称/数量/参考小时/休息图案），按任务来源隔离、有界最多12模板/20阶段/100番茄，未来新日使用默认；今日既有安排不自动覆盖。应用复用resize保护已完成/活动轮廓、关联任务保留；活动时不应用，正常无活动且容量足够仍可应用，缩掉已完成/损坏存储须拒绝且原数据保留。模板不保存实际记录/session绑定，不新增历史真相源。
+- 四处预检：①TodayJourney旧半列纵列表与单日resize已有任务绑定/真实完成；HistoryPanel旧50条，FarmField caption存在右侧空白。②React16.14/Electron34.5.8/TS4.9.4沿用，不改第三方运行语义，无新依赖；原生HTML input/select/DragEvent公开类型与P044固定本地lib.dom.d.ts证据复用，不适用新采用/升级Gate。③复用journey保存/校验/锁定、week.tomatoRecordTone项目色、原25旗helper和headless中央静音，task-commit/build/version helpers；Learning039仅未来发布命中，042查询缓存不修改。④tests/journey.test.mjs和journey-desktop.cjs真实生产链+两进程恢复、overview/portrait/AW回归；P044验收原文作为防丢成果/静音/日期来源证据，不重复私有记录。
+- 写集：本卡、docs/ACCEPTANCE-P0-POMO-045.md、docs/DAILY-JOURNEY.md、CHANGELOG.md；app/renderer/src/focus/journey.js/.d.ts；新components/JourneyIcons.tsx、JourneyTemplates.tsx、FarmProgress.tsx；components/TodayJourney.tsx、HistoryPanel.tsx、FarmField.tsx，FocusApp.tsx仅休息持久回执守卫，focus.css仅旅程/模板/农场caption/进度条；tests/journey.test.mjs、journey-desktop.cjs及新tests/journey-templates.test.mjs/desktop.cjs、scripts/test-journey-templates-desktop.cjs，必要overview/portrait预期；version helper生成electron/package.json、SettingsPanel.tsx。ignored artifacts仅合成证据，不写根仓/用户profile/真实飞书/AW/Edge/系统配置。
+- 角色包：仅适用AGENTS、context-loading-policy隔离模块段/how-to-dispatch、version-control模块边界、目标代码及P044验收；明确不加载根路线图/七参考材料/用户历史/其他模块，无跨组件接入任务。不触及新的权限/IPC/服务/schema；模板是隔离模块本地配置。
+- 正反验收：默认16与显式8/12/20/24正确，空小时可保存而逆序/越界拒绝；可编辑数量/休息顺序并实时预览，设默认后未来新日/真实进程重启保留，旧日与其他来源不受影响；应用正常安排保留任务/实际完成，活动/缩掉已完拒绝且正常后续仍可用；模板不含实际绑定/任务副本；模板坏JSON/写失败保原且正常恢复通；真实点击碗/ZZZ/月亮手动暂停恢复，存储失败不假休息；完成记录色复用、0/放弃不填，既有拖动/次日任务守卫通过；旅程等宽科学专注，外层四象限/概览比例不改、默认横条可见，长/窄安排在自身有界滚动；caption右侧原比例不挤任务，25旗与全局累计不改；所有桌面测试静音且无用户App操作。
+- 并发/资源/预算：本clone串行独占，仅短时合成Electron隔离profile/测试端口；无生产服务/数据库/NAS/常驻后台/新计时器。开工/冻结/提交核对status、worktree、基线..canonical。最多本轮前台交付；同因两次unknown暂停该步骤，known按证据修正；不扩范围。允许既有review_scientific_rest一次冻结源码和测试证据只读独立复核，无写入/用户App/继续派发；不新建Agent。
+- 回滚：回退本卡明确源码至c4fee83；新的模板键独立配置可忽略，日旅程v1新增可选字段兼容读取，不改FocusSession或原历史。Learning判断none：截至领卡复用既有本地配置/任务保护/静音路径，未形成新可跨任务教训，复核后再判定。
