@@ -1,6 +1,6 @@
 # P0-POMO-043 科学专注秒级展示与紧凑今日热力
 
-- REVIEW；独立模块唯一状态源，本卡owner/实现/root。用户2026-10-08明确要求今日0–8默认隐藏、滚轮看凌晨、卡片收紧让专注积累上移；改名科学专注；状态点悬浮详细实时检测状态；两站用时X小时X分钟X秒，实际观看时秒数推进。沿用本会话源码和App手动安装版更新交付授权，不自动安装/重启App。
+- DONE；独立模块唯一状态源，本卡owner/实现/root。用户2026-10-08明确要求今日0–8默认隐藏、滚轮看凌晨、卡片收紧让专注积累上移；改名科学专注；状态点悬浮详细实时检测状态；两站用时X小时X分钟X秒，实际观看时秒数推进。沿用本会话源码和App手动安装版更新交付授权，不自动安装/重启App。
 - 基线0d024363521f691a9268817d8c65b037ac99c2dc，实时fetch/check sync等于公开canonical、preview.75；单worktree干净绿灯；分支task/p0-pomo-043-live-focus（本模块task-commit固定分支契约）。串行单写本clone，专用合成测试profile/临时loopback端口，不重启用户AW/Edge、不写根仓/系统启动项/私有profile。
 - 目标/非目标：热力32格8–24为默认视口，48格均可滚轮/键盘查看，凌晨数据不丢弃；卡片高度跟随内容，维持既有四象限/概览列比例。主界面名称科学专注、两站用时统一秒格式，具体健康/故障/最近核对时间在点悬浮中可读。只复用AW已有官方query/events与唯一Rest采集循环；不造离线时长，不新增原始历史数据库，不改额度策略/原番茄计时/原生置顶提醒/既有IPC权限。
 - T0/四处预检：①当前POLL_MS=30000、日查询每次全量、状态updatedAt和usage精确秒已存在；今日48格撑168px且全日可见；status点只有原生title，网站显示小数分钟。②固定AW v0.13.2/aw-server b4ad07509067defec9a2a958ea9d58f3ed220c88公开query timeperiods与events，WebWatcher0.6.0 2e70779b09733afd25f7bbeb7f188ae1938f4f42 heartbeat；读取原文冻结最小快照和真实REST验证后采用。React16.14/Electron34.5.8沿用，无升级。③既有usageQuery/summarize/dayBounds/singleflight/generation、Learning042缓存失效和039发布规则；scripts版本/构建/发布/显式taskcommit helper；④activitywatch28单测、20真实desktop、overview6与portrait14，增加短窗拼接/重复/恢复/午夜/活动识别/失联冻结、真UI秒变化/切站/鼠标tooltip/滚轮与卡高。
@@ -14,4 +14,6 @@
 
 - 实现检查点：preview.76准备完成；默认逻辑全套284/284 PASS、真实生产隔离desktop23/23、overview7/7、portrait14/14。5秒短窗/30秒全日，单一原循环；同一快照触发界面渲染时读取当下时钟，防止两次秒tick之间出现暂时回退；跨日清空live。详细性能/负例/限制见ACCEPTANCE-P0-POMO-043.md。固定WebWatcher config.ts L4–7心跳60秒；heartbeat.ts活动切换/定时公开心跳；aw-server-api.py L339–349官方timeperiods query2。快照manifest逐blob/SHA固定，不是运行依赖。
 
-- REVIEW修正：7c6d177独立复核两项P2已旧版负例复现并修复；全逻辑285、desktop23、overview7 PASS。重新冻结后再只读复核，版本76未打包/公开，不替换旧版。Learning none，复用042的暂停/恢复缓存失效边界。
+- REVIEW修正：7c6d177独立复核两项P2已旧版负例复现并修复；全逻辑285、desktop23、overview7 PASS。新冻结5e18e7e已只读复核PASS并随76安装版交付，不替换旧版。Learning none，复用042的暂停/恢复缓存失效边界。
+
+- 交付检查点：固定运行源5e18e7e源码/包独立PASS；preview.76公开五资产、旧75不变、真实75→76应用内更新检测PASS。细证据见ACCEPTANCE；最后公开交付独立复核PASS，DONE。源码tag固定，后续仅本卡/回执收口。Learning none，沿用042/039；本轮未增加进程、后台任务或用户软件自动更新。
