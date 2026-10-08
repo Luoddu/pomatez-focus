@@ -154,6 +154,49 @@ app.whenReady().then(async () => {
       js(`document.querySelectorAll('.journey-tomato').length===16`)
     );
     if (phase === "plan") {
+      await click("设置", ".journey-heading button");
+      await click("复制新建", ".journey-dialog button");
+      await change('[aria-label="模板名称"]', "合成15");
+      await change('[aria-label="第1段番茄数量"]', "3");
+      assert.equal(await js(`document.querySelectorAll('.journey-template-preview .journey-preview-tomato').length`),15);
+      fs.writeFileSync(path.join(root,"artifacts/journey-template-editor.png"),(await win.webContents.capturePage()).toPNG());
+      await click("第1段添加健身", ".journey-dialog button");
+      await js(`document.querySelector('[aria-label="设为默认模板"]').click()`);
+      await click("保存模板", ".journey-dialog button");
+      assert.equal(await js(`document.querySelectorAll('.journey-card .journey-tomato').length`),16);
+      await click("关闭旅程编辑");
+      await click("明天", ".journey-heading button");
+      await until(()=>js(`document.querySelectorAll('.journey-card .journey-tomato').length===15`));
+      checks.push("real template editor live count/icons, saves default; today remains 16 while new tomorrow uses 15");
+      await click("设置", ".journey-heading button");
+      await change('[aria-label="选择旅程模板"]', "balanced-day");
+      await click("应用到明日", ".journey-dialog button");
+      assert.equal((await plan()).stages.flatMap(s=>s.slots).length,16);
+      await click("设置", ".journey-heading button");
+      await change('[aria-label="选择旅程模板"]', "balanced-day");
+      await js(`document.querySelector('[aria-label="设为默认模板"]').click()`);
+      await click("保存模板", ".journey-dialog button");
+      await click("复制新建", ".journey-dialog button");
+      await change('[aria-label="模板名称"]', "合成临时");
+      await click("保存模板", ".journey-dialog button");
+      await click("移除模板", ".journey-dialog button");
+      await click("确认移除", ".journey-dialog button");
+      assert.equal(await js(`JSON.parse(localStorage.getItem('pomatez-journey-templates-v1:synthetic')).templates.length`),2);
+      const libraryBefore=await js(`localStorage.getItem('pomatez-journey-templates-v1:synthetic')`);
+      await change('[aria-label="第1段参考时间"]', "23");
+      await click("保存模板", ".journey-dialog button");
+      assert.match(await js(`document.querySelector('.journey-dialog [role="alert"]').textContent`),/参考时间/);
+      assert.equal(await js(`localStorage.getItem('pomatez-journey-templates-v1:synthetic')`),libraryBefore);
+      await change('[aria-label="第1段参考时间"]', "8");
+      await change('[aria-label="模板名称"]', "未保存测试");
+      await js(`window.originalTemplateSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-journey-templates-v1:'))throw Error('Synthetic template quota');return window.originalTemplateSet.call(this,k,v)};void 0`);
+      await click("保存模板", ".journey-dialog button");
+      assert.match(await js(`document.querySelector('.journey-dialog [role="alert"]').textContent`),/quota/);
+      assert.equal(await js(`localStorage.getItem('pomatez-journey-templates-v1:synthetic')`),libraryBefore);
+      await js(`Storage.prototype.setItem=window.originalTemplateSet;void 0`);
+      await click("关闭旅程编辑");
+      await click("今天", ".journey-heading button");
+      checks.push("explicit template apply, create/delete/default edits; invalid reference and storage failure preserve library without false apply");
       const d = new Date();
       d.setHours(9, 0, 0, 0);
       const rec = (id, count, day) => ({
@@ -163,6 +206,7 @@ app.whenReady().then(async () => {
           title: "实际合成记录",
           source: "feishu",
           sourceKey: "synthetic",
+          projectType: "research",
         },
         startedAt: d.getTime() + day * 86400000,
         endedAt: d.getTime() + day * 86400000 + 4500000,
@@ -193,15 +237,16 @@ app.whenReady().then(async () => {
       );
       assert.equal(
         await js(`document.querySelector('.stb-from').textContent`),
-        "250"
+        "200"
       );
       assert.equal(
         await js(`document.querySelector('.stb-to').textContent`),
         "300"
       );
       checks.push(
-        "confirmed records fill 3 outlines, 282 road 250–300"
+        "confirmed records fill 3 outlines, 282 road 200–300"
       );
+      assert.ok(await js(`document.querySelector('.journey-tomato[data-complete="true"]').innerHTML.includes('#e57368')`));
       await open(3);
       await change('[aria-label="预设番茄任务"]', "plan-row1");
       await click("保存任务", ".journey-dialog button");
@@ -228,18 +273,19 @@ app.whenReady().then(async () => {
         false
       );
       const shape = await js(
-        `(()=>{const a=document.querySelector('[data-stat="今日番茄"]').getBoundingClientRect(),b=document.querySelector('.journey-card').getBoundingClientRect(),c=document.querySelector('.right-col').getBoundingClientRect();return {same:Math.abs(a.width-b.width)<1,left:Math.abs(a.left-b.left)<1,below:b.top>=a.bottom,width:c.width,overflow:document.documentElement.scrollWidth>innerWidth}})()`
+        `(()=>{const a=document.querySelector('.scientific-rest .rest-card').getBoundingClientRect(),b=document.querySelector('.journey-card').getBoundingClientRect(),c=document.querySelector('.right-col').getBoundingClientRect();return {same:Math.abs(a.width-b.width)<1,left:Math.abs(a.left-b.left)<1,below:b.top<a.top,width:c.width,overflow:document.documentElement.scrollWidth>innerWidth}})()`
       );
       assert.ok(
         shape.same && shape.left && shape.below && !shape.overflow,
         JSON.stringify(shape)
       );
+      assert.ok(await js(`(()=>{const e=document.querySelector('.journey-card .journey-stages');return e.scrollWidth<=e.clientWidth+1})()`));
       checks.push(
-        "journey same half-column width below count, outer column preserved"
+        "journey full overview width above science card, outer column preserved"
       );
-      await click("休息", ".journey-stage button");
+      await click("休息：吃饭", ".journey-stage button");
       assert.equal((await plan()).resting, (await plan()).stages[0].id);
-      await click("继续", ".journey-stage button");
+      await click("继续：吃饭", ".journey-stage button");
       assert.equal((await plan()).resting, null);
       checks.push("rest manually entered/continued without clock gate");
       await click("明天", ".journey-heading button");
@@ -316,7 +362,7 @@ app.whenReady().then(async () => {
       await js(
         `window.originalJourneySet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-journey-v1:'))throw Error('Synthetic plan quota');return window.originalJourneySet.call(this,k,v)};void 0`
       );
-      await click("开始", ".journey-footer button");
+      await click("开始", ".journey-heading button");
       assert.equal((await stored()).active, null);
       await until(() =>
         js(`!!document.querySelector('.journey-error')`)
@@ -334,19 +380,19 @@ app.whenReady().then(async () => {
       checks.push(
         "plan storage failure preserves plan/history and prevents timer start"
       );
-      await click("开始", ".journey-footer button");
+      await click("开始", ".journey-heading button");
       await until(async () => !!(await stored()).active);
-      await click("休息", ".journey-stage button");
+      await click("休息：吃饭", ".journey-stage button");
       const resting = await plan(), paused = (await stored()).active;
       assert.equal(paused.status, "paused");
       await js(`window.originalFocusSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='pomatez-focus-v1')throw Error('Synthetic timer quota');return window.originalFocusSet.call(this,k,v)};void 0`);
-      await click("继续", ".journey-stage button");
+      await click("继续：吃饭", ".journey-stage button");
       assert.equal((await stored()).active.status, "paused");
       assert.equal((await plan()).resting, resting.resting);
       assert.deepEqual((await plan()).passed, resting.passed);
       assert.match(await js(`document.querySelector('.journey-error').textContent`), /恢复未保存/);
       await js(`void (Storage.prototype.setItem=window.originalFocusSet)`);
-      await click("继续", ".journey-stage button");
+      await click("继续：吃饭", ".journey-stage button");
       assert.equal((await stored()).active.id, paused.id);
       assert.equal((await stored()).active.status, "active");
       assert.equal((await plan()).resting, null);
@@ -394,6 +440,10 @@ app.whenReady().then(async () => {
       await until(async()=>(await stored()).active===null);
       checks.push("same process day rollover rejects stale task snapshot, explicit refresh starts today's row");
     } else {
+      const lib=await js(`JSON.parse(localStorage.getItem('pomatez-journey-templates-v1:synthetic'))`);
+      assert.equal(lib.defaultId,"balanced-day");
+      assert.equal(lib.templates.find(t=>t.name==="合成15").stages.reduce((n,s)=>n+s.count,0),15);
+      checks.push("second real Electron process restores named visual templates and chosen default");
       const fixed = new Date();
       fixed.setDate(fixed.getDate() + 1);
       fixed.setHours(12, 0, 0, 0);

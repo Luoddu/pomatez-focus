@@ -59,7 +59,7 @@ export const restPopup = new RestReminderWindow(__dirname, headless,
   },
   (key, action) => {
     restMonitor.acknowledge(key);
-    if (action === "sleep") win?.hide(); else show();
+    if (action === "sleep" || action === "gym") win?.hide(); else show();
   },
   key => restMonitor.acknowledge(key)
 );

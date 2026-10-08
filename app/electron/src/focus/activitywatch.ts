@@ -23,7 +23,7 @@ export type Usage = {
 };
 export type RestState = {
   settings: RestSettings;
-  progress: { day: string; completedCount: number } | null;
+  progress: { day: string; completedCount: number; gymAvailable?: boolean } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
   message: string;
@@ -587,6 +587,7 @@ export class ActivityWatchRest {
     if (
       !value ||
       value.day !== dayKey(this.now()) ||
+      (value.gymAvailable !== undefined && typeof value.gymAvailable !== "boolean") ||
       (value.completedCount !== null &&
         (!Number.isSafeInteger(value.completedCount) ||
           value.completedCount < 0 ||
@@ -604,6 +605,7 @@ export class ActivityWatchRest {
     this.state.progress = {
       day: value.day,
       completedCount: value.completedCount,
+      ...(value.gymAvailable === undefined ? {} : {gymAvailable:value.gymAvailable}),
     };
     if (
       value.completedCount >= this.state.settings.pomodoroGoal &&

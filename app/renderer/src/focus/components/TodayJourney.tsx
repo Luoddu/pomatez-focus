@@ -10,12 +10,21 @@ import {
   moveSlot,
   readJourney,
   reconcileJourney,
-  resizeStages,
+  applyJourneyTemplate,
+  restActions,
+  REST_LABELS,
   resolveTask,
   taskRef,
   writeJourney,
 } from "../journey.js";
 import { parseTitle, LogoIcon } from "./shared";
+import { tomatoRecordTone } from "../week";
+import {
+  JourneyRestIcon,
+  JourneyOutline,
+  JourneySettingsIcon,
+} from "./JourneyIcons";
+import JourneyTemplates from "./JourneyTemplates";
 
 export type JourneyControls = {
   scope: string;
@@ -25,6 +34,8 @@ export type JourneyControls = {
   change: (task: FocusTask | null) => boolean;
   pause: () => void;
   resume: () => void;
+  onPlan?: (plan: Journey) => void;
+  refreshToken?: number;
 };
 export default function TodayJourney({
   records,
@@ -41,10 +52,7 @@ export default function TodayJourney({
   const [edit, setEdit] = useState<string | null>(null),
     [choice, setChoice] = useState(""),
     [destination, setDestination] = useState("");
-  const [settings, setSettings] = useState(false),
-    [rows, setRows] = useState<
-      { id?: string; count: number; rest: string }[]
-    >([]);
+  const [settings, setSettings] = useState(false);
   const day = journeyDay(Date.now(), offset),
     scope = controls.scope;
   const ref = useRef<Journey | null>(null);
@@ -53,6 +61,7 @@ export default function TodayJourney({
     const valid = writeJourney(localStorage, next);
     ref.current = valid;
     setPlan(valid);
+    if (valid.day === journeyDay()) controls.onPlan?.(valid);
     return valid;
   };
   const attempt = (fn: () => void) => {
@@ -80,7 +89,7 @@ export default function TodayJourney({
     );
     // A record event or day/source change reconciles outlines, never the one-second clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, day, controls.ready]);
+  }, [scope, day, controls.ready, controls.refreshToken]);
   useEffect(() => {
     if (
       !controls.ready ||
@@ -194,6 +203,7 @@ export default function TodayJourney({
     const next = JSON.parse(JSON.stringify(ref.current)) as Journey;
     const id = crypto.randomUUID();
     next.resting = null;
+    next.restingAction = null;
     next.stages
       .flatMap((s) => s.slots)
       .find((s) => s.id === p.id)!.binding = { sessionId: id, unit: 0 };
@@ -229,10 +239,34 @@ export default function TodayJourney({
       !done[p.id] &&
       !(controls.active && p.binding?.sessionId === controls.active.id)
   );
+  const toggleRest = (stageId: string, index: number) =>
+    attempt(() => {
+      if (!today || !ref.current || ref.current.day !== journeyDay())
+        throw Error("只能进入当天休息");
+      const previous = ref.current,
+        key = `${stageId}:${index}`;
+      const continuing =
+        previous.resting === stageId &&
+        (previous.restingAction || `${stageId}:0`) === key;
+      const next = JSON.parse(JSON.stringify(previous)) as Journey;
+      next.resting = continuing ? null : stageId;
+      next.restingAction = continuing ? null : key;
+      if (continuing && !next.passedActions.includes(key))
+        next.passedActions.push(key);
+      persist(next); // Do not change the timer if the journey write fails.
+      try {
+        if (continuing) controls.resume();
+        else controls.pause();
+      } catch (e) {
+        persist(previous);
+        throw e;
+      }
+    });
   useEffect(() => {
     if (!edit && !settings) return;
     const previous = document.activeElement as HTMLElement | null;
-    const dialog = document.querySelector<HTMLElement>(".journey-dialog");
+    const dialog =
+      document.querySelector<HTMLElement>(".journey-dialog");
     dialog?.querySelector<HTMLElement>("select,input,button")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -240,29 +274,89 @@ export default function TodayJourney({
         setSettings(false);
       }
       if (e.key === "Tab" && dialog) {
-        const items = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled),select,input"));
-        const first = items[0], last = items[items.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+        const items = Array.from(
+          dialog.querySelectorAll<HTMLElement>(
+            "button:not(:disabled),select,input"
+          )
+        );
+        const first = items[0],
+          last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); if(previous?.isConnected)previous.focus(); };
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (previous?.isConnected) previous.focus();
+    };
   }, [edit, settings]);
   return (
     <div
       className="card journey-card"
+      data-long={slots.length > 16}
       data-day={day}
       data-scope={scope}
     >
       <div className="journey-heading">
-        <strong>{today ? "今日旅程" : "明日旅程"}</strong>
-        <button
-          className="btn-text"
-          onClick={() => setOffset(today ? 1 : 0)}
+        <strong
+          title={`${Object.keys(done).length}/${slots.length} 个番茄`}
         >
-          {today ? "明天" : "今天"}
-        </button>
+          {today ? "今日旅程" : "明日旅程"}
+        </strong>
+        <span className="journey-heading-actions">
+          <button
+            className="btn-text"
+            aria-label={today ? "明天" : "今天"}
+            title={today ? "预设明天旅程" : "返回今日旅程"}
+            onClick={() => setOffset(today ? 1 : 0)}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M3 10h18M8 2v6M16 2v6M8 14h2M14 14h2M8 18h2" />
+            </svg>
+          </button>
+          <button
+            className="btn-text"
+            aria-label="设置"
+            title="可视化旅程模板"
+            disabled={!plan}
+            onClick={() => {
+              setSettings(true);
+              setEdit(null);
+              setError("");
+            }}
+          >
+            <JourneySettingsIcon />
+          </button>
+          {today &&
+            plan &&
+            !plan.resting &&
+            nextSlot &&
+            !controls.active && (
+              <button
+                className="btn-text"
+                aria-label="开始"
+                title="开始下一个旅程番茄"
+                onClick={() => start(nextSlot)}
+              >
+                ▶
+              </button>
+            )}
+        </span>
       </div>
       {!plan && (
         <div className="journey-note">
@@ -343,104 +437,66 @@ export default function TodayJourney({
                       >
                         {actual || running ? (
                           <LogoIcon
-                            size={18}
-                            tone={actual ? "#e78567" : "#e2ab52"}
+                            size={22}
+                            tone={
+                              actual
+                                ? tomatoRecordTone(actual)
+                                : "#e2ab52"
+                            }
                           />
                         ) : (
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            aria-hidden="true"
-                          >
-                            <circle
-                              cx="12"
-                              cy="13.5"
-                              r="8.5"
-                              fill="none"
-                              stroke="#dd967f"
-                              strokeWidth="1.5"
-                            />
-                            <path
-                              d="M8 4l4 2 3-4"
-                              fill="none"
-                              stroke="#789878"
-                              strokeWidth="1.5"
-                            />
-                          </svg>
+                          <JourneyOutline size={22} />
                         )}
+                        {j === 0 && s.time !== null ? (
+                          <small className="journey-time-corner">
+                            {s.time}
+                          </small>
+                        ) : i === plan.stages.length - 1 &&
+                          j === s.slots.length - 1 &&
+                          plan.endHour !== null ? (
+                          <small className="journey-time-corner">
+                            {plan.endHour}
+                          </small>
+                        ) : null}
                       </button>
                     );
                   })}
                 </div>
                 <div className="journey-rest">
-                  <span title={s.rest}>→ {s.rest}</span>
-                  {today && (
-                    <button
-                      className="btn-text"
-                      title={
-                        plan.resting === s.id
-                          ? "结束这个休息节点"
-                          : "手动进入休息，不受钟点限制"
-                      }
-                      onClick={() =>
-                        attempt(() => {
-                          const next = {
-                            ...plan,
-                            passed: [...plan.passed],
-                          };
-                          if (plan.resting === s.id) {
-                            controls.resume();
-                            next.resting = null;
-                            if (!next.passed.includes(s.id))
-                              next.passed.push(s.id);
-                          } else {
-                            controls.pause();
-                            next.resting = s.id;
-                          }
-                          persist(next);
-                        })
-                      }
-                    >
-                      {plan.resting === s.id
-                        ? "继续"
-                        : plan.passed.includes(s.id)
-                        ? "✓"
-                        : "休息"}
-                    </button>
-                  )}
+                  {restActions(s).map((kind, n) => {
+                    const key = `${s.id}:${n}`,
+                      resting =
+                        plan.resting === s.id &&
+                        (plan.restingAction || `${s.id}:0`) === key;
+                    return (
+                      <button
+                        key={key}
+                        className={`journey-rest-button${
+                          plan.passedActions.includes(key)
+                            ? " is-passed"
+                            : ""
+                        }`}
+                        data-rest-kind={kind}
+                        data-rest-index={n}
+                        aria-label={`${resting ? "继续" : "休息"}：${
+                          REST_LABELS[kind]
+                        }`}
+                        aria-pressed={resting}
+                        disabled={!today}
+                        title={
+                          resting
+                            ? `${REST_LABELS[kind]}中 · 点击结束并继续`
+                            : `${REST_LABELS[kind]} · 点击进入，不强制卡点`
+                        }
+                        onClick={() => toggleRest(s.id, n)}
+                      >
+                        <JourneyRestIcon kind={kind} />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}
-          </div>
-          <div className="journey-footer">
-            <span>
-              {Object.keys(done).length}/{slots.length}
-            </span>
-            <button
-              className="btn-text"
-              onClick={() => {
-                setRows(
-                  plan.stages.map((s) => ({
-                    id: s.id,
-                    count: s.slots.length,
-                    rest: s.rest,
-                  }))
-                );
-                setSettings(true);
-                setError("");
-              }}
-            >
-              设置
-            </button>
-            {today && !plan.resting && nextSlot && !controls.active && (
-              <button
-                className="btn-text"
-                onClick={() => start(nextSlot)}
-              >
-                开始
-              </button>
-            )}
           </div>
         </>
       )}
@@ -487,113 +543,30 @@ export default function TodayJourney({
                 </button>
               </div>
               {settings ? (
-                <>
-                  <p className="journey-note">
-                    按顺序接续，不绑定钟点。拖动轮廓可调整各段数量。
-                  </p>
-                  <div className="journey-settings">
-                    {rows.map((r, i) => (
-                      <div
-                        className="journey-setting-row"
-                        key={r.id || i}
-                      >
-                        <label>
-                          {i + 1}
-                          <input
-                            aria-label={`第${i + 1}段番茄数量`}
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={r.count}
-                            onChange={(e) =>
-                              setRows(
-                                rows.map((v, n) =>
-                                  n === i
-                                    ? {
-                                        ...v,
-                                        count: Number(e.target.value),
-                                      }
-                                    : v
-                                )
-                              )
-                            }
-                          />
-                        </label>
-                        <input
-                          aria-label={`第${i + 1}段休息名称`}
-                          maxLength={80}
-                          value={r.rest}
-                          onChange={(e) =>
-                            setRows(
-                              rows.map((v, n) =>
-                                n === i
-                                  ? { ...v, rest: e.target.value }
-                                  : v
-                              )
-                            )
-                          }
-                        />
-                        <button
-                          className="btn-text"
-                          disabled={i === 0}
-                          aria-label={`上移第${i + 1}段`}
-                          onClick={() => {
-                            const a = rows.slice();
-                            [a[i - 1], a[i]] = [a[i], a[i - 1]];
-                            setRows(a);
-                          }}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          className="btn-text"
-                          aria-label={`移除第${i + 1}段`}
-                          onClick={() =>
-                            setRows(rows.filter((_, n) => n !== i))
-                          }
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="journey-dialog-actions">
-                    <button
-                      className="btn-text"
-                      disabled={rows.length >= 20}
-                      onClick={() =>
-                        setRows([
-                          ...rows,
-                          {
-                            id: crypto.randomUUID(),
-                            count: 3,
-                            rest: "休息",
-                          },
-                        ])
-                      }
-                    >
-                      添加一段
-                    </button>
-                    <button
-                      className="btn-primary"
-                      onClick={() =>
-                        attempt(() => {
-                          persist(
-                            resizeStages(
-                              ref.current!,
-                              rows,
-                              records,
-                              controls.active
-                            )
-                          );
-                          setSettings(false);
-                        })
-                      }
-                    >
-                      保存旅程
-                    </button>
-                  </div>
-                </>
+                <JourneyTemplates
+                  plan={plan!}
+                  today={today}
+                  activeToday={today && !!controls.active}
+                  onApply={(t) => {
+                    if (
+                      !ref.current ||
+                      ref.current.scope !== scope ||
+                      ref.current.day !== day
+                    )
+                      throw Error(
+                        "日期或任务来源已变化，请重新打开模板"
+                      );
+                    persist(
+                      applyJourneyTemplate(
+                        ref.current,
+                        t,
+                        records,
+                        controls.active
+                      )
+                    );
+                    setSettings(false);
+                  }}
+                />
               ) : (
                 selected && (
                   <>

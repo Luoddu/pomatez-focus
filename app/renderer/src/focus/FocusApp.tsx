@@ -23,6 +23,7 @@ import {
   RemovePlan,
 } from "./editQueue";
 import { recolorSession } from "./classification.js";
+import { Journey, journeyDay, readJourney, writeJourney, reconcileJourney, gymRestTarget } from "./journey.js";
 import { loadReviews, saveReviews } from "./reviewCache";
 import {
   projectQuickTasks,
@@ -1529,11 +1530,27 @@ export default function FocusApp() {
       : active
       ? "timing"
       : "board";
-  const restState = useScientificRest(timer.records, timer.ready && !timer.blocked);
+  const [journeyProjection, setJourneyProjection] = useState<Journey | null>(null);
+  const [journeyRefresh, setJourneyRefresh] = useState(0);
+  const reportJourney = useCallback((plan: Journey) => setJourneyProjection(prev => JSON.stringify(prev) === JSON.stringify(plan) ? prev : plan), []);
+  const gymAvailable = !!(connectionReady && journeyProjection && journeyProjection.day === journeyDay() && journeyProjection.scope === (sourceKey || "local") && gymRestTarget(journeyProjection, shownRecords));
+  const restState = useScientificRest(timer.records, timer.ready && !timer.blocked, gymAvailable);
+  const goGym = gymAvailable ? () => {
+    if (!timer.ready || timer.blocked || !connectionReady) throw Error("旅程尚未就绪");
+    const snapshot = timer.getSnapshot();
+    if (snapshot.active?.status === "review") throw Error("请先确认当前番茄");
+    const previous = reconcileJourney(readJourney(localStorage, sourceKey || "local", journeyDay()), snapshot.records, snapshot.active);
+    const target = gymRestTarget(previous, snapshot.records);
+    if (!target) throw Error("当前旅程没有可进入的健身节点");
+    const next = writeJourney(localStorage, {...previous, resting:target.stageId, restingAction:target.actionKey});
+    try { timer.pause(); if (timer.getSnapshot().active?.status === "active") throw Error("暂停未保存"); }
+    catch (error) { writeJourney(localStorage, previous); throw error; }
+    reportJourney(next); setJourneyRefresh(value => value + 1);
+  } : undefined;
   const restReminder = <ScientificRestReminder state={restState} onSleep={() => {
     timer.pause();
     if (timer.getSnapshot().active?.status === "active") throw Error("暂停未完成");
-  }} onFocus={() => {
+  }} onGym={goGym} onFocus={() => {
     setSettingsOpen(false); setStatsOpen(false);
     const current = timer.getSnapshot().active;
     if (current) {
@@ -1722,6 +1739,8 @@ export default function FocusApp() {
               scope: sourceKey || "local",
               ready: timer.ready && !timer.blocked && connectionReady,
               active: timer.active,
+              onPlan: reportJourney,
+              refreshToken: journeyRefresh,
               begin: (target, sessionId) => {
                 if (
                   !timer.ready ||

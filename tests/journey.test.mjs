@@ -42,7 +42,7 @@ test("default flexible itinerary 4/3/3/3/3 and local calendar tomorrow", () => {
     p.stages.map((s) => s.slots.length),
     [4, 3, 3, 3, 3]
   );
-  assert.equal(p.stages.at(-1).rest, "下班");
+  assert.deepEqual(p.stages.at(-1).restActions, ["nap", "night"]);
   assert.equal(
     journeyDay(new Date(2026, 11, 31, 23).getTime(), 1),
     "2027-01-01"
@@ -258,8 +258,8 @@ test("bad storage preserved; bounds/duplicates reject; valid storage stays writa
   writeJourney(s, plan());
   assert.equal(readJourney(s, "local", day).stages.length, 5);
 });
-test("road is exactly 50 tomatoes independent of legacy milestones", () => {
-  assert.deepEqual(journeyRoad(282), { reached: 250, next: 300 });
-  assert.deepEqual(journeyRoad(300), { reached: 300, next: 350 });
-  assert.deepEqual(journeyRoad(1000), { reached: 1000, next: 1050 });
+test("road is 100 tomatoes with independent 25-unit flags", () => {
+  assert.deepEqual(journeyRoad(282), { reached: 200, next: 300 });
+  assert.deepEqual(journeyRoad(300), { reached: 300, next: 400 });
+  assert.deepEqual(journeyRoad(1000), { reached: 1000, next: 1100 });
 });

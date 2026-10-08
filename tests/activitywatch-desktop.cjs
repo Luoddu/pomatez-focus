@@ -226,13 +226,13 @@ app.whenReady().then(async () => {
     };
     const click = async (text) => {
       console.log("UI click:", text);
-      if (text === "去睡觉" || text === "开始下一个番茄")
+      if (text === "去睡觉" || text === "去健身" || text === "开始下一个番茄")
         await until(
           () =>
             popup() &&
             !popup().webContents.isLoadingMainFrame() &&
             js(
-              "Array.from(document.querySelectorAll('button')).every(b=>!b.disabled)",
+              "Array.from(document.querySelectorAll('button')).filter(b=>!b.hidden).every(b=>!b.disabled)",
               popup()
             )
         );
@@ -246,9 +246,9 @@ app.whenReady().then(async () => {
         )});if(e.disabled)throw Error('Disabled '+${JSON.stringify(
           text
         )});e.click()})()`,
-        text === "去睡觉" || text === "开始下一个番茄" ? popup() : win
+        text === "去睡觉" || text === "去健身" || text === "开始下一个番茄" ? popup() : win
       );
-      if (text === "去睡觉" || text === "开始下一个番茄")
+      if (text === "去睡觉" || text === "去健身" || text === "开始下一个番茄")
         await until(() => !popup());
     };
     await js(`(${installNoonClock.toString()})()`, win);
@@ -357,7 +357,7 @@ app.whenReady().then(async () => {
       );
       assert.equal(
         await js(
-          `document.querySelectorAll('.rest-reminder button').length`
+          `[...document.querySelectorAll('.rest-reminder button')].filter(b=>!b.hidden).length`
         ),
         2
       );
@@ -387,7 +387,39 @@ app.whenReady().then(async () => {
         )});e.dispatchEvent(new Event('input',{bubbles:true}))})()`
       );
     await click("补记");
-    await setInput('[aria-label="补记番茄数"]', 12);
+    await setInput('[aria-label="补记番茄数"]', 7);
+    await click("保存补记");
+    await until(() => restMonitor.snapshot().progress?.gymAvailable === true);
+    await click("开始专注");
+    bSeconds = 1080; xSeconds = 120;
+    await restMonitor.refresh();
+    await until(() => popup() && !popup().webContents.isLoadingMainFrame());
+    assert.equal(await js(`getComputedStyle(document.querySelector('.rest-reminder')).borderTopColor`,popup()),"rgb(80, 101, 255)");
+    await until(() => js(`!document.querySelector('[data-action="gym"]').hidden`,popup()));
+    assert.equal(await js(`[...document.querySelectorAll('button')].filter(b=>!b.hidden).length`,popup()),3);
+    await capture("scientific-focus-gym-reminder");
+    fs.writeFileSync(path.join(root,"artifacts/scientific-focus-native-gym.png"),(await popup().webContents.capturePage()).toPNG());
+    await js(`window.gymOriginalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-journey-v1:'))throw Error('Synthetic gym quota');return window.gymOriginalSet.call(this,k,v)};void 0`,win);
+    await js(`document.querySelector('[data-action="gym"]').click()`,popup());
+    await until(()=>js(`document.querySelector('p').textContent.includes('操作未完成')`,popup()));
+    assert.equal(await js(`JSON.parse(localStorage.getItem('pomatez-focus-v1')).active.status`,win),"active");
+    assert.ok(restMonitor.snapshot().reminder);
+    await js(`Storage.prototype.setItem=window.gymOriginalSet;void 0`,win);
+    await click("去健身");
+    assert.equal(await js(`JSON.parse(localStorage.getItem('pomatez-focus-v1')).active.status`,win),"paused");
+    assert.ok(await js(`(()=>{const e=document.querySelector('.journey-card');const p=JSON.parse(localStorage.getItem('pomatez-journey-v1:'+encodeURIComponent(e.dataset.scope)+':'+e.dataset.day));return p.restingAction.endsWith(':1')})()`,win));
+    await click("结束"); await click("确认结束"); await click("放弃本次");
+    await click("继续：健身");
+    await until(() => restMonitor.snapshot().progress?.gymAvailable === false);
+    bSeconds = 1380;
+    await restMonitor.refresh();
+    await until(() => popup() && !popup().webContents.isLoadingMainFrame());
+    assert.equal(await js(`document.querySelector('[data-action="gym"]').hidden`,popup()),true);
+    await assert.rejects(js(`window.restReminderApi.act({key:${JSON.stringify(restMonitor.snapshot().reminder.key)},action:'gym'})`,popup()));
+    await click("去睡觉");
+    checks.push("blue native border, current journey gym action pauses real timer/persists rest, passed gym hides and forged gym rejected");
+    await click("补记");
+    await setInput('[aria-label="补记番茄数"]', 5);
     await click("保存补记");
     await until(
       () => restMonitor.snapshot().progress?.completedCount === 12
@@ -613,7 +645,7 @@ app.whenReady().then(async () => {
     await until(() => js(`!!document.querySelector('.rest-reminder')`));
     assert.equal(
       await js(
-        `document.querySelectorAll('.rest-reminder button').length`
+        `[...document.querySelectorAll('.rest-reminder button')].filter(b=>!b.hidden).length`
       ),
       2
     );
@@ -750,7 +782,7 @@ app.whenReady().then(async () => {
     await restMonitor.refresh();
     await until(() => js(`!!document.querySelector('.rest-reminder')`));
     const compact = await js(
-      `(()=>{const r=document.querySelector('.rest-reminder').getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:innerWidth,height:innerHeight,buttons:document.querySelectorAll('.rest-reminder button').length}})()`
+      `(()=>{const r=document.querySelector('.rest-reminder').getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:innerWidth,height:innerHeight,buttons:[...document.querySelectorAll('.rest-reminder button')].filter(b=>!b.hidden).length}})()`
     );
     assert.ok(
       compact.top >= 0 &&

@@ -31,7 +31,7 @@ export type RestState = {
     pomodoroGoal: number;
     reminderMinutes: number;
   };
-  progress: { day: string; completedCount: number } | null;
+  progress: { day: string; completedCount: number; gymAvailable?: boolean } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
   message: string;
@@ -68,7 +68,8 @@ const initial: RestState = {
 };
 export function useScientificRest(
   records: FocusSession[],
-  ready: boolean
+  ready: boolean,
+  gymAvailable = false
 ) {
   const [state, setState] = useState(initial);
   useEffect(() => {
@@ -117,11 +118,12 @@ export function useScientificRest(
         .restProgress({
           day: progressDay,
           completedCount: reportedCount,
+          gymAvailable: ready && gymAvailable,
         })
         .catch(() => {});
     // Progress is a projection of the timer's confirmed records, including edits
     // and cloud merges. No independent daily counter or polling timer is needed.
-  }, [progressDay, reportedCount]);
+  }, [progressDay, reportedCount, ready, gymAvailable]);
   return state;
 }
 const minutes = (seconds: number) =>
@@ -588,10 +590,12 @@ export function ScientificRestReminder({
   state,
   onSleep,
   onFocus,
+  onGym,
 }: {
   state: RestState;
   onSleep: () => void;
   onFocus: () => void;
+  onGym?: () => void;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -601,8 +605,8 @@ export function ScientificRestReminder({
     state.settings.supervise && state.status === "recording"
       ? state.reminder
       : null;
-  const callbacks = useRef({ onSleep, onFocus, reminder });
-  callbacks.current = { onSleep, onFocus, reminder };
+  const callbacks = useRef({ onSleep, onFocus, onGym, reminder });
+  callbacks.current = { onSleep, onFocus, onGym, reminder };
   useEffect(() => {
     const bridge = api();
     if (!bridge?.nativeRestReminder) return;
@@ -615,6 +619,7 @@ export function ScientificRestReminder({
             throw Error("Stale reminder");
           if (request.action === "sleep") current.onSleep();
           else if (request.action === "focus") current.onFocus();
+          else if (request.action === "gym" && current.onGym) current.onGym();
           else throw Error("Invalid action");
           ok = true;
         } catch (_) {
@@ -696,6 +701,7 @@ export function ScientificRestReminder({
           >
             去睡觉
           </button>
+          {onGym && state.progress?.gymAvailable && <button disabled={busy} className="btn-small outline" onClick={() => void act(onGym, true)}>去健身</button>}
           <button
             disabled={busy}
             className="btn-small"

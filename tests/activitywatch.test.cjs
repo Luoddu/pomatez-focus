@@ -18,6 +18,17 @@ const {
 const dir = () =>
   fs.mkdtempSync(path.join(os.tmpdir(), "pomo-aw-test-"));
 const at = (h = 12, m = 0) => new Date(2026, 9, 7, h, m).getTime();
+test("gym projection uses a bounded current-day boolean; invalid input retains previous value and ordinary progress still works", () => {
+  const m=new ActivityWatchRest(dir(),()=>{},()=>{},async()=>{},()=>at());
+  m.reportProgress({day:dayKey(at()),completedCount:7,gymAvailable:true});
+  assert.equal(m.snapshot().progress.gymAvailable,true);
+  assert.throws(()=>m.reportProgress({day:dayKey(at()),completedCount:7,gymAvailable:"true"}));
+  assert.throws(()=>m.reportProgress({day:"2026-10-06",completedCount:7,gymAvailable:true}));
+  assert.equal(m.snapshot().progress.gymAvailable,true);
+  m.reportProgress({day:dayKey(at()),completedCount:7,gymAvailable:false});assert.equal(m.snapshot().progress.gymAvailable,false);
+  m.reportProgress({day:dayKey(at()),completedCount:null,gymAvailable:true});assert.equal(m.snapshot().progress,null);
+  m.reportProgress({day:dayKey(at()),completedCount:8});assert.equal(m.snapshot().progress.completedCount,8);
+});
 const event = (start, seconds, site = "bilibili", extra = {}) => ({
   timestamp: new Date(start).toISOString(),
   duration: seconds,

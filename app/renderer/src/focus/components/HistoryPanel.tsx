@@ -1,6 +1,5 @@
 import ResearchGoal from "./ResearchGoal";
 import TodayJourney, { JourneyControls } from "./TodayJourney";
-import { journeyRoad } from "../journey.js";
 import ScientificRest, { RestState } from "./ScientificRest";
 import { companionGreeting } from "../wellbeing.js";
 import React, { useEffect, useRef, useState } from "react";
@@ -137,24 +136,6 @@ const PencilIcon = () => (
 );
 
 // 里程碑小旗：未达成时只改变颜色，旗面始终直立。
-const FlagIcon = ({ big }: { raised: boolean; big?: boolean }) => (
-  <svg
-    width={big ? 12 : 9}
-    height={big ? 16 : 13}
-    viewBox="0 0 12 16"
-    aria-hidden="true"
-  >
-    <rect
-      x="1.1"
-      y="1"
-      width="1.7"
-      height="14"
-      rx="0.85"
-      fill="currentColor"
-    />
-    <path d="M2.8 1.6 L10.8 4.1 L2.8 6.7 Z" fill="currentColor" />
-  </svg>
-);
 
 export default function HistoryPanel({
   records,
@@ -294,22 +275,7 @@ export default function HistoryPanel({
   const shownWeekTotal = useCountUp(weekTotal);
   const totalTomatoes = sum(records, (r) => r.completedCount || 0);
   const todayTier = harvestTier(shownTodayTomatoes);
-  // 里程碑按上一个成果到下一档计进度。
-  const totalMs = journeyRoad(totalTomatoes);
-  const totalDone = false;
-  const totalProgress = totalDone
-    ? 100
-    : Math.min(
-        100,
-        Math.round(
-          ((totalTomatoes - totalMs.reached) /
-            (totalMs.next - totalMs.reached)) *
-            1000
-        ) / 10
-      );
-  const flags = [totalMs.reached + 25];
-  // 越过里程碑：本会话内从 below 到 ≥ 时旗子弹起一次并通知；挂载基线不补播
-  const [justRaised, setJustRaised] = useState<number | null>(null);
+  // Preserve existing milestone notifications; the compact farm bar needs no timer.
   const milestoneBase = useRef<number | null>(null);
   useEffect(() => {
     if (milestoneBase.current === null) {
@@ -321,10 +287,7 @@ export default function HistoryPanel({
     const crossed = crossedFlags(prev, totalTomatoes);
     if (!crossed.length) return;
     const top = crossed[crossed.length - 1];
-    setJustRaised(top);
     onMilestone?.(top);
-    const t = setTimeout(() => setJustRaised(null), 900);
-    return () => clearTimeout(t);
     // flags/next 由 totalTomatoes 派生，只需盯总数
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalTomatoes]);
@@ -438,63 +401,7 @@ export default function HistoryPanel({
           ))}
           <TodayJourney records={records} tasks={tasks} controls={journey} />
         </div>
-        {/* 上一个已达成果 → 下一档，实时值贴着进度端点。 */}
-        <div
-          className="card stat-totalbar"
-          title={`总番茄 ${totalTomatoes} 个的成就进度`}
-        >
-          <span className="stb-from">{totalMs.reached}</span>
-          <div className="stb-main">
-            <div className="stb-track" aria-hidden="true">
-              <i style={{ width: `${totalProgress}%` }} />
-              <span
-                className={`stb-current${
-                  totalProgress <= 4
-                    ? " at-start"
-                    : totalProgress >= 96
-                    ? " at-end"
-                    : ""
-                }`}
-                style={{ left: `${totalProgress}%` }}
-              >
-                {totalTomatoes}
-              </span>
-              {flags.map((m) => (
-                <span
-                  key={m}
-                  className={`ms-flag${
-                    totalTomatoes >= m ? " raised" : ""
-                  }${justRaised === m ? " just-raised" : ""}`}
-                  style={{
-                    left: `${
-                      ((m - totalMs.reached) /
-                        (totalMs.next - totalMs.reached)) *
-                      100
-                    }%`,
-                  }}
-                  title={`${m} 个番茄`}
-                >
-                  <FlagIcon raised={totalTomatoes >= m} />
-                </span>
-              ))}
-              <span
-                className={`ms-flag big${
-                  totalDone || totalTomatoes >= totalMs.next
-                    ? " raised"
-                    : ""
-                }${justRaised === totalMs.next ? " just-raised" : ""}`}
-                style={{ left: "100%" }}
-                title={`${totalMs.next} 个番茄（终点）`}
-              >
-                <FlagIcon
-                  raised={totalDone || totalTomatoes >= totalMs.next}
-                  big
-                />
-              </span>
-            </div>
-          </div>
-          <span className="stb-to">{totalMs.next}</span>
-        </div>
+
       </div>
       <div className="rest-calendar-group">
       <ScientificRest state={restState} />

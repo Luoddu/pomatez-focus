@@ -2,8 +2,8 @@ import { BrowserWindow, screen } from "electron";
 import path from "path";
 import type { RestState } from "./activitywatch";
 
-export type RestAction = "sleep" | "focus";
-type Presentation = { key: string; line: string };
+export type RestAction = "sleep" | "focus" | "gym";
+type Presentation = { key: string; line: string; gymAvailable: boolean };
 
 // One short-lived window; never changes the farm's pin or timer ownership.
 export class RestReminderWindow {
@@ -25,7 +25,7 @@ export class RestReminderWindow {
   update(state: RestState) {
     const reminder = state.settings.supervise && state.status === "recording" ? state.reminder : null;
     if (!reminder) { this.current = null; this.close(); return; }
-    this.current = { key: reminder.key, line: reminder.kind === "focus"
+    this.current = { key: reminder.key, gymAvailable: state.progress?.day === state.usage?.day && state.progress?.gymAvailable === true, line: reminder.kind === "focus"
       ? `已看 ${reminder.watchedMinutes} 分钟，番茄 ${state.progress?.completedCount ?? reminder.completedCount}/${state.settings.pomodoroGoal}：去睡觉，或回到科研主线。`
       : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。` };
     if (this.window && !this.window.isDestroyed()) {
@@ -35,7 +35,7 @@ export class RestReminderWindow {
     const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     const width = Math.min(620, area.width), height = Math.min(260, area.height);
     const popup = this.window = new BrowserWindow({
-      title: "科学休息", width, height,
+      title: "科学专注", width, height,
       x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2),
       show: false, frame: false, resizable: false, maximizable: false, minimizable: false,
       skipTaskbar: true, backgroundColor: "#ffffff",
@@ -77,7 +77,8 @@ export class RestReminderWindow {
     });
   }
   async act(value: any) {
-    if (!value || (value.action !== "sleep" && value.action !== "focus") ||
+    if (!value || (value.action !== "sleep" && value.action !== "focus" && value.action !== "gym") ||
+      (value.action === "gym" && !this.current?.gymAvailable) ||
       !this.current || value.key !== this.current.key || this.pending)
       throw Error("提醒已变更或正在处理");
     const key = this.current.key, action: RestAction = value.action;

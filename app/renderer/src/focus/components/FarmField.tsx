@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { FocusSession } from "../session";
 import FarmCompanion from "./FarmCompanion";
+import FarmProgress from "./FarmProgress";
 import { holidayDay } from "../wellbeing.js";
 import {
   PLANT_STAGES,
@@ -1108,6 +1109,7 @@ export default function FarmField({
       : 0;
   return (
     <div className="card farm-field">
+      <div className="farm-toolbar">
       <div className="farm-caption">
         <span
           className="term-pill"
@@ -1120,6 +1122,8 @@ export default function FarmField({
           {term.emoji} {term.name} · 第 {term.dayOfTerm} 天
         </span>
         {caption}
+      </div>
+      <FarmProgress total={total}/>
       </div>
       {/* 分层场景：天空层随卡片高度舒展，地面层保持 720:150 比例锚底，
           窗口拉高时空白被天空有机吃掉而不拉伸变形 */}

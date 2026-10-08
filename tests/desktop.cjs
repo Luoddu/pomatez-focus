@@ -347,7 +347,7 @@ app
       const a=document.querySelector('.left-col').getBoundingClientRect();
       const b=document.querySelector('.right-col').getBoundingClientRect();
       return {sideBySide:a.right<=b.left,rows:document.querySelectorAll('.records li').length,
-        total:document.querySelector('[data-stat="总番茄"] strong').textContent,
+        total:document.querySelector('.farm-total-progress .stb-current').textContent,
         today:document.querySelector('[data-stat="今日番茄"] strong').textContent,
         groups:document.querySelectorAll('.record-day').length};
     })()`);
