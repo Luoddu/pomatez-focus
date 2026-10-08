@@ -4393,3 +4393,197 @@ button.stats-range-label:hover {
     font-size: 12px;
   }
 }
+
+/* Daily journey occupies the same grid column as today's tomato count. */
+.journey-card {
+  grid-column: 1;
+  min-width: 0;
+  padding: 10px 12px;
+}
+.journey-heading,
+.journey-footer,
+.journey-rest,
+.journey-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.journey-heading strong {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.journey-heading button,
+.journey-footer button {
+  font-size: 11px;
+  padding: 0;
+}
+.journey-stages {
+  max-height: 210px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  margin: 5px -3px 3px;
+  padding: 0 3px;
+}
+.journey-stage {
+  border-bottom: 1px solid var(--border);
+  padding: 5px 0 3px;
+  border-radius: 4px;
+}
+.journey-stage.is-resting {
+  background: var(--blue-soft);
+}
+.journey-slots {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+.journey-tomato {
+  flex: none;
+  position: relative;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+}
+.journey-tomato svg {
+  position: relative;
+  z-index: 1;
+}
+.journey-outline {
+  position: absolute;
+  inset: 5px 2px 1px;
+  border: 1.2px solid #dd967f;
+  border-radius: 44% 44% 48% 48%;
+}
+.journey-tomato.is-complete {
+  cursor: default;
+}
+.journey-tomato.is-complete .journey-outline {
+  border-color: transparent;
+}
+.journey-tomato.is-active {
+  background: var(--amber-soft);
+  border-radius: 5px;
+  cursor: default;
+}
+.journey-rest {
+  font-size: 9px;
+  color: var(--muted);
+  min-width: 0;
+}
+.journey-rest span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.journey-rest button {
+  font-size: 9px;
+  flex: none;
+  padding: 0;
+  line-height: 1.35;
+}
+.journey-footer {
+  color: var(--muted);
+  font-size: 10px;
+}
+.journey-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.journey-error {
+  font-size: 11px;
+  color: #bd5545;
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+}
+.journey-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 38, 60, 0.25);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.journey-dialog {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  width: 460px;
+  max-width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  padding: 22px;
+  box-shadow: 0 12px 60px #0002;
+}
+.journey-dialog h3 {
+  font-size: 18px;
+}
+.journey-dialog button {
+  cursor: pointer;
+}
+.journey-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.journey-dialog .btn-primary {
+  padding: 9px 15px;
+  border-radius: 10px;
+}
+.journey-label {
+  display: block;
+  font-size: 13px;
+  margin-top: 16px;
+}
+.journey-label select {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+  padding: 10px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+.journey-settings {
+  max-height: 50vh;
+  overflow: auto;
+}
+.journey-setting-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 9px;
+}
+.journey-setting-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.journey-setting-row input {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 0;
+  width: 100%;
+}
+.journey-setting-row label input {
+  width: 53px;
+}
+.journey-setting-row > input {
+  flex: 1;
+}
+.journey-setting-row > button {
+  flex: none;
+}

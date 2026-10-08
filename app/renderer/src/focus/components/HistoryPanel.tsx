@@ -1,4 +1,6 @@
 import ResearchGoal from "./ResearchGoal";
+import TodayJourney, { JourneyControls } from "./TodayJourney";
+import { journeyRoad } from "../journey.js";
 import ScientificRest, { RestState } from "./ScientificRest";
 import { companionGreeting } from "../wellbeing.js";
 import React, { useEffect, useRef, useState } from "react";
@@ -16,10 +18,7 @@ import {
   PROJECT_TONES,
   tomatoCategoryLabel,
   harvestTier,
-  totalMilestone,
-  TOTAL_MILESTONES,
   weekTomatoes,
-  flagMarks,
   crossedFlags,
 } from "../week";
 import {
@@ -183,6 +182,7 @@ export default function HistoryPanel({
   onOpenStats,
   onMilestone,
   restState,
+  journey,
 }: {
   records: FocusSession[];
   pendingCount: number;
@@ -209,6 +209,7 @@ export default function HistoryPanel({
   onOpenStats?: () => void;
   onMilestone?: (milestone: number) => void;
   restState: RestState;
+  journey: JourneyControls;
 }) {
   const [entryOpen, setEntryOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<FocusSession | null>(
@@ -294,9 +295,8 @@ export default function HistoryPanel({
   const totalTomatoes = sum(records, (r) => r.completedCount || 0);
   const todayTier = harvestTier(shownTodayTomatoes);
   // 里程碑按上一个成果到下一档计进度。
-  const totalMs = totalMilestone(totalTomatoes);
-  const totalDone =
-    totalMs.reached >= TOTAL_MILESTONES[TOTAL_MILESTONES.length - 1];
+  const totalMs = journeyRoad(totalTomatoes);
+  const totalDone = false;
   const totalProgress = totalDone
     ? 100
     : Math.min(
@@ -307,9 +307,7 @@ export default function HistoryPanel({
             1000
         ) / 10
       );
-  const flags = flagMarks(totalMs.next).filter(
-    (m) => m > totalMs.reached
-  );
+  const flags = [totalMs.reached + 25];
   // 越过里程碑：本会话内从 below 到 ≥ 时旗子弹起一次并通知；挂载基线不补播
   const [justRaised, setJustRaised] = useState<number | null>(null);
   const milestoneBase = useRef<number | null>(null);
@@ -438,6 +436,7 @@ export default function HistoryPanel({
               <span>{label}</span>
             </div>
           ))}
+          <TodayJourney records={records} tasks={tasks} controls={journey} />
         </div>
         {/* 上一个已达成果 → 下一档，实时值贴着进度端点。 */}
         <div

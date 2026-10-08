@@ -36,7 +36,7 @@ type CounterProps = {
   error: string;
   blocked: boolean;
   restSeconds: number;
-  begin: (task: FocusTask, minutes: number) => void;
+  begin: (task: FocusTask, minutes: number, sessionId?: string) => void;
   changeTask: (task: FocusTask) => boolean;
   pause: () => void;
   resume: () => void;
@@ -235,10 +235,22 @@ const CounterProvider: React.FC = ({ children }) => {
       }
     }
   };
-  const begin = (task: FocusTask, minutes: number) =>
+  const begin = (
+    task: FocusTask,
+    minutes: number,
+    sessionId?: string
+  ) =>
     action(() => {
       if (dataRef.current.active)
         throw new Error("请先结束并确认当前专注");
+      if (
+        sessionId &&
+        (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          sessionId
+        ) ||
+          dataRef.current.records.some((r) => r.id === sessionId))
+      )
+        throw new Error("专注记录标识不可复用");
       if (
         !task?.id ||
         !task.title.trim() ||
@@ -254,7 +266,7 @@ const CounterProvider: React.FC = ({ children }) => {
       setError("");
       lastTick.current = performance.now();
       const active: FocusSession = {
-        id: crypto.randomUUID(),
+        id: sessionId || crypto.randomUUID(),
         task,
         startedAt: Date.now(),
         plannedSeconds: minutes * 60,

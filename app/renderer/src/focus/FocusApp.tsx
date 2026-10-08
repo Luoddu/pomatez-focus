@@ -1718,6 +1718,49 @@ export default function FocusApp() {
           )}
           <HistoryPanel
             restState={restState}
+            journey={{
+              scope: sourceKey || "local",
+              ready: timer.ready && !timer.blocked && connectionReady,
+              active: timer.active,
+              begin: (target, sessionId) => {
+                if (
+                  !timer.ready ||
+                  timer.blocked ||
+                  !connectionReady ||
+                  loadingTasks
+                )
+                  throw Error("任务和计时记录尚未就绪");
+                const task = target || {
+                  id: crypto.randomUUID(),
+                  title: "自由番茄",
+                  kind: "free" as const,
+                  source: sourceKey
+                    ? ("feishu" as const)
+                    : ("local" as const),
+                  ...(sourceKey ? { sourceKey } : {}),
+                };
+                timer.begin(
+                  withPendingCredit(task),
+                  minutes,
+                  sessionId
+                );
+                if (timer.getSnapshot().active?.id !== sessionId)
+                  throw Error("专注未开始，请检查计时器或存储状态");
+              },
+              change: (target) =>
+                changeActiveTask(target?.id || "__free__"),
+              pause: () => {
+                if (timer.getSnapshot().active?.status === "review")
+                  throw Error("请先确认当前专注，再进入休息");
+                timer.pause();
+                if (timer.getSnapshot().active?.status === "active")
+                  throw Error("暂停未保存，请检查存储");
+              },
+              resume: () => {
+                if (timer.getSnapshot().active?.status === "paused")
+                  timer.resume();
+              },
+            }}
             records={shownRecords}
             pendingCount={historyPending.length}
             canSync={connected && !!api()}
