@@ -10,8 +10,8 @@ const main=require('../app/electron/build/main'),wait=ms=>new Promise(r=>setTime
 app.whenReady().then(async()=>{try{
   let win;const until=async f=>{for(let i=0;i<160;i++){if(await f())return;await wait(40)}throw Error('timeout '+f)};
   await until(()=>{win=BrowserWindow.getAllWindows()[0];return win&&!win.webContents.isLoadingMainFrame()&&win.webContents.getURL().startsWith('file:')});
-  const js=s=>win.webContents.executeJavaScript(s,true),checks=[];
-  const click=text=>js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)}||b.getAttribute('aria-label')===${JSON.stringify(text)});if(!b||b.disabled)throw Error('unavailable '+${JSON.stringify(text)});b.click()})()`);
+  const js=async s=>{try{return await win.webContents.executeJavaScript(s,true)}catch(e){console.error('Synthetic script',s);throw e}},checks=[];
+  const click=(text,selector='button')=>js(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(selector)})].find(b=>b.textContent.trim()===${JSON.stringify(text)}||b.getAttribute('aria-label')===${JSON.stringify(text)});if(!b||b.disabled)throw Error('unavailable '+${JSON.stringify(text)});b.click()})()`);
   const set=async(label,at)=>js(`(()=>{const input=document.querySelector('[aria-label="${label}"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(localInput(at))});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   const log=()=>js(`JSON.parse(localStorage.getItem('pomatez-rest-log-v2:${source}'))`),focus=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
   await until(()=>js(`document.querySelectorAll('.journey-tomato[data-complete=true]').length===${process.env.POMO_BACKFILL_PHASE==='empty'?0:6}&&!document.querySelector('[aria-label=健身记录]').disabled`));
@@ -36,11 +36,13 @@ app.whenReady().then(async()=>{try{
     await click('小憩记录');await click('睡醒了');await set('休息开始时间',day+9.5*3600000);await set('休息结束时间',day+9.75*3600000);await click('保存休息补记');
     assert.equal((await log()).events[0].startedAt,day+9.5*3600000);assert.deepEqual((await log()).events.slice(1),beforeEarlier.events);
     checks.push('manually backfilled earlier empty gap sorts into timeline; existing identities, preset keys and timestamps untouched');
-    await click('设置');await click('第2段添加健身');await click('保存模板');await click('应用到今日');
+    await click('设置','.journey-heading button');await click('第2段添加健身');await click('保存模板');await click('应用到今日');
     await until(()=>js("!document.querySelector('.journey-dialog')"));
-    const state=main.restMonitor.snapshot();state.status='recording';state.gymAvailable=true;
+    await until(()=>main.restMonitor.snapshot().progress?.gymAvailable===true);
+    const state=main.restMonitor.snapshot();state.status='recording';state.usage={day:state.progress.day,start:day,end:base+600000,totalSeconds:300,bilibili:300,xiaohongshu:0,hours:[],sessions:[],coverageStart:day};
     state.reminder={key:'synthetic-backfill/native-gym',kind:'focus',watchedMinutes:5,excessMinutes:0,completedCount:6};
     main.restPopup.update(state);win.webContents.send('focus:rest-state',state);
+    assert.equal(main.restPopup.snapshot().gymAvailable,true);
     await until(()=>{const popup=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().endsWith('/assets/rest-reminder.html'));return popup&&!popup.webContents.isLoadingMainFrame()});
     await wait(120);await main.restPopup.act({key:state.reminder.key,action:'gym'});
     const native=(await log()).events.at(-1);assert.equal(native.kind,'gym');assert.equal(native.endedAt,null);assert.ok(native.presetKey);
@@ -57,7 +59,7 @@ app.whenReady().then(async()=>{try{
     assert.equal(await js("document.querySelectorAll('.journey-tomato').length"),16);assert.equal((await focus()).active,null);
     checks.push('gym button finishes into adjustable defaults; exact edited times insert after six without count/timer changes');
     await click('吃饭记录');await click('吃完了');assert.equal(new Date(await js("document.querySelector('[aria-label=休息开始时间]').value")).getTime(),day+11*3600000);
-    await set('休息开始时间',day+8*3600000);await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/已有专注/);
+    await set('休息开始时间',day+8*3600000);await set('休息结束时间',day+8.75*3600000);await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/已有专注/);
     await set('休息开始时间',day+11*3600000);await set('休息结束时间',day+11.5*3600000);
     await js("window.normalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v2:'))return;return window.normalSet.call(this,k,v)};void 0");
     await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/未保存/);
