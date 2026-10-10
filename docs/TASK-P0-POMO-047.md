@@ -1,0 +1,12 @@
+# P0-POMO-047 时段补记与每日刷新
+
+- IN_PROGRESS；模块状态源；owner /root。用户2026-10-10明确要求本地实现：补记起止时间驱动默认时长/番茄数、独立手调数量；每日08:30复用生成今日番茄，原按钮显示成功实际刷新日期/星期/时分并可手动刷新。此请求授权产品内该每日生成操作，测试只合成飞书，不读取凭证/实际调用外部写入；本轮不发布、不安装、不重启用户App。
+- 基线3df299c961ca052de94bc172edb2b4a012a3dc45，实时fetch/check:sync相同canonical、preview80、clean/single worktree绿灯。分支task/p0-pomo-047-period-refresh；本clone与隔离合成测试profile/临时端口串行独占，不控制用户AW/Edge/生产服务。
+- 目标/语义：新补记先选择时段，默认分钟=有效跨度（向下两位小数），默认数量=floor(跨度/25分钟)，随后数量可0–100独立调整、不动起止/分钟；修改已保存记录继续遵原暂停上限和不膨胀守卫。每日08:30为App所在本地日期时钟（本机Asia/Hong_Kong）；App未运行/休眠则下一次启动/恢复补当天、不追补旧日、不唤醒系统；正在专注/确认、其他写入/初始化忙时等待。自动一次有界尝试，失败原位提示且用户手动重试，不自动高频重放。手动可重复刷新，每次成功更新实际完成时间。
+- 非目标：不重置历史、当日成果、旅程或实际计时；生成沿现有幂等补齐逻辑，不新增scheduler服务/系统开机项/自动更新/额外网络轮询，不改变飞书字段/schema/身份/权限，日标记只记录成功/尝试元数据而非第二计划真相源。
+- 四处预检：①ManualEntry changeCount→changeMinutes→setWhen导致用户问题；start也改end，end只改minutes。FocusApp生成现有同步锁/前后台反馈、refresh序列与snapshot，主进程FocusService.planWriting锁+Feishu.generateToday幂等、回读验证、不删旧成果。②沿用React16.14/Electron34.5.8/TS4.9.4，无新依赖/第三方关键语义变更；固定lib.dom.d.ts原生setTimeout、visibilityState/onfocus及已有onSuspend公开桥复用，main backgroundThrottling=false已有，generate.ts dayStart/dateKey同本地日。③manualRecord/manualWindow、taskSnapshot、silentgen、版本/提交helper；Learning039仅未来发布、042采集不命中，本次生成不改其缓存。④manual-category纯逻辑/category真实修正验收（暂停扣除）、silent-generate-desktop进度锁/成功回读/失败重试/窄布局，以及generate幂等原验收复用。
+- 允许写：本卡、docs/ACCEPTANCE-P0-POMO-047.md、CHANGELOG.md、docs/DEVELOPMENT.md仅产品刷新说明；ManualEntry.tsx、manualRecord.ts、FocusApp.tsx、HistoryPanel.tsx、focus.css仅标题按钮字号/表单排列；新dailyRefresh.ts与tests/daily-refresh.test.mjs、tests/auto-refresh-desktop.cjs、scripts/test-auto-refresh-desktop.cjs；tests/manual-category.test.mjs/category-review-desktop.cjs、silent-generate-desktop.cjs及必要受影响合成fixture；版本helper的electron/package.json和SettingsPanel.tsx。ignored artifacts仅合成证据。禁止其他产品/根仓文件、真实配置/凭证/用户数据写入。
+- 刷新标记按source分离、有界，持久化先验证写入回执再尝试自动生成；坏数据不覆盖、不假成功。尝试失败阻止同日自动反复，手动仍可重试；成功时间只在生成+看板完整刷新成功且source/日期仍相同时落盘。新日/换源不显示旧日期成功。单一低频本地timeout与focus/visibility/既有onSuspend恢复检查、卸载清理，不逐秒读写/请求。
+- 正反验收：140分钟默认5番茄，改成4/6/0保持起止/140；修改任一起止重新预填，不连动另一端，非法/未来/超600拒保存而有效时段正常保存。原编辑暂停上限/接受时长/分类/任务不损坏。08:29不生成、08:30一次、晚启动补一次/重启不重放、次日再一次、手动更新时间；失败不标成功/不循环而手动恢复仍通；异源/跨日不串记；busy/活动等待后正常通，生成中用户可开始专注且timer不改；窄列按钮完整原位、列比例不变；所有测试静默隔离，0真实飞书写入。
+- 预算/复核：本轮前台有界实现及验收，无常驻新进程/高频查询；同根因两次unknown停止该步骤。允许既有review_scientific_rest冻结源码+原始测试证据一次只读独立复核，不写、不操作用户App、不分派；不新建Agent。开工/检查点/提交复核status/worktree/canonical，实际冲突只停对应步骤。
+- 回滚：明确源码revert至基线，新刷新元数据键可忽略，原历史/旅程/任务不迁移；本轮不外部发布。Learning none预检：复用现有幂等生成/持久回执/手动修正路径，最终根据验证再判断。
