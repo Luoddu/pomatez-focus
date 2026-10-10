@@ -65,6 +65,7 @@ import {
   silentGenerateNotice,
 } from "./silentgen";
 import "./focus.css";
+import { readRefresh, writeRefresh, refreshDue, nextRefreshDelay, refreshLabel, RefreshStamp } from "./dailyRefresh";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
 const demo: FocusTask[] = [
@@ -413,6 +414,12 @@ export default function FocusApp() {
     text?: string;
   } | null>(null);
   const genActive = useRef(false);
+  const [dailyRefresh, setDailyRefresh] = useState<{ source: string | null; stamp: RefreshStamp | null; error?: boolean }>({ source: null, stamp: null });
+  useEffect(() => {
+    if (!sourceKey) { setDailyRefresh({ source: null, stamp: null }); return; }
+    try { setDailyRefresh({ source: sourceKey, stamp: readRefresh(localStorage, sourceKey) }); }
+    catch (e: any) { setDailyRefresh({ source: sourceKey, stamp: null, error: true }); notify(e.message, "error"); }
+  }, [sourceKey]);
   useEffect(() => {
     if (!api() || !api().onGenerateProgress) return;
     return api().onGenerateProgress((p: any) => {
@@ -552,6 +559,7 @@ export default function FocusApp() {
         // today() 完成四象限探测后重读 status，拿到命中结果
         const after = await api().status();
         if (sequence !== refreshSequence.current) return;
+        if (after.sourceKey !== status.sourceKey) throw Error("任务来源已变化，请重新刷新");
         setQuadrantField(after.quadrantField ?? null);
       } else {
         // Demo tasks are only appropriate once local mode is confirmed.
@@ -562,6 +570,7 @@ export default function FocusApp() {
             : demoTasks
         );
       }
+      return status.configured ? status.sourceKey : null;
     } finally {
       if (sequence === refreshSequence.current) setLoadingTasks(false);
     }
@@ -1074,7 +1083,7 @@ export default function FocusApp() {
   // 生成今日番茄：App 内原生走飞书 API，不弹任何外部窗口。
   // 点击后立即进入「连接飞书」阶段文字（乐观首帧），随后由主进程
   // 真实阶段事件推进；generating 锁 + 按钮 disabled 双重防重入
-  const generate = () => {
+  const generate = (automatic = false) => {
     if (genActive.current || generating || silentGenerating) return;
     if (genMock) {
       // 截图/设计稿 mock：按真实阶段顺序本地推进（无网络、不写任何数据）
@@ -1115,6 +1124,20 @@ export default function FocusApp() {
       notify("请先在设置中连接飞书，再生成今日番茄。", "error");
       return;
     }
+    if (!sourceKey) return;
+    const attemptSource = sourceKey, attemptDay = taskDay();
+    let stamp: RefreshStamp;
+    try {
+      const previous = readRefresh(localStorage, attemptSource);
+      // The synchronously persisted attempt prevents restart/focus event replays.
+      if (automatic && !refreshDue(Date.now(), previous)) return;
+      stamp = { source: attemptSource, attemptedAt: Date.now(), completedAt: previous?.completedAt || 0 };
+      writeRefresh(localStorage, stamp);
+      setDailyRefresh({ source: attemptSource, stamp });
+    } catch (e: any) {
+      setDailyRefresh({ source: attemptSource, stamp: null, error: true });
+      setGenStage({ stage: "error" }); notify(e.message, "error"); return;
+    }
     genActive.current = true;
     setGenStage({ stage: "connect" });
     const completeGeneration = (r: any) =>
@@ -1129,17 +1152,29 @@ export default function FocusApp() {
             ? "无可生成任务"
             : "已是最新",
       });
+    const generateAndRefresh = async () => {
+      const status = await api().status();
+      if (!status.configured || status.sourceKey !== attemptSource || taskDay() !== attemptDay)
+        throw Error("日期或任务来源已变化，请重新刷新");
+      const result = await api().generateToday();
+      setGenStage({ stage: "refresh" });
+      const loadedSource = await refresh();
+      if (loadedSource !== attemptSource || reviewSource.current !== attemptSource || taskDay() !== attemptDay)
+        throw Error("日期或任务来源已变化，请重新刷新");
+      const completed = { ...stamp, completedAt: Date.now() };
+      writeRefresh(localStorage, completed);
+      setDailyRefresh({ source: attemptSource, stamp: completed });
+      return result;
+    };
     // Background work keeps the board interactive; explicit clicks still get feedback.
-    if (shouldGenerateSilently(todayCount)) {
+    if (automatic || shouldGenerateSilently(todayCount)) {
       setSilentGenerating(true);
       (async () => {
         try {
-          const r = await api().generateToday();
-          setGenStage({ stage: "refresh" });
-          await refresh();
+          const r = await generateAndRefresh();
           completeGeneration(r);
           const notice = silentGenerateNotice(r);
-          if (notice) notify(notice);
+          if (notice && !automatic) notify(notice);
         } catch (e: any) {
           setGenStage({ stage: "error" });
           notify(
@@ -1157,7 +1192,7 @@ export default function FocusApp() {
     setGenStage({ stage: "connect" });
     run(async () => {
       try {
-        const r = await api().generateToday();
+        const r = await generateAndRefresh();
         const parts = [
           r.created > 0
             ? `已生成 ${r.created} 个今日番茄`
@@ -1173,8 +1208,6 @@ export default function FocusApp() {
           parts.push(`${r.blocked} 个任务数据不完整，已跳过`);
         if (r.capacityExceeded)
           parts.push(`超出建议日容量 ${r.capacityOverage} 个`);
-        setGenStage({ stage: "refresh" });
-        await refresh();
         completeGeneration(r);
         notify(parts.join("；") + "。");
       } catch (e) {
@@ -1186,6 +1219,33 @@ export default function FocusApp() {
       }
     });
   };
+  // One local wake-up, no network polling or per-second storage. Native resume,
+  // focus and visibility events catch sleep/clock changes; idle state catches deferrals.
+  useEffect(() => {
+    if (!connectionReady || !connected || !sourceKey || dailyRefresh.source !== sourceKey || genMock) return;
+    let wake: number | undefined;
+    const check = () => {
+      if (wake !== undefined) window.clearTimeout(wake);
+      const now = Date.now();
+      const blocked = busy || loadingTasks || syncBusy || generating || silentGenerating || !!active || queued.length > 0 || editQueue.entries.some(e => e.sourceKey === sourceKey);
+      const due = !dailyRefresh.error && refreshDue(now, dailyRefresh.stamp);
+      if (due && !blocked && !genActive.current) generate(true);
+      wake = window.setTimeout(check, due && blocked ? 60000 : nextRefreshDelay(now));
+    };
+    const visible = () => { if (document.visibilityState === "visible") check(); };
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", visible);
+    const unsubscribe = api()?.onSuspend?.(check);
+    check();
+    return () => {
+      if (wake !== undefined) window.clearTimeout(wake);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", visible);
+      unsubscribe?.();
+    };
+    // Callback reads this render's readiness; never depend on ticking elapsed seconds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionReady, connected, sourceKey, dailyRefresh, busy, loadingTasks, syncBusy, generating, silentGenerating, active?.id, active?.status, queueRevision, editRevision, genMock]);
   // Both directions persist exact intent before asynchronous Feishu writes.
   const adjust = (taskId: string, delta: 1 | -1) => {
     if (!api() || !connected) {
@@ -1811,7 +1871,8 @@ export default function FocusApp() {
             dayReviews={dayReviews}
             reviewState={reviewState}
             editingIds={editingIds}
-            onGenerate={generate}
+            onGenerate={() => generate()}
+            refreshedLabel={dailyRefresh.source === sourceKey ? refreshLabel(dailyRefresh.stamp) : ""}
             generating={generating || silentGenerating}
             genStageText={genStageText}
             genPercent={genPercent}

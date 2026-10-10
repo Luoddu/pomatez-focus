@@ -6,6 +6,7 @@ import {
   manualRecord,
   manualWindow,
   focusTimeLabel,
+  manualPeriodDefaults,
 } from "../manualRecord";
 
 // datetime-local 需要本地时区的 YYYY-MM-DDTHH:mm
@@ -67,6 +68,14 @@ export default function ManualEntry({
   const adjustWindow = (startValue: string, endValue: string) => {
     setError("");
     const { startedAt, endedAt } = timestamps(startValue, endValue);
+    if (!initial) {
+      const defaults = manualPeriodDefaults(startedAt, endedAt);
+      if (defaults) {
+        setMinutes(defaults.minutes);
+        setCount(defaults.count);
+      }
+      return;
+    }
     if (
       !initial ||
       !Number.isFinite(startedAt) ||
@@ -111,16 +120,11 @@ export default function ManualEntry({
     setMinutes(mins);
     setError("");
     setAdjusted(false);
-    if (!initial && Number.isFinite(mins))
-      setWhen(
-        localInputValue(new Date(endWhen).getTime() - mins * 60000)
-      );
   };
   const changeCount = (value: number) => {
     const next = Math.min(100, Math.max(0, Math.round(value) || 0));
     setCount(next);
-    // 零番茄仍可记录不足一颗的时长，保留用户此前填写的分钟。
-    if (!initial && next > 0) changeMinutes(next * 25);
+    // Independent estimate of output/effort, including zero; dates and minutes stay put.
   };
   const save = () => {
     const { startedAt, endedAt } = current;
@@ -210,6 +214,34 @@ export default function ManualEntry({
         </div>
       )}
       <div className="manual-row">
+        <label htmlFor="manual-when">开始时间</label>
+        <input
+          id="manual-when"
+          type="datetime-local"
+          value={when}
+          max={maxWhen}
+          step="1"
+          onChange={(e) => {
+            setWhen(e.target.value);
+            adjustWindow(e.target.value, endWhen);
+          }}
+        />
+      </div>
+      <div className="manual-row">
+        <label htmlFor="manual-end">结束时间</label>
+        <input
+          id="manual-end"
+          type="datetime-local"
+          step="1"
+          value={endWhen}
+          max={maxWhen}
+          onChange={(e) => {
+            setEndWhen(e.target.value);
+            adjustWindow(when, e.target.value);
+          }}
+        />
+      </div>
+      <div className="manual-row">
         <label>番茄数</label>
         <span className="stepper">
           <button
@@ -264,43 +296,6 @@ export default function ManualEntry({
           />
           分钟
         </span>
-      </div>
-      <div className="manual-row">
-        <label htmlFor="manual-when">开始时间</label>
-        <input
-          id="manual-when"
-          type="datetime-local"
-          value={when}
-          max={maxWhen}
-          step="1"
-          onChange={(e) => {
-            setWhen(e.target.value);
-            adjustWindow(e.target.value, endWhen);
-            const at = new Date(e.target.value).getTime();
-            if (!initial && Number.isFinite(at))
-              setEndWhen(localInputValue(at + minutes * 60000));
-          }}
-        />
-      </div>
-      <div className="manual-row">
-        <label htmlFor="manual-end">结束时间</label>
-        <input
-          id="manual-end"
-          type="datetime-local"
-          step="1"
-          value={endWhen}
-          max={maxWhen}
-          onChange={(e) => {
-            setEndWhen(e.target.value);
-            adjustWindow(when, e.target.value);
-            if (!initial)
-              setMinutes(
-                (new Date(e.target.value).getTime() -
-                  new Date(when).getTime()) /
-                  60000
-              );
-          }}
-        />
       </div>
       {initial &&
         Number.isFinite(available) &&

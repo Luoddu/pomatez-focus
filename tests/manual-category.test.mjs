@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   manualRecord,
   manualWindow,
+  manualPeriodDefaults,
 } from "../app/renderer/src/focus/manualRecord.ts";
 import {
   recolorSession,
@@ -15,6 +16,14 @@ import {
 } from "../app/renderer/src/focus/stats.ts";
 import { mergeCloudRecords } from "../app/renderer/src/focus/cloud.ts";
 import { EditQueue } from "../app/renderer/src/focus/editQueue.ts";
+test("period defaults floor 140 minutes to five tomatoes and reject invalid spans", () => {
+  const at = Date.parse("2026-10-10T08:20:28+08:00");
+  assert.deepEqual(manualPeriodDefaults(at, at + 140 * 60000), { minutes: 140, count: 5 });
+  assert.deepEqual(manualPeriodDefaults(at, at + 24 * 60000), { minutes: 24, count: 0 });
+  assert.deepEqual(manualPeriodDefaults(at, at + 1500123), { minutes: 25, count: 1 });
+  assert.equal(manualPeriodDefaults(NaN, at), null);
+  assert.equal(manualPeriodDefaults(at, at - 1), null);
+});
 import {
   saveReviews,
   loadReviews,

@@ -29,6 +29,7 @@ let calls = 0,
   fail = false,
   holdRefresh = false,
   refreshResume;
+let scheduledWarmup = true;
 FocusService.prototype.status = () => ({
   configured: true,
   sourceKey: "synthetic",
@@ -43,6 +44,7 @@ FocusService.prototype.today = async () => {
   return rows;
 };
 FocusService.prototype.generateToday = async function () {
+  if (scheduledWarmup) { scheduledWarmup = false; return { created: 0, eligibleTasks: 1, blocked: 0 }; }
   calls++;
   emit = (p) => this.onGenerateProgress?.(p);
   emit({ stage: "tasks" });
@@ -188,10 +190,7 @@ app.whenReady().then(async () => {
     resume();
     await until(async () => (await pct()) === 100);
     await until(() => js("!document.querySelector('.gen-track')"));
-    assert.equal(
-      await js("document.querySelector('.gen-label').textContent"),
-      "生成今日番茄"
-    );
+    assert.match(await js("document.querySelector('.gen-label').textContent"), /\d{1,2}\.\d{1,2} 周. \d{2}:\d{2}已刷新/);
     rows = [];
     win.webContents.reload();
     await until(() =>

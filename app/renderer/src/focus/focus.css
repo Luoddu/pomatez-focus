@@ -1060,6 +1060,10 @@ input:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.gen-btn.refreshed .gen-label {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 .gen-track {
   position: absolute;
   bottom: 0;

@@ -51,6 +51,7 @@ FocusService.prototype.history = () => client.history();
 FocusService.prototype.archiveHistory = (v) => client.archiveHistory(v);
 FocusService.prototype.recolorRecord = (v) => client.recolorRecord(v);
 FocusService.prototype.correctRecord = (v) => client.correctRecord(v);
+FocusService.prototype.generateToday = async () => ({ created: 0, eligibleTasks: 0, blocked: 0 });
 FocusService.prototype.dailyReviews = async () => ({
   sourceKey: source,
   summaries: {
@@ -350,6 +351,20 @@ app.whenReady().then(async () => {
     await click("补记");
     await until(() => js("Boolean(document.querySelector('#manual-name'))"));
     await input("#manual-name", "模拟临时命名番茄");
+    const period = await js(`(()=>{const fmt=n=>{const d=new Date(n);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)};const end=Date.now()-60000;return {start:fmt(end-140*60000),end:fmt(end)}})()`);
+    await input("#manual-when", period.start);
+    await input("#manual-end", period.end);
+    assert.equal(await js("Number(document.querySelector('#manual-minutes').value)"), 140);
+    assert.equal(await js("Number(document.querySelector('[aria-label=补记番茄数]').value)"), 5);
+    for (const count of [4, 6, 0, 5]) {
+      await input("[aria-label=补记番茄数]", String(count));
+      assert.deepEqual(await js("({start:document.querySelector('#manual-when').value,end:document.querySelector('#manual-end').value,minutes:Number(document.querySelector('#manual-minutes').value)})"), { ...period, minutes: 140 });
+    }
+    await input("#manual-end", period.start);
+    assert.equal(await js("Number(document.querySelector('[aria-label=补记番茄数]').value)"), 0);
+    await click("保存补记");
+    assert.ok(await js("Boolean(document.querySelector('.manual-error'))"));
+    await input("#manual-end", period.end);
     await click("保存补记");
     await until(() =>
       js(
@@ -359,6 +374,11 @@ app.whenReady().then(async () => {
     checks.push(
       "supplement accepts ad hoc typed name and explicit end without task selection"
     );
+    const savedPeriod = await js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).records.find(r=>r.task.title==='模拟临时命名番茄')");
+    assert.equal(savedPeriod.acceptedSeconds, 8400);
+    assert.equal(savedPeriod.completedCount, 5);
+    assert.equal(savedPeriod.endedAt - savedPeriod.startedAt, 8400000);
+    checks.push("period sets defaults; independent count including zero leaves both endpoints and duration; invalid span rejected, valid period persists");
     await click("统计");
     await until(() =>
       js("Boolean(document.querySelector('.stats-page'))")

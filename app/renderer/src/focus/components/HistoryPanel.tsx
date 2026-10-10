@@ -151,6 +151,7 @@ export default function HistoryPanel({
   reviewState = "loaded",
   editingIds = [],
   onGenerate,
+  refreshedLabel,
   generating,
   genStageText,
   genPercent,
@@ -178,6 +179,7 @@ export default function HistoryPanel({
   reviewState?: "loading" | "loaded" | "error";
   editingIds?: string[];
   onGenerate: () => void;
+  refreshedLabel: string;
   generating: boolean;
   genStageText: string;
   genPercent: number;
@@ -337,6 +339,7 @@ export default function HistoryPanel({
             <button
               className={`btn-text gen-btn overview-action${
                 generating ? " busy" : ""
+              }${refreshedLabel && !genStageText ? " refreshed" : ""
               }${genFailed ? " failed" : ""}${
                 genPercent === 100 ? " complete" : ""
               }`}
@@ -348,7 +351,7 @@ export default function HistoryPanel({
                         ? "（按步骤估算进度，非耗时百分比）"
                         : ""
                     }`
-                  : "生成今日番茄并刷新任务"
+                  : `${refreshedLabel || "每天08:30自动刷新"} · 点击手动刷新今日番茄`
               }
               disabled={refreshBusy || generating}
               onClick={onGenerate}
@@ -358,7 +361,7 @@ export default function HistoryPanel({
                 aria-live="polite"
                 aria-atomic="true"
               >
-                {genStageText || "生成今日番茄"}
+                {genStageText || refreshedLabel || "08:30自动刷新"}
               </span>
               {genStageText && (
                 <span

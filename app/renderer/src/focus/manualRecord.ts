@@ -1,5 +1,15 @@
 import type { FocusSession, FocusTask } from "./session";
 
+// The period owns both defaults; a later count edit never rewrites the period.
+export function manualPeriodDefaults(startedAt: number, endedAt: number) {
+  const seconds = (endedAt - startedAt) / 1000;
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return {
+    minutes: Math.floor(seconds / 60 * 100) / 100,
+    count: Math.min(100, Math.floor(seconds / 1500)),
+  };
+}
+
 // 表单预览与保存共用同一有效时间窗口；暂停不计入专注。
 export function manualWindow(
   initial: FocusSession | undefined,
