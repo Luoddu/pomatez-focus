@@ -1,9 +1,13 @@
 # P0-POMO-050 休息入口与补记验收
 
-- REVIEW；执行范围、默认发布授权、四处预检、正反门禁、回滚与资源见TASK-P0-POMO-050.md。基线67470b2，产品冻结9dd892a；仅独立番茄农场模块，未触碰真实App/profile/ActivityWatch/Edge/飞书、根私有仓或新增服务。
+- DONE；执行范围、默认发布授权、四处预检、正反门禁、回滚与资源见TASK-P0-POMO-050.md。基线67470b2，产品冻结9dd892a，安装运行源c6f424e08592c025677543361e6bae256a450894；仅独立番茄农场模块，未触碰真实App/profile/ActivityWatch/Edge/飞书、根私有仓或新增服务。
 - 已验证：吃饭/小憩/健身三个30px蓝色交互按钮；去事件沿单一正计时，已有同类结束直接收口；未先开始的结束打开起止补记，默认最近同来源专注/实际休息结束至现在，可调整。无可靠上一结束要求手填。补记不增加番茄、不改原专注计时、不自动恢复专注；按开始时完成数插入并依序消费同类预设，保留所有轮廓番茄。
 - 已验证：休息v2兼容只读v1，首次写v2精确回执，v1原字节保留；坏/空字节拒写。真实重叠/未来/倒置/异类进行中拒绝，合法已知暂停间隙、较早空档与跨午夜仍通；较早补记排序插入，旧事件ID/时间/预设键不变。未知旧专注缺可靠结束时间时拒绝推断，已知segments间隙正常。默认时间输入保留原毫秒，手调按用户值计算。
 - 已验证：p050-all-logic-final.txt逻辑319/319 PASS；p050-rest-logic.txt休息10/10含上述正反和v1保全。产品无新每秒I/O：复用单可见UI秒钟，隐藏停止；p050-rest-desktop.txt双进程8/8包括0逐秒写盘、receipt/pause/resume失败恢复、旧原生sleep与focus收口。p050-journey-desktop.txt旅程20/20；旧gym手动休息fixture迁至下班night，真实gym语义由新桌面链验证。
 - 已验证：p050-backfill-desktop.txt三进程9/9 PASS，rest-backfill-record/resume/empty.json原始回执；按钮/手调/重叠与失败回执、冷启动进行中gym、默认毫秒边界、较早空档、无锚点手填、真实原生gym IPC到实际记录及原free-focus收口、窄列布局与全程hidden/mute。fixture合成状态修正：gymAvailable必须使用生产progress字段；完整Usage而非仅day。两者是测试状态构造问题，没有修改产品守卫。
-- 独立复核：review_scientific_rest产品原始diff发现较早合法空档与未知旧暂停跨度两项P2，已修复并正反验证；最终源码/UI结论及安装包、公开发布与真实旧83更新证据待补齐。不将本地测试等同于公开交付完成。
+- 独立复核已验证：review_scientific_rest产品原始diff发现较早合法空档与未知旧暂停跨度两项P2，已修复并正反验证；最终产品9dd源码/UI PASS，c6增量仅已审fixture和本卡/验收文档。逻辑319、补记9、原休息8、旅程20原始证据均核对。
+- 已验证：p050-build-final.txt与p050-package.txt退出0，c6/preview.84/dirty=false；152个build文件逐一与ASAR一致，包内版本/原生提醒资源正确，成品hidden/mute隔离profile启动退出0。五附件setup/blockmap/preview.yml/source-version.json/SHA256SUMS.txt大小/SHA256、setup SHA512与feed一致，见release84-package-acceptance.json、p050-verify-package.txt。setup83589366字节，SHA256 1ca97483d1263a39e6b05779025273c18d7823efd42cd12d9a354f47067af417。固定Electron34.5.8、builder25.1.8、updater6.8.3未改变关键语义；复用049官方NSIS路径，仅生成安装版。独立152文件与五资产重算包源PASS。
+- 已发布：https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.84 。canonical非force同步c6，草稿先上传核验五附件后新annotated tag精确c6立即非draft/prerelease/nonLatest公开；草稿/公开五资产ID/size/digest一致，旧83日期/状态/资产不变，Latest仍51。原始release84-upload-result.json、release84-remote-draft.json/public.json、release84-old83-before.json、release84-latest-after.txt及p050-verify-draft/public.txt。
+- 已验证：真实旧83 FocusUpdater从冻结release84-old83.asar读取，source0377/preview.83已核；隔离静默Electron使用同版原生GitHub preview通道，发布前current83、发布后available84，setup URL/size/SHA512精确匹配公开feed；autoDownload=false、autoInstallOnAppQuit=false、下载/安装0、errors[]。见release84-before-update.json/live-update.json及p050-update-before/public.txt。未自动安装或重启用户App。
+- 最终交付独立复核PASS：review_scientific_rest回读原始公开五资产/固定tag及旧83真实更新回执，无阻断。其额外GH只读查询连接失败未重试，不宣称该查询成功；公开状态依据原始远端JSON与协调者实时成功核验。DONE检查点仅本卡/任务卡，安装tag及运行包保持c6不重建。
 - Learning none：落实本模块既有不可变事件/真实重叠与回执语义；合成fixture必须合法属于本次测试修正，没有新增第三方或跨任务通用机制证据。回滚保留原v1，源码显式revert；新发布使用新号，不替换83/tag/资产，不自动安装或重启用户App。
