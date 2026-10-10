@@ -284,9 +284,9 @@ app.whenReady().then(async () => {
       checks.push(
         "journey full overview width above science card, outer column preserved"
       );
-      await click("休息：健身", ".journey-stage button");
-      assert.equal((await plan()).resting, (await plan()).stages.find(s => s.restActions.includes("gym")).id);
-      await click("继续：健身", ".journey-stage button");
+      await click("休息：下班睡觉", ".journey-stage button");
+      assert.equal((await plan()).resting, (await plan()).stages.find(s => s.restActions.includes("night")).id);
+      await click("继续：下班睡觉", ".journey-stage button");
       assert.equal((await plan()).resting, null);
       checks.push("rest manually entered/continued without clock gate");
       await click("明天", ".journey-heading button");
@@ -383,17 +383,17 @@ app.whenReady().then(async () => {
       );
       await click("开始", ".journey-heading button");
       await until(async () => !!(await stored()).active);
-      await click("休息：健身", ".journey-stage button");
+      await click("休息：下班睡觉", ".journey-stage button");
       const resting = await plan(), paused = (await stored()).active;
       assert.equal(paused.status, "paused");
       await js(`window.originalFocusSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='pomatez-focus-v1')throw Error('Synthetic timer quota');return window.originalFocusSet.call(this,k,v)};void 0`);
-      await click("继续：健身", ".journey-stage button");
+      await click("继续：下班睡觉", ".journey-stage button");
       assert.equal((await stored()).active.status, "paused");
       assert.equal((await plan()).resting, resting.resting);
       assert.deepEqual((await plan()).passed, resting.passed);
       assert.match(await js(`document.querySelector('.journey-error').textContent`), /计时操作未保存|恢复未保存/);
       await js(`void (Storage.prototype.setItem=window.originalFocusSet)`);
-      await click("继续：健身", ".journey-stage button");
+      await click("继续：下班睡觉", ".journey-stage button");
       assert.equal((await stored()).active.id, paused.id);
       assert.equal((await stored()).active.status, "active");
       assert.equal((await plan()).resting, null);

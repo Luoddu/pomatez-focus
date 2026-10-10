@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { newJourney, journeyDay } from "../app/renderer/src/focus/journey.js";
-import { readRestLog, writeRestLog, restLogKey, openRest, startRest, closeRest, restClock, completedBeforeRest, validateRestLog } from "../app/renderer/src/focus/restLog.ts";
+import { readRestLog, writeRestLog, restLogKey, legacyRestLogKey, openRest, startRest, closeRest, restClock, completedBeforeRest, validateRestLog, restBackfillWindow, backfillRest } from "../app/renderer/src/focus/restLog.ts";
 const at = (d,h,m=0) => new Date(2026,9,d,h,m).getTime();
 const memory = () => { const m=new Map(); return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)}; };
 const plan = () => newJourney("A",journeyDay(at(10,12)),()=>"unused");
@@ -49,4 +49,45 @@ test("overlap, duplicate ids, backwards clock, malformed and oversized records r
   for(const change of [{afterCount:-1},{afterCount:1.5},{endedAt:at(10,11)},{startedAt:NaN}])
     assert.throws(()=>validateRestLog({...log,events:[{...log.events[0],...change}]},"A"));
   assert.throws(()=>validateRestLog({...log,events:Array(2049).fill(log.events[0])},"A"));
+});
+
+test("v1 is read without rewriting; gym persists in v2, corrupt old and new bytes stay intact",()=>{
+  const storage=memory(),p=plan();const old=JSON.stringify({version:1,scope:"A",events:[]});
+  storage.setItem(legacyRestLogKey("A"),old);
+  const initial=readRestLog(storage,"A");assert.equal(initial.version,2);assert.equal(storage.getItem(restLogKey("A")),null);
+  const gym=startRest(initial,p,"gym",at(10,16),10,"g");
+  const saved=writeRestLog(storage,gym);assert.equal(readRestLog(storage,"A").events[0].kind,"gym");
+  assert.equal(storage.getItem(legacyRestLogKey("A")),old);assert.deepEqual(saved,gym);
+  for(const key of [legacyRestLogKey("A"),restLogKey("A")]){
+    const broken=memory();broken.setItem(key,"");assert.throws(()=>writeRestLog(broken,initial));assert.equal(broken.getItem(key),"");
+  }
+});
+
+const record=(start,end,count=6)=>({status:"saved",startedAt:start,endedAt:end,completedCount:count,
+  task:{source:"feishu",sourceKey:"A"}});
+test("backfill defaults to most recent ended focus/rest, allows adjusted meal/nap/gym sequential presets",()=>{
+  const p=plan(),empty=readRestLog(memory(),"A"),r=record(at(10,9),at(10,11));
+  assert.deepEqual(restBackfillWindow(empty,[r],null,at(10,12)),{startedAt:at(10,11),endedAt:at(10,12)});
+  let log=backfillRest(empty,p,"meal",at(10,11,15),at(10,12),at(10,12),[r],null,"m1");
+  assert.equal(log.events[0].afterCount,6);assert.equal(log.events[0].startedAt,at(10,11,15));assert.equal(openRest(log),undefined);
+  assert.equal(restBackfillWindow(log,[r],null,at(10,13)).startedAt,at(10,12));
+  log=backfillRest(log,p,"nap",at(10,12),at(10,12,30),at(10,13),[r],null,"n");
+  log=backfillRest(log,p,"gym",at(10,16),at(10,17),at(10,18),[r],null,"g");
+  assert.ok(log.events[2].presetKey);assert.equal(log.events[2].kind,"gym");
+  log=backfillRest(log,p,"meal",at(10,18),at(10,18,30),at(10,19),[r],null,"m2");
+  assert.notEqual(log.events[0].presetKey,log.events[3].presetKey);
+});
+test("backfill rejects overlaps/future/running focus/open other rest, but paused gaps and cross-day remain valid",()=>{
+  const p=plan(),empty=readRestLog(memory(),"A"),r=record(at(10,9),at(10,11));
+  for(const [s,e] of [[at(10,10),at(10,12)],[at(10,13),at(10,12)],[at(10,12),at(10,14)]])
+    assert.throws(()=>backfillRest(empty,p,"meal",s,e,at(10,13),[r],null,"x"));
+  const paused={...r,status:"paused",endedAt:undefined,segments:[{start:at(10,9),end:at(10,10)},{start:at(10,11),end:at(10,12)}]};
+  const valid=backfillRest(empty,p,"nap",at(10,10),at(10,11),at(10,13),[],paused,"gap");
+  assert.equal(valid.events.length,1);
+  assert.throws(()=>backfillRest(empty,p,"nap",at(10,10),at(10,11),at(10,13),[],{...paused,status:"active"},"run"));
+  assert.throws(()=>backfillRest(startRest(empty,p,"meal",at(10,12),6,"m"),p,"nap",at(10,12),at(10,13),at(10,13),[],null,"open"));
+  assert.throws(()=>backfillRest(valid,p,"nap",at(10,10),at(10,11),at(10,13),[],null,"dup"));
+  assert.equal(restBackfillWindow(empty,[{...r,task:{source:"local",sourceKey:"A"}}],null,at(10,12)).startedAt,null);
+  const overnight=backfillRest(empty,p,"nap",at(10,23),at(11,1),at(11,2),[],null,"night");
+  assert.equal(overnight.events[0].endedAt,at(11,1));
 });

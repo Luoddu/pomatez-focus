@@ -23,7 +23,7 @@ import {
   RemovePlan,
 } from "./editQueue";
 import { recolorSession } from "./classification.js";
-import { Journey, journeyDay, readJourney, writeJourney, reconcileJourney, gymRestTarget } from "./journey.js";
+import { Journey, journeyDay, readJourney, reconcileJourney, gymRestTarget } from "./journey.js";
 import { loadReviews, saveReviews } from "./reviewCache";
 import {
   projectQuickTasks,
@@ -66,7 +66,7 @@ import {
 } from "./silentgen";
 import "./focus.css";
 import { readRefresh, writeRefresh, refreshDue, refreshAttempt, nextRefreshDelay, refreshLabel, RefreshStamp } from "./dailyRefresh";
-import { ActualRestKind, RestLog, readRestLog, writeRestLog, openRest, closeRest, startRest, completedBeforeRest } from "./restLog";
+import { ActualRestKind, RestLog, readRestLog, writeRestLog, openRest, closeRest, startRest, completedBeforeRest, restBackfillWindow, backfillRest } from "./restLog";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
 const demo: FocusTask[] = [
@@ -230,6 +230,10 @@ const demoHistory = (): FocusSession[] => {
     };
   });
 };
+const withActualGym = (plan: Journey, log: RestLog | null) => ({...plan,
+  passedActions:[...plan.passedActions, ...(log?.scope === plan.scope ? log.events.filter(e =>
+    e.kind === "gym" && e.presetKey && journeyDay(e.startedAt) === plan.day).map(e => e.presetKey!) : [])]});
+
 export default function FocusApp() {
   const timer = useContext(CounterContext);
   const [tasks, setTasks] = useState<FocusTask[]>(() =>
@@ -1553,6 +1557,22 @@ export default function FocusApp() {
     }
     setActualRestLog(persisted);
   };
+  const restWindow = () => {
+    if (!connectionReady || !timer.ready || timer.blocked) throw Error("旅程尚未就绪");
+    const snapshot = timer.getSnapshot(), log = readRestLog(localStorage, restScope);
+    if (openRest(log)) throw Error("请先结束当前休息，再补记其他事件");
+    if (snapshot.active?.status === "active" || snapshot.active?.status === "review")
+      throw Error("请先暂停或确认当前番茄，再补记休息");
+    return restBackfillWindow(log, snapshot.records, snapshot.active, Date.now());
+  };
+  const saveRestBackfill = (kind: ActualRestKind, startedAt: number, endedAt: number) => {
+    if (!connectionReady || !timer.ready || timer.blocked) throw Error("旅程尚未就绪");
+    const snapshot = timer.getSnapshot(), log = readRestLog(localStorage, restScope);
+    const plan = readJourney(localStorage, restScope, journeyDay(startedAt));
+    const next = backfillRest(log, plan, kind, startedAt, endedAt, Date.now(), snapshot.records,
+      snapshot.active, crypto.randomUUID());
+    setActualRestLog(writeRestLog(localStorage, next));
+  };
   const beginTask = (task: FocusTask) => {
     const previousId = timer.getSnapshot().active?.id;
     try {
@@ -1665,19 +1685,18 @@ export default function FocusApp() {
     // Projection remains available on tomorrow/compact views. No periodic I/O or new store.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionReady, timer.ready, timer.blocked, currentJourneyDay, currentJourneyScope, shownRecords, active?.id, reportJourney]);
-  const gymAvailable = useMemo(() => !!(connectionReady && journeyProjection && journeyProjection.day === currentJourneyDay && journeyProjection.scope === currentJourneyScope && gymRestTarget(journeyProjection, shownRecords)), [connectionReady, journeyProjection, currentJourneyDay, currentJourneyScope, shownRecords]);
+  const gymAvailable = useMemo(() => !!(connectionReady && journeyProjection && journeyProjection.day === currentJourneyDay &&
+    journeyProjection.scope === currentJourneyScope && gymRestTarget(withActualGym(journeyProjection, actualRestLog), shownRecords)),
+    [connectionReady, journeyProjection, currentJourneyDay, currentJourneyScope, actualRestLog, shownRecords]);
   const restState = useScientificRest(timer.records, timer.ready && !timer.blocked, gymAvailable);
   const goGym = gymAvailable ? () => {
     if (!timer.ready || timer.blocked || !connectionReady) throw Error("旅程尚未就绪");
     const snapshot = timer.getSnapshot();
     if (snapshot.active?.status === "review") throw Error("请先确认当前番茄");
     const previous = reconcileJourney(readJourney(localStorage, sourceKey || "local", journeyDay()), snapshot.records, snapshot.active);
-    const target = gymRestTarget(previous, snapshot.records);
+    const target = gymRestTarget(withActualGym(previous, readRestLog(localStorage, restScope)), snapshot.records);
     if (!target) throw Error("当前旅程没有可进入的健身节点");
-    const next = writeJourney(localStorage, {...previous, resting:target.stageId, restingAction:target.actionKey});
-    try { withRestEnd(() => timer.pause(), () => timer.getSnapshot().active?.status !== "active"); }
-    catch (error) { writeJourney(localStorage, previous); throw error; }
-    reportJourney(next); setJourneyRefresh(value => value + 1);
+    restAction("gym", false);
   } : undefined;
   const restReminder = <ScientificRestReminder state={restState} onSleep={() => {
     restAction("nap", false);
@@ -1872,6 +1891,8 @@ export default function FocusApp() {
               active: timer.active,
               restLog: actualRestLog?.scope === restScope ? actualRestLog : null,
               restAction,
+              restWindow,
+              saveRestBackfill,
               onPlan: reportJourney,
               refreshToken: journeyRefresh,
               begin: (target, sessionId) => {

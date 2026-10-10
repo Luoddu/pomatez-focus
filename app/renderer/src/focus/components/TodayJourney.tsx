@@ -25,7 +25,19 @@ import {
   JourneySettingsIcon,
 } from "./JourneyIcons";
 import JourneyTemplates from "./JourneyTemplates";
-import { ActualRestKind, RestEvent, RestLog, openRest, restClock } from "../restLog";
+import { ACTUAL_REST, ActualRestKind, RestEvent, RestLog, openRest, restClock } from "../restLog";
+
+const localTimeInput = (at: number) => {
+  const d = new Date(at);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,19);
+};
+type RestEntry = {kind:ActualRestKind; start:string; end:string; suggestedStart:number|null; suggestedEnd:number};
+const restEntryTimes = (entry: RestEntry) => ({
+  startedAt: entry.suggestedStart !== null && entry.start === localTimeInput(entry.suggestedStart)
+    ? entry.suggestedStart : new Date(entry.start).getTime(),
+  endedAt: entry.end === localTimeInput(entry.suggestedEnd) ? entry.suggestedEnd : new Date(entry.end).getTime(),
+});
 
 export type JourneyControls = {
   scope: string;
@@ -33,6 +45,8 @@ export type JourneyControls = {
   active: FocusSession | null;
   restLog: RestLog | null;
   restAction: (kind: ActualRestKind, finish: boolean) => void;
+  restWindow: () => { startedAt: number | null; endedAt: number };
+  saveRestBackfill: (kind: ActualRestKind, startedAt: number, endedAt: number) => void;
   begin: (task: FocusTask | null, sessionId: string) => void;
   change: (task: FocusTask | null) => boolean;
   pause: () => void;
@@ -58,6 +72,7 @@ export default function TodayJourney({
   const [settings, setSettings] = useState(false);
   const day = journeyDay(Date.now(), offset), scope = controls.scope;
   const [restMenu, setRestMenu] = useState<ActualRestKind | null>(null);
+  const [restEntry, setRestEntry] = useState<RestEntry | null>(null);
   const [restNow, setRestNow] = useState(Date.now());
   const ongoing = openRest(controls.restLog);
   useEffect(() => {
@@ -73,7 +88,7 @@ export default function TodayJourney({
     document.addEventListener("visibilitychange", syncVisibility);
     return () => { if (tick) clearInterval(tick); document.removeEventListener("visibilitychange", syncVisibility); };
   }, [ongoing, offset]);
-  useEffect(() => { setRestMenu(null); }, [scope, day]);
+  useEffect(() => { setRestMenu(null); setRestEntry(null); }, [scope, day]);
   useEffect(() => {
     if (!restMenu) return;
     const outside = (e: MouseEvent) => {
@@ -180,7 +195,7 @@ export default function TodayJourney({
   const actualRests = controls.restLog?.events.filter(e => journeyDay(e.startedAt) === day) || [];
   const restDetails = (event: RestEvent) => {
     const when = (at: number) => new Date(at).toLocaleTimeString("zh-CN", {hour12:false});
-    return `${event.kind === "meal" ? "吃饭" : "小憩"} · ${when(event.startedAt)}—${event.endedAt === null ? "进行中" : when(event.endedAt)} · ${restClock(event, restNow)} · 第${event.afterCount}个番茄后`;
+    return `${ACTUAL_REST[event.kind].label} · ${when(event.startedAt)}—${event.endedAt === null ? "进行中" : when(event.endedAt)} · ${restClock(event, restNow)} · 第${event.afterCount}个番茄后`;
   };
   const actualAt = (position: number) => actualRests
     .filter(e => Math.min(e.afterCount, slots.length) === position)
@@ -194,6 +209,13 @@ export default function TodayJourney({
       </button>
     </span>);
   const commitRest = (kind: ActualRestKind, finish: boolean) => attempt(() => {
+    if (finish && ongoing?.kind !== kind) {
+      const window = controls.restWindow();
+      setRestEntry({kind, start:window.startedAt === null ? "" : localTimeInput(window.startedAt), end:localTimeInput(window.endedAt),
+        suggestedStart:window.startedAt, suggestedEnd:window.endedAt});
+      setRestMenu(null);
+      return;
+    }
     controls.restAction(kind, finish);
     setRestMenu(null);
   });
@@ -311,8 +333,9 @@ export default function TodayJourney({
         throw e;
       }
     });
+  const restEntryKind = restEntry?.kind;
   useEffect(() => {
-    if (!edit && !settings) return;
+    if (!edit && !settings && !restEntryKind) return;
     const previous = document.activeElement as HTMLElement | null;
     const dialog =
       document.querySelector<HTMLElement>(".journey-dialog");
@@ -321,6 +344,7 @@ export default function TodayJourney({
       if (e.key === "Escape") {
         setEdit(null);
         setSettings(false);
+        setRestEntry(null);
       }
       if (e.key === "Tab" && dialog) {
         const items = Array.from(
@@ -344,7 +368,7 @@ export default function TodayJourney({
       document.removeEventListener("keydown", onKey);
       if (previous?.isConnected) previous.focus();
     };
-  }, [edit, settings]);
+  }, [edit, settings, restEntryKind]);
   return (
     <div
       className="card journey-card"
@@ -360,21 +384,21 @@ export default function TodayJourney({
         </strong>
         <span className="journey-heading-actions">
           {today && <span className="journey-rest-controls">
-            {(["meal", "nap"] as ActualRestKind[]).map(kind => <button key={kind}
+            {(["meal", "nap", "gym"] as ActualRestKind[]).map(kind => <button key={kind}
               className={`btn-text journey-rest-start${ongoing?.kind === kind ? " is-ongoing" : ""}`}
-              aria-label={kind === "meal" ? "吃饭记录" : "小憩记录"}
-              title={ongoing?.kind === kind ? restDetails(ongoing) : kind === "meal" ? "记录实际吃饭" : "记录实际小憩"}
+              aria-label={ACTUAL_REST[kind].record}
+              title={ongoing?.kind === kind ? restDetails(ongoing) : `记录实际${ACTUAL_REST[kind].label}`}
               aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
               onClick={() => { setRestMenu(restMenu === kind ? null : kind); setError(""); }}>
               <JourneyRestIcon kind={kind} />
               {ongoing?.kind === kind && <small role="timer">{restClock(ongoing, restNow)}</small>}
             </button>)}
-            {restMenu && <div className="journey-rest-menu" role="group" aria-label={restMenu === "meal" ? "吃饭选项" : "小憩选项"}>
+            {restMenu && <div className="journey-rest-menu" role="group" aria-label={`${ACTUAL_REST[restMenu].label}选项`}>
               <button className="btn-text" disabled={ongoing?.kind === restMenu} onClick={() => commitRest(restMenu, false)}>
-                {restMenu === "meal" ? "去吃饭" : "去睡觉"}
+                {ACTUAL_REST[restMenu].begin}
               </button>
-              <button className="btn-text" disabled={ongoing?.kind !== restMenu} onClick={() => commitRest(restMenu, true)}>
-                {restMenu === "meal" ? "吃完了" : "睡醒了"}
+              <button className="btn-text" onClick={() => commitRest(restMenu, true)}>
+                {ACTUAL_REST[restMenu].finish}
               </button>
             </div>}
           </span>}
@@ -562,7 +586,7 @@ export default function TodayJourney({
                             ? `${REST_LABELS[kind]}中 · 点击结束并继续`
                             : `${REST_LABELS[kind]} · 点击进入，不强制卡点`
                         }
-                        onClick={() => kind === "meal" || kind === "nap" ? setRestMenu(kind) : toggleRest(s.id, n)}
+                        onClick={() => kind === "meal" || kind === "nap" || kind === "gym" ? setRestMenu(kind) : toggleRest(s.id, n)}
                       >
                         <JourneyRestIcon kind={kind} />
                       </button>
@@ -579,6 +603,27 @@ export default function TodayJourney({
           {error}
         </p>
       )}
+      {restEntry && createPortal(
+        <div className="journey-overlay" onClick={() => setRestEntry(null)}>
+          <section className="journey-dialog journey-rest-dialog" role="dialog" aria-modal="true"
+            aria-label={`补记${ACTUAL_REST[restEntry.kind].label}`} onClick={e => e.stopPropagation()}>
+            <div className="journey-dialog-heading"><h3>补记{ACTUAL_REST[restEntry.kind].label}</h3>
+              <button className="btn-text" aria-label="关闭休息补记" onClick={() => setRestEntry(null)}>关闭</button></div>
+            <p className="journey-note">{restEntry.start ? "默认从上一事件结束算起，可以调整起止时间。" : "未找到上一事件，请填写实际开始时间。"}</p>
+            <label className="journey-label">开始时间<input aria-label="休息开始时间" type="datetime-local" step="1" value={restEntry.start}
+              onChange={e => { setRestEntry({...restEntry,start:e.target.value}); setError(""); }} /></label>
+            <label className="journey-label">结束时间<input aria-label="休息结束时间" type="datetime-local" step="1" value={restEntry.end}
+              onChange={e => { setRestEntry({...restEntry,end:e.target.value}); setError(""); }} /></label>
+            <p className="journey-note">时长 {Number.isFinite(restEntryTimes(restEntry).startedAt) && restEntryTimes(restEntry).endedAt > restEntryTimes(restEntry).startedAt
+              ? restClock(restEntryTimes(restEntry) as RestEvent) : "—"}</p>
+            {error && <p className="journey-error" role="alert">{error}</p>}
+            <div className="journey-dialog-actions"><button className="btn-primary" onClick={() => attempt(() => {
+              const times = restEntryTimes(restEntry);
+              controls.saveRestBackfill(restEntry.kind,times.startedAt,times.endedAt);
+              setRestEntry(null);
+            })}>保存休息补记</button><button className="btn-text" onClick={() => setRestEntry(null)}>取消</button></div>
+          </section>
+        </div>,document.body)}
       {(selected || settings) &&
         createPortal(
           <div

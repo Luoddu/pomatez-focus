@@ -4597,13 +4597,17 @@ button.stats-range-label:hover {
 .journey-heading-actions { display:flex; align-items:center; gap:14px; }
 .journey-heading-actions button { color:var(--muted); display:grid; place-items:center; min-width:18px; height:20px; }
 .journey-heading-actions { gap:10px; }
-.journey-rest-controls { display:flex; align-items:center; gap:8px; position:relative; }
-.journey-heading-actions .journey-rest-start { display:flex; align-items:center; gap:4px; height:24px; min-width:24px; }
+.journey-rest-controls { display:flex; align-items:center; gap:5px; position:relative; }
+.journey-heading-actions .journey-rest-start { display:flex; align-items:center; justify-content:center; gap:4px; height:30px; min-width:30px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background:var(--card); }
+.journey-rest-start .journey-rest-icon { width:18px; height:18px; }
+.journey-heading-actions .journey-rest-start:hover, .journey-heading-actions .journey-rest-start[aria-expanded="true"], .journey-heading-actions .journey-rest-start.is-ongoing { color:var(--blue); border-color:var(--blue); background:var(--blue-soft); }
 .journey-rest-start small { font-size:10px; font-variant-numeric:tabular-nums; }
 .journey-rest-start.is-ongoing, .journey-rest-button.is-ongoing { color:var(--blue); }
-.journey-rest-menu { position:absolute; z-index:20; top:28px; right:0; display:flex; gap:5px; padding:6px; white-space:nowrap; background:var(--card); border:1px solid var(--border); border-radius:8px; box-shadow:0 3px 12px #0001; }
+.journey-rest-menu { position:absolute; z-index:20; top:35px; right:0; display:flex; gap:5px; padding:6px; white-space:nowrap; background:var(--card); border:1px solid var(--blue); border-radius:8px; box-shadow:0 3px 12px #0001; }
 .journey-heading-actions .journey-rest-menu button { height:28px; padding:3px 8px; }
 .journey-rest-menu button:disabled { opacity:.4; cursor:default; }
+.journey-rest-dialog { max-width:420px; }
+.journey-rest-dialog input { width:100%; min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; color:var(--text); background:var(--card); }
 .journey-stages { display:flex; align-items:center; gap:3px; max-height:none; overflow-x:auto; overflow-y:hidden; margin:4px 0 0; padding:14px 1px 6px; scrollbar-width:thin; }
 .journey-stage { display:flex; align-items:center; flex:none; gap:3px; border:0; padding:0; }
 .journey-slots { flex-wrap:nowrap; gap:1px; min-height:24px; }

@@ -2,7 +2,12 @@ import type { FocusSession } from "./session";
 import type { Journey } from "./journey.js";
 import { journeyDay, restActions } from "./journey.js";
 
-export type ActualRestKind = "meal" | "nap";
+export type ActualRestKind = "meal" | "nap" | "gym";
+export const ACTUAL_REST = {
+  meal: { label:"吃饭", record:"吃饭记录", begin:"去吃饭", finish:"吃完了" },
+  nap: { label:"小憩", record:"小憩记录", begin:"去睡觉", finish:"睡醒了" },
+  gym: { label:"健身", record:"健身记录", begin:"去健身", finish:"练完了" },
+};
 export type RestEvent = {
   id: string;
   kind: ActualRestKind;
@@ -11,21 +16,22 @@ export type RestEvent = {
   afterCount: number;
   presetKey: string | null;
 };
-export type RestLog = { version: 1; scope: string; events: RestEvent[] };
+export type RestLog = { version: 2; scope: string; events: RestEvent[] };
 const MAX_EVENTS = 2048;
 const timestamp = (n: unknown): n is number =>
   Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) <= 8640000000000000;
 const text = (s: unknown, max: number): s is string =>
   typeof s === "string" && s.length > 0 && s.length <= max;
-export const restLogKey = (scope: string) => `pomatez-rest-log-v1:${encodeURIComponent(scope)}`;
+export const restLogKey = (scope: string) => `pomatez-rest-log-v2:${encodeURIComponent(scope)}`;
+export const legacyRestLogKey = (scope: string) => `pomatez-rest-log-v1:${encodeURIComponent(scope)}`;
 export function validateRestLog(raw: any, scope: string): RestLog {
-  if (!text(scope, 1000) || raw?.version !== 1 || raw.scope !== scope ||
+  if (!text(scope, 1000) || ![1,2].includes(raw?.version) || raw.scope !== scope ||
       !Array.isArray(raw.events) || raw.events.length > MAX_EVENTS)
     throw Error("休息记录损坏，原记录已保留");
   const ids = new Set<string>();
   let previousEnd = 0;
   const events = raw.events.map((e: any, index: number): RestEvent => {
-    if (!text(e?.id, 100) || ids.has(e.id) || !["meal", "nap"].includes(e.kind) ||
+    if (!text(e?.id, 100) || ids.has(e.id) || !(raw.version === 1 ? ["meal", "nap"] : ["meal", "nap", "gym"]).includes(e.kind) ||
         !timestamp(e.startedAt) || e.startedAt < previousEnd ||
         !(e.endedAt === null || (timestamp(e.endedAt) && e.endedAt >= e.startedAt)) ||
         (e.endedAt === null && index !== raw.events.length - 1) ||
@@ -37,13 +43,18 @@ export function validateRestLog(raw: any, scope: string): RestLog {
     return { id:e.id, kind:e.kind, startedAt:e.startedAt, endedAt:e.endedAt,
       afterCount:e.afterCount, presetKey:e.presetKey };
   });
-  return { version:1, scope, events };
+  return { version:2, scope, events };
 }
 export function readRestLog(storage: Storage, scope: string): RestLog {
-  const raw = storage.getItem(restLogKey(scope));
-  if (raw === null) return validateRestLog({version:1, scope, events:[]}, scope);
+  const current = storage.getItem(restLogKey(scope));
+  const raw = current === null ? storage.getItem(legacyRestLogKey(scope)) : current;
+  if (raw === null) return validateRestLog({version:2, scope, events:[]}, scope);
   if (raw.length > 600000) throw Error("休息记录过大，原记录已保留");
-  try { return validateRestLog(JSON.parse(raw), scope); }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed.version !== (current === null ? 1 : 2)) throw Error("Invalid storage version");
+    return validateRestLog(parsed, scope);
+  }
   catch (_) { throw Error("休息记录损坏，原记录已保留"); }
 }
 export function writeRestLog(storage: Storage, log: RestLog): RestLog {
@@ -85,4 +96,40 @@ export function restClock(event: RestEvent, now = Date.now()): string {
   const seconds = Math.max(0, Math.floor(((event.endedAt ?? now) - event.startedAt) / 1000));
   const mins = Math.floor(seconds / 60), tail = String(seconds % 60).padStart(2, "0");
   return mins < 60 ? `${String(mins).padStart(2,"0")}:${tail}` : `${Math.floor(mins/60)}:${String(mins%60).padStart(2,"0")}:${tail}`;
+}
+
+const inScope = (r: FocusSession, scope: string) =>
+  scope === "local" ? r.task.source === "local" : r.task.source === "feishu" && r.task.sourceKey === scope;
+const intervals = (r: FocusSession) => r.segments ??
+  (r.endedAt === undefined ? [] : [{start:r.startedAt, end:r.endedAt}]);
+
+export function restBackfillWindow(log: RestLog, records: FocusSession[], active: FocusSession | null,
+  now: number): { startedAt: number | null; endedAt: number } {
+  const ended = validateRestLog(log, log.scope).events.map(e => e.endedAt).filter(timestamp);
+  for (const r of [...records, ...(active ? [active] : [])]) {
+    if (!inScope(r, log.scope)) continue;
+    if (timestamp(r.endedAt)) ended.push(r.endedAt);
+    for (const s of intervals(r)) if (timestamp(s.end)) ended.push(s.end);
+  }
+  const past = ended.filter(at => at <= now);
+  return { startedAt:past.length ? Math.max(...past) : null, endedAt:now };
+}
+
+export function backfillRest(log: RestLog, plan: Journey, kind: ActualRestKind,
+  startedAt: number, endedAt: number, now: number, records: FocusSession[],
+  active: FocusSession | null, id: string): RestLog {
+  if (!timestamp(startedAt) || !timestamp(endedAt) || !timestamp(now) || endedAt <= startedAt || endedAt > now)
+    throw Error("请选择有效的起止时间，结束须晚于开始且不能在未来");
+  if (openRest(log)) throw Error("请先结束当前休息，再补记其他事件");
+  if (startedAt < (log.events[log.events.length - 1]?.endedAt ?? 0))
+    throw Error("这段时间已有休息记录，请调整休息起止时间");
+  if (active?.status === "active" || active?.status === "review")
+    throw Error("请先暂停或确认当前番茄，再补记休息");
+  for (const r of [...records, ...(active ? [active] : [])]) {
+    if (!inScope(r, log.scope)) continue;
+    if (intervals(r).some(s => startedAt < s.end && endedAt > s.start))
+      throw Error("这段时间已有专注记录，请调整休息起止时间");
+  }
+  const next = startRest(log, plan, kind, startedAt, completedBeforeRest(records, log.scope, startedAt), id);
+  return closeRest(next, endedAt);
 }

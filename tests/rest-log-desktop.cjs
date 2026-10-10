@@ -16,11 +16,11 @@ app.whenReady().then(async()=>{try{
   assert.equal(win.isVisible(),false);assert.equal(win.webContents.isAudioMuted(),true);
   const js=s=>win.webContents.executeJavaScript(s,true),checks=[];
   const click=(text,selector="button")=>js(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(selector)})].find(b=>b.textContent.trim()===${JSON.stringify(text)}||b.getAttribute('aria-label')===${JSON.stringify(text)});if(!b||b.disabled)throw Error('unavailable '+${JSON.stringify(text)});b.click()})()`);
-  const log=()=>js(`JSON.parse(localStorage.getItem('pomatez-rest-log-v1:${source}'))`);
+  const log=()=>js(`JSON.parse(localStorage.getItem('pomatez-rest-log-v2:${source}'))`);
   const focus=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
   if(process.env.POMO_REST_PHASE === "diagnose") {
     await wait(1500);
-    console.log("READONLY_SYNTHETIC_DIAG",await js("({text:document.body.textContent.slice(-1800),rest:localStorage.getItem('pomatez-rest-log-v1:synthetic-rest-log'),focus:localStorage.getItem('pomatez-focus-v1')})"));
+    console.log("READONLY_SYNTHETIC_DIAG",await js("({text:document.body.textContent.slice(-1800),rest:localStorage.getItem('pomatez-rest-log-v2:synthetic-rest-log'),focus:localStorage.getItem('pomatez-focus-v1')})"));
     clearTimeout(deadline); app.exit(0); return;
   }
   await until(()=>js("document.querySelectorAll('.journey-tomato[data-complete=true]').length===6&&!document.querySelector('[aria-label=吃饭记录]').disabled"));
@@ -31,7 +31,7 @@ app.whenReady().then(async()=>{try{
     const resumedAt=Math.max(Date.now(),previous.events[4].startedAt)+15000;
     await js(`(()=>{window.__restClock=${resumedAt};const Original=Date;window.Date=class extends Original{constructor(...args){args.length?super(...args):super(window.__restClock)}static now(){return window.__restClock}}})()`);
     try { await until(()=>js("!!document.querySelector('[aria-label=吃饭记录] [role=timer]')")); }
-    catch(error) { console.error("Synthetic restart diagnostic",await js("({text:document.body.textContent.slice(-1400),rest:localStorage.getItem('pomatez-rest-log-v1:synthetic-rest-log'),focus:localStorage.getItem('pomatez-focus-v1')})"));throw error; }
+    catch(error) { console.error("Synthetic restart diagnostic",await js("({text:document.body.textContent.slice(-1400),rest:localStorage.getItem('pomatez-rest-log-v2:synthetic-rest-log'),focus:localStorage.getItem('pomatez-focus-v1')})"));throw error; }
     await click("吃饭记录");await click("吃完了");assert.ok((await log()).events[4].endedAt);assert.equal((await log()).events.length,5);
     assert.equal((await focus()).records.filter(r=>r.id===seed.id).length,1);
     checks.push("cold process restores ongoing actual meal; explicit finish preserves five records and single focus seed");
@@ -48,7 +48,7 @@ app.whenReady().then(async()=>{try{
     assert.equal((await log()).events[5].endedAt,resumedAt);assert.equal(win.isVisible(),false);
     assert.equal(win.webContents.isAudioMuted(),true);checks.push("native reminder IPC sleep action records nap; original free-focus button closes it, hidden and muted throughout");
   }else{
-    const base=Date.now();await js(`(()=>{window.__restClock=${base};const Original=Date;window.Date=class extends Original{constructor(...args){args.length?super(...args):super(window.__restClock)}static now(){return window.__restClock}};window.__writes=0;window.__originalRestSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v1:'))window.__writes++;return window.__originalRestSet.call(this,k,v)}})()`);
+    const base=Date.now();await js(`(()=>{window.__restClock=${base};const Original=Date;window.Date=class extends Original{constructor(...args){args.length?super(...args):super(window.__restClock)}static now(){return window.__restClock}};window.__writes=0;window.__originalRestSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v2:'))window.__writes++;return window.__originalRestSet.call(this,k,v)}})()`);
     const advance=async seconds=>{await js(`window.__restClock=${base+seconds*1000};void 0`);await wait(1100)};
     await click("吃饭记录");await click("去吃饭");let first=await log();assert.equal(first.events[0].afterCount,6);assert.equal(first.events[0].presetKey,mealKeys[0]);
     const order=await js("[...document.querySelectorAll('.journey-tomato,[data-rest-event]')].map(e=>({tomato:!!e.dataset.journeySlot,event:e.dataset.restEvent}))");
@@ -69,7 +69,7 @@ app.whenReady().then(async()=>{try{
     await js("Storage.prototype.setItem=window.__focusSet;void 0");
     await click("去吃饭");await until(()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).active?.status==='paused'"));current=await log();assert.equal(current.events[2].presetKey,mealKeys[1]);assert.deepEqual(current.events[0],firstCompleted);
     checks.push("failed timer pause rolls back rest; successful second meal matches second preset and pauses same focus");
-    const unchanged=JSON.stringify(current);await js("window.__normalRestSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v1:'))return;return window.__normalRestSet.call(this,k,v)};void 0");
+    const unchanged=JSON.stringify(current);await js("window.__normalRestSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v2:'))return;return window.__normalRestSet.call(this,k,v)};void 0");
     await click("吃饭记录");await click("吃完了");assert.equal(JSON.stringify(await log()),unchanged);assert.match(await js("document.querySelector('.journey-error').textContent"),/未保存/);
     await js("Storage.prototype.setItem=window.__normalRestSet;void 0");await click("吃完了");assert.ok((await log()).events[2].endedAt);
     await click("吃饭记录");await click("去吃饭");const open=await log();assert.equal(open.events.length,4);
