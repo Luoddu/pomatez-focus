@@ -1,0 +1,10 @@
+# P0-POMO-050 休息入口与结束补记
+
+- IN_PROGRESS；模块状态源；owner /root，根实现者，仅独立工具。用户要求优化今日旅程休息按钮、补健身，并确认直接结束采用类似补记：默认上一事件结束至现在，允许手动调整；既有默认推送授权适用。基线67470b28fd32a48de4dad82af1d3c2fd4dfabd61，实时canonical相同、preview83，干净单worktree串行task/p0-pomo-050-rest-backfill。
+- 目标：三个一致可点击的吃饭/小憩/健身按钮，清晰图标、蓝色交互边框和菜单。去→原位正计时、结束→已有同类事件收口；未先开始则显示起止补记小窗，默认最近已结束同来源专注/实际休息的结束时间和现在，可调起止，保存后按开始时完成数插入、依序替代同类预设。不影响整体列比例、模板轮廓、原专注计数与计时所有权。native健身与旅程健身复用同入口，当前实时秒钟仍一个可见UI interval。
+- 范围/资源：允许本卡、docs/ACCEPTANCE-P0-POMO-050.md、docs/DAILY-JOURNEY.md、CHANGELOG.md，restLog.ts、TodayJourney.tsx、FocusApp.tsx、focus.css；tests/rest-log.test.mjs、tests/rest-log-desktop.cjs、tests/journey-desktop.cjs（旧gym语义fixture按新入口适配），必要新tests/rest-backfill-desktop.cjs及scripts/test-rest-backfill-desktop.cjs；版本helper仅app/electron/package.json、SettingsPanel.tsx。ignored artifacts仅合成profile/证据/安装包。禁止根共享控制文件、真实用户profile/AW/Edge/飞书API、FocusSession持久schema/网络/新服务/其他功能。独占本clone/build/dist与各隔离测试profile，不与其他写者并行。
+- 四处预检：①83的ActualRestKind只有meal/nap，finish无进行中被禁用且root抛错，gym走旧plan.resting无起止；按钮仅24px/15px图标。②不改变第三方关键语义，沿React16.14原生表单、Electron34.5.8已有静默测试与发布；项目自有事件算法无需外部调研，发布固定builder25.1.8/updater6.8.3官方证据复用049。③复用restLog回执/不重叠/顺序预设、completedBeforeRest、journeyDay、唯一timer与ManualEntry本地datetime格式，Learning039发布门禁适用，042采集未改不适用。④048/049实际休息8、补记9、journey20和314逻辑验收，补gym正反、补记默认/手调/无锚点/重叠/来源/跨日/恢复失败与旧存储保全。
+- 持久边界：新gym类型采用休息v2独立键；v2不存在时只读兼容v1饭/小憩，首次写v2并精确回读，v1原字节保留，坏/空字节拒写，旧App仍能读取v1。一个同来源进行中事件；结束补记不改已有结束记录、不覆盖专注时段、不推断未结束异类事件。没有上一结束不编造8点或默认时长，提示手填。已有其他进行中则明确先结束或使用去事件自动接续；运行中专注须先暂停/确认才补记，正常暂停间隙可补，不改变已记录实际专注。
+- 正反验收：三类去/结束菜单可用、顺序替代且保留未完成轮廓；同类已有计时直接结束不弹补记，没开始能起止预填与手动调整保存，未来/倒置/重叠拒绝但合法间隙与跨午夜仍通；无上一事件要求手填且可成功；补记不新增番茄/不重写计时、不默认恢复focus；v1有效无损升级、坏v1/v2原字节不覆盖、正常写/冷启动可用；实时秒数无逐秒I/O、隐藏停止；窄列三按钮与表单可点击且原外列比例不变；静默native gym路径真实记录；新五安装资产/固定源码、旧83真实更新可检测且0下载/安装、旧83资产不变。
+- 预算/停止/复核：一次前台有界交付，根因不明同因两次停止相应步骤，范围外记录不修；不创建常驻进程/任务。允许复用已有review_scientific_rest对冻结源码/原始证据/包与公开结果独立只读review，不新建Agent/再分派，不运行用户App。发布复用049资产先齐、tag立即公开、真实旧83更新，全程静默。
+- 回滚：允许文件显式恢复67470b2；原v1休息字节不动、v2新键旧版忽略，FocusSession/飞书计数不迁移；发布修复用新号，旧tag/资产不改、不force、不自动安装。Learning预判none：沿已有回执/事件日志与表单，检查点后根据证据再判。
