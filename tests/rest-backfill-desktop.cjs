@@ -14,19 +14,30 @@ app.whenReady().then(async()=>{try{
   const click=(text,selector='button')=>js(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(selector)})].find(b=>b.textContent.trim()===${JSON.stringify(text)}||b.getAttribute('aria-label')===${JSON.stringify(text)});if(!b||b.disabled)throw Error('unavailable '+${JSON.stringify(text)});b.click()})()`);
   const set=async(label,at)=>js(`(()=>{const input=document.querySelector('[aria-label="${label}"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(localInput(at))});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   const log=()=>js(`JSON.parse(localStorage.getItem('pomatez-rest-log-v2:${source}'))`),focus=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
+  const assertRestState=async(kind,state)=>{
+    const rendered=await js(`(()=>{const b=document.querySelector('.journey-rest-start[data-rest-kind="${kind}"]'),nodes=[...document.querySelectorAll('[data-rest-event][data-rest-kind="${kind}"]')],n=nodes[nodes.length-1];return {header:b.dataset.restState,lit:!!b.querySelector('.is-lit'),timer:!!b.querySelector('[role=timer]'),node:n?.dataset.restState,color:n&&getComputedStyle(n).color,background:n&&getComputedStyle(n).backgroundColor,label:n?.getAttribute('aria-label'),napFill:n?.querySelector('g')&&getComputedStyle(n.querySelector('g')).fill}})()`);
+    assert.equal(rendered.header,state);assert.equal(rendered.lit,state!=='planned');assert.equal(rendered.timer,state==='ongoing');
+    if(state!=='planned'){assert.equal(rendered.node,state);assert.equal(rendered.color,state==='ongoing'?'rgb(76, 111, 255)':'rgb(24, 129, 79)');assert.notEqual(rendered.background,'rgba(0, 0, 0, 0)');assert.match(rendered.label,state==='ongoing'?/正在进行/:/已完成/);if(kind==='nap')assert.equal(rendered.napFill,rendered.color);}
+  };
   await until(()=>js(`document.querySelectorAll('.journey-tomato[data-complete=true]').length===${process.env.POMO_BACKFILL_PHASE==='empty'?0:6}&&!document.querySelector('[aria-label=健身记录]').disabled`));
   assert.equal(win.isVisible(),false);assert.equal(win.webContents.isAudioMuted(),true);
   await js(`(()=>{window.__now=${base};const Base=Date;window.Date=class extends Base{constructor(...args){args.length?super(...args):super(window.__now)}static now(){return window.__now}}})()`);
   if(process.env.POMO_BACKFILL_PHASE==='empty'){
+    for(const kind of ['meal','nap','gym'])await assertRestState(kind,'planned');
     await click('小憩记录');await click('睡醒了');assert.equal(await js("document.querySelector('[aria-label=休息开始时间]').value"),'');
     await click('保存休息补记');assert.equal(await log(),null);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/有效/);
     await set('休息开始时间',day+12*3600000);await set('休息结束时间',base+600000);await click('保存休息补记');assert.equal(await log(),null);
     await set('休息结束时间',day+12.5*3600000);await click('保存休息补记');assert.equal((await log()).events[0].afterCount,0);assert.equal((await focus()).active,null);
+    await assertRestState('nap','completed');await assertRestState('meal','planned');await assertRestState('gym','planned');
+    checks.push('manual nap backfill fills ZZZ and lights only actual nap; untouched meal and gym remain outlines');
     checks.push('no previous event requires manual start; missing/future refused, explicit legitimate nap saved without invented start or tomatoes');
   }else if(process.env.POMO_BACKFILL_PHASE==='resume'){
     const saved=await log();assert.equal(saved.events.length,4);assert.equal(saved.events[3].kind,'gym');assert.equal(saved.events[3].endedAt,null);
+    await assertRestState('gym','ongoing');await assertRestState('meal','completed');await assertRestState('nap','completed');
     await click('健身记录');await click('练完了');assert.ok((await log()).events[3].endedAt);assert.equal((await log()).events.length,4);
     assert.equal(await js("!!document.querySelector('.journey-rest-dialog')"),false);
+    await assertRestState('gym','completed');
+    checks.push('cold startup restores all three highlights; ongoing gym is blue and finishing makes it green without a timer');
     checks.push('cold process restores gym; finish closes same event without backfill or added tomatoes');
     await js(`window.__now=${base+600000};void 0`);
     await click('吃饭记录');await click('吃完了');await click('保存休息补记');
@@ -46,28 +57,43 @@ app.whenReady().then(async()=>{try{
     await until(()=>{const popup=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().endsWith('/assets/rest-reminder.html'));return popup&&!popup.webContents.isLoadingMainFrame()});
     await wait(120);await main.restPopup.act({key:state.reminder.key,action:'gym'});
     const native=(await log()).events.at(-1);assert.equal(native.kind,'gym');assert.equal(native.endedAt,null);assert.ok(native.presetKey);
+    await assertRestState('gym','ongoing');
     await js("document.querySelector('.btn-begin').click()");await until(()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).active?.status==='active'"));
     assert.ok((await log()).events.at(-1).endedAt);assert.equal(win.isVisible(),false);
+    await assertRestState('gym','completed');
     checks.push('visual template supplies native gym option; real IPC records actual gym, then original free focus closes it');
   }else{
     assert.equal(await js("document.querySelectorAll('.journey-rest-start').length"),3);
+    for(const kind of ['meal','nap','gym'])await assertRestState(kind,'planned');
     await click('健身记录');await click('练完了');await until(()=>js("!!document.querySelector('.journey-rest-dialog')"));
     const defaults=await js("[...document.querySelectorAll('.journey-rest-dialog input')].map(i=>i.value)");
     assert.equal(new Date(defaults[0]).getTime(),seed.endedAt);assert.equal(new Date(defaults[1]).getTime(),Math.floor(base/1000)*1000);
     await set('休息开始时间',day+10*3600000);await set('休息结束时间',day+11*3600000);
     await click('保存休息补记');let saved=await log();assert.equal(saved.events[0].kind,'gym');assert.equal(saved.events[0].startedAt,day+10*3600000);assert.equal(saved.events[0].endedAt,day+11*3600000);assert.equal(saved.events[0].afterCount,6);assert.ok(saved.events[0].presetKey);
     assert.equal(await js("document.querySelectorAll('.journey-tomato').length"),16);assert.equal((await focus()).active,null);
+    await assertRestState('gym','completed');await assertRestState('meal','planned');
     checks.push('gym button finishes into adjustable defaults; exact edited times insert after six without count/timer changes');
     await click('吃饭记录');await click('吃完了');assert.equal(new Date(await js("document.querySelector('[aria-label=休息开始时间]').value")).getTime(),day+11*3600000);
     await set('休息开始时间',day+8*3600000);await set('休息结束时间',day+8.75*3600000);await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/已有专注/);
     await set('休息开始时间',day+11*3600000);await set('休息结束时间',day+11.5*3600000);
     await js("window.normalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v2:'))return;return window.normalSet.call(this,k,v)};void 0");
     await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/未保存/);
+    await assertRestState('meal','planned');
     await js("Storage.prototype.setItem=window.normalSet;void 0");await click('保存休息补记');assert.equal((await log()).events.length,2);
+    await assertRestState('meal','completed');
     checks.push('overlap and missing write receipt preserve history; normal adjusted meal saves after retry');
     await click('小憩记录');await click('睡醒了');assert.equal(new Date(await js("document.querySelector('[aria-label=休息开始时间]').value")).getTime(),day+11.5*3600000);
     await set('休息结束时间',day+12*3600000);await click('保存休息补记');assert.equal((await log()).events[2].kind,'nap');
     await click('健身记录');await click('去健身');assert.equal((await log()).events[3].kind,'gym');assert.equal((await log()).events[3].endedAt,null);
+    await assertRestState('gym','ongoing');await assertRestState('nap','completed');
+    assert.equal(await js("[...document.querySelectorAll('.journey-rest-button[data-rest-kind=nap][data-rest-state=planned]')].every(b=>!b.querySelector('.is-lit'))"),true);
+    await click('明天');assert.equal(await js("document.querySelectorAll('[data-rest-event],.journey-rest-start,.journey-rest-button .is-lit').length"),0);await click('今天');
+    await assertRestState('gym','ongoing');await assertRestState('meal','completed');await assertRestState('nap','completed');
+    const unchanged=JSON.stringify(await log());await wait(1100);assert.equal(JSON.stringify(await log()),unchanged);
+    await js("document.querySelector('.journey-card').scrollIntoView({block:'center'})");await wait(200);
+    const rect=await js("(()=>{const r=document.querySelector('.journey-card').getBoundingClientRect();return {x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height)}})()");
+    fs.writeFileSync(path.join(__dirname,'../artifacts/rest-highlight-preview.png'),(await win.capturePage(rect,{stayHidden:true,stayAwake:true})).toPNG());
+    checks.push('actual meal and solid nap green, ongoing gym blue; future outlines and tomorrow stay unlit; return restores highlights with no clock writes, silent screenshot');
     await js(`window.__now=${base+70000};void 0`);await wait(1150);assert.equal(await js("document.querySelector('[aria-label=健身记录] [role=timer]').textContent"),'01:10');
     await click('吃饭记录');await click('吃完了');assert.equal(await js("!!document.querySelector('.journey-rest-dialog')"),false);assert.match(await js("document.querySelector('.journey-error').textContent"),/先结束/);
     checks.push('nap finish reuses last ended meal; gym goes into positive clock; other-kind finish cannot silently reclassify open event');

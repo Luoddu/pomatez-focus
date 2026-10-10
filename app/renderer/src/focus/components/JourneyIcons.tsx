@@ -1,10 +1,10 @@
 import React from "react";
 import { RestKind } from "../journey.js";
 
-export function JourneyRestIcon({ kind }: { kind: RestKind }) {
+export function JourneyRestIcon({ kind, lit = false }: { kind: RestKind; lit?: boolean }) {
   return (
     <svg
-      className={`journey-rest-icon icon-${kind}`}
+      className={`journey-rest-icon icon-${kind}${lit ? " is-lit" : ""}`}
       width="15"
       height="15"
       viewBox="0 0 24 24"

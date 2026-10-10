@@ -4601,6 +4601,7 @@ button.stats-range-label:hover {
 .journey-heading-actions .journey-rest-start { display:flex; align-items:center; justify-content:center; gap:4px; height:30px; min-width:30px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background:var(--card); }
 .journey-rest-start .journey-rest-icon { width:18px; height:18px; }
 .journey-heading-actions .journey-rest-start:hover, .journey-heading-actions .journey-rest-start[aria-expanded="true"], .journey-heading-actions .journey-rest-start.is-ongoing { color:var(--blue); border-color:var(--blue); background:var(--blue-soft); }
+.journey-heading-actions .journey-rest-start.is-complete:not(:hover):not([aria-expanded="true"]) { color:#18814f; border-color:#9fd8b5; background:#e9f7ee; }
 .journey-rest-start small { font-size:10px; font-variant-numeric:tabular-nums; }
 .journey-rest-start.is-ongoing, .journey-rest-button.is-ongoing { color:var(--blue); }
 .journey-rest-menu { position:absolute; z-index:20; top:35px; right:0; display:flex; gap:5px; padding:6px; white-space:nowrap; background:var(--card); border:1px solid var(--blue); border-radius:8px; box-shadow:0 3px 12px #0001; }
@@ -4615,10 +4616,14 @@ button.stats-range-label:hover {
 .journey-rest { justify-content:flex-start; gap:1px; flex:none; color:#929bad; }
 .journey-rest button { width:17px; height:24px; display:grid; place-items:center; border:0; background:transparent; color:inherit; border-radius:4px; cursor:pointer; }
 .journey-rest button[aria-pressed="true"] { background:var(--blue-soft); color:var(--blue); }
-.journey-rest-button.is-passed { color:#81a28d; }
+.journey-rest button.is-passed { color:#18814f; background:#e9f7ee; }
+.journey-rest button.is-ongoing { color:var(--blue); background:var(--blue-soft); }
 .journey-rest button:disabled { cursor:default; opacity:.65; }
 .journey-time-corner { position:absolute; left:0; top:-10px; color:var(--muted); font-size:9px; line-height:10px; font-weight:400; }
 .journey-rest-icon { display:block; flex:none; }
+.journey-rest-icon.is-lit { stroke-width:2; }
+.journey-rest-icon.icon-meal.is-lit, .journey-rest-icon.icon-night.is-lit { fill:currentColor; }
+.journey-rest-icon.icon-nap.is-lit g { fill:currentColor; stroke-width:.45; }
 .journey-card[data-long="false"] .journey-stages { gap:2px; }
 .journey-card[data-long="false"] .journey-stage { gap:1px; }
 .journey-card[data-long="false"] .journey-tomato { width:clamp(13px,4cqw,24px); }

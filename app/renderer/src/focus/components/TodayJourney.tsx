@@ -202,12 +202,14 @@ export default function TodayJourney({
   const actualAt = (position: number) => actualRests
     .filter(e => Math.min(e.afterCount, slots.length) === position)
     .map(event => <span className="journey-rest journey-actual-rest" key={event.id}>
-      <button className={`journey-rest-button is-passed${event.endedAt === null ? " is-ongoing" : ""}`}
+      <button className={`journey-rest-button${event.endedAt === null ? " is-ongoing" : " is-passed"}`}
         data-rest-event={event.id} data-after-count={event.afterCount}
         data-preset-key={event.presetKey || ""} data-rest-kind={event.kind}
-        title={restDetails(event)} aria-label={restDetails(event)}
+        data-rest-state={event.endedAt === null ? "ongoing" : "completed"}
+        title={`${event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
+        aria-label={`${event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
         onClick={() => { if (today) setRestMenu(event.kind); }} disabled={!today}>
-        <JourneyRestIcon kind={event.kind} />
+        <JourneyRestIcon kind={event.kind} lit />
       </button>
     </span>);
   const commitRest = (kind: ActualRestKind, finish: boolean) => attempt(() => {
@@ -386,15 +388,19 @@ export default function TodayJourney({
         </strong>
         <span className="journey-heading-actions">
           {today && <span className="journey-rest-controls">
-            {(["meal", "nap", "gym"] as ActualRestKind[]).map(kind => <button key={kind}
-              className={`btn-text journey-rest-start${ongoing?.kind === kind ? " is-ongoing" : ""}`}
+            {(["meal", "nap", "gym"] as ActualRestKind[]).map(kind => {
+              const recent = ongoing?.kind === kind ? ongoing : actualRests.filter(event => event.kind === kind).slice(-1)[0];
+              const state = recent ? recent.endedAt === null ? "ongoing" : "completed" : "planned";
+              return <button key={kind}
+              className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : state === "completed" ? " is-complete" : ""}`}
+              data-rest-kind={kind} data-rest-state={state}
               aria-label={ACTUAL_REST[kind].record}
-              title={ongoing?.kind === kind ? restDetails(ongoing) : `记录实际${ACTUAL_REST[kind].label}`}
+              title={recent ? `${state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `记录实际${ACTUAL_REST[kind].label}`}
               aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
               onClick={() => { setRestMenu(restMenu === kind ? null : kind); setError(""); }}>
-              <JourneyRestIcon kind={kind} />
+              <JourneyRestIcon kind={kind} lit={state !== "planned"} />
               {ongoing?.kind === kind && <small role="timer">{restClock(ongoing, restNow)}</small>}
-            </button>)}
+            </button>})}
             {restMenu && <div className="journey-rest-menu" role="group" aria-label={`${ACTUAL_REST[restMenu].label}选项`}>
               <button className="btn-text" disabled={ongoing?.kind === restMenu} onClick={() => commitRest(restMenu, false)}>
                 {ACTUAL_REST[restMenu].begin}
@@ -577,6 +583,7 @@ export default function TodayJourney({
                             : ""
                         }`}
                         data-rest-kind={kind}
+                        data-rest-state={resting ? "ongoing" : plan.passedActions.includes(key) ? "completed" : "planned"}
                         data-rest-index={n}
                         aria-label={`${resting ? "继续" : "休息"}：${
                           REST_LABELS[kind]
@@ -590,7 +597,7 @@ export default function TodayJourney({
                         }
                         onClick={() => kind === "meal" || kind === "nap" || kind === "gym" ? setRestMenu(kind) : toggleRest(s.id, n)}
                       >
-                        <JourneyRestIcon kind={kind} />
+                        <JourneyRestIcon kind={kind} lit={resting || plan.passedActions.includes(key)} />
                       </button>
                     );
                   })}
