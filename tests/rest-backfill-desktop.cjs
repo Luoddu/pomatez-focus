@@ -90,7 +90,8 @@ app.whenReady().then(async()=>{try{
     await click('明天');assert.equal(await js("document.querySelectorAll('[data-rest-event],.journey-rest-start,.journey-rest-button .is-lit').length"),0);await click('今天');
     await assertRestState('gym','ongoing');await assertRestState('meal','completed');await assertRestState('nap','completed');
     const unchanged=JSON.stringify(await log());await wait(1100);assert.equal(JSON.stringify(await log()),unchanged);
-    await js("document.querySelector('.journey-card').scrollIntoView({block:'center'})");await wait(200);
+    win.setSize(1440,960);await wait(250);
+    await js("document.querySelector('.journey-card').scrollIntoView({block:'center'})");win.webContents.invalidate();await wait(350);
     const rect=await js("(()=>{const r=document.querySelector('.journey-card').getBoundingClientRect();return {x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height)}})()");
     fs.writeFileSync(path.join(__dirname,'../artifacts/rest-highlight-preview.png'),(await win.capturePage(rect,{stayHidden:true,stayAwake:true})).toPNG());
     checks.push('actual meal and solid nap green, ongoing gym blue; future outlines and tomorrow stay unlit; return restores highlights with no clock writes, silent screenshot');
