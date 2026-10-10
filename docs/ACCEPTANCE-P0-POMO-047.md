@@ -7,3 +7,4 @@
 - 有界分类：初次构建TS2367为editQueue状态仅pending/failed的精确类型判断，修正为只检查source；一次桌面执行处于未成功构建期间，弃为无效证据。后续测试初始等待明确为启动同步并行today读取只释放单个fixture门闩，原始诊断calls0/任务已显示/refreshBusy=true；源码sync→refresh原文与多门闩回读修正后真实PASS，不以产品补丁解决测试竞态。
 - 防时钟回退同日重放、08:29手动跨08:30成功不重复，已加纯逻辑正反。待冻结独立复核与最终clean build；Learning none：复用既有生成/写入回执，fixture修正不推广为产品工程教训。
 - fb62独立复核两P2：空字符串须作为损坏而非缺失；09:00自动后时钟退到08:20手动须保留同日已跨界证据。修正仅null首次空、refreshAttempt保留同日最大尝试/成功事实而completedAt仍显示实际手动时刻；新增空坏字节不覆盖/正常null可用与完整09:00→08:20→08:30/次日正反序列，待修复冻结复核。
+- DONE 本地：a82c2ab修复冻结独立复核PASS，两P2关闭；a82生产构建p047-build-final.txt、真实双进程自动刷新7组p047-auto-final.txt重新PASS。preview.81由官方仓库helper准备，未打包/发布/安装。Learning none，原因见本卡，单工作树无冲突。后续048在独立任务分支串行承接，无自动合并或改写。
