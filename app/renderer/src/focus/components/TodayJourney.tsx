@@ -25,11 +25,14 @@ import {
   JourneySettingsIcon,
 } from "./JourneyIcons";
 import JourneyTemplates from "./JourneyTemplates";
+import { ActualRestKind, RestEvent, RestLog, openRest, restClock } from "../restLog";
 
 export type JourneyControls = {
   scope: string;
   ready: boolean;
   active: FocusSession | null;
+  restLog: RestLog | null;
+  restAction: (kind: ActualRestKind, finish: boolean) => void;
   begin: (task: FocusTask | null, sessionId: string) => void;
   change: (task: FocusTask | null) => boolean;
   pause: () => void;
@@ -53,8 +56,34 @@ export default function TodayJourney({
     [choice, setChoice] = useState(""),
     [destination, setDestination] = useState("");
   const [settings, setSettings] = useState(false);
-  const day = journeyDay(Date.now(), offset),
-    scope = controls.scope;
+  const day = journeyDay(Date.now(), offset), scope = controls.scope;
+  const [restMenu, setRestMenu] = useState<ActualRestKind | null>(null);
+  const [restNow, setRestNow] = useState(Date.now());
+  const ongoing = openRest(controls.restLog);
+  useEffect(() => {
+    if (!ongoing || offset !== 0) return;
+    let tick: ReturnType<typeof setInterval> | undefined;
+    const syncVisibility = () => {
+      if (tick) clearInterval(tick);
+      tick = undefined;
+      setRestNow(Date.now());
+      if (!document.hidden) tick = setInterval(() => setRestNow(Date.now()), 1000);
+    };
+    syncVisibility();
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => { if (tick) clearInterval(tick); document.removeEventListener("visibilitychange", syncVisibility); };
+  }, [ongoing, offset]);
+  useEffect(() => { setRestMenu(null); }, [scope, day]);
+  useEffect(() => {
+    if (!restMenu) return;
+    const outside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".journey-rest-controls,.journey-rest-button")) setRestMenu(null);
+    };
+    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") setRestMenu(null); };
+    document.addEventListener("click", outside);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("click", outside); document.removeEventListener("keydown", escape); };
+  }, [restMenu]);
   const ref = useRef<Journey | null>(null);
   const drag = useRef<string | null>(null);
   const persist = (next: Journey) => {
@@ -148,6 +177,26 @@ export default function TodayJourney({
       ? selected?.task || null
       : null;
   const today = offset === 0;
+  const actualRests = controls.restLog?.events.filter(e => journeyDay(e.startedAt) === day) || [];
+  const restDetails = (event: RestEvent) => {
+    const when = (at: number) => new Date(at).toLocaleTimeString("zh-CN", {hour12:false});
+    return `${event.kind === "meal" ? "吃饭" : "小憩"} · ${when(event.startedAt)}—${event.endedAt === null ? "进行中" : when(event.endedAt)} · ${restClock(event, restNow)} · 第${event.afterCount}个番茄后`;
+  };
+  const actualAt = (position: number) => actualRests
+    .filter(e => Math.min(e.afterCount, slots.length) === position)
+    .map(event => <span className="journey-rest journey-actual-rest" key={event.id}>
+      <button className={`journey-rest-button is-passed${event.endedAt === null ? " is-ongoing" : ""}`}
+        data-rest-event={event.id} data-after-count={event.afterCount}
+        data-preset-key={event.presetKey || ""} data-rest-kind={event.kind}
+        title={restDetails(event)} aria-label={restDetails(event)}
+        onClick={() => { if (today) setRestMenu(event.kind); }} disabled={!today}>
+        <JourneyRestIcon kind={event.kind} />
+      </button>
+    </span>);
+  const commitRest = (kind: ActualRestKind, finish: boolean) => attempt(() => {
+    controls.restAction(kind, finish);
+    setRestMenu(null);
+  });
   const open = (p: JourneySlot) => {
     setEdit(p.id);
     setError("");
@@ -310,6 +359,25 @@ export default function TodayJourney({
           {today ? "今日旅程" : "明日旅程"}
         </strong>
         <span className="journey-heading-actions">
+          {today && <span className="journey-rest-controls">
+            {(["meal", "nap"] as ActualRestKind[]).map(kind => <button key={kind}
+              className={`btn-text journey-rest-start${ongoing?.kind === kind ? " is-ongoing" : ""}`}
+              aria-label={kind === "meal" ? "吃饭记录" : "小憩记录"}
+              title={ongoing?.kind === kind ? restDetails(ongoing) : kind === "meal" ? "记录实际吃饭" : "记录实际小憩"}
+              aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
+              onClick={() => { setRestMenu(restMenu === kind ? null : kind); setError(""); }}>
+              <JourneyRestIcon kind={kind} />
+              {ongoing?.kind === kind && <small role="timer">{restClock(ongoing, restNow)}</small>}
+            </button>)}
+            {restMenu && <div className="journey-rest-menu" role="group" aria-label={restMenu === "meal" ? "吃饭选项" : "小憩选项"}>
+              <button className="btn-text" disabled={ongoing?.kind === restMenu} onClick={() => commitRest(restMenu, false)}>
+                {restMenu === "meal" ? "去吃饭" : "去睡觉"}
+              </button>
+              <button className="btn-text" disabled={ongoing?.kind !== restMenu} onClick={() => commitRest(restMenu, true)}>
+                {restMenu === "meal" ? "吃完了" : "睡醒了"}
+              </button>
+            </div>}
+          </span>}
           <button
             className="btn-text"
             aria-label={today ? "明天" : "今天"}
@@ -366,6 +434,7 @@ export default function TodayJourney({
       {plan && (
         <>
           <div className="journey-stages">
+            {actualAt(0)}
             {plan.stages.map((s, i) => (
               <div
                 className={`journey-stage${
@@ -388,7 +457,9 @@ export default function TodayJourney({
                       running =
                         !!p.binding &&
                         controls.active?.id === p.binding.sessionId;
+                    const position = slots.findIndex(v => v.id === p.id) + 1;
                     return (
+                      <React.Fragment key={p.id}>
                       <button
                         key={p.id}
                         data-journey-slot={p.id}
@@ -459,6 +530,8 @@ export default function TodayJourney({
                           </small>
                         ) : null}
                       </button>
+                      {actualAt(position)}
+                      </React.Fragment>
                     );
                   })}
                 </div>
@@ -468,6 +541,7 @@ export default function TodayJourney({
                       resting =
                         plan.resting === s.id &&
                         (plan.restingAction || `${s.id}:0`) === key;
+                    if (actualRests.some(event => event.presetKey === key && event.kind === kind)) return null;
                     return (
                       <button
                         key={key}
@@ -488,7 +562,7 @@ export default function TodayJourney({
                             ? `${REST_LABELS[kind]}中 · 点击结束并继续`
                             : `${REST_LABELS[kind]} · 点击进入，不强制卡点`
                         }
-                        onClick={() => toggleRest(s.id, n)}
+                        onClick={() => kind === "meal" || kind === "nap" ? setRestMenu(kind) : toggleRest(s.id, n)}
                       >
                         <JourneyRestIcon kind={kind} />
                       </button>

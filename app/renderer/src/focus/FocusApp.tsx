@@ -66,6 +66,7 @@ import {
 } from "./silentgen";
 import "./focus.css";
 import { readRefresh, writeRefresh, refreshDue, refreshAttempt, nextRefreshDelay, refreshLabel, RefreshStamp } from "./dailyRefresh";
+import { ActualRestKind, RestLog, readRestLog, writeRestLog, openRest, closeRest, startRest, completedBeforeRest } from "./restLog";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
 const demo: FocusTask[] = [
@@ -1497,8 +1498,70 @@ export default function FocusApp() {
       creditedSeconds: (task.creditedSeconds || 0) + unsyncedSeconds,
     };
   };
-  const beginTask = (task: FocusTask) =>
-    timer.begin(withPendingCredit(task), minutes);
+  const restScope = sourceKey || "local";
+  const [actualRestLog, setActualRestLog] = useState<RestLog | null>(null);
+  useEffect(() => {
+    setActualRestLog(null);
+    if (!connectionReady || !timer.ready || timer.blocked) return;
+    try { setActualRestLog(readRestLog(localStorage, restScope)); }
+    catch (error: any) { notify(error.message, "error"); }
+    // Read once per source/readiness event, never on the timer's display tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restScope, connectionReady, timer.ready, timer.blocked]);
+  const withRestEnd = (action: () => void, verified: () => boolean) => {
+    if (!connectionReady || !timer.ready || timer.blocked) throw Error("计时记录尚未就绪");
+    const previous = readRestLog(localStorage, restScope);
+    const changed = !!openRest(previous);
+    const next = changed ? writeRestLog(localStorage, closeRest(previous, Date.now())) : previous;
+    try {
+      action();
+      if (!verified()) throw Error("计时操作未保存，请重试");
+    } catch (error) {
+      if (changed) setActualRestLog(writeRestLog(localStorage, previous));
+      throw error;
+    }
+    setActualRestLog(next);
+  };
+  const resumeFocus = () => {
+    const paused = timer.getSnapshot().active;
+    if (paused?.status !== "paused") return;
+    withRestEnd(() => timer.resume(), () => {
+      const current = timer.getSnapshot().active;
+      return current?.id === paused.id && current.status === "active";
+    });
+  };
+  const restAction = (kind: ActualRestKind, finish: boolean) => {
+    if (!connectionReady || !timer.ready || timer.blocked) throw Error("旅程尚未就绪");
+    const snapshot = timer.getSnapshot(), previous = readRestLog(localStorage, restScope);
+    if (snapshot.active?.status === "review") throw Error("请先确认当前番茄");
+    if (finish) {
+      if (openRest(previous)?.kind !== kind) throw Error("当前没有这项进行中的休息");
+      setActualRestLog(writeRestLog(localStorage, closeRest(previous, Date.now())));
+      return;
+    }
+    const now = Date.now();
+    const plan = readJourney(localStorage, restScope, journeyDay(now));
+    const next = startRest(previous, plan, kind, now,
+      completedBeforeRest(snapshot.records, restScope, now), crypto.randomUUID());
+    const persisted = writeRestLog(localStorage, next);
+    try {
+      timer.pause();
+      if (timer.getSnapshot().active?.status === "active") throw Error("暂停未保存，请重试");
+    } catch (error) {
+      setActualRestLog(writeRestLog(localStorage, previous));
+      throw error;
+    }
+    setActualRestLog(persisted);
+  };
+  const beginTask = (task: FocusTask) => {
+    const previousId = timer.getSnapshot().active?.id;
+    try {
+      withRestEnd(() => timer.begin(withPendingCredit(task), minutes), () => {
+        const current = timer.getSnapshot().active;
+        return !!current && current.status === "active" && current.id !== previousId;
+      });
+    } catch (error: any) { notify(error.message, "error"); }
+  };
   const changeActiveTask = (id: string) => {
     const current = timer.getSnapshot().active;
     if (!current) return false;
@@ -1612,18 +1675,17 @@ export default function FocusApp() {
     const target = gymRestTarget(previous, snapshot.records);
     if (!target) throw Error("当前旅程没有可进入的健身节点");
     const next = writeJourney(localStorage, {...previous, resting:target.stageId, restingAction:target.actionKey});
-    try { timer.pause(); if (timer.getSnapshot().active?.status === "active") throw Error("暂停未保存"); }
+    try { withRestEnd(() => timer.pause(), () => timer.getSnapshot().active?.status !== "active"); }
     catch (error) { writeJourney(localStorage, previous); throw error; }
     reportJourney(next); setJourneyRefresh(value => value + 1);
   } : undefined;
   const restReminder = <ScientificRestReminder state={restState} onSleep={() => {
-    timer.pause();
-    if (timer.getSnapshot().active?.status === "active") throw Error("暂停未完成");
+    restAction("nap", false);
   }} onGym={goGym} onFocus={() => {
     setSettingsOpen(false); setStatsOpen(false);
     const current = timer.getSnapshot().active;
     if (current) {
-      if (current.status === "paused") { timer.resume(); if (timer.getSnapshot().active?.status !== "active") throw Error("恢复未完成"); }
+      if (current.status === "paused") resumeFocus();
       return;
     }
     beginTask(boardTasks.find(t => t.id === selected && t.kind !== "done" && t.kind !== "pending") || boardTasks.find(t => t.kind !== "done" && t.kind !== "pending") || makeFreeTask());
@@ -1643,7 +1705,7 @@ export default function FocusApp() {
           shownTime={shownTime}
           pinned={pinned}
           onPause={timer.pause}
-          onResume={timer.resume}
+          onResume={() => { try { resumeFocus(); } catch (error: any) { notify(error.message, "error"); } }}
           onFinish={timer.finish}
           onExpand={() => windowMode(false, pinned)}
           onTogglePin={() => windowMode(true, !pinned)}
@@ -1757,7 +1819,7 @@ export default function FocusApp() {
               restSeconds={timer.restSeconds}
               shownTime={shownTime}
               onPause={timer.pause}
-              onResume={timer.resume}
+              onResume={() => { try { resumeFocus(); } catch (error: any) { notify(error.message, "error"); } }}
               onFinish={timer.finish}
             />
           ) : (
@@ -1808,6 +1870,8 @@ export default function FocusApp() {
               scope: sourceKey || "local",
               ready: timer.ready && !timer.blocked && connectionReady,
               active: timer.active,
+              restLog: actualRestLog?.scope === restScope ? actualRestLog : null,
+              restAction,
               onPlan: reportJourney,
               refreshToken: journeyRefresh,
               begin: (target, sessionId) => {
@@ -1829,11 +1893,11 @@ export default function FocusApp() {
                     : ("local" as const),
                   ...(sourceKey ? { sourceKey } : {}),
                 };
-                timer.begin(
+                withRestEnd(() => timer.begin(
                   withPendingCredit(task),
                   minutes,
                   sessionId
-                );
+                ), () => timer.getSnapshot().active?.id === sessionId && timer.getSnapshot().active?.status === "active");
                 if (timer.getSnapshot().active?.id !== sessionId)
                   throw Error("专注未开始，请检查计时器或存储状态");
               },
@@ -1842,14 +1906,12 @@ export default function FocusApp() {
               pause: () => {
                 if (timer.getSnapshot().active?.status === "review")
                   throw Error("请先确认当前专注，再进入休息");
-                timer.pause();
-                if (timer.getSnapshot().active?.status === "active")
-                  throw Error("暂停未保存，请检查存储");
+                withRestEnd(() => timer.pause(), () => timer.getSnapshot().active?.status !== "active");
               },
               resume: () => {
                 const paused = timer.getSnapshot().active;
                 if (paused?.status === "paused") {
-                  timer.resume();
+                  resumeFocus();
                   const resumed = timer.getSnapshot().active;
                   if (resumed?.id !== paused.id || resumed.status !== "active")
                     throw Error("恢复未保存，请检查存储并重试");
