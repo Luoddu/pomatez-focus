@@ -6,3 +6,4 @@
 - 测试分类：首次误在新构建进程19086仍运行时启动，旧84 header无data-rest-kind导致null元素；已按p051-test-failure-classification.json原始84/85 bundle与dirty=false source证据确认，构建完成后顺序运行通过，无产品试错补丁。自动审批因此拒绝一次无分类重跑；提供上述只读分类证据后获准、已解决。隐藏窗口截图旧帧在invalidate后仍存在，扩展完整链对照原rest-log8/8及其实际截图，复用既有resize→invalidate→capture顺序后实际画面正确，无产品捕获机制修改。
 - 已验证：p051-journey-desktop.txt原旅程双进程20/20，模板、未完成轮廓、任务绑定、旧下班rest/passed状态、失败恢复、跨日原功能均正常。来源与检查点：仅固定React16.14/SVG/CSS展示，无第三方关键语义改变；NSIS/Electron/updater版本及官方证据沿049/050。逻辑算法原050319/319未改，不重复无关逻辑测试。最终干净源/包五资产及旧84→新安装版更新验证、独立复核待补齐。
 - Learning none：这是本模块显示对比度/填色及既有合成截图路径落实，没有新增可跨任务通用机制；不把未证实的隐藏绘制原因写成官方机制。回滚显式revert允许文件，原事件数据不迁移；发布修复新号、不覆盖旧tag/资产、不自动安装重启用户App。
+- 独立复核修正：review_scientific_rest在9f6发现旧night/break已passed节点再次进入时类仍is-passed、后置green盖住aria-pressed蓝色；显示class改resting优先is-ongoing，追加原旅程night完成→重入→再结束computedColor/SVG填色与计时不变化证据，等待最终干净构建验证。85仅本地初包未推送/tag/公开，保留原本地产物；版本helper准备新86，上一公开仍84。

@@ -578,7 +578,7 @@ export default function TodayJourney({
                       <button
                         key={key}
                         className={`journey-rest-button${
-                          plan.passedActions.includes(key)
+                          resting ? " is-ongoing" : plan.passedActions.includes(key)
                             ? " is-passed"
                             : ""
                         }`}
