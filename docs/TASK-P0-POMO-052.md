@@ -1,0 +1,8 @@
+# P0-POMO-052 旅程彩色 emoji
+
+- IN_PROGRESS；owner /root，隔离模块根实现者，唯一状态源本卡；基线cec0f0df1d30d80e19142f2f5ffc5fbd59cf9223，公开codex/feishu-focus同SHA，单worktree task/p0-pomo-052-rest-emoji。用户本轮明确：未激活保持轮廓，激活只变彩色emoji，按钮保持轮廓；默认源码推送/Windows安装更新发布授权沿模块AGENTS第6条。
+- 轻风险T1局部展示；写集app/renderer/src/focus/components/JourneyIcons.tsx、TodayJourney.tsx、focus.css、tests/rest-backfill-desktop.cjs、tests/journey-desktop.cjs、docs/TASK-P0-POMO-052.md、docs/ACCEPTANCE-P0-POMO-052.md、docs/DAILY-JOURNEY.md、CHANGELOG.md及版本helper的app/electron/package.json、SettingsPanel.tsx。ignored artifacts仅合成测试、截图、包、发布回执/helper；不改事件状态算法、存储、计时、来源匹配、提醒、真实App/用户数据/AW/飞书/根仓/服务/外列比例。
+- 四处预检：①51新增is-lit填色及节点/入口绿色底块，用户要求撤掉；JourneyRestIcon统一SVG，可用原lit投影彩色字形。②只改React16.14/SVG/CSS项目自有展示，第三方关键语义不适用；沿049/051固定Electron34.5.8/builder25.1.8/updater6.8.3官方NSIS公开路径。③复用已有lit、事件data-rest-state、title、单可见UI秒钟、task-commit/version/repo-sync发布helper；Learning039草稿/tag不够证明更新链，须真实旧86→新版检测。④51原始12/8/21桌面、157包文件/五资产/旧84→86验收；在已有rest-backfill三进程与journey两进程改显示断言，不造新事件算法测试。
+- 正反验收：实际开始/结束/补记/冷启动，meal🍚、nap💤、gym💪、night🌙（普通break⏸️）只在激活节点显示彩色字形；未激活仍SVG轮廓。标题按钮始终轮廓，不保留completed绿色背景/填色，进行中原秒钟可用。旅程图标无色块，无布局列宽改变，明日不继承今日，返回恢复；原保存失败/原计时/冷启动/窄列/原日志字节与番茄数仍正常。实际静默UI截图查看、最终干净构建/ASAR/五资产一致、公开固定tag和旧86真实更新检测0下载/安装。仅显示改动由实现者自测收口，无新Agent；发布证据复用既有公开核验链。
+- 资源/预算/回滚：独占本clone/build/dist，每测试profile隔离；无共享DB/端口/服务/后台任务/新依赖/计时器/动画/I/O。一次前台有界交付；根因未知同因失败两次暂停对应步骤，范围外记录不修。绿灯当前无冲突，写前/提交前/发布前复核允许写集和资源。显式revert本卡写集，数据不迁移；旧tag/资产不可替换，新版本修复；不自动安装重启用户App，不发布便携包。
+- Learning none：已有事件显示字形与对比度调整，原发布/更新机制不变，无新的可跨任务机制或待记录候选。
