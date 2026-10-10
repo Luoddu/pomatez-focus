@@ -30,7 +30,7 @@ test("source isolated and actual saved count excludes pending/demo/future/other 
   assert.equal(readRestLog(storage,"B").events.length,0);
   assert.throws(()=>startRest(readRestLog(storage,"B"),p,"meal",at(10,12),6,"x"),/来源/);
   const r={status:"saved",startedAt:at(10,10),endedAt:at(10,11),completedCount:6,task:{source:"feishu",sourceKey:"A"}};
-  assert.equal(completedBeforeRest([r,{...r,status:"review"},{...r,task:{source:"local"}},{...r,startedAt:at(11,10)},{...r,endedAt:at(10,13)}],"A",at(10,12)),6);
+  assert.equal(completedBeforeRest([r,{...r,status:"review"},{...r,task:{source:"local",sourceKey:"A"}},{...r,startedAt:at(11,10)},{...r,endedAt:at(10,13)}],"A",at(10,12)),6);
 });
 test("corrupt/empty bytes not overwritten, missing and verified writes still work",()=>{
   for(const raw of ["", "{", JSON.stringify({version:1,scope:"wrong",events:[]})]){

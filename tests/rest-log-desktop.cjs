@@ -8,7 +8,7 @@ FocusService.prototype.today=async()=>[];
 FocusService.prototype.history=async()=>({sourceKey:source,records:[seed],missing:0});
 FocusService.prototype.generateToday=async()=>({created:0});
 FocusService.prototype.dailyReviews=async()=>({sourceKey:source,reviews:{}});
-require("../app/electron/build/main");
+const main=require("../app/electron/build/main");
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),55000);
 app.whenReady().then(async()=>{try{
   let win;const until=async fn=>{for(let i=0;i<160;i++){if(await fn())return;await wait(40)}throw Error("timeout "+fn)};
@@ -35,6 +35,18 @@ app.whenReady().then(async()=>{try{
     await click("吃饭记录");await click("吃完了");assert.ok((await log()).events[4].endedAt);assert.equal((await log()).events.length,5);
     assert.equal((await focus()).records.filter(r=>r.id===seed.id).length,1);
     checks.push("cold process restores ongoing actual meal; explicit finish preserves five records and single focus seed");
+    const state=main.restMonitor.snapshot();
+    state.status="recording";
+    state.reminder={key:"synthetic-rest-log/native-sleep",kind:"focus",watchedMinutes:5,excessMinutes:0,completedCount:6};
+    main.restPopup.update(state);
+    win.webContents.send("focus:rest-state",state);
+    await until(()=>{const popup=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().endsWith("/assets/rest-reminder.html"));return popup&&!popup.webContents.isLoadingMainFrame()});
+    await wait(100);await main.restPopup.act({key:state.reminder.key,action:"sleep"});
+    assert.equal((await log()).events[5].kind,"nap");assert.equal((await log()).events[5].endedAt,null);
+    await js("document.querySelector('.btn-begin').click()");
+    await until(()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).active?.status==='active'"));
+    assert.equal((await log()).events[5].endedAt,resumedAt);assert.equal(win.isVisible(),false);
+    assert.equal(win.webContents.isAudioMuted(),true);checks.push("native reminder IPC sleep action records nap; original free-focus button closes it, hidden and muted throughout");
   }else{
     const base=Date.now();await js(`(()=>{window.__restClock=${base};const Original=Date;window.Date=class extends Original{constructor(...args){args.length?super(...args):super(window.__restClock)}static now(){return window.__restClock}};window.__writes=0;window.__originalRestSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v1:'))window.__writes++;return window.__originalRestSet.call(this,k,v)}})()`);
     const advance=async seconds=>{await js(`window.__restClock=${base+seconds*1000};void 0`);await wait(1100)};

@@ -66,7 +66,7 @@ export function closeRest(log: RestLog, now: number): RestLog {
 export function completedBeforeRest(records: FocusSession[], scope: string, now: number): number {
   return records.filter(r => r.status === "saved" && journeyDay(r.startedAt) === journeyDay(now) &&
     r.startedAt <= now && (!r.endedAt || r.endedAt <= now) &&
-    (scope === "local" ? r.task.source === "local" : r.task.sourceKey === scope))
+    (scope === "local" ? r.task.source === "local" : r.task.source === "feishu" && r.task.sourceKey === scope))
     .reduce((sum, r) => sum + (Number.isInteger(r.completedCount) && r.completedCount! >= 0 && r.completedCount! <= 100 ? r.completedCount! : 0), 0);
 }
 export function startRest(log: RestLog, plan: Journey, kind: ActualRestKind, now: number,
