@@ -65,7 +65,7 @@ import {
   silentGenerateNotice,
 } from "./silentgen";
 import "./focus.css";
-import { readRefresh, writeRefresh, refreshDue, nextRefreshDelay, refreshLabel, RefreshStamp } from "./dailyRefresh";
+import { readRefresh, writeRefresh, refreshDue, refreshAttempt, nextRefreshDelay, refreshLabel, RefreshStamp } from "./dailyRefresh";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
 const demo: FocusTask[] = [
@@ -1131,7 +1131,7 @@ export default function FocusApp() {
       const previous = readRefresh(localStorage, attemptSource);
       // The synchronously persisted attempt prevents restart/focus event replays.
       if (automatic && !refreshDue(Date.now(), previous)) return;
-      stamp = { source: attemptSource, attemptedAt: Date.now(), completedAt: previous?.completedAt || 0 };
+      stamp = refreshAttempt(attemptSource, previous, Date.now());
       writeRefresh(localStorage, stamp);
       setDailyRefresh({ source: attemptSource, stamp });
     } catch (e: any) {

@@ -6,3 +6,4 @@
 - 原生生产main/preload/renderer自动刷新7组、两独立进程PASS（auto-refresh-plan.json、auto-refresh-resume.json、p047-auto-gate.txt）：08:29等待、08:30一次、回读未完成不记成功、手动实际时刻、跨日活动等待、失败不重放/显式手动恢复、窄按钮时间完整、冷进程不重复。既有生成进度/后台可开始专注/锁/失败重试/窄布局PASS（p047-generation.txt）。测试只使用合成飞书及隔离profile、headless/mute，0用户应用/真实外部写入。
 - 有界分类：初次构建TS2367为editQueue状态仅pending/failed的精确类型判断，修正为只检查source；一次桌面执行处于未成功构建期间，弃为无效证据。后续测试初始等待明确为启动同步并行today读取只释放单个fixture门闩，原始诊断calls0/任务已显示/refreshBusy=true；源码sync→refresh原文与多门闩回读修正后真实PASS，不以产品补丁解决测试竞态。
 - 防时钟回退同日重放、08:29手动跨08:30成功不重复，已加纯逻辑正反。待冻结独立复核与最终clean build；Learning none：复用既有生成/写入回执，fixture修正不推广为产品工程教训。
+- fb62独立复核两P2：空字符串须作为损坏而非缺失；09:00自动后时钟退到08:20手动须保留同日已跨界证据。修正仅null首次空、refreshAttempt保留同日最大尝试/成功事实而completedAt仍显示实际手动时刻；新增空坏字节不覆盖/正常null可用与完整09:00→08:20→08:30/次日正反序列，待修复冻结复核。

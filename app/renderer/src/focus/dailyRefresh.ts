@@ -11,7 +11,7 @@ export function refreshBoundary(now: number, tomorrow = false) {
 }
 function readAll(storage: Store): RefreshStamp[] {
   const raw = storage.getItem(DAILY_REFRESH_KEY);
-  if (!raw) return [];
+  if (raw === null) return [];
   const data = JSON.parse(raw);
   if (data?.version !== 1 || !Array.isArray(data.entries) || data.entries.length > 16)
     throw Error("每日刷新状态损坏，请保留数据并重试");
@@ -40,6 +40,12 @@ export function writeRefresh(storage: Store, stamp: RefreshStamp) {
 export function refreshDue(now: number, stamp: RefreshStamp | null) {
   const boundary = refreshBoundary(now);
   return now >= boundary && !(stamp && [stamp.attemptedAt, stamp.completedAt].some(at => day(at) === day(now) && at >= boundary));
+}
+export function refreshAttempt(source: string, previous: RefreshStamp | null, now: number): RefreshStamp {
+  // A manual run after wall-clock rollback may change its display time, but must
+  // not erase the same-day evidence that the scheduled boundary was crossed.
+  const sameDay = (at: number) => day(at) === day(now) ? at : 0;
+  return { source, attemptedAt: Math.max(now, sameDay(previous?.attemptedAt || 0), sameDay(previous?.completedAt || 0)), completedAt: previous?.completedAt || 0 };
 }
 export function nextRefreshDelay(now: number) {
   return Math.max(1, refreshBoundary(now, now >= refreshBoundary(now)) - now);

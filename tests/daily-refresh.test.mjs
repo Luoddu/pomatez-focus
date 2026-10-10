@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DAILY_REFRESH_KEY, readRefresh, writeRefresh, refreshDue, nextRefreshDelay, refreshLabel } from "../app/renderer/src/focus/dailyRefresh.ts";
+import { DAILY_REFRESH_KEY, readRefresh, writeRefresh, refreshDue, refreshAttempt, nextRefreshDelay, refreshLabel } from "../app/renderer/src/focus/dailyRefresh.ts";
 const clock=(d,h,m)=>new Date(2026,9,d,h,m).getTime();
 const memory=()=>{const values=new Map();return { getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v) };};
 test("08:30 due, persisted attempt prevents same-day replay but early manual permits scheduled run",()=>{
@@ -30,4 +30,20 @@ test("source-separated bounded metadata survives reload; corruption and false re
   const raw="{broken";s.setItem(DAILY_REFRESH_KEY,raw);
   assert.throws(()=>writeRefresh(s,{source:"A",attemptedAt:0,completedAt:0}));assert.equal(s.getItem(DAILY_REFRESH_KEY),raw);
   assert.throws(()=>writeRefresh({getItem:()=>null,setItem:()=>{}},{source:"A",attemptedAt:0,completedAt:0}),/未保存/);
+  s.setItem(DAILY_REFRESH_KEY,"");
+  assert.throws(()=>readRefresh(s,"A"));
+  assert.throws(()=>writeRefresh(s,{source:"A",attemptedAt:0,completedAt:0}));
+  assert.equal(s.getItem(DAILY_REFRESH_KEY),"");
+  assert.equal(readRefresh(memory(),"A"),null);
+});
+test("manual success after clock rollback preserves same-day auto-attempt while displaying actual manual time",()=>{
+  const s=memory(),first={source:"A",attemptedAt:clock(10,9,0),completedAt:clock(10,9,0)};
+  writeRefresh(s,first);
+  const attempt=refreshAttempt("A",readRefresh(s,"A"),clock(10,8,20));
+  writeRefresh(s,{...attempt,completedAt:clock(10,8,20)});
+  const restored=readRefresh(s,"A");
+  assert.equal(refreshLabel(restored,clock(10,8,20)),"10.10 周六 08:20已刷新");
+  assert.equal(refreshDue(clock(10,8,30),restored),false);
+  assert.equal(refreshDue(clock(11,8,30),restored),true);
+  const next=refreshAttempt("A",restored,clock(11,8,30));assert.equal(next.attemptedAt,clock(11,8,30));
 });
