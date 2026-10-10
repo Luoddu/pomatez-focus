@@ -289,14 +289,14 @@ app.whenReady().then(async () => {
       await click("继续：下班睡觉", ".journey-stage button");
       assert.equal((await plan()).resting, null);
       checks.push("rest manually entered/continued without clock gate");
-      const nightState=()=>js(`(()=>{const b=document.querySelector('.journey-rest-button[data-rest-kind=night]');return {state:b.dataset.restState,color:getComputedStyle(b).color,lit:!!b.querySelector('.is-lit'),fill:getComputedStyle(b.querySelector('svg')).fill}})()`);
-      assert.deepEqual(await nightState(),{state:'completed',color:'rgb(24, 129, 79)',lit:true,fill:'rgb(24, 129, 79)'});
+      const nightState=()=>js(`(()=>{const b=document.querySelector('.journey-rest-button[data-rest-kind=night]');return {state:b.dataset.restState,background:getComputedStyle(b).backgroundColor,emoji:b.querySelector('.journey-rest-emoji')?.textContent.trim(),outline:!!b.querySelector('svg')}})()`);
+      assert.deepEqual(await nightState(),{state:'completed',background:'rgba(0, 0, 0, 0)',emoji:'🌙',outline:false});
       await click("休息：下班睡觉", ".journey-stage button");
-      assert.deepEqual(await nightState(),{state:'ongoing',color:'rgb(76, 111, 255)',lit:true,fill:'rgb(76, 111, 255)'});
+      assert.deepEqual(await nightState(),{state:'ongoing',background:'rgba(0, 0, 0, 0)',emoji:'🌙',outline:false});
       await click("继续：下班睡觉", ".journey-stage button");
-      assert.deepEqual(await nightState(),{state:'completed',color:'rgb(24, 129, 79)',lit:true,fill:'rgb(24, 129, 79)'});
+      assert.deepEqual(await nightState(),{state:'completed',background:'rgba(0, 0, 0, 0)',emoji:'🌙',outline:false});
       assert.equal((await stored()).active,null);
-      checks.push('completed night reentry is blue ongoing, then green completed; existing passed/timer state still normal');
+      checks.push('activated night is colored moon with no background through completed reentry and finish; original state and timer normal');
       await click("明天", ".journey-heading button");
       await until(() =>
         js(

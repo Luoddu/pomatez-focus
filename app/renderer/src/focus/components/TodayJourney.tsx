@@ -392,13 +392,13 @@ export default function TodayJourney({
               const recent = ongoing?.kind === kind ? ongoing : actualRests.filter(event => event.kind === kind).slice(-1)[0];
               const state = recent ? recent.endedAt === null ? "ongoing" : "completed" : "planned";
               return <button key={kind}
-              className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : state === "completed" ? " is-complete" : ""}`}
+              className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : ""}`}
               data-rest-kind={kind} data-rest-state={state}
               aria-label={ACTUAL_REST[kind].record}
               title={recent ? `${state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `记录实际${ACTUAL_REST[kind].label}`}
               aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
               onClick={() => { setRestMenu(restMenu === kind ? null : kind); setError(""); }}>
-              <JourneyRestIcon kind={kind} lit={state !== "planned"} />
+              <JourneyRestIcon kind={kind} />
               {ongoing?.kind === kind && <small role="timer">{restClock(ongoing, restNow)}</small>}
             </button>})}
             {restMenu && <div className="journey-rest-menu" role="group" aria-label={`${ACTUAL_REST[restMenu].label}选项`}>

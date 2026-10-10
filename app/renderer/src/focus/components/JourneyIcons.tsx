@@ -1,10 +1,19 @@
 import React from "react";
 import { RestKind } from "../journey.js";
 
+const REST_EMOJI: Record<RestKind, string> = { meal: "🍚", nap: "💤", night: "🌙", gym: "💪", break: "⏸️" };
+
 export function JourneyRestIcon({ kind, lit = false }: { kind: RestKind; lit?: boolean }) {
+  if (lit) {
+    return (
+      <span className={`journey-rest-icon journey-rest-emoji icon-${kind} is-lit`} aria-hidden="true">
+        {REST_EMOJI[kind]}
+      </span>
+    );
+  }
   return (
     <svg
-      className={`journey-rest-icon icon-${kind}${lit ? " is-lit" : ""}`}
+      className={`journey-rest-icon icon-${kind}`}
       width="15"
       height="15"
       viewBox="0 0 24 24"

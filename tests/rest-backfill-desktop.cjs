@@ -15,9 +15,9 @@ app.whenReady().then(async()=>{try{
   const set=async(label,at)=>js(`(()=>{const input=document.querySelector('[aria-label="${label}"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(localInput(at))});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   const log=()=>js(`JSON.parse(localStorage.getItem('pomatez-rest-log-v2:${source}'))`),focus=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
   const assertRestState=async(kind,state)=>{
-    const rendered=await js(`(()=>{const b=document.querySelector('.journey-rest-start[data-rest-kind="${kind}"]'),nodes=[...document.querySelectorAll('[data-rest-event][data-rest-kind="${kind}"]')],n=nodes[nodes.length-1];return {header:b.dataset.restState,lit:!!b.querySelector('.is-lit'),timer:!!b.querySelector('[role=timer]'),node:n?.dataset.restState,color:n&&getComputedStyle(n).color,background:n&&getComputedStyle(n).backgroundColor,label:n?.getAttribute('aria-label'),napFill:n?.querySelector('g')&&getComputedStyle(n.querySelector('g')).fill}})()`);
-    assert.equal(rendered.header,state);assert.equal(rendered.lit,state!=='planned');assert.equal(rendered.timer,state==='ongoing');
-    if(state!=='planned'){assert.equal(rendered.node,state);assert.equal(rendered.color,state==='ongoing'?'rgb(76, 111, 255)':'rgb(24, 129, 79)');assert.notEqual(rendered.background,'rgba(0, 0, 0, 0)');assert.match(rendered.label,state==='ongoing'?/正在进行/:/已完成/);if(kind==='nap')assert.equal(rendered.napFill,rendered.color);}
+    const rendered=await js(`(()=>{const b=document.querySelector('.journey-rest-start[data-rest-kind="${kind}"]'),nodes=[...document.querySelectorAll('[data-rest-event][data-rest-kind="${kind}"]')],n=nodes[nodes.length-1];return {header:b.dataset.restState,lit:!!b.querySelector('.is-lit'),outline:!!b.querySelector('svg.journey-rest-icon'),headerBackground:getComputedStyle(b).backgroundColor,timer:!!b.querySelector('[role=timer]'),node:n?.dataset.restState,emoji:n?.querySelector('.journey-rest-emoji')?.textContent.trim(),background:n&&getComputedStyle(n).backgroundColor,label:n?.getAttribute('aria-label')}})()`);
+    assert.equal(rendered.header,state);assert.equal(rendered.lit,false);assert.equal(rendered.outline,true);assert.equal(rendered.headerBackground,'rgb(255, 255, 255)');assert.equal(rendered.timer,state==='ongoing');
+    if(state!=='planned'){assert.equal(rendered.node,state);assert.equal(rendered.emoji,{meal:'🍚',nap:'💤',gym:'💪'}[kind]);assert.equal(rendered.background,'rgba(0, 0, 0, 0)');assert.match(rendered.label,state==='ongoing'?/正在进行/:/已完成/);}
   };
   await until(()=>js(`document.querySelectorAll('.journey-tomato[data-complete=true]').length===${process.env.POMO_BACKFILL_PHASE==='empty'?0:6}&&!document.querySelector('[aria-label=健身记录]').disabled`));
   assert.equal(win.isVisible(),false);assert.equal(win.webContents.isAudioMuted(),true);
@@ -29,7 +29,7 @@ app.whenReady().then(async()=>{try{
     await set('休息开始时间',day+12*3600000);await set('休息结束时间',base+600000);await click('保存休息补记');assert.equal(await log(),null);
     await set('休息结束时间',day+12.5*3600000);await click('保存休息补记');assert.equal((await log()).events[0].afterCount,0);assert.equal((await focus()).active,null);
     await assertRestState('nap','completed');await assertRestState('meal','planned');await assertRestState('gym','planned');
-    checks.push('manual nap backfill fills ZZZ and lights only actual nap; untouched meal and gym remain outlines');
+    checks.push('manual nap backfill shows colored sleep emoji only at actual nap; all header controls stay outlines');
     checks.push('no previous event requires manual start; missing/future refused, explicit legitimate nap saved without invented start or tomatoes');
   }else if(process.env.POMO_BACKFILL_PHASE==='resume'){
     const saved=await log();assert.equal(saved.events.length,4);assert.equal(saved.events[3].kind,'gym');assert.equal(saved.events[3].endedAt,null);
@@ -37,7 +37,7 @@ app.whenReady().then(async()=>{try{
     await click('健身记录');await click('练完了');assert.ok((await log()).events[3].endedAt);assert.equal((await log()).events.length,4);
     assert.equal(await js("!!document.querySelector('.journey-rest-dialog')"),false);
     await assertRestState('gym','completed');
-    checks.push('cold startup restores all three highlights; ongoing gym is blue and finishing makes it green without a timer');
+    checks.push('cold startup restores colored actual emojis; outline gym control retains ongoing timer then removes it on finish');
     checks.push('cold process restores gym; finish closes same event without backfill or added tomatoes');
     await js(`window.__now=${base+600000};void 0`);
     await click('吃饭记录');await click('吃完了');await click('保存休息补记');
@@ -86,7 +86,7 @@ app.whenReady().then(async()=>{try{
     await set('休息结束时间',day+12*3600000);await click('保存休息补记');assert.equal((await log()).events[2].kind,'nap');
     await click('健身记录');await click('去健身');assert.equal((await log()).events[3].kind,'gym');assert.equal((await log()).events[3].endedAt,null);
     await assertRestState('gym','ongoing');await assertRestState('nap','completed');
-    assert.equal(await js("[...document.querySelectorAll('.journey-rest-button[data-rest-kind=nap][data-rest-state=planned]')].every(b=>!b.querySelector('.is-lit'))"),true);
+    assert.equal(await js("[...document.querySelectorAll('.journey-rest-button[data-rest-kind=nap][data-rest-state=planned]')].every(b=>!!b.querySelector('svg.journey-rest-icon')&&!b.querySelector('.journey-rest-emoji'))"),true);
     await click('明天');assert.equal(await js("document.querySelectorAll('[data-rest-event],.journey-rest-start,.journey-rest-button .is-lit').length"),0);await click('今天');
     await assertRestState('gym','ongoing');await assertRestState('meal','completed');await assertRestState('nap','completed');
     const unchanged=JSON.stringify(await log());await wait(1100);assert.equal(JSON.stringify(await log()),unchanged);
@@ -94,7 +94,7 @@ app.whenReady().then(async()=>{try{
     await js("document.querySelector('.journey-card').scrollIntoView({block:'center'})");win.webContents.invalidate();await wait(350);
     const rect=await js("(()=>{const r=document.querySelector('.journey-card').getBoundingClientRect();return {x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height)}})()");
     fs.writeFileSync(path.join(__dirname,'../artifacts/rest-highlight-preview.png'),(await win.capturePage(rect,{stayHidden:true,stayAwake:true})).toPNG());
-    checks.push('actual meal and solid nap green, ongoing gym blue; future outlines and tomorrow stay unlit; return restores highlights with no clock writes, silent screenshot');
+    checks.push('actual meal sleep gym show colored emojis without blocks; header and future presets stay outlines; tomorrow excludes actual emojis; return restores with no clock writes, silent screenshot');
     await js(`window.__now=${base+70000};void 0`);await wait(1150);assert.equal(await js("document.querySelector('[aria-label=健身记录] [role=timer]').textContent"),'01:10');
     await click('吃饭记录');await click('吃完了');assert.equal(await js("!!document.querySelector('.journey-rest-dialog')"),false);assert.match(await js("document.querySelector('.journey-error').textContent"),/先结束/);
     checks.push('nap finish reuses last ended meal; gym goes into positive clock; other-kind finish cannot silently reclassify open event');
