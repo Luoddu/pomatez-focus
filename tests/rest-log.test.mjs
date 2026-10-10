@@ -91,3 +91,21 @@ test("backfill rejects overlaps/future/running focus/open other rest, but paused
   const overnight=backfillRest(empty,p,"nap",at(10,23),at(11,1),at(11,2),[],null,"night");
   assert.equal(overnight.events[0].endedAt,at(11,1));
 });
+
+test("backfill into earlier empty gap sorts chronologically without changing existing event identities",()=>{
+  const p=plan(),empty=readRestLog(memory(),"A");
+  const later=backfillRest(empty,p,"meal",at(10,12),at(10,12,30),at(10,13),[],null,"later");
+  const before=structuredClone(later.events[0]);
+  const next=backfillRest(later,p,"nap",at(10,10),at(10,11),at(10,13),[],null,"earlier");
+  assert.deepEqual(next.events.map(e=>e.id),["earlier","later"]);assert.deepEqual(next.events[1],before);
+  assert.throws(()=>backfillRest(later,p,"gym",at(10,12,15),at(10,13),at(10,13),[],null,"overlap"),/已有休息/);
+});
+test("legacy paused focus with unknown end is not treated as empty; explicit segments keep normal gaps available",()=>{
+  const p=plan(),empty=readRestLog(memory(),"A"),old={...record(at(10,9),at(10,10)),endedAt:undefined,elapsedSeconds:3600,status:"paused"};
+  assert.throws(()=>restBackfillWindow(empty,[],old,at(10,12)),/可靠/);
+  assert.throws(()=>backfillRest(empty,p,"meal",at(10,9,30),at(10,10),at(10,12),[],old,"no"),/可靠/);
+  assert.equal(backfillRest(empty,p,"nap",at(10,8),at(10,9),at(10,12),[],old,"before").events.length,1);
+  const known={...old,segments:[{start:at(10,9),end:at(10,10)}]};
+  assert.equal(restBackfillWindow(empty,[],known,at(10,12)).startedAt,at(10,10));
+  assert.equal(backfillRest(empty,p,"nap",at(10,10),at(10,11),at(10,12),[],known,"gap").events.length,1);
+});

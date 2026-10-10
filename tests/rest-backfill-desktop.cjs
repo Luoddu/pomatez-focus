@@ -4,7 +4,7 @@ const {FocusService}=require('../app/electron/build/focus/service'),source='synt
 const day=new Date().setHours(0,0,0,0),base=day+13*3600000+321;
 const seed={id:'six',task:{id:'six-task',title:'合成科研',kind:'free',source:'feishu',sourceKey:source,projectType:'research'},startedAt:day+6*3600000,endedAt:day+9*3600000,plannedSeconds:1500,elapsedSeconds:9000,acceptedSeconds:9000,completedCount:6,status:'saved',sync:'synced',cloudSynced:true};
 FocusService.prototype.status=()=>({configured:true,sourceKey:source});
-FocusService.prototype.today=async()=>[];FocusService.prototype.history=async()=>({sourceKey:source,records:[seed],missing:0});
+FocusService.prototype.today=async()=>[];FocusService.prototype.history=async()=>({sourceKey:source,records:process.env.POMO_BACKFILL_PHASE==='empty'?[]:[seed],missing:0});
 FocusService.prototype.generateToday=async()=>({created:0});FocusService.prototype.dailyReviews=async()=>({sourceKey:source,reviews:{}});
 const main=require('../app/electron/build/main'),wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),55000);
 app.whenReady().then(async()=>{try{
@@ -14,10 +14,16 @@ app.whenReady().then(async()=>{try{
   const click=text=>js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)}||b.getAttribute('aria-label')===${JSON.stringify(text)});if(!b||b.disabled)throw Error('unavailable '+${JSON.stringify(text)});b.click()})()`);
   const set=async(label,at)=>js(`(()=>{const input=document.querySelector('[aria-label="${label}"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(localInput(at))});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   const log=()=>js(`JSON.parse(localStorage.getItem('pomatez-rest-log-v2:${source}'))`),focus=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
-  await until(()=>js("document.querySelectorAll('.journey-tomato[data-complete=true]').length===6&&!document.querySelector('[aria-label=健身记录]').disabled"));
+  await until(()=>js(`document.querySelectorAll('.journey-tomato[data-complete=true]').length===${process.env.POMO_BACKFILL_PHASE==='empty'?0:6}&&!document.querySelector('[aria-label=健身记录]').disabled`));
   assert.equal(win.isVisible(),false);assert.equal(win.webContents.isAudioMuted(),true);
   await js(`(()=>{window.__now=${base};const Base=Date;window.Date=class extends Base{constructor(...args){args.length?super(...args):super(window.__now)}static now(){return window.__now}}})()`);
-  if(process.env.POMO_BACKFILL_PHASE==='resume'){
+  if(process.env.POMO_BACKFILL_PHASE==='empty'){
+    await click('小憩记录');await click('睡醒了');assert.equal(await js("document.querySelector('[aria-label=休息开始时间]').value"),'');
+    await click('保存休息补记');assert.equal(await log(),null);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/有效/);
+    await set('休息开始时间',day+12*3600000);await set('休息结束时间',base+600000);await click('保存休息补记');assert.equal(await log(),null);
+    await set('休息结束时间',day+12.5*3600000);await click('保存休息补记');assert.equal((await log()).events[0].afterCount,0);assert.equal((await focus()).active,null);
+    checks.push('no previous event requires manual start; missing/future refused, explicit legitimate nap saved without invented start or tomatoes');
+  }else if(process.env.POMO_BACKFILL_PHASE==='resume'){
     const saved=await log();assert.equal(saved.events.length,4);assert.equal(saved.events[3].kind,'gym');assert.equal(saved.events[3].endedAt,null);
     await click('健身记录');await click('练完了');assert.ok((await log()).events[3].endedAt);assert.equal((await log()).events.length,4);
     assert.equal(await js("!!document.querySelector('.journey-rest-dialog')"),false);
@@ -26,6 +32,10 @@ app.whenReady().then(async()=>{try{
     await click('吃饭记录');await click('吃完了');await click('保存休息补记');
     assert.equal((await log()).events[4].startedAt,base);assert.equal((await log()).events[4].endedAt,base+600000);
     checks.push('unchanged second-resolution defaults preserve exact millisecond boundary and save without false overlap');
+    const beforeEarlier=await log();
+    await click('小憩记录');await click('睡醒了');await set('休息开始时间',day+9.5*3600000);await set('休息结束时间',day+9.75*3600000);await click('保存休息补记');
+    assert.equal((await log()).events[0].startedAt,day+9.5*3600000);assert.deepEqual((await log()).events.slice(1),beforeEarlier.events);
+    checks.push('manually backfilled earlier empty gap sorts into timeline; existing identities, preset keys and timestamps untouched');
     await click('设置');await click('第2段添加健身');await click('保存模板');await click('应用到今日');
     await until(()=>js("!document.querySelector('.journey-dialog')"));
     const state=main.restMonitor.snapshot();state.status='recording';state.gymAvailable=true;
@@ -33,27 +43,27 @@ app.whenReady().then(async()=>{try{
     main.restPopup.update(state);win.webContents.send('focus:rest-state',state);
     await until(()=>{const popup=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().endsWith('/assets/rest-reminder.html'));return popup&&!popup.webContents.isLoadingMainFrame()});
     await wait(120);await main.restPopup.act({key:state.reminder.key,action:'gym'});
-    assert.equal((await log()).events[5].kind,'gym');assert.equal((await log()).events[5].endedAt,null);assert.ok((await log()).events[5].presetKey);
+    const native=(await log()).events.at(-1);assert.equal(native.kind,'gym');assert.equal(native.endedAt,null);assert.ok(native.presetKey);
     await js("document.querySelector('.btn-begin').click()");await until(()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).active?.status==='active'"));
-    assert.ok((await log()).events[5].endedAt);assert.equal(win.isVisible(),false);
+    assert.ok((await log()).events.at(-1).endedAt);assert.equal(win.isVisible(),false);
     checks.push('visual template supplies native gym option; real IPC records actual gym, then original free focus closes it');
   }else{
     assert.equal(await js("document.querySelectorAll('.journey-rest-start').length"),3);
     await click('健身记录');await click('练完了');await until(()=>js("!!document.querySelector('.journey-rest-dialog')"));
     const defaults=await js("[...document.querySelectorAll('.journey-rest-dialog input')].map(i=>i.value)");
-    assert.equal(defaults[0],localInput(seed.endedAt));assert.equal(defaults[1],localInput(base));
+    assert.equal(new Date(defaults[0]).getTime(),seed.endedAt);assert.equal(new Date(defaults[1]).getTime(),Math.floor(base/1000)*1000);
     await set('休息开始时间',day+10*3600000);await set('休息结束时间',day+11*3600000);
     await click('保存休息补记');let saved=await log();assert.equal(saved.events[0].kind,'gym');assert.equal(saved.events[0].startedAt,day+10*3600000);assert.equal(saved.events[0].endedAt,day+11*3600000);assert.equal(saved.events[0].afterCount,6);assert.ok(saved.events[0].presetKey);
     assert.equal(await js("document.querySelectorAll('.journey-tomato').length"),16);assert.equal((await focus()).active,null);
     checks.push('gym button finishes into adjustable defaults; exact edited times insert after six without count/timer changes');
-    await click('吃饭记录');await click('吃完了');assert.equal(await js("document.querySelector('[aria-label=休息开始时间]').value"),localInput(day+11*3600000));
+    await click('吃饭记录');await click('吃完了');assert.equal(new Date(await js("document.querySelector('[aria-label=休息开始时间]').value")).getTime(),day+11*3600000);
     await set('休息开始时间',day+8*3600000);await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/已有专注/);
     await set('休息开始时间',day+11*3600000);await set('休息结束时间',day+11.5*3600000);
     await js("window.normalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v2:'))return;return window.normalSet.call(this,k,v)};void 0");
     await click('保存休息补记');assert.equal((await log()).events.length,1);assert.match(await js("document.querySelector('.journey-rest-dialog .journey-error').textContent"),/未保存/);
     await js("Storage.prototype.setItem=window.normalSet;void 0");await click('保存休息补记');assert.equal((await log()).events.length,2);
     checks.push('overlap and missing write receipt preserve history; normal adjusted meal saves after retry');
-    await click('小憩记录');await click('睡醒了');assert.equal(await js("document.querySelector('[aria-label=休息开始时间]').value"),localInput(day+11.5*3600000));
+    await click('小憩记录');await click('睡醒了');assert.equal(new Date(await js("document.querySelector('[aria-label=休息开始时间]').value")).getTime(),day+11.5*3600000);
     await set('休息结束时间',day+12*3600000);await click('保存休息补记');assert.equal((await log()).events[2].kind,'nap');
     await click('健身记录');await click('去健身');assert.equal((await log()).events[3].kind,'gym');assert.equal((await log()).events[3].endedAt,null);
     await js(`window.__now=${base+70000};void 0`);await wait(1150);assert.equal(await js("document.querySelector('[aria-label=健身记录] [role=timer]').textContent"),'01:10');
@@ -63,7 +73,7 @@ app.whenReady().then(async()=>{try{
     assert.equal(await js("[...document.querySelectorAll('.journey-rest-start')].every(b=>b.getBoundingClientRect().width>=30&&b.getBoundingClientRect().height>=30)"),true);
     checks.push('three enlarged blue bordered controls and menu remain within unchanged narrow columns');
   }
-  assert.equal((await focus()).records.filter(r=>r.id===seed.id).length,1);assert.equal(win.webContents.isAudioMuted(),true);
+  assert.equal((await focus()).records.filter(r=>r.id===seed.id).length,process.env.POMO_BACKFILL_PHASE==='empty'?0:1);assert.equal(win.webContents.isAudioMuted(),true);
   fs.writeFileSync(path.join(__dirname,`../artifacts/rest-backfill-${process.env.POMO_BACKFILL_PHASE}.json`),JSON.stringify({passed:checks.length,checks},null,2));console.log(JSON.stringify({passed:checks.length,checks}));clearTimeout(deadline);app.exit(0);
 }catch(e){console.error(e);clearTimeout(deadline);app.exit(1)}});
 function localInput(at){const d=new Date(at);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)}

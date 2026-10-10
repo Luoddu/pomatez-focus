@@ -33,10 +33,12 @@ const localTimeInput = (at: number) => {
   return d.toISOString().slice(0,19);
 };
 type RestEntry = {kind:ActualRestKind; start:string; end:string; suggestedStart:number|null; suggestedEnd:number};
+const sameTimeInput = (value: string, at: number) =>
+  (value.length === 16 ? `${value}:00` : value) === localTimeInput(at);
 const restEntryTimes = (entry: RestEntry) => ({
-  startedAt: entry.suggestedStart !== null && entry.start === localTimeInput(entry.suggestedStart)
+  startedAt: entry.suggestedStart !== null && sameTimeInput(entry.start,entry.suggestedStart)
     ? entry.suggestedStart : new Date(entry.start).getTime(),
-  endedAt: entry.end === localTimeInput(entry.suggestedEnd) ? entry.suggestedEnd : new Date(entry.end).getTime(),
+  endedAt: sameTimeInput(entry.end,entry.suggestedEnd) ? entry.suggestedEnd : new Date(entry.end).getTime(),
 });
 
 export type JourneyControls = {
