@@ -4,14 +4,15 @@ const root=path.resolve(__dirname,'..'),wait=ms=>new Promise(r=>setTimeout(r,ms)
 const {FocusService}=require('../app/electron/build/focus/service');
 FocusService.prototype.status=()=>({configured:true,sourceKey:'synthetic-control'});FocusService.prototype.today=async()=>[];FocusService.prototype.dailyReviews=async()=>({sourceKey:'synthetic-control',reviews:{}});
 FocusService.prototype.history=async()=>({sourceKey:'synthetic-control',missing:0,records:[{id:'control-test',task:{id:'test',title:'合成科研',source:'feishu',sourceKey:'synthetic-control',projectType:'research'},startedAt:dayDate.getTime(),endedAt:dayDate.getTime()+1000,acceptedSeconds:1,elapsedSeconds:1,completedCount:65,status:'saved',sync:'synced',cloudSynced:true}]});
-const main=require('../app/electron/build/main'),{decide}=require('../app/electron/src/assets/browser-control/background');
+ const main=require('../app/electron/build/main'),{decide}=require('../app/electron/build/assets/browser-control/background');
 const deadline=setTimeout(()=>app.exit(2),45000),checks=[];
 app.whenReady().then(async()=>{let child,video;try{
  const until=async f=>{for(let n=0;n<150;n++){if(await f())return;await wait(40);}throw Error('wait timeout');};
  let farm;await until(()=>{farm=BrowserWindow.getAllWindows()[0];return farm&&!farm.webContents.isLoadingMainFrame()});const js=s=>farm.webContents.executeJavaScript(s,true);
  await until(()=>js("document.querySelector('.wg-now')?.textContent.trim()==='65'"));
  const weight=await js("[getComputedStyle(document.querySelector('.wg-now')).fontWeight,getComputedStyle(document.querySelector('.wg-goal')).fontWeight]");assert.deepEqual(weight,['700','400']);
- assert.equal(await js("[...document.querySelectorAll('.hm-badge-slot')].filter(b=>b.querySelector('.hm-badge')).every(b=>{const n=b.querySelector('.hm-week-total').getBoundingClientRect(),m=b.querySelector('.hm-badge').getBoundingClientRect();return m.top>=n.bottom})"),true);
+ await js("const x=document.querySelector('.hm-badge-slot');x.innerHTML='<span class=hm-week-total>65</span><span class=hm-badge>🏅</span>'");
+ assert.equal(await js("document.querySelectorAll('.hm-badge').length>0 && [...document.querySelectorAll('.hm-badge-slot')].filter(b=>b.querySelector('.hm-badge')).every(b=>{const n=b.querySelector('.hm-week-total').getBoundingClientRect(),m=b.querySelector('.hm-badge').getBoundingClientRect();return m.top>=n.bottom})"),true);
  checks.push('current tomato count bold, normal goal; reached-week medal below readable total with no overlap');
  const day=`${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,'0')}-${String(dayDate.getDate()).padStart(2,'0')}`;
  const state=main.restMonitor.snapshot();state.status='recording';state.updatedAt=Date.now();state.usage={day,start:dayDate.getTime(),end:Date.now(),totalSeconds:4532,bilibili:4532,xiaohongshu:0,hours:[],sessions:[],coverageStart:dayDate.getTime()};state.live={checkedAt:Date.now(),startedAt:now,expiresAt:Date.now()+7000,site:'bilibili',estimateFrom:null,detail:'synthetic'};state.reminder={key:'synthetic/5',kind:'focus',watchedMinutes:75,excessMinutes:15,completedCount:0};
@@ -27,7 +28,7 @@ app.whenReady().then(async()=>{let child,video;try{
  await assert.rejects(js("window.focusApi.browserConfigure({mode:'wrong',cooldownMinutes:2,autoRaise:true})"));
  await assert.rejects(js("window.focusApi.browserSetup()"));
  checks.push('trusted real IPC saves selectable policy, invalid policy refused; unattended real registry installation refused');
- let registry=null;const installed=main.browserControl.install(require('electron'),{read:()=>registry,write:v=>registry=v});
+ let registry=null;const installed=main.browserControl.install(process.execPath,{read:()=>registry,write:v=>registry=v});
  state.live.checkedAt=Date.now();state.live.expiresAt=Date.now()+7000;main.browserControl.publish(state);
  child=spawn('cmd.exe',['/d','/c',path.join(path.dirname(registry),'native-host.cmd'),`chrome-extension://${installed.extensionId}/`],{cwd:path.dirname(registry),windowsHide:true,stdio:['pipe','pipe','pipe']});
  let buffer=Buffer.alloc(0),responses=[];child.stdout.on('data',v=>{buffer=Buffer.concat([buffer,v]);while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){const n=buffer.readUInt32LE(0);responses.push(JSON.parse(buffer.subarray(4,4+n)));buffer=buffer.subarray(4+n);}});

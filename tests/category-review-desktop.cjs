@@ -341,6 +341,14 @@ app.whenReady().then(async () => {
     checks.push(
       "overnight end edit saves earlier real endpoint, retains accepted duration/count/category through adapter"
     );
+    await js("document.querySelector('.record-edit').click()");
+    await until(() => js("Boolean(document.querySelector('#manual-end'))"));
+    await input("#manual-end", await js(`(()=>{const d=new Date(${start + 2400000});d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)})()`));
+    await input("#manual-minutes", "40");
+    await click("保存修改");
+    await until(async () => (await client.history()).records[0].acceptedSeconds === 2400);
+    assert.equal((await client.history()).records[0].completedCount, 1);
+    checks.push("manual endpoint extension includes ten additional working minutes, count stays independent");
     await click("补记");
     await until(() =>
       js("Boolean(document.querySelector('#manual-name'))")

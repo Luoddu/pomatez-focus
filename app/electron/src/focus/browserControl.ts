@@ -57,6 +57,7 @@ export class BrowserControl {
     if(r.error||r.status!==0) throw Error("浏览器配套注册失败");
   } }) {
     if(process.platform!=="win32") throw Error("配套安装目前支持Windows Edge");
+    if(typeof executable!=="string" || !path.isAbsolute(executable) || !fs.statSync(executable).isFile()) throw Error("配套运行文件无效");
     const target=path.join(this.directory,"browser-control"), manifest=path.join(target,"host-manifest.json"), old=registry.read();
     if(old && path.resolve(old).toLowerCase()!==path.resolve(manifest).toLowerCase()) throw Error("已有其他来源的浏览器注册，未覆盖");
     if(fs.existsSync(target) && (!fs.existsSync(path.join(target,"host-config.json")) || json(path.join(target,"host-config.json")).owner!==OWNER)) throw Error("配套目录不属于本App，未覆盖");
@@ -65,12 +66,18 @@ export class BrowserControl {
     const ext=json(path.join(assets,"manifest.json"));
     const id=crypto.createHash("sha256").update(Buffer.from(ext.key,"base64")).digest("hex").slice(0,32).replace(/[0-9a-f]/g,c=>String.fromCharCode(97+parseInt(c,16)));
     const origin=`chrome-extension://${id}/`;
-    fs.mkdirSync(path.join(target,"extension"),{recursive:true});
-    for(const file of ["manifest.json","background.js","content.js","popup.html","popup.js"]) fs.copyFileSync(path.join(assets,file),path.join(target,"extension",file));
-    fs.copyFileSync(path.join(this.build,"focus","nativeBrowserHost.js"),path.join(target,"nativeBrowserHost.js"));
-    atomic(path.join(target,"host-config.json"),{owner:OWNER,directory:this.directory,origin});
-    fs.writeFileSync(path.join(target,"native-host.cmd"),`@echo off\r\nchcp 65001 >nul\r\nset "ELECTRON_RUN_AS_NODE=1"\r\n"${executable}" "%~dp0nativeBrowserHost.js" "%~dp0host-config.json" %*\r\n`);
-    atomic(manifest,{name:HOST,description:"番茄农场本机浏览器督促",path:path.join(target,"native-host.cmd"),type:"stdio",allowed_origins:[origin]});
+    const fresh=!fs.existsSync(target), stage=fresh?path.join(this.directory,"browser-control-stage-"+crypto.randomUUID()):target;
+    try {
+      fs.mkdirSync(path.join(stage,"extension"),{recursive:true});
+      atomic(path.join(stage,"host-config.json"),{owner:OWNER,directory:this.directory,origin});
+      for(const file of ["manifest.json","background.js","content.js","popup.html","popup.js"]) fs.copyFileSync(path.join(assets,file),path.join(stage,"extension",file));
+      fs.copyFileSync(path.join(this.build,"focus","nativeBrowserHost.js"),path.join(stage,"nativeBrowserHost.js"));
+      fs.writeFileSync(path.join(stage,"native-host.cmd"),`@echo off\r\nchcp 65001 >nul\r\nset "ELECTRON_RUN_AS_NODE=1"\r\n"${executable}" "%~dp0nativeBrowserHost.js" "%~dp0host-config.json" %*\r\n`);
+      atomic(path.join(stage,"host-manifest.json"),{name:HOST,description:"番茄农场本机浏览器督促",path:path.join(target,"native-host.cmd"),type:"stdio",allowed_origins:[origin]});
+      if(fresh) fs.renameSync(stage,target);
+    } finally {
+      if(fresh && fs.existsSync(stage) && path.dirname(path.resolve(stage))===path.resolve(this.directory)) fs.rmSync(stage,{recursive:true});
+    }
     registry.write(manifest);
     if(registry.read()?.toLowerCase()!==manifest.toLowerCase()) throw Error("配套注册回读未确认，请重试");
     return { directory:path.join(target,"extension"),extensionId:id };
@@ -83,7 +90,7 @@ export class FarmPresence {
   update(state: RestState, policy: BrowserPolicy, now=Date.now()) {
     const w=this.getWindow(); if(!w||w.isDestroyed()) return;
     const watching=policy.autoRaise && state.settings.supervise && state.status==="recording" && !!state.live?.site && now>=state.live.checkedAt && now<=state.live.expiresAt;
-    if(watching && !this.pinned) { this.original=w.isAlwaysOnTop(); this.pinned=true; w.setAlwaysOnTop(true); if(!this.headless) { if(w.isMinimized()) w.restore(); w.showInactive(); w.moveTop(); } }
+    if(watching && !this.pinned) { this.original=w.isAlwaysOnTop(); this.pinned=true; w.setAlwaysOnTop(true); if(!this.headless) { w.showInactive(); w.moveTop(); } }
     else if(!watching) this.close();
   }
   close() { const w=this.getWindow(); if(this.pinned && w && !w.isDestroyed()) w.setAlwaysOnTop(this.original); this.pinned=false; }

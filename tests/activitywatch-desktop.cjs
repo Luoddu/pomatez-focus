@@ -478,7 +478,7 @@ app.whenReady().then(async () => {
     await restMonitor.refresh();
     await until(() =>
       js(
-        `document.querySelector('.rest-ring-label strong')?.textContent==='5'`
+        `document.querySelector('.rest-ring-label strong')?.textContent==='0:05:00'`
       )
     );
     assert.equal(win.isVisible(), false);
