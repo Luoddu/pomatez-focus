@@ -18,3 +18,7 @@
 Learning recorded LEARN-P0-POMO-054-01：独立review提出并确认逻辑ID/transport UUID分离的窄复用条件，已同检查点记录本模块Learning；早期none是当时预判。串行lease所有权与既有LEARN-P0-POMO-042-01跨await调度教训邻接，不重复泛化记录；专项证据保留本验收。根Learning未写。回滚源码revert、停App停入口，原记录/计时数据不迁移，字段兼容原Journey校验。
 
 包验收：release88-package-acceptance.json现绑定3af（旧e109未发布候选已恢复保留）；178文件逐字ASAR匹配，journeyGateway/client/nativehost/扩展均存在，实际安装包unpacked hidden启动成功，setup/blockmap/feed/source-version/sha清单五资产内部大小/哈希一致。旧87真实更新器发布前current87，0下载安装，发布后结果待补。
+
+已验证额外实际安装版：release88-packaged-journey.json，真实Windows unpacked App与ASAR自带客户端（entry=null）读→write→重复replayed→回读一致，隔离静默。一次验证helper用了POSIX字符串而Windows ASAR库按本地分隔符查找，path.join后通过；包中的client原已逐字校验存在，非遗漏文件。
+
+发布状态纠正：88草稿五资产远端大小/sha256已验证，旧87不可变；但新tag pre-push要求tag commit==HEAD，Learning/验收doc提交导致3af!=917，门禁正确拒绝，远端无88 tag、未公开。不改/替换该候选，改用89正式封版；功能基线与独立PASS仍为3af，版本元数据由现有helper更新。89包、公开及旧87→89更新链待补。公开前不得再推进HEAD，公开后文档回执可独立提交。

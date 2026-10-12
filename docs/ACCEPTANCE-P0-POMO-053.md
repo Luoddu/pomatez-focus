@@ -13,3 +13,5 @@
 - 全测试POMATEZ_HEADLESS=1、隔离profiles、mute-audio/windowsHide；0真实Edge/profile/registry操作、0用户数据写入。showInactive官方路径静态保守，实际最小化/个人Edge焦点与B/X具体页面播放器待用户安装确认后验证，不能用合成HTML冒充。
 
 Learning none：未记录未经独立原始证据支持的泛化教训；本轮有界安装/生命周期问题和修正留在任务验收，复用既有门禁。回滚见任务卡/关闭督促禁用配套，新版修复不替换旧资产。
+
+正式版本89：88草稿验证后tag被当前HEAD一致性门禁拒绝，未公开/远端无tag；保留候选不替换。新89将包含同一已复核功能与精度修正，固定HEAD/包/tag一致，发布回执另补。真实个人Edge确认仍为后续用户安装gate。
