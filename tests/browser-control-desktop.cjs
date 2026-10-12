@@ -6,6 +6,9 @@ FocusService.prototype.status=()=>({configured:true,sourceKey:'synthetic-control
 FocusService.prototype.history=async()=>({sourceKey:'synthetic-control',missing:0,records:[{id:'control-test',task:{id:'test',title:'合成科研',source:'feishu',sourceKey:'synthetic-control',projectType:'research'},startedAt:dayDate.getTime(),endedAt:dayDate.getTime()+1000,acceptedSeconds:1,elapsedSeconds:1,completedCount:65,status:'saved',sync:'synced',cloudSynced:true}]});
  const main=require('../app/electron/build/main'),{decide}=require('../app/electron/build/assets/browser-control/background');
 const deadline=setTimeout(()=>app.exit(2),45000),checks=[];
+let scratchKey=null,scratchOwner=null;
+const ps=script=>{const r=require('node:child_process').spawnSync(path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr)};
+const clearScratch=()=>{if(!scratchKey)return;assert.match(scratchKey,/^Software\\PomatezFocusTests\\p055-[a-f0-9-]{36}$/);ps(`$base=[Microsoft.Win32.Registry]::CurrentUser;$key=$base.OpenSubKey('${scratchKey}',$false);if($null -eq $key -or $key.GetValue('TestOwner') -ne '${scratchOwner}'){throw 'Foreign scratch marker'};$key.Dispose();$base.DeleteSubKeyTree('${scratchKey}',$false)`);assert.equal(require('../app/electron/build/focus/nativeRegistry').nativeRegistry(scratchKey).read(),null);scratchKey=null;};
 app.whenReady().then(async()=>{let child,video;try{
  const until=async f=>{for(let n=0;n<150;n++){if(await f())return;await wait(40);}throw Error('wait timeout');};
  let farm;await until(()=>{farm=BrowserWindow.getAllWindows()[0];return farm&&!farm.webContents.isLoadingMainFrame()});const js=s=>farm.webContents.executeJavaScript(s,true);
@@ -28,7 +31,11 @@ app.whenReady().then(async()=>{let child,video;try{
  await assert.rejects(js("window.focusApi.browserConfigure({mode:'wrong',cooldownMinutes:2,autoRaise:true})"));
  await assert.rejects(js("window.focusApi.browserSetup()"));
  checks.push('trusted real IPC saves selectable policy, invalid policy refused; unattended real registry installation refused');
- let registry=null;const installed=main.browserControl.install(process.execPath,{read:()=>registry,write:v=>registry=v});
+ scratchOwner=require('node:crypto').randomUUID();scratchKey='Software\\PomatezFocusTests\\p055-'+scratchOwner;
+ const typed=require('../app/electron/build/focus/nativeRegistry').nativeRegistry(scratchKey);assert.equal(typed.read(),null);
+ ps(`$key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('${scratchKey}',$true);$key.SetValue('TestOwner','${scratchOwner}');$key.Dispose()`);
+ const installed=main.browserControl.install(process.execPath,typed),registry=typed.read();assert.equal(registry,path.join(process.env.POMATEZ_PROFILE,'browser-control','host-manifest.json'));
+ checks.push('real typed CurrentUser scratch registry missing -> install -> exact REG_SZ readback; production browser key untouched');
  state.live.checkedAt=Date.now();state.live.expiresAt=Date.now()+7000;main.browserControl.publish(state);
  child=spawn('cmd.exe',['/d','/c',path.join(path.dirname(registry),'native-host.cmd'),`chrome-extension://${installed.extensionId}/`],{cwd:path.dirname(registry),windowsHide:true,stdio:['pipe','pipe','pipe']});
  let buffer=Buffer.alloc(0),responses=[];child.stdout.on('data',v=>{buffer=Buffer.concat([buffer,v]);while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){const n=buffer.readUInt32LE(0);responses.push(JSON.parse(buffer.subarray(4,4+n)));buffer=buffer.subarray(4+n);}});
@@ -48,5 +55,5 @@ app.whenReady().then(async()=>{let child,video;try{
  assert.equal(farm.isVisible(),false);assert.equal(farm.webContents.isAudioMuted(),true);
  await js("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='返回额度').click()");farm.setSize(1440,960);await wait(200);await js("document.querySelector('.rest-card').scrollIntoView({block:'center'})");farm.webContents.invalidate();await wait(250);
  fs.writeFileSync(path.join(root,'artifacts/p053-overview-preview.png'),(await farm.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
- fs.writeFileSync(path.join(root,'artifacts/p053-browser-desktop.json'),JSON.stringify({checks,passed:checks.length,silent:true,realRegistryWrites:0,realEdgeProfileWrites:0},null,2));console.log(JSON.stringify({checks,passed:checks.length}));clearTimeout(deadline);app.exit(0);
-}catch(e){console.error(e);if(video&&!video.isDestroyed())video.destroy();if(child)child.kill();clearTimeout(deadline);app.exit(1);}});
+ clearScratch();fs.writeFileSync(path.join(root,'artifacts/p055-browser-desktop.json'),JSON.stringify({checks,passed:checks.length,silent:true,productionRegistryWrites:0,temporaryMarkerKeyCleaned:true,realEdgeProfileWrites:0},null,2));console.log(JSON.stringify({checks,passed:checks.length}));clearTimeout(deadline);app.exit(0);
+}catch(e){console.error(e);if(video&&!video.isDestroyed())video.destroy();if(child)child.kill();try{clearScratch()}catch(cleanupError){console.error(cleanupError)}clearTimeout(deadline);app.exit(1);}});

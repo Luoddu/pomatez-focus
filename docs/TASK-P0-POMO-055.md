@@ -9,3 +9,5 @@
 - 范围边界：用户仍手动安装App及点击按钮注册真实项目键、在Edge确认加载；本任务不代写真实NativeMessaging键、不升管理员/改ACL、不开公网、不自动安装重启/播放声音。独占module build/dist与隔离profile/随机临时注册项，无真实用户App/Edge控制。临时测试key系统边界有疑点只暂停对应步骤，仍可做代码/假runner/readonly复现。
 - 停止/预算/回滚：一次有界前台修复；同根因两次未知停止对应尝试，已精确根因在原范围继续有证据修复；副作用不盲重放。当前单worktree/无脏文件绿灯，开工/冻结/发布前复核HEAD/写集/资源。临时注册项只删自己UUID/marker，源码显式revert；公开发布新90不替换89及88候选、不force/noverify。采用既有固定源draft五资产→tag同HEAD→立即公开→真实旧版发现链，发布前不再推进HEAD。
 - Learning预判none：本机OEM错误文本误解编码与typed API薄修已有常规机制；若形成已验证可跨任务教训由本模块/root单写并独立复核后再记；不写根Learning。验收/正反/来源/风险/未完成均入acceptance。界面首次真实Edge连接属于用户最后gate，不冒充已控制个人视频。
+- 完整链fixture补充允许tests/browser-control-desktop.cjs：在既有hidden主App/生成CMD/真实HTML测试中，将假registry换成独立UUID+marker的typed HKCU测试键并核owner清理；不让production browserSetup越过headless拒绝真实注册的门禁。
+- 经实链10项正反形成窄编码教训，追加允许本模块Learning.md，仅/root协调写；Evidence为本卡验收+实际OEM/typed scratch测试，候选必须独立复核后采纳。根Learning仍不写。

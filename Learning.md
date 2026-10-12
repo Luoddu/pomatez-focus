@@ -36,3 +36,14 @@
 - Required-Check: 重试复用完全相同逻辑ID/版本/操作，但每次传输独立文件所有权；保存回执在Journey真相源。验证同ID并发、旧实例孤儿、不同内容复用ID被拒、旧版本不能覆盖手动修改及正常新请求仍通；不能用静默删孤儿或换逻辑ID掩盖未知提交结果。
 - Supersedes: none
 - Invalid-When: 改成具备请求复用/租约/回执的成熟IPC通道、移除文件传输或改变去重保存机制时须重新验证；本条不泛化为所有协议都必须两个UUID，也不代表个人Hermes工具已接通。
+
+## LEARN-P0-POMO-055-01 - 隐藏原生CLI错误文本不能按UTF8假设分类
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-055
+- Evidence: docs/ACCEPTANCE-P0-POMO-055.md; tests/native-registry.test.cjs; app/electron/src/focus/nativeRegistry.ts
+- Applies-To: 本农场Windows原生CLI输出用于权限/缺失分类的后续改动
+- Lesson: 本机Windows reg.exe从无console Node子进程输出status1与GBK中文“系统找不到指定的注册表项或值”；UTF8乱码使旧missing正则失败，首次不存在的注册被误报为权限不足。直接PowerShell显示英语不能证明隐藏App子进程同编码。当前RegistryKey结构化结果区分null缺失和Security/UnauthorizedAccess，真实临时HKCU Unicode安装/回读/重复/foreign拒绝与清理证明正常路径仍通。
+- Required-Check: 保留实际spawn环境的原始bytes/status与正确解码，不把所有exit1当缺失或要求用户升权；优先公开typed返回机制，并验证真拒绝/未知类型仍拦、正常缺失/Unicode回读仍通、stdin数据不作脚本。涉及用户真实注册时仍按授权和owner边界。
+- Supersedes: none
+- Invalid-When: 更换本机runtime、native工具/编码、typed API或错误分类机制时须重新验证；不泛化所有Windows工具都是GBK，也不授权改系统codepage或提高权限。

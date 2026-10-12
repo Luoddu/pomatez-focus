@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { spawnSync } from "child_process";
+import { nativeRegistry } from './nativeRegistry';
 import type { RestState } from "./activitywatch";
 
 export type BrowserPolicy = { mode: "mirror" | "pause" | "cooldown" | "quota"; cooldownMinutes: number; autoRaise: boolean };
@@ -46,16 +46,7 @@ export class BrowserControl {
   close() { try { atomic(path.join(this.directory,"browser-control-projection.json"),{owner:OWNER,v:1,ready:false,expiresAt:0}); } catch (_) {} }
   // Only an explicit trusted farm action installs the per-user host. Tests
   // inject a registry adapter and never touch the real browser registration.
-  install(executable: string, registry = { read: () => {
-    const r=spawnSync("reg.exe",["query",`HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\${HOST}`,"/ve"],{windowsHide:true,encoding:"utf8"});
-    if(r.error) throw r.error;
-    if(r.status===0) { const m=r.stdout.match(/REG_SZ\s+(.+)/); if(!m) throw Error("已有注册格式无效"); return m[1].trim(); }
-    if(r.status===1 && /找不到|unable to find|cannot find/i.test(r.stderr+r.stdout)) return null;
-    throw Error("无法核对浏览器注册权限");
-  }, write: (manifest: string) => {
-    const r=spawnSync("reg.exe",["add",`HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\${HOST}`,"/ve","/t","REG_SZ","/d",manifest,"/f"],{windowsHide:true,encoding:"utf8"});
-    if(r.error||r.status!==0) throw Error("浏览器配套注册失败");
-  } }) {
+  install(executable: string, registry = nativeRegistry()) {
     if(process.platform!=="win32") throw Error("配套安装目前支持Windows Edge");
     if(typeof executable!=="string" || !path.isAbsolute(executable) || !fs.statSync(executable).isFile()) throw Error("配套运行文件无效");
     const target=path.join(this.directory,"browser-control"), manifest=path.join(target,"host-manifest.json"), old=registry.read();
