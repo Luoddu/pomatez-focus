@@ -1,5 +1,4 @@
-import { researchFirst } from "../research";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FocusTask,
   FocusQuadrant,
@@ -14,6 +13,8 @@ import TaskTitle from "./TaskTitle";
 
 // 已收格子的视觉上限：计划数很大时只画前 12 格，文字仍显示真实 x/y
 const HARVEST_CELLS_MAX = 12;
+type BoardDrag = { key: string; scope: string };
+type Move = (key: string, quadrant: FocusQuadrant, target?: string, after?: boolean) => void;
 
 const GroupList = ({
   tasks,
@@ -23,6 +24,11 @@ const GroupList = ({
   activeTaskId,
   onComplete,
   completing,
+  dragRef,
+  boardScope,
+  onMove,
+  quadrant,
+  onDragChange,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -31,8 +37,14 @@ const GroupList = ({
   activeTaskId: string;
   onComplete?: (task: FocusTask) => void;
   completing: string;
+  dragRef: React.MutableRefObject<BoardDrag | null>;
+  boardScope: string | null;
+  onMove?: Move;
+  quadrant: FocusQuadrant;
+  onDragChange: (key: string) => void;
 }) => {
   const [hover, setHover] = useState("");
+  const [landing, setLanding] = useState<{key: string; after: boolean} | null>(null);
   // 右键 chip 的上下文菜单：单选项「标记完成」，点别处或右键别处关闭
   const [menu, setMenu] = useState<{
     task: FocusTask;
@@ -47,7 +59,7 @@ const GroupList = ({
     task.kind !== "pending";
   return (
     <div className="task-list">
-      {researchFirst(groupTasks(tasks)).map((group) => {
+      {groupTasks(tasks).map((group) => {
         // 占位行（done）只贡献已收数据，不渲染 chip；pending 是乐观临时 chip
         const research = group.tasks.some(
           (t) => t.projectType === "research"
@@ -71,12 +83,27 @@ const GroupList = ({
           !group.tasks.some((t) => t.kind === "free");
         // 计时中的任务不允许减：该行可能已有未同步的专注分钟
         const timing = !!activeTaskId && activeTaskId === taskId;
+        const draggable = !!boardScope && !!onMove && !group.tasks.some(t => t.quickTask || t.kind === "pending" || t.kind === "free");
         return (
           <div
             className={`task${complete ? " complete" : ""}${
               research ? " is-research" : ""
-            }`}
+            }${landing?.key === group.key ? landing.after ? " drop-after" : " drop-before" : ""}`}
             key={group.key}
+            data-task-group={group.key}
+            onDragOver={(e) => {
+              if (!onMove || !dragRef.current || dragRef.current.scope !== boardScope || dragRef.current.key === group.key) return;
+              e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect = "move";
+              const r=e.currentTarget.getBoundingClientRect();setLanding({key:group.key,after:e.clientY>=r.top+r.height/2});
+            }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setLanding(null); }}
+            onDrop={(e) => {
+              e.preventDefault();e.stopPropagation();const d=dragRef.current;
+              if (d && d.scope===boardScope && onMove) {
+                const r=e.currentTarget.getBoundingClientRect();onMove(d.key,quadrant,group.key,e.clientY>=r.top+r.height/2);
+              }
+              dragRef.current=null;setLanding(null);onDragChange("");
+            }}
             onMouseOver={() => setHover(group.key)}
             onMouseOut={(e) => {
               // 子元素之间移动不算移出；只有真正离开整行才收起 ±
@@ -93,6 +120,10 @@ const GroupList = ({
                   description={
                     group.tasks.find((t) => t.description)?.description
                   }
+                  drag={draggable ? {
+                    onStart: e => { dragRef.current={key:group.key,scope:boardScope!};e.dataTransfer.setData("application/x-pomatez-task",group.key);e.dataTransfer.effectAllowed="move";onDragChange(group.key); },
+                    onEnd: () => { dragRef.current=null;setLanding(null);onDragChange(""); }
+                  } : undefined}
                 />
                 {group.tasks.some((t) => t.quickTask) && (
                   <small> · 待同步，可专注</small>
@@ -277,6 +308,8 @@ export default function QuadrantBoard({
   records,
   journalSource,
   journalConnected,
+  boardScope = null,
+  onMove,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -308,8 +341,15 @@ export default function QuadrantBoard({
   records: FocusSession[];
   journalSource: string;
   journalConnected: boolean;
+  boardScope?: string | null;
+  onMove?: Move;
 }) {
   const [adding, setAdding] = useState<FocusQuadrant | null>(null);
+  const dragRef = useRef<BoardDrag | null>(null);
+  const [dragging, setDragging] = useState("");
+  const [overQuadrant, setOverQuadrant] = useState<FocusQuadrant | null>(null);
+  const dragChange = (key: string) => { setDragging(key);if (!key) setOverQuadrant(null); };
+  useEffect(() => { dragRef.current=null;dragChange(""); }, [boardScope]);
   const selectedRow = tasks.find((t) => t.id === selected);
   const selectedTask = selectedRow ? selectedRow.title : "";
   // 象限缺失或无法识别的任务全部归入“不紧急不重要”
@@ -319,7 +359,7 @@ export default function QuadrantBoard({
   const rows = [QUADRANTS.slice(0, 2), QUADRANTS.slice(2, 4)];
   return (
     <div className="left-col">
-      <div className="quadrants">
+      <div className={`quadrants${dragging ? " is-dragging" : ""}`}>
         {rows.map((row) => {
           const rowLists = row.map((q) =>
             tasks.filter((t) => quadrantOf(t) === q.key)
@@ -335,9 +375,12 @@ export default function QuadrantBoard({
                   <div
                     className={`card quad quad-${q.key}${
                       slim ? " slim" : ""
-                    }${spread ? " spread" : ""}`}
+                    }${spread ? " spread" : ""}${overQuadrant===q.key ? " drag-over" : ""}`}
                     key={q.key}
                     data-quadrant={q.key}
+                    onDragOver={(e) => { if (!onMove || !dragRef.current || dragRef.current.scope!==boardScope) return;e.preventDefault();e.dataTransfer.dropEffect="move";setOverQuadrant(q.key); }}
+                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverQuadrant(null); }}
+                    onDrop={(e) => { e.preventDefault();const d=dragRef.current;if (d && d.scope===boardScope && onMove) onMove(d.key,q.key);dragRef.current=null;dragChange(""); }}
                   >
                     <div className="quad-head">
                       <span className={`pill ${q.pill}`}>
@@ -373,6 +416,11 @@ export default function QuadrantBoard({
                       activeTaskId={activeTaskId}
                       onComplete={onComplete}
                       completing={completing}
+                      dragRef={dragRef}
+                      boardScope={boardScope}
+                      onMove={onMove}
+                      quadrant={q.key}
+                      onDragChange={dragChange}
                     />
                   </div>
                 );

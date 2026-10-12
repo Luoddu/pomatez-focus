@@ -11,10 +11,15 @@ export default function TaskTitle({
   taskKey,
   title,
   description,
+  drag,
 }: {
   taskKey: string;
   title: string;
   description?: string;
+  drag?: {
+    onStart: (e: React.DragEvent<HTMLButtonElement>) => void;
+    onEnd: () => void;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ left: 12, top: 12 });
@@ -76,11 +81,14 @@ export default function TaskTitle({
     <>
       <button
         ref={button}
-        className="task-title-button"
+        className={`task-title-button${drag ? " task-drag-handle" : ""}`}
         type="button"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        title="单击查看任务详情"
+        title={drag ? "拖动调整顺序或象限；单击查看详情" : "单击查看任务详情"}
+        draggable={!!drag}
+        onDragStart={(e) => { setOpen(false); drag?.onStart(e); }}
+        onDragEnd={drag?.onEnd}
         onClick={() => setOpen((value) => !value)}
       >
         {title}

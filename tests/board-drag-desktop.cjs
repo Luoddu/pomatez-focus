@@ -1,0 +1,57 @@
+const {app,BrowserWindow}=require('electron'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('silent isolated profile required');
+const root=path.resolve(__dirname,'..'),phase=process.env.POMATEZ_TEST_PHASE||'write';
+let scope='synthetic-board-A',writes=0;
+const row=(key,n=1,quad='iu',extra={})=>({id:key+n,taskId:key,planId:key+n,title:`Synthetic ${key} · 第 ${n} 个番茄`,description:'Synthetic details',source:'feishu',sourceKey:scope,quadrant:quad,doneToday:0,plannedToday:1,...extra});
+const rows=()=>[row('a',1,'iu',{plannedToday:3,doneToday:1}),row('a',2,'iu',{plannedToday:3,doneToday:1,creditedSeconds:60,appliedSessionIds:['saved']}),row('b',1,'iu',{projectType:'research'}),row('c',1,'inu'),row('d',1,'iu',{kind:'done',doneToday:1})];
+const history=()=>[{id:'saved',task:row('a'),startedAt:Date.now()-3600000,endedAt:Date.now()-3590000,acceptedSeconds:10,elapsedSeconds:10,completedCount:1,status:'saved',sync:'synced',cloudSynced:true}];
+const {FocusService}=require('../app/electron/build/focus/service');
+FocusService.prototype.status=()=>({configured:true,sourceKey:scope});FocusService.prototype.today=async()=>structuredClone(rows());FocusService.prototype.history=async()=>({sourceKey:scope,records:history(),missing:0});FocusService.prototype.dailyReviews=async()=>({sourceKey:scope,reviews:{}});FocusService.prototype.generateToday=async()=>({created:0});
+FocusService.prototype.configure=async()=>({configured:true});
+for(const name of ['sync','editHistory','createQuickTask','removePlan','archiveHistory'])FocusService.prototype[name]=()=>{writes++;throw Error('External writes forbidden')};
+require('../app/electron/build/main');
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),45000),checks=[];
+app.whenReady().then(async()=>{try{
+ let farm;const until=async f=>{for(let i=0;i<150;i++){if(await f())return;await wait(30)}throw Error('Timed out: '+f)};
+ await until(()=>{farm=BrowserWindow.getAllWindows()[0];return farm&&!farm.webContents.isLoadingMainFrame()});const js=s=>farm.webContents.executeJavaScript(s,true);
+ const stored=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
+ const click=label=>js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===${JSON.stringify(label)}||b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)throw Error('Unavailable '+${JSON.stringify(label)});b.click()})()`);
+ const order=q=>js(`Array.from(document.querySelectorAll('.quad-${q} [data-task-group]'),b=>b.dataset.taskGroup)`);
+ const layout=()=>js("localStorage.getItem('pomatez-board-layout-v1:synthetic-board-A')");
+ const start=key=>js(`(()=>{globalThis.__dragData=new DataTransfer();document.querySelector('[data-task-group="${key}"] .task-title-button').dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData}))})()`);
+ const drop=async(key,q,target=null,after=false)=>{
+  await start(key);await until(()=>js("document.querySelector('.quadrants').classList.contains('is-dragging')"));
+  await js(`(()=>{const e=document.querySelector(${JSON.stringify(target?'[data-task-group="'+target+'"]':'.quad-'+q)}),r=e.getBoundingClientRect(),y=r.top+r.height*${after?.8:.2};e.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:y}));e.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:y}))})()`);
+ };
+ if(phase==='restore'){
+  await until(async()=>!!(await stored())?.active);
+  const active=(await stored()).active;assert.equal(active.task.id,'a1');assert.equal(active.task.quadrant,'inu');assert.equal(active.task.planId,'a1');
+  await click('结束');await click('确认结束');await click('放弃本次');
+  await until(async()=>(await order('inu')).join(',')==='a,c');assert.deepEqual(await order('iu'),['b']);assert.deepEqual(await order('unu'),['d']);
+  checks.push('cold App restart preserves order/quadrants and active task identity; discard restores arranged board');
+ }else{
+  await until(async()=>(await order('iu')).join(',')==='b,a,d');await until(()=>js("document.querySelector('[data-task-group=a] .task-title-button').draggable && !document.querySelector('.gen-btn').disabled"));
+  const savedBefore=(await stored()).records.find(r=>r.id==='saved');
+  farm.setSize(1440,1000);await wait(100);const width=await js("[document.querySelector('.left-col').getBoundingClientRect().width,document.querySelector('.right-col').getBoundingClientRect().width]");
+  await drop('a','iu','b');await until(async()=>(await order('iu')).join(',')==='a,b,d');
+  await drop('a','iu','d',true);await until(async()=>(await order('iu')).join(',')==='b,d,a');checks.push('actual title DragEvents move task above and below without research sort undo');
+  await drop('a','inu','c');await until(async()=>(await order('inu')).join(',')==='a,c');assert.equal(await js("document.querySelectorAll('.quad-inu [data-task-group=a] .chip').length"),2);
+  await drop('d','unu');await until(async()=>(await order('unu')).join(',')==='d');assert.deepEqual((await stored()).records.find(r=>r.id==='saved'),savedBefore);checks.push('whole group crosses populated quadrant; completed group drops into empty quadrant; saved record unchanged');
+  const before=await layout();await js("document.querySelector('.quad-uni').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:new DataTransfer()}))");assert.equal(await layout(),before);
+  await start('b');await js("document.querySelector('[data-task-group=b] .task-title-button').dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:globalThis.__dragData}))");assert.equal(await layout(),before);
+  await js("globalThis.__originalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-board-layout-v1:'))throw Error('Synthetic storage quota');return globalThis.__originalSet.call(this,k,v)};void 0");
+  await drop('b','inu','c');assert.deepEqual(await order('iu'),['b']);assert.equal(await layout(),before);await js("Storage.prototype.setItem=globalThis.__originalSet;void 0");
+  checks.push('external drop/cancel leave layout untouched; storage failure retains previous board and persisted preference');
+  await click('生成今日番茄');await until(()=>js("!document.querySelector('.gen-btn').disabled"));assert.deepEqual(await order('inu'),['a','c']);
+  const switchSource=async next=>{scope=next;await click('设置');await js("document.querySelector('form.field-grid').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))");await until(()=>js("!document.querySelector('.settings-save').disabled"));await click('设置');await until(()=>js("!document.querySelector('.gen-btn').disabled"));};
+  await start('b');await switchSource('synthetic-board-B');await until(async()=>(await order('iu')).join(',')==='b,a,d');await js("document.querySelector('.quad-uni').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData}))");assert.deepEqual(await order('iu'),['b','a','d']);assert.equal(await layout(),before);
+  await switchSource('synthetic-board-A');await until(async()=>(await order('inu')).join(',')==='a,c');checks.push('manual refresh preserves arrangement; stale source drag denied; source switch isolates preferences and returns to A');
+  await js("document.querySelector('[data-task-group=a] .task-title-button').click()");assert.equal(await js("document.querySelector('.task-detail-text').textContent"),'Synthetic details');await js("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
+  assert.deepEqual(await js("[document.querySelector('.left-col').getBoundingClientRect().width,document.querySelector('.right-col').getBoundingClientRect().width]"),width);
+  const gaps=await js("[getComputedStyle(document.querySelector('.right-col')).gap,getComputedStyle(document.querySelector('.rest-calendar-group')).gap,getComputedStyle(document.querySelector('.scientific-rest')).gap]");assert.deepEqual(gaps,['12px','14px','6px']);
+  await farm.capturePage(undefined,{stayHidden:true,stayAwake:true});farm.webContents.invalidate();await wait(200);fs.writeFileSync(path.join(root,'artifacts/p057-board-preview.png'),(await farm.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());checks.push('title click still opens details; compact title gaps and left/right widths preserved');
+  await js("document.querySelector('[data-task-group=a] .chip').click()");await click('开始专注');await until(async()=>!!(await stored()).active);assert.equal((await stored()).active.task.id,'a1');assert.equal((await stored()).active.task.quadrant,'inu');assert.deepEqual((await stored()).records.find(r=>r.id==='saved'),savedBefore);checks.push('next focus retains task/plan IDs with arranged quadrant; existing completed history unchanged');
+ }
+ assert.equal(writes,0);assert.equal(farm.isVisible(),false);assert.equal(farm.webContents.isAudioMuted(),true);
+ fs.writeFileSync(path.join(root,`artifacts/p057-desktop-${phase}.json`),JSON.stringify({checks,passed:checks.length,silent:true,externalWrites:writes,realProfileWrites:0},null,2));console.log(JSON.stringify({phase,checks,passed:checks.length}));clearTimeout(deadline);app.exit(0);
+}catch(e){console.error(e.stack);clearTimeout(deadline);app.exit(1)}});

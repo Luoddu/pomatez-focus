@@ -40,6 +40,7 @@ import {
   taskDay,
 } from "./taskSnapshot";
 import QuadrantBoard from "./components/QuadrantBoard";
+import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup } from "./boardLayout";
 import FocusTimer from "./components/FocusTimer";
 import ReviewPanel from "./components/ReviewPanel";
 import SettingsPanel, { FocusConfig } from "./components/SettingsPanel";
@@ -315,10 +316,31 @@ export default function FocusApp() {
   );
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
-  const boardTasks = completionQueue.project(
-    projectQuickTasks(tasks, outbox, sourceKey),
-    sourceKey
+  const [boardRevision, setBoardRevision] = useState(0);
+  const boardScope = !connectionReady ? null : connected ? sourceKey : "local";
+  const boardLayout = useMemo(
+    () => readBoardLayout(localStorage, boardScope),
+    // Successful preference writes invalidate this cache; ticking seconds do not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boardScope, boardRevision]
   );
+  const baseBoardTasks = useMemo(() => completionQueue.project(
+    projectQuickTasks(tasks, editQueue.entries.filter(e => e.sourceKey === sourceKey), sourceKey), sourceKey
+  // Queue revisions trigger projection; elapsed-second renders do not touch storage/sorting.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [tasks, sourceKey, editRevision, queueRevision]);
+  const boardTasks = useMemo(() => projectBoardLayout(baseBoardTasks, boardLayout), [baseBoardTasks, boardLayout]);
+  const boardTasksRef = useRef(boardTasks);
+  boardTasksRef.current = boardTasks;
+  const moveBoard = (key: string, quadrant: FocusQuadrant, target?: string, after?: boolean) => {
+    if (!boardScope || loadingTasks || timer.blocked) return;
+    try {
+      const latest = readBoardLayout(localStorage, boardScope);
+      const next = moveBoardGroup(boardTasksRef.current, latest, boardScope, key, quadrant, target, after);
+      saveBoardLayout(localStorage, next);
+      setBoardRevision(n => n + 1);
+    } catch (e: any) { notify(e.message || "看板安排未能保存", "error"); }
+  };
   const editingIds = outbox
     .filter((e) => e.kind === "edit" || e.kind === "color")
     .map((e) => (e.payload as PendingEdit).before.id);
@@ -1859,6 +1881,8 @@ export default function FocusApp() {
           ) : (
             <QuadrantBoard
               tasks={boardTasks}
+              boardScope={boardScope}
+              onMove={loadingTasks || timer.blocked ? undefined : moveBoard}
               selected={selected}
               onSelect={(id) =>
                 setSelected((previous) => (previous === id ? "" : id))

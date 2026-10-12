@@ -169,7 +169,7 @@ input:focus-visible {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-height: 0;
   overflow: hidden;
 }
@@ -842,14 +842,14 @@ input:focus-visible {
 .side-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 .side-section.records-section {
   flex: 1;
   min-height: 0;
 }
 /* Local ActivityWatch mirror, kept in the calendar column. */
-.rest-calendar-group { display: flex; flex-direction: column; gap: 18px; min-width: 0; flex: none; }
+.rest-calendar-group { display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: none; }
 .rest-heading { display: inline-flex; align-items: center; gap: 6px; }
 .rest-refresh { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 3px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
 .rest-refresh svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
@@ -858,7 +858,7 @@ input:focus-visible {
   opacity: 0.5;
   cursor: wait;
 }
-.scientific-rest { gap: 8px; flex: none; }
+.scientific-rest { gap: 6px; flex: none; }
 .rest-back { margin-left: auto; font-size: 11px; }
 .rest-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface, #fff); padding: 10px 12px 8px; min-width: 0; }
 .rest-quota { display: grid; grid-template-columns: minmax(88px, 42%) minmax(0, 1fr); gap: 12px; height: 128px; align-items: center; }
@@ -990,6 +990,18 @@ input:focus-visible {
   margin-left: auto;
   font-size: 14px;
 }
+/* Native title dragging; indicators do not consume row space. */
+.task-drag-handle { cursor: grab; }
+.task-drag-handle:active { cursor: grabbing; }
+.quadrants.is-dragging .task { position: relative; }
+.quadrants.is-dragging .task.drop-before::before,
+.quadrants.is-dragging .task.drop-after::after {
+  content: ""; position: absolute; left: 0; right: 0; height: 2px;
+  border-radius: 2px; background: var(--primary); pointer-events: none; z-index: 2;
+}
+.quadrants.is-dragging .task.drop-before::before { top: -1px; }
+.quadrants.is-dragging .task.drop-after::after { bottom: -1px; }
+.quadrants.is-dragging .quad.drag-over { box-shadow: inset 0 0 0 2px #bbc5ff; }
 .side-title-actions {
   margin-left: auto;
   display: flex;
