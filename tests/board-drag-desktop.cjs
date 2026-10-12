@@ -1,10 +1,11 @@
 const {app,BrowserWindow}=require('electron'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('silent isolated profile required');
 const root=path.resolve(__dirname,'..'),phase=process.env.POMATEZ_TEST_PHASE||'write';
+const historyStart=new Date().setHours(8,0,0,0);
 let scope='synthetic-board-A',writes=0;
 const row=(key,n=1,quad='iu',extra={})=>({id:key+n,taskId:key,planId:key+n,title:`Synthetic ${key} · 第 ${n} 个番茄`,description:'Synthetic details',source:'feishu',sourceKey:scope,quadrant:quad,doneToday:0,plannedToday:1,...extra});
 const rows=()=>[row('a',1,'iu',{plannedToday:3,doneToday:1}),row('a',2,'iu',{plannedToday:3,doneToday:1,creditedSeconds:60,appliedSessionIds:['saved']}),row('b',1,'iu',{projectType:'research'}),row('c',1,'inu'),row('d',1,'iu',{kind:'done',doneToday:1})];
-const history=()=>[{id:'saved',task:row('a'),startedAt:Date.now()-3600000,endedAt:Date.now()-3590000,acceptedSeconds:10,elapsedSeconds:10,completedCount:1,status:'saved',sync:'synced',cloudSynced:true}];
+const history=()=>[{id:scope==='synthetic-board-A'?'saved':'saved-B',task:row('a'),startedAt:historyStart,endedAt:historyStart+10000,acceptedSeconds:10,elapsedSeconds:10,completedCount:1,status:'saved',sync:'synced',cloudSynced:true}];
 const {FocusService}=require('../app/electron/build/focus/service');
 FocusService.prototype.status=()=>({configured:true,sourceKey:scope});FocusService.prototype.today=async()=>structuredClone(rows());FocusService.prototype.history=async()=>({sourceKey:scope,records:history(),missing:0});FocusService.prototype.dailyReviews=async()=>({sourceKey:scope,reviews:{}});FocusService.prototype.generateToday=async()=>({created:0});
 FocusService.prototype.configure=async()=>({configured:true});
@@ -21,7 +22,11 @@ app.whenReady().then(async()=>{try{
  const start=key=>js(`(()=>{globalThis.__dragData=new DataTransfer();document.querySelector('[data-task-group="${key}"] .task-title-button').dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData}))})()`);
  const drop=async(key,q,target=null,after=false)=>{
   await start(key);await until(()=>js("document.querySelector('.quadrants').classList.contains('is-dragging')"));
-  await js(`(()=>{const e=document.querySelector(${JSON.stringify(target?'[data-task-group="'+target+'"]':'.quad-'+q)}),r=e.getBoundingClientRect(),y=r.top+r.height*${after?.8:.2};e.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:y}));e.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:y}))})()`);
+  const selector=target?'[data-task-group="'+target+'"]':'.quad-'+q;
+  await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect(),y=r.top+r.height*${after?0.8:0.2};e.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:y}))})()`);
+  if(target)assert.equal(await js(`document.querySelector(${JSON.stringify(selector)}).classList.contains(${JSON.stringify(after?'drop-after':'drop-before')})`),true);
+  else assert.equal(await js(`document.querySelector(${JSON.stringify(selector)}).classList.contains('drag-over')`),true);
+  await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();e.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:r.top+r.height*${after?0.8:0.2}}))})()`);
  };
  if(phase==='restore'){
   await until(async()=>!!(await stored())?.active);
