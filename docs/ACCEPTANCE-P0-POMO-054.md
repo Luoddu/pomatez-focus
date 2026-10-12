@@ -1,6 +1,6 @@
 # P0-POMO-054 受控旅程接口验收
 
-部分确认：接口实现/原始隔离实链已验证，冻结最终源码/独立复核/Windows发布待补。模块没有注册Hermes工具、修改根组件锁或声明根接入完成。
+已验证：冻结运行源3afcd1b0b02a3fd48e6792c13faf666fc9ca1bd3，独立review_scientific_rest源码PASS，无剩余实质缺陷；335/335全量PASS，精度两文件delta额外10逻辑/10真实UI PASS。当前Windows包已验证，公开发布待补。模块没有注册Hermes工具、修改根组件锁或声明根接入完成。
 
 四处与角色/写集/红黄绿引用TASK-P0-POMO-054：根脏治理文件黄灯只读，本模块单分支/单worktree绿灯；当前运行所有者为原FocusApp/Timer/Journey。固定Electron34.5.8官方app.md第二实例/单实例锁已读；原raw域名超时后从GitHub固定commit文件API取得blob a93348469d0fb60e576c3fa9a81dc03baec24fb0、67843字节，SHA原文回退manifest见ignored p054-official，无运行依赖。
 
@@ -15,4 +15,6 @@
 
 范围/风险：Windows当前用户AppData继承ACL为边界，同用户进程/管理员可信；没有公网/HTTP/Secret。客户端要求App已运行，首次single且带API参数立即退出，不新起农场；只支持今天/未来写，历史只读，每日256次API写回执满拒，不遗忘去重。Hermes接口说明/样例见JOURNEY-API.md，真实Hermes接入需后续明确任务。用户App不自动安装/重启。
 
-Learning none：复用现有真相源和原生生命周期，不将未复核假设写根Learning；具体闭环问题/证据保留本验收。回滚源码revert、停App停入口，原记录/计时数据不迁移，字段兼容原Journey校验。
+Learning recorded LEARN-P0-POMO-054-01：独立review提出并确认逻辑ID/transport UUID分离的窄复用条件，已同检查点记录本模块Learning；早期none是当时预判。串行lease所有权与既有LEARN-P0-POMO-042-01跨await调度教训邻接，不重复泛化记录；专项证据保留本验收。根Learning未写。回滚源码revert、停App停入口，原记录/计时数据不迁移，字段兼容原Journey校验。
+
+包验收：release88-package-acceptance.json现绑定3af（旧e109未发布候选已恢复保留）；178文件逐字ASAR匹配，journeyGateway/client/nativehost/扩展均存在，实际安装包unpacked hidden启动成功，setup/blockmap/feed/source-version/sha清单五资产内部大小/哈希一致。旧87真实更新器发布前current87，0下载安装，发布后结果待补。

@@ -25,3 +25,14 @@
 - Required-Check: 等待期间重新检查最新daily/week在途查询；排空后不跨await执行缓存失效和新单飞查询启动。验证重复手动刷新合并、交错旧查询覆盖仍完整、新查询确实重新发现，以及暂停取消后未来刷新仍可用。
 - Supersedes: none
 - Invalid-When: 更换缓存所有者、查询调度或并发模型时须重新验证；不泛化为所有缓存都需要全局排空。
+
+## LEARN-P0-POMO-054-01 - 逻辑去重ID不要复用为单次文件传输槽位
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-054
+- Evidence: docs/ACCEPTANCE-P0-POMO-054.md; tests/journey-api-desktop.cjs; app/electron/src/assets/journey-client.cjs
+- Applies-To: 本农场当前用户文件请求/回应与App单实例交接接口的后续调整
+- Lesson: 同一逻辑requestId需要跨超时、重试和重启保留，而单次请求文件用wx排他创建。冻结56aa旧客户端把二者合一，残留同ID输入使后续调用EEXIST，并发caller在取得请求文件前删同ID回应也会干扰第一caller。当前客户端每调用分配独立transport UUID，Journey内的逻辑ID回执仍唯一；真实CLI双实例/renderer实链证明两个相同逻辑请求都回读去重，旧instance孤儿保留且不阻塞正常重试，不删除他人响应。
+- Required-Check: 重试复用完全相同逻辑ID/版本/操作，但每次传输独立文件所有权；保存回执在Journey真相源。验证同ID并发、旧实例孤儿、不同内容复用ID被拒、旧版本不能覆盖手动修改及正常新请求仍通；不能用静默删孤儿或换逻辑ID掩盖未知提交结果。
+- Supersedes: none
+- Invalid-When: 改成具备请求复用/租约/回执的成熟IPC通道、移除文件传输或改变去重保存机制时须重新验证；本条不泛化为所有协议都必须两个UUID，也不代表个人Hermes工具已接通。

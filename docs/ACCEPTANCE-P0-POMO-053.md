@@ -1,6 +1,6 @@
 # P0-POMO-053 验收
 
-部分确认：代码/隔离链路已验证，实际用户Edge首次加载配套后待验；本卡与P054合并发布preview88，发布证据待补。根仓/Hermes/个人App未修改或自动安装。
+部分确认：冻结3af源码独立PASS、335全量/精度10及真实手动10、CLI4、原生视频4、AW25均PASS，3af clean包178文件ASAR/hidden启动/五资产内部哈希PASS；实际用户Edge首次加载配套后待验。本卡与P054合并发布preview88，公开发布证据待补。根仓/Hermes/个人App未修改或自动安装。
 
 四处预检引用TASK-P0-POMO-053及P054追加回执。官方固定Electron34.5.8/Node20.19.1/Edge154 NativeMessaging证据SHA和blob见ignored p053-official/manifest.json；官方原文与生产机制均已读，未引入第二统计或网络接口。
 
