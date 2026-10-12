@@ -1,0 +1,10 @@
+# P0-POMO-057 标题拖动任务与紧凑右栏
+
+- IN_PROGRESS；owner /root，隔离模块实现/既有授权发布；唯一状态本卡。基线07624c23099429fe71234f4bc39b7da8da3e1c19，实时canonical同源，task/p0-pomo-057-board-drag，单worktree无其他写者。用户要求标题抓手上下排序、跨象限，以及右侧标题略紧凑；默认推送沿模块AGENTS。
+- 完整卡（本机持久看板安排与业务显示）；允许复用现有review_scientific_rest有界只读冻结diff/原始正反测试，不加新Agent或写者。根仓规则/模块不可写边界和版本规则本会话已读，不加载无关组件。真实用户状态不用于测试。
+- 写集：app/renderer/src/focus/boardLayout.ts、FocusApp.tsx、components/QuadrantBoard.tsx、TaskTitle.tsx、focus.css；tests/board-layout.test.mjs、board-drag-desktop.cjs，scripts/test-board-drag-desktop.cjs；docs/TASK-P0-POMO-057.md、ACCEPTANCE-P0-POMO-057.md、CHANGELOG.md；version helper package.json/SettingsPanel.tsx；ignored合成profiles/截图/验证/已有发布helper与包。不得改任务表/云API、计时/完成队列、原快照schema、旅程协议/AW或注册权限。
+- 四处预检：①QuadrantBoard GroupList研究优先硬排序、TaskTitle只读popover，无拖放；FocusApp用completion/quick队列投影，raw tasks与active/records独立，刷新会重读sourceKey。②复用固定基线TodayJourney原生draggable/DataTransfer/drop路径、安装React16.14/@types/react公开DragEvent/onDragStart/onDrop类型原文；只用原生HTML拖放，不加库或更改第三方生命周期。③taskSnapshot/editQueue/completionQueue原保护、researchFirst与稳定taskId分组、版本/build/push/五资产updater；Learning039发布门禁命中，无新候选。④031 task交互/快照/分类原始测试与053真实桌面静默测试可复用；已有任务排序持久元数据未找到，范围renderer/测试目录。
+- 方案：按当前用户/任务sourceKey保存薄看板偏好（稳定group taskId或本地id、顺序与象限），没有任务内容/计划副本或第二统计源，不向飞书写字段。投影只改变当前候选任务的显示顺序/象限；raw任务id、番茄槽位、完成信用/planId及现有active/records保持。没手动调整时原researchFirst默认仍通；调整后手动顺序优先。按source隔离、schema/长度/枚举/唯一ID校验，保存失败显示错误且不先改画面。旧source拖动载荷/未知id/外部drop/未同步临时组拒；有效内部标题drag同象限上下与空象限仍通。重读刷新仍应用偏好，切换source不串用。
+- 正反验收：标题drag有抓手cursor/落点线/跨象限高亮；详情单击仍可用、chip选择仍正常。真实production renderer同象限上/下、跨非空及空象限、外部drop/cancel、刷新和冷重启、切换来源、存储失败；每个无效情况拒而正常路径仍通。一组多个番茄整体移动，done/credit/IDs保留；当前计时和历史记录不被安排修改；新任务/刷新不会丢失。右栏side-section gap12→约8、组间18→约14/right-col16→约12，字体/列宽/四象限占比不改，目视1440以上及窄窗口。
+- 资源：独占clone/build/dist与静默随机profile，无真实DB、账号、Edge、registry、端口或服务写入；UI HTML fixture使用合成任务与禁云写桩。一次前台有界交付；未知同根因两次停止对应步骤、查明可在范围修正；跨来源/身份或scope升级时暂停对应写。源码反向显式revert，偏好独立key可忽略回退原排序；发布新92不替换91，五资产与真实旧91→92更新检测，不自动下载安装重启。
+- Learning初判none：复用原生拖放与纯投影隔离，独立复核前出现可复用已验证候选则/root单写本模块Learning并登记证据；不写根Learning。开工/冻结/提交对比HEAD/写集/资源绿灯，不把非重叠漂移升级停工。
