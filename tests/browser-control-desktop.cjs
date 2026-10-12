@@ -14,9 +14,15 @@ app.whenReady().then(async()=>{let child,video;try{
  let farm;await until(()=>{farm=BrowserWindow.getAllWindows()[0];return farm&&!farm.webContents.isLoadingMainFrame()});const js=s=>farm.webContents.executeJavaScript(s,true);
  await until(()=>js("document.querySelector('.wg-now')?.textContent.trim()==='65'"));
  const weight=await js("[getComputedStyle(document.querySelector('.wg-now')).fontWeight,getComputedStyle(document.querySelector('.wg-goal')).fontWeight]");assert.deepEqual(weight,['700','400']);
- await js("const x=document.querySelector('.hm-badge-slot');x.innerHTML='<span class=hm-week-total>65</span><span class=hm-badge>🏅</span>'");
- assert.equal(await js("document.querySelectorAll('.hm-badge').length>0 && [...document.querySelectorAll('.hm-badge-slot')].filter(b=>b.querySelector('.hm-badge')).every(b=>{const n=b.querySelector('.hm-week-total').getBoundingClientRect(),m=b.querySelector('.hm-badge').getBoundingClientRect();return m.top>=n.bottom})"),true);
- checks.push('current tomato count bold, normal goal; reached-week medal below readable total with no overlap');
+ assert.equal(await js("[...document.querySelectorAll('.weekgoal-chip')].every(b=>getComputedStyle(b.querySelector('.wg-now')).color===getComputedStyle(b.querySelector('.wg-goal')).color)"),true);
+ assert.equal(await js("getComputedStyle(document.querySelector('.research-goal .wg-now')).color"),'rgb(173, 56, 47)');
+ await js("document.querySelectorAll('.hm-badge').forEach(b=>b.getAnimations().forEach(a=>a.finish()))");
+ for(const cell of [13,22]) {
+  await js(`document.querySelector('.heatmap').style.setProperty('--hm-cell','${cell}px')`);
+  assert.equal(await js("document.querySelectorAll('.hm-badge').length>0 && [...document.querySelectorAll('.hm-badge-slot')].filter(b=>b.querySelector('.hm-badge')).every(b=>{const n=b.querySelector('.hm-week-total').getBoundingClientRect(),m=b.querySelector('.hm-badge').getBoundingClientRect();return m.left>=n.right-.1 && Math.abs((m.top+m.bottom)/2-(n.top+n.bottom)/2)<.6 && n.width+m.width+1<=b.getBoundingClientRect().width+3})"),true);
+ }
+ await js("document.querySelector('.heatmap').style.removeProperty('--hm-cell')");
+ checks.push('current tomato count bold and same hue as target including red research; weekly total and mini gold tomato inline without overlap at 13px/22px cells');
  const day=`${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,'0')}-${String(dayDate.getDate()).padStart(2,'0')}`;
  const state=main.restMonitor.snapshot();state.status='recording';state.updatedAt=Date.now();state.usage={day,start:dayDate.getTime(),end:Date.now(),totalSeconds:4532,bilibili:4532,xiaohongshu:0,hours:[],sessions:[],coverageStart:dayDate.getTime()};state.live={checkedAt:Date.now(),startedAt:now,expiresAt:Date.now()+7000,site:'bilibili',estimateFrom:null,detail:'synthetic'};state.reminder={key:'synthetic/5',kind:'focus',watchedMinutes:75,excessMinutes:15,completedCount:0};
  main.restMonitor.state=state;

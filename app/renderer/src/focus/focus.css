@@ -1994,42 +1994,37 @@ input:focus-visible {
   );
   box-shadow: 0 0 4px 1px rgba(232, 169, 23, 0.4);
 }
-/* 徽章行同时承载周合计：槽位锁定格宽不外扩（数字可略微溢出居中显示），
-   达成徽章移到列右上角，月历卡高度不变 */
+/* 周合计和小金番茄同一基线，保持原周列宽；不再为徽章另占一行。 */
 .hm-badge-slot {
   position: relative;
   width: var(--hm-cell, 13px);
-  height: 27px;
+  height: 14px;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex-direction: row;
+  gap: 1px;
   align-items: center;
   justify-content: center;
   overflow: visible;
 }
 .hm-week-total {
-  font-size: 9px;
+  font-size: clamp(6px, calc(var(--hm-cell, 13px) * 0.4), 9px);
   line-height: 1;
   color: #9aa1ab;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  flex: none;
 }
 .hm-badge {
   position: static;
   display: inline-flex;
-  animation: hm-badge-grow 0.45s ease-out both;
-  transform-origin: bottom center;
+  flex: none;
+  align-items: center;
 }
-@keyframes hm-badge-grow {
-  from {
-    transform: scale(0);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
+.hm-badge svg {
+  width: clamp(5px, calc(var(--hm-cell, 13px) * 0.36), 8px);
+  height: clamp(5px, calc(var(--hm-cell, 13px) * 0.36), 8px);
 }
+.hm-badge-slot.met .hm-week-total { color: #9b741f; }
 
 /* ── 周目标 chip + 悬浮设置 popover（挂在「番茄月历」标题行右侧） ── */
 .weekgoal {
@@ -2080,11 +2075,8 @@ input:focus-visible {
 .wg-now {
   font-size: 14px;
   font-weight: 700;
-  color: #3f4650;
+  color: inherit;
   font-variant-numeric: tabular-nums;
-}
-.weekgoal-chip.met .wg-now {
-  color: #8a6107;
 }
 @media (prefers-reduced-motion: reduce) {
   .wg-fill {
@@ -3973,7 +3965,8 @@ button.stats-range-label:hover {
 /* Research encouragement: preserve quadrant hues and accessible task controls. */
 .research-goals-title { flex-wrap: wrap; gap: 6px; }
 .research-weekgoal { margin-left: 0; }
-.research-goal { color: #ad382f; background: #fff1ee; border-color: #efbcb4; cursor: pointer; }
+.research-goal,
+.research-goal.met { color: #ad382f; background: #fff1ee; border-color: #efbcb4; cursor: pointer; }
 .research-goal .wg-fill { background: #cf5145; }
 .research-weekgoal .weekgoal-hint { color: #67707d; line-height: 1.5; }
 .research-weekgoal::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }

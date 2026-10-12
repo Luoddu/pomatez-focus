@@ -229,7 +229,7 @@ export default function HeatmapCalendar({
               );
               return (
                 <span
-                  className="hm-badge-slot"
+                  className={`hm-badge-slot${met ? " met" : ""}`}
                   key={`badge-${week.key}`}
                 >
                   {total > 0 && (
