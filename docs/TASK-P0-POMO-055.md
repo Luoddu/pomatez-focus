@@ -1,6 +1,6 @@
 # P0-POMO-055 首次配套注册检查与Unicode
 
-- IN_PROGRESS；owner /root，隔离农场模块修复/发布协调者，唯一状态本卡。用户按本会话指导点击配套安装后报“无法核对浏览器注册权限”，明确目标消除首次安装误判并继续配套使用；默认源码/NSIS preview发布沿模块AGENTS既有授权。基线0b36604aab56b93ee1e00ac9e2064535048d9ff9，实时canonical同源，单worktree task/p0-pomo-055-native-registry。
+- DONE（修复/公开交付）；owner /root，隔离农场模块修复/发布协调者，唯一状态本卡。用户按本会话指导点击配套安装后报“无法核对浏览器注册权限”，明确目标消除首次安装误判并继续配套使用；默认源码/NSIS preview发布沿模块AGENTS既有授权。基线0b36604aab56b93ee1e00ac9e2064535048d9ff9，实时canonical同源，单worktree task/p0-pomo-055-native-registry。
 - 完整卡：注册/编码系统边界，复用review_scientific_rest只读冻结源码/官方机制/原始测试，不加新Agent。根私有仓不写/不push，不碰其他组件/真实登录态/用户计时或AW数据库。已读适用root入口、how-to-dispatch/version-control和模块AGENTS；控制包已有有限同会话内容不重复加载无关全文。
 - 写集：app/electron/src/focus/browserControl.ts、nativeRegistry.ts；tests/native-registry.test.cjs、browser-control.test.cjs；docs/TASK-P0-POMO-055.md、ACCEPTANCE-P0-POMO-055.md、BROWSER-CONTROL.md、CHANGELOG.md；version helper app/electron/package.json、app/renderer/src/focus/components/SettingsPanel.tsx。ignored artifacts仅编码复现、固定官方证据、隔离profiles、包与有界发布helpers。
 - 四处预检/系统T0分类：①89源码spawnSync reg.exe encoding:utf8，按中文/英文错误文本识别missing；本机raw Node调用status1/无spawnError，stderrHex b4edcef33a20cfb5cdb3d5d2b2bbb5bdd6b8b6a8b5c4d7a2b2e1b1edcfeebbf2d6b5a1a30d0a，用gbk解码为“错误: 系统找不到指定的注册表项或值”，utf8乱码造成误判。真实native key只读确认尚未创建，首次缺失应正常，不是真实权限不足。②采用固定Windows PowerShell5.1.19041.6456/CLR4.0.30319.42000/.NET Framework4.8.1 Release533325内置Microsoft.Win32.RegistryKey OpenSubKey/GetValue/GetValueKind/CreateSubKey/SetValue公开API；missing null与Security/UnauthorizedAccess异常分开，显式UTF8 JSON。Node内置20.19.1 spawnSync公开路径，原NativeMessaging微软固定证据复用。③模块039不可变发布/Learning054去重教训命中但不改变；当前stage/owner guard、native fixed host、registry injection、version/build/push发布helpers复用。④P053/P054假registry正反与stdio/HTML安装链通过，但无真实中文reg.exe首次缺失案例，本卡补该实链缺口。
@@ -11,3 +11,4 @@
 - Learning预判none：本机OEM错误文本误解编码与typed API薄修已有常规机制；若形成已验证可跨任务教训由本模块/root单写并独立复核后再记；不写根Learning。验收/正反/来源/风险/未完成均入acceptance。界面首次真实Edge连接属于用户最后gate，不冒充已控制个人视频。
 - 完整链fixture补充允许tests/browser-control-desktop.cjs：在既有hidden主App/生成CMD/真实HTML测试中，将假registry换成独立UUID+marker的typed HKCU测试键并核owner清理；不让production browserSetup越过headless拒绝真实注册的门禁。
 - 经实链10项正反形成窄编码教训，追加允许本模块Learning.md，仅/root协调写；Evidence为本卡验收+实际OEM/typed scratch测试，候选必须独立复核后采纳。根Learning仍不写。
+- 封版：review_scientific_rest独立源码/官方/10项注册、338项回归、5项隔离实链、185文件包源/五资产、公开90及真实旧89更新器检测90全部PASS，冻结tag/runtime 8a786f76bb4a2c81201743b1bc60fc123f9186bb，证据见ACCEPTANCE-P0-POMO-055.md。LEARN055同实现commit记录并接受，无剩余候选。个人Edge正式加载仍用户操作gate，未代写真实注册项或安装重启个人App；不得称个人视频暂停已实测。
