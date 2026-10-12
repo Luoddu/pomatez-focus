@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "番茄农场 · 科学专注",
+  "version": "1.0.0",
+  "description": "由本机农场控制B站和小红书的暂停与冷静期；不读取Cookie或上传浏览记录。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1kSy+h8ezKIGJGVTC0sZF1BGdTEXyaGRATwFuvE2sNqP7ZUGGRQAx0cTRylGxHw6ZExjRVWNCq81HC7cL+O6mQcO9jlzRxQXuIzi03MOzSyYrIYwLsBR+oDtnxdLC8LXn9hz5Q5GLmtL/709thayJ7mVwK3oIZA52MWQh6I0dZsTK2FhHH1ykmJp2btJ6NXo0uu4ud5dP2tWapIjBBTXqN3YmdVfrN6rsNhcp7shCxMAIUurPlSXvODeHuh94oeY+2TYj6RYwTKqqupLTzxf0R4Dh94N8qfAi+dsmm5aIDC4//KE4tXVsSyNH6iMM2hli3nzCpL7FW7wYm+dPEXv5wIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.bilibili.com/*",
+    "*://*.xiaohongshu.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.bilibili.com/*",
+        "*://*.xiaohongshu.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

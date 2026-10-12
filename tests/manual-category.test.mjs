@@ -99,7 +99,7 @@ test("edit window exposes pause-aware maximum, seconds precision and legacy boun
   assert.equal(
     manualWindow(initial, start, initial.endedAt + 3600000, 3600)
       .availableSeconds,
-    initial.elapsedSeconds
+    initial.elapsedSeconds + 3600
   );
   assert.equal(
     manualWindow(
@@ -108,8 +108,18 @@ test("edit window exposes pause-aware maximum, seconds precision and legacy boun
       endedAt,
       3600
     ).availableSeconds,
-    3600
+    0
   );
+});
+test("manual extension adds ten minutes, keeps explicit pause clock positions and independent count",()=>{
+  const small={...initial,endedAt:start+1800000,elapsedSeconds:1500,acceptedSeconds:1500,completedCount:1,segments:[{start,end:start+600000},{start:start+900000,end:start+1800000}]};
+  const r=manualRecord({initial:small,id:'unused',task:small.task,startedAt:start,endedAt:start+2400000,seconds:2100,count:1,now});
+  assert.equal(r.acceptedSeconds,2100);assert.equal(r.elapsedSeconds,2100);assert.equal(r.completedCount,1);assert.equal(r.id,small.id);
+  assert.deepEqual(r.segments,[{start,end:start+600000},{start:start+900000,end:start+2400000}]);
+  assert.equal(manualWindow(small,start+300000,start+2400000,2400).availableSeconds,1800);
+  assert.throws(()=>manualRecord({initial:small,id:'unused',task:small.task,startedAt:start,endedAt:start+2400000,seconds:2400,count:1,now}),/超过/);
+  const legacy={...small,segments:undefined};
+  assert.equal(manualWindow(legacy,start,start+2400000,2100).availableSeconds,2100);
 });
 test("overnight end correction clips active spans, keeps pauses and identity; rejected time cannot fabricate focus", () => {
   const r = edit({ endedAt: start + 2 * 3600000 });

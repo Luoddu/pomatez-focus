@@ -75,7 +75,7 @@ export default function ResearchGoal({
           style={{ width: `${goalProgressRatio(count, goal) * 100}%` }}
         />
         <span className="wg-text">
-          科研 {count}/<b>{goal}</b>
+          科研 <span className="wg-now">{count}</span>/<span className="wg-goal">{goal}</span>
           {count >= goal ? " ✓" : ""}
         </span>
       </button>

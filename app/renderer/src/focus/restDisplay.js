@@ -6,6 +6,17 @@ export function durationText(value) {
     Math.floor(seconds / 60) % 60
   }分钟 ${seconds % 60}秒`;
 }
+export function clockText(value) {
+  const s = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
+  return `${Math.floor(s/3600)}:${String(Math.floor(s/60)%60).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+}
+export function quotaDisplay(seconds, quotaMinutes) {
+  const used = Math.max(0, Number.isFinite(seconds) ? seconds : 0), quota = quotaMinutes * 60;
+  const over = used >= quota, excess = Math.max(0, used - quota);
+  return { over, ratio: over ? (excess % quota)/quota : Math.max(0,(quota-used)/quota),
+    clock: clockText(over ? used : quota-used),
+    label: over ? "今日累计" : "剩余额度", excess: clockText(excess), laps: Math.floor(used/quota) };
+}
 const day = (value) => {
   const d = new Date(value);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(

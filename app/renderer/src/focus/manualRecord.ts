@@ -21,26 +21,41 @@ export function manualWindow(
     initial &&
     startedAt === initial.startedAt &&
     endedAt === initial.endedAt;
-  const segments = unchanged
-    ? initial!.segments
-    : initial?.segments
-        ?.map((s) => ({
-          start: Math.max(
-            startedAt,
-            s.start + (startedAt - initial!.startedAt)
-          ),
-          end: Math.min(
-            endedAt,
-            s.end + (startedAt - initial!.startedAt)
-          ),
-        }))
-        .filter((s) => s.end > s.start);
   const span = (endedAt - startedAt) / 1000;
+  const oldEnd = initial?.endedAt ?? initial?.startedAt ?? startedAt;
+  const oldSpan = initial ? (oldEnd - initial.startedAt) / 1000 : 0;
+  const shifted = initial && !unchanged && Math.abs(span - oldSpan) < 0.000001;
+  let segments = unchanged ? initial!.segments : undefined;
+  if (initial?.segments && !unchanged) {
+    if (shifted) {
+      const offset = startedAt - initial.startedAt;
+      segments = initial.segments.map(s => ({ start: s.start + offset, end: s.end + offset }));
+    } else {
+      // Recorded gaps stay at their real clock positions. A manual boundary
+      // extension confirms extra work, instead of retaining the old ceiling.
+      const active = initial.segments.map(s => ({ start: Math.max(initial.startedAt, s.start), end: Math.min(oldEnd, s.end) }))
+        .filter(s => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start).sort((a,b) => a.start-b.start);
+      const pauses: { start: number; end: number }[] = [];
+      let cursor = initial.startedAt;
+      for (const s of active) { if (s.start > cursor) pauses.push({ start: cursor, end: s.start }); cursor = Math.max(cursor, s.end); }
+      if (oldEnd > cursor) pauses.push({ start: cursor, end: oldEnd });
+      segments = []; cursor = startedAt;
+      for (const p of pauses) {
+        const a = Math.max(startedAt, p.start), b = Math.min(endedAt, p.end);
+        if (b <= a) continue;
+        if (a > cursor) segments.push({ start: cursor, end: a });
+        cursor = Math.max(cursor, b);
+      }
+      if (endedAt > cursor) segments.push({ start: cursor, end: endedAt });
+    }
+  }
   const elapsed = unchanged
     ? initial!.elapsedSeconds
     : segments
     ? segments.reduce((sum, s) => sum + (s.end - s.start) / 1000, 0)
-    : Math.min(initial?.elapsedSeconds ?? seconds, span);
+    : initial
+    ? Math.max(0, span - Math.max(0, oldSpan - initial.elapsedSeconds))
+    : Math.min(seconds, span);
   return {
     segments,
     elapsed,
@@ -101,9 +116,9 @@ export function manualRecord(input: {
     endedAt,
     plannedSeconds: initial?.plannedSeconds || 1500,
     elapsedSeconds: elapsed,
-    segments: segments || [
+    segments: segments || (initial ? undefined : [
       { start: startedAt, end: startedAt + elapsed * 1000 },
-    ],
+    ]),
     acceptedSeconds: seconds,
     completedCount: count,
     status: "saved",

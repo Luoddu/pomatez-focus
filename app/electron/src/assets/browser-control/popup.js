@@ -1,0 +1,1 @@
+document.getElementById("connect").onclick=()=>chrome.runtime.sendMessage({type:"reconnect"},()=>{document.getElementById("state").textContent=chrome.runtime.lastError?"连接未完成，请在农场内安装配套后重试。":"已请求重新连接，请查看农场中的连接状态。";});

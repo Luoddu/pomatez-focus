@@ -17,7 +17,7 @@ test("08:30 due, persisted attempt prevents same-day replay but early manual per
 });
 test("success label uses actual completion, excludes other days and future clock",()=>{
   const stamp={source:"A",attemptedAt:clock(10,8,30),completedAt:clock(10,8,33)};
-  assert.equal(refreshLabel(stamp,clock(10,9,0)),"10.10 周六 08:33已刷新");
+  assert.equal(refreshLabel(stamp,clock(10,9,0)),"今日 08:33已刷新");
   assert.equal(refreshLabel(stamp,clock(11,9,0)),"");
   assert.equal(refreshLabel(stamp,clock(10,8,31)),"");
   assert.equal(refreshLabel({...stamp,completedAt:0},clock(10,9,0)),"");
@@ -42,7 +42,7 @@ test("manual success after clock rollback preserves same-day auto-attempt while 
   const attempt=refreshAttempt("A",readRefresh(s,"A"),clock(10,8,20));
   writeRefresh(s,{...attempt,completedAt:clock(10,8,20)});
   const restored=readRefresh(s,"A");
-  assert.equal(refreshLabel(restored,clock(10,8,20)),"10.10 周六 08:20已刷新");
+  assert.equal(refreshLabel(restored,clock(10,8,20)),"今日 08:20已刷新");
   assert.equal(refreshDue(clock(10,8,30),restored),false);
   assert.equal(refreshDue(clock(11,8,30),restored),true);
   const next=refreshAttempt("A",restored,clock(11,8,30));assert.equal(next.attemptedAt,clock(11,8,30));

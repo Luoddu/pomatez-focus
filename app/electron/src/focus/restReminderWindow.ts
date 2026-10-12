@@ -10,6 +10,7 @@ export class RestReminderWindow {
   private window: BrowserWindow | null = null;
   private current: Presentation | null = null;
   private serial = 0;
+  private takeFocus = true;
   private securedSessions = new WeakSet<Electron.Session>();
   private pending: { id: number; key: string; action: RestAction; resolve: (ok: boolean) => void; timeout: NodeJS.Timeout } | null = null;
   constructor(private directory: string, private headless: boolean,
@@ -22,14 +23,17 @@ export class RestReminderWindow {
       event.sender === this.window.webContents && event.senderFrame === this.window.webContents.mainFrame;
   }
   snapshot() { return this.current ? { ...this.current } : null; }
-  update(state: RestState) {
+  update(state: RestState & { browserControl?: { policy?: { mode: string } } }) {
     const reminder = state.settings.supervise && state.status === "recording" ? state.reminder : null;
     if (!reminder) { this.current = null; this.close(); return; }
+    const previousKey=this.current?.key;
+    this.takeFocus=state.browserControl?.policy?.mode!=="mirror";
     this.current = { key: reminder.key, gymAvailable: state.progress?.day === state.usage?.day && state.progress?.gymAvailable === true, line: reminder.kind === "focus"
       ? `已看 ${reminder.watchedMinutes} 分钟，番茄 ${state.progress?.completedCount ?? reminder.completedCount}/${state.settings.pomodoroGoal}：去睡觉，或回到科研主线。`
       : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。` };
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send("rest-reminder:state", this.snapshot());
+      if(!this.headless && previousKey!==reminder.key) { if(this.takeFocus) { this.window.show(); this.window.focus(); } else { this.window.showInactive(); this.window.moveTop(); } }
       return;
     }
     const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -70,7 +74,10 @@ export class RestReminderWindow {
     });
     popup.once("ready-to-show", () => {
       if (popup.isDestroyed() || this.window !== popup || !this.current) return;
-      if (!this.headless) { popup.showInactive(); popup.moveTop(); }
+      if (!this.headless) {
+        if(!this.takeFocus) { popup.showInactive(); popup.moveTop(); }
+        else { popup.show(); popup.focus(); }
+      }
     });
     void popup.loadFile(path.join(this.directory, "assets/rest-reminder.html")).catch(() => {
       if (this.window === popup) this.close();

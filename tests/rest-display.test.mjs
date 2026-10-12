@@ -4,7 +4,14 @@ import {
   durationText,
   displayUsage,
   monitorDetail,
+  quotaDisplay,
 } from "../app/renderer/src/focus/restDisplay.js";
+test("quota expires into continuing total clock and excess lap, never a frozen zero",()=>{
+  assert.equal(quotaDisplay(3599,60).clock,'0:00:01');assert.equal(quotaDisplay(3599,60).over,false);
+  assert.deepEqual(quotaDisplay(3600,60),{over:true,ratio:0,clock:'1:00:00',label:'今日累计',excess:'0:00:00',laps:1});
+  const r=quotaDisplay(4532,60);assert.equal(r.clock,'1:15:32');assert.equal(r.excess,'0:15:32');assert.ok(r.ratio>0&&r.ratio<1);
+  assert.equal(quotaDisplay(7201,60).laps,2);assert.equal(quotaDisplay(7201,60).clock,'2:00:01');
+});
 const now = new Date(2026, 9, 8, 12).getTime();
 function fixture() {
   return {

@@ -53,5 +53,5 @@ export function nextRefreshDelay(now: number) {
 export function refreshLabel(stamp: RefreshStamp | null, now = Date.now()) {
   if (!stamp?.completedAt || day(stamp.completedAt) !== day(now) || stamp.completedAt > now) return "";
   const date = new Date(stamp.completedAt), pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getMonth() + 1}.${date.getDate()} 周${"日一二三四五六"[date.getDay()]} ${pad(date.getHours())}:${pad(date.getMinutes())}已刷新`;
+  return `今日 ${pad(date.getHours())}:${pad(date.getMinutes())}已刷新`;
 }

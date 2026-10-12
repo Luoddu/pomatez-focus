@@ -7,6 +7,7 @@ import {
   durationText,
   displayUsage,
   monitorDetail,
+  quotaDisplay,
 } from "../restDisplay";
 
 type Usage = {
@@ -25,6 +26,7 @@ type Usage = {
   }[];
 };
 export type RestState = {
+  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean };
   settings: {
     quotaMinutes: number;
     supervise: boolean;
@@ -150,6 +152,8 @@ export default function ScientificRest({
   const [draftGoal, setDraftGoal] = useState("12");
   const [draftReminder, setDraftReminder] = useState("5");
   const [busy, setBusy] = useState(false);
+  const [setupNote,setSetupNote]=useState("");
+  const policy=state.browserControl?.policy || {mode:"pause" as const,cooldownMinutes:2,autoRaise:true};
   const requestId = useRef(0);
   useEffect(
     () => () => {
@@ -172,14 +176,10 @@ export default function ScientificRest({
   // Read the clock on every render, including new detector snapshots between ticks.
   const displayNow = Date.now();
   const usage = displayUsage(state, displayNow);
-  const statusDetail = monitorDetail(state, displayNow);
-  const remaining = usage
-    ? Math.max(0, state.settings.quotaMinutes - usage.totalSeconds / 60)
-    : null;
-  const ratio =
-    remaining === null ? 0 : remaining / state.settings.quotaMinutes;
-  const over =
-    !!usage && usage.totalSeconds > state.settings.quotaMinutes * 60;
+  const statusDetail = monitorDetail(state, displayNow)+"\n浏览器控制："+(state.browserControl?.connected?"配套扩展已连接":"未连接，暂停尚未确认");
+  const ring=usage?quotaDisplay(usage.totalSeconds,state.settings.quotaMinutes):null;
+  const ratio=ring?.ratio||0,over=ring?.over||false;
+  const watching=state.status==="recording" && !!state.live?.site && displayNow>=state.live.checkedAt && displayNow<=state.live.expiresAt;
   const chart = range === "week" ? week : usage;
   const max = Math.max(
     60,
@@ -290,12 +290,12 @@ export default function ScientificRest({
         {view === "quota" ? (
           <div className="rest-quota">
             <div
-              className={`rest-ring${over ? " over" : ""}`}
+              className={`rest-ring${over ? " over" : ""}${watching ? " watching" : ""}`}
               role="group"
               aria-label={
-                remaining === null
+                !ring
                   ? "暂无记录"
-                  : `剩余额度 ${minutes(remaining * 60)}`
+                  : `${ring.label} ${ring.clock}${over?`，已超额 ${ring.excess}`:""}`
               }
             >
               <div
@@ -340,12 +340,12 @@ export default function ScientificRest({
                   transform="rotate(-90 60 60)"
                 />
               </svg>
-              <div className="rest-ring-label">
+              <div className="rest-ring-label rest-clock-label">
                 <strong>
-                  {remaining === null ? "—" : Math.ceil(remaining)}
+                  {ring?.clock || "—"}
                 </strong>
-                <span>分钟</span>
-                <small>{over ? "额度已用完" : "剩余额度"}</small>
+                <small>{ring?.label || "剩余额度"}</small>
+                {over && <small className="rest-excess">超额 {ring!.excess}</small>}
               </div>
             </div>
             <div className="rest-controls">
@@ -404,6 +404,7 @@ export default function ScientificRest({
                   </strong>
                 </div>
               </div>
+              {watching && <div className="rest-watching" role="status">正在浏览{state.live!.site==="bilibili"?" B站":"小红书"} · 时间正在流逝</div>}
             </div>
           </div>
         ) : view === "settings" ? (
@@ -448,6 +449,17 @@ export default function ScientificRest({
               分钟
             </label>
             <p>未达目标时督促，超额继续提醒；目标设0则仅按额度提醒。</p>
+            <div className="browser-policy">
+              <label>干预挡位 <select aria-label="浏览器干预挡位" value={policy.mode} onChange={async e=>{setError("");try{await api().browserConfigure({...policy,mode:e.target.value});}catch(err:any){setError(err.message);}}}>
+                <option value="mirror">时间镜子</option><option value="pause">暂停挡</option><option value="cooldown">冷静挡</option><option value="quota">额度锁定挡</option>
+              </select></label>
+              <label>冷静时间 <input aria-label="冷静时间（分钟）" type="number" min={1} max={30} value={policy.cooldownMinutes} onChange={async e=>{try{await api().browserConfigure({...policy,cooldownMinutes:Number(e.target.value)});}catch(err:any){setError(err.message);}}} /> 分钟</label>
+              <label><input type="checkbox" checked={policy.autoRaise} onChange={async e=>{try{await api().browserConfigure({...policy,autoRaise:e.target.checked});}catch(err:any){setError(err.message);}}} />浏览时农场原屏幕置顶</label>
+              <small>干预设置即时保存；镜子挡不暂停，冷静挡等待后可续，额度挡用完后至次日限制。</small>
+              <p role="status">{state.browserControl?.error || (state.browserControl?.connected ? `配套扩展已连接${state.browserControl.pauseKey?` · 最近确认暂停 ${state.browserControl.pausedCount} 个播放器`:""}` : "配套扩展未连接 · 视频暂停尚未确认")}</p>
+              <button className="btn-small" disabled={busy} onClick={async()=>{setBusy(true);setError("");try{const result=await api().browserSetup();setSetupNote(`已打开配套文件夹。Edge扩展 → 开发人员模式 → 加载解压缩的扩展，选择该文件夹。扩展ID：${result.extensionId}`);}catch(err:any){setError(err.message);}finally{setBusy(false);}}}>安装／更新浏览器配套</button>
+              {setupNote && <small>{setupNote}</small>}
+            </div>
             <button
               className="btn-small"
               disabled={busy}

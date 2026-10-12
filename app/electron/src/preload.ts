@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld("focusApi", {
   restState: () => invoke("restState"),
   restRefresh: () => invoke("restRefresh"),
   restSettings: (value: any) => invoke("restSettings", value),
+  browserConfigure: (value: any) => invoke("browserConfigure", value),
+  browserSetup: () => invoke("browserSetup"),
   restProgress: (value: { day: string; completedCount: number | null; gymAvailable?: boolean }) => invoke("restProgress", value),
   restStatistics: (value: "today" | "week") => invoke("restStatistics", value),
   restAcknowledge: (value: string) => invoke("restAcknowledge", value),

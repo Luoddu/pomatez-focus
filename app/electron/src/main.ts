@@ -16,6 +16,7 @@ import { FocusUpdater } from "./focus/updater";
 import { ActivityWatchRest } from "./focus/activitywatch";
 import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
+import { BrowserControl, FarmPresence } from "./focus/browserControl";
 const headless = process.env.POMATEZ_HEADLESS === "1";
 // Unattended tests must never play timer/reminder sounds on the user's desktop.
 // Set both Chromium's startup switch and the public per-contents audio mute.
@@ -52,6 +53,16 @@ const show = () => {
     win.focus();
   }
 };
+export const browserControl = new BrowserControl(app.getPath("userData"), __dirname);
+export const farmPresence = new FarmPresence(() => win, headless);
+const publishRest = (state: ReturnType<ActivityWatchRest["snapshot"]>) => {
+  const browser = browserControl.publish(state);
+  farmPresence.update(state,browser.policy);
+  const next={...state,browserControl:browser};
+  if(win && !win.isDestroyed()) win.webContents.send("focus:rest-state",next);
+  if(!quitting && farmReady) restPopup.update(next);
+  return next;
+};
 export const restPopup = new RestReminderWindow(__dirname, headless,
   request => {
     if (!win || win.isDestroyed() || win.webContents.isLoadingMainFrame()) throw Error("Farm unavailable");
@@ -65,10 +76,7 @@ export const restPopup = new RestReminderWindow(__dirname, headless,
 );
 export const restMonitor = new ActivityWatchRest(
   app.getPath("userData"),
-  (state) => {
-    if (win && !win.isDestroyed()) win.webContents.send("focus:rest-state", state);
-    if (!quitting && farmReady) restPopup.update(state);
-  }
+  (state) => { publishRest(state); }
 );
 let restRuntimePaused = false;
 export const awRuntime = new ActivityWatchRuntime({ allowed: () => !quitting && !restRuntimePaused });
@@ -187,14 +195,21 @@ else {
         service.archiveHistory(value)
       );
       handler("journal", () => service.journal());
-      handler("restState", () => restMonitor.snapshot());
+      handler("restState", () => ({...restMonitor.snapshot(),browserControl:browserControl.snapshot()}));
+      handler("browserConfigure", value => { browserControl.configure(value); return publishRest(restMonitor.snapshot()); });
+      handler("browserSetup", async () => {
+        if(headless) throw Error("静默测试不得安装真实浏览器配套");
+        const result=browserControl.install(process.execPath);
+        await shell.openPath(result.directory);
+        return result;
+      });
       handler("restRefresh", async () => {
         let failure: Error | null = null;
         try { await ensureRestRuntime(); } catch (error: any) { failure = error; }
         if (quitting || restRuntimePaused) throw Error("检测已暂停，恢复后再刷新");
         const state = await restMonitor.refreshNow();
         if (failure && state.status !== "recording") throw failure;
-        return state;
+        return {...state,browserControl:browserControl.snapshot()};
       });
       handler("restSettings", (value) => restMonitor.configure(value));
       handler("restProgress", (value) => restMonitor.reportProgress(value));
@@ -213,7 +228,7 @@ else {
       win.webContents.on("did-start-loading", () => { farmReady = false; restPopup.close(); });
       win.webContents.on("did-finish-load", () => {
         farmReady = true;
-        if (!quitting) restPopup.update(restMonitor.snapshot());
+        if (!quitting) publishRest(restMonitor.snapshot());
       });
       handler("saveJournal", (value) => service.saveJournal(value));
       handler("backupHistory", (value) => service.backupHistory(value));
@@ -387,6 +402,8 @@ app.on("before-quit", () => {
   quitting = true;
   restMonitor.stop();
   restPopup.close();
+  farmPresence.close();
+  browserControl.close();
 });
 app.on("window-all-closed", () => app.quit());
 app.on("activate", show);

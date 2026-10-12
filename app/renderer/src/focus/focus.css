@@ -874,6 +874,16 @@ input:focus-visible {
 .rest-ring-label { position: absolute; inset: 0; display: flex; align-items: baseline; align-content: center; justify-content: center; flex-wrap: wrap; padding: 30% 12%; color: var(--text); gap: 0 3px; }
 .rest-ring-label strong { font-size: clamp(23px, 2.8vw, 32px); font-weight: 650; line-height: 1; }
 .rest-ring-label span { font-size: 12px; }
+.rest-clock-label { padding:24% 5%; align-items:center; gap:0; }
+.rest-clock-label strong { font-size:clamp(17px,2.2vw,23px); font-variant-numeric:tabular-nums; letter-spacing:-.5px; white-space:nowrap; }
+.rest-clock-label small { margin-top:5px; }
+.rest-ring.over .rest-ring-value { stroke:#d4513e; }
+.rest-ring.over .rest-clock-label strong, .rest-excess { color:#bd4233; }
+.rest-ring.watching { outline:1px solid #f2b1a6; outline-offset:3px; border-radius:50%; }
+.rest-watching { margin-top:5px; font-size:10px; color:#bd4233; }
+.browser-policy { display:grid; gap:9px; padding-top:12px; border-top:1px solid var(--border); }
+.browser-policy small { font-size:11px; line-height:1.5; overflow-wrap:anywhere; color:var(--muted); }
+.browser-policy select { padding:5px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:6px; }
 .rest-ring-label small { flex-basis: 100%; text-align: center; font-size: 11px; color: var(--muted); margin-top: 7px; }
 .rest-controls { display: flex; flex-direction: column; min-width: 0; align-self: stretch; padding: 7px 0; }
 .rest-supervise { display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 6px; }
@@ -1989,8 +1999,10 @@ input:focus-visible {
 .hm-badge-slot {
   position: relative;
   width: var(--hm-cell, 13px);
-  height: 14px;
+  height: 27px;
   display: flex;
+  flex-direction: column;
+  gap: 3px;
   align-items: center;
   justify-content: center;
   overflow: visible;
@@ -2003,9 +2015,7 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .hm-badge {
-  position: absolute;
-  top: -3px;
-  right: -5px;
+  position: static;
   display: inline-flex;
   animation: hm-badge-grow 0.45s ease-out both;
   transform-origin: bottom center;
@@ -2061,16 +2071,19 @@ input:focus-visible {
   align-items: baseline;
   gap: 1px;
 }
-/* 目标值强调：更大更粗深色；进度数字保持常规 */
+/* 当前成果强调，目标保持常规。 */
 .wg-goal {
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+}
+.wg-now {
   font-size: 14px;
   font-weight: 700;
   color: #3f4650;
-}
-.wg-now {
   font-variant-numeric: tabular-nums;
 }
-.weekgoal-chip.met .wg-goal {
+.weekgoal-chip.met .wg-now {
   color: #8a6107;
 }
 @media (prefers-reduced-motion: reduce) {
