@@ -1,6 +1,6 @@
 # P0-POMO-057 标题拖动任务与紧凑右栏
 
-- IN_PROGRESS；owner /root，隔离模块实现/既有授权发布；唯一状态本卡。基线07624c23099429fe71234f4bc39b7da8da3e1c19，实时canonical同源，task/p0-pomo-057-board-drag，单worktree无其他写者。用户要求标题抓手上下排序、跨象限，以及右侧标题略紧凑；默认推送沿模块AGENTS。
+- DONE；owner /root，隔离模块实现/既有授权发布；唯一状态本卡。基线07624c23099429fe71234f4bc39b7da8da3e1c19，实时canonical同源，task/p0-pomo-057-board-drag，单worktree无其他写者。用户要求标题抓手上下排序、跨象限，以及右侧标题略紧凑；默认推送沿模块AGENTS。
 - 完整卡（本机持久看板安排与业务显示）；允许复用现有review_scientific_rest有界只读冻结diff/原始正反测试，不加新Agent或写者。根仓规则/模块不可写边界和版本规则本会话已读，不加载无关组件。真实用户状态不用于测试。
 - 写集：app/renderer/src/focus/boardLayout.ts、FocusApp.tsx、components/QuadrantBoard.tsx、TaskTitle.tsx、focus.css；tests/board-layout.test.mjs、board-drag-desktop.cjs，scripts/test-board-drag-desktop.cjs；docs/TASK-P0-POMO-057.md、ACCEPTANCE-P0-POMO-057.md、CHANGELOG.md；version helper package.json/SettingsPanel.tsx；ignored合成profiles/截图/验证/已有发布helper与包。不得改任务表/云API、计时/完成队列、原快照schema、旅程协议/AW或注册权限。
 - 四处预检：①QuadrantBoard GroupList研究优先硬排序、TaskTitle只读popover，无拖放；FocusApp用completion/quick队列投影，raw tasks与active/records独立，刷新会重读sourceKey。②复用固定基线TodayJourney原生draggable/DataTransfer/drop路径、安装React16.14/@types/react公开DragEvent/onDragStart/onDrop类型原文；只用原生HTML拖放，不加库或更改第三方生命周期。③taskSnapshot/editQueue/completionQueue原保护、researchFirst与稳定taskId分组、版本/build/push/五资产updater；Learning039发布门禁命中，无新候选。④031 task交互/快照/分类原始测试与053真实桌面静默测试可复用；已有任务排序持久元数据未找到，范围renderer/测试目录。
@@ -10,3 +10,4 @@
 - Learning初判none：复用原生拖放与纯投影隔离，独立复核前出现可复用已验证候选则/root单写本模块Learning并登记证据；不写根Learning。开工/冻结/提交对比HEAD/写集/资源绿灯，不把非重叠漂移升级停工。
 - 独立复核R1（95f535）发现baseBoardTasks memo遗漏本地日：quick/remove投影按Date.now当天筛选。修复在既有render用稳定本地日开始时间作为memo依赖及projectQuickTasks now参数，同日秒render不排序/读存储，跨日无需改队列即可失效。新增允许tests/board-midnight-desktop.cjs、scripts/test-board-midnight-desktop.cjs和原始证据；实际生产renderer失败意图留队、同日仍通/跨日不继续投影配对。已打包未公开92保留不覆盖，按版本helper用下一未用preview号，不复用候选包/tag。修复后重新冻结/独立复核才能发布。
 - R1原始生产renderer旧92跨午夜精确失败（昨天quick仍显示、remove仍扣）；修复93同fixture3/3、队列字节不变、偏好存储读取0；344回归、拖动6+1再PASS。已形成可复用本地日过滤memo失效教训，新增明确允许本模块Learning.md，由/root同R1代码commit记录LEARN-P0-POMO-057-01，独立复核接受前不封版；根Learning不写。
+- 封版：独立review_scientific_rest关闭R1、接受LEARN057同批记录；冻结26524e7a74ccabb369be26a88e92026895f8c7ab/source/tag preview.93，原344、跨日3/3、生产拖动6+1/冷启及clean构建PASS。新93包196文件/5资产逐字节/哈希/静默成品启动、公开五资产及真实旧91→93更新器检测均独立PASS。92未公开候选包保留不覆盖，91原资产不动，稳定Latest51保持；最终证据见ACCEPTANCE-P0-POMO-057.md，无剩余Learning候选，不自动安装或重启个人App。
