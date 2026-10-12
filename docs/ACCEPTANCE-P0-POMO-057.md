@@ -11,3 +11,7 @@ p057-unit.txt 6项纯正反；p057-all.txt全量344/344包含顺序前/后、res
 测试分类：ES5目标不支持Map/Set展开，采用Array.from等价路径，未改编译目标；偏好读取memo的成功写入版本依赖加精确lint说明。初始任务显示但状态回读未完时drag暂禁，fixture等待就绪；fixture函数回传不能结构克隆，改void返回。来源切换应走设置configure刷新，不放宽生成按钮已有来源门禁。隐藏合成器截图先capture唤醒再取最终图，p057-board-preview.png目视复核；这些fixture限制不改用户运行生命周期。
 
 Learning none：本次复用原生拖放、薄投影/持久偏好和既有不可变发布；上述编译/合成fixture问题有常规精确修正，无新的跨任务产品/权限机制。独立复核若有候选必须先处置，再封版。源码显式revert本卡写集可恢复原默认排序；忽略独立偏好key不影响任务/统计/计时，公开用新版本不替换91资产。
+
+R1独立复核冻结95f535发现baseBoardTasks cache遗漏本地日，而projectQuickTasks按本地日筛意图。p057-midnight-before.txt在旧92实际renderer精确失败：23:58同source失败quick/remove正常投影；跨午夜只有分钟输入触发render、任务/队列没有更新时，quick仍显示、remove仍扣。修复把本地dayStart作为依赖及同一projectQuickTasks now参数；p057-midnight-after.txt/p057-midnight.json实际3/3，旧日quick消失、remove不再扣、同日仍正常、持久queue原字节不改；相同/下一日render偏好Storage.getItem次数0。未增轮询、每秒I/O或进程，原待同步队列保留及自动生成阻塞政策不扩改。
+
+R1修复后344/344、生产拖动/隔离/保存失败/刷新/冷重启6+1再PASS。合成历史改成固定日内时间并区分来源ID，避免fixture每次生成相同ID不同内容导致无关冲突toast；生产云冲突门禁不改。新增LEARN-P0-POMO-057-01与R1修复同批记录，限定本农场按日筛选的纯投影缓存，不要求每秒排序；独立复核接受或拒绝后再封版。92未公开包保留，新93按版本规则制作，不覆盖候选或旧91资产。

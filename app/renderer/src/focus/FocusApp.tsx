@@ -324,11 +324,12 @@ export default function FocusApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boardScope, boardRevision]
   );
+  const boardDayStart = new Date().setHours(0, 0, 0, 0);
   const baseBoardTasks = useMemo(() => completionQueue.project(
-    projectQuickTasks(tasks, editQueue.entries.filter(e => e.sourceKey === sourceKey), sourceKey), sourceKey
+    projectQuickTasks(tasks, editQueue.entries.filter(e => e.sourceKey === sourceKey), sourceKey, boardDayStart), sourceKey
   // Queue revisions trigger projection; elapsed-second renders do not touch storage/sorting.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [tasks, sourceKey, editRevision, queueRevision]);
+  ), [tasks, sourceKey, editRevision, queueRevision, boardDayStart]);
   const boardTasks = useMemo(() => projectBoardLayout(baseBoardTasks, boardLayout), [baseBoardTasks, boardLayout]);
   const boardTasksRef = useRef(boardTasks);
   boardTasksRef.current = boardTasks;

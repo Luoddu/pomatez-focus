@@ -47,3 +47,14 @@
 - Required-Check: 保留实际spawn环境的原始bytes/status与正确解码，不把所有exit1当缺失或要求用户升权；优先公开typed返回机制，并验证真拒绝/未知类型仍拦、正常缺失/Unicode回读仍通、stdin数据不作脚本。涉及用户真实注册时仍按授权和owner边界。
 - Supersedes: none
 - Invalid-When: 更换本机runtime、native工具/编码、typed API或错误分类机制时须重新验证；不泛化所有Windows工具都是GBK，也不授权改系统codepage或提高权限。
+
+## LEARN-P0-POMO-057-01 - 按日过滤的投影缓存必须依赖同一个本地日
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-057
+- Evidence: docs/ACCEPTANCE-P0-POMO-057.md; tests/board-midnight-desktop.cjs; app/renderer/src/focus/FocusApp.tsx
+- Applies-To: 本农场以本地日筛选待同步意图、同时希望避免秒级重算的纯UI投影缓存
+- Lesson: 固定95f535的board memo只依赖任务/队列/来源；其内部projectQuickTasks读取Date.now按日过滤。实际renderer同source失败新增/减少意图跨午夜且队列未变时，旧日投影继续存在；同fixture在修复后证明旧日投影清除、同日仍有效、队列字节未变。日期筛选来自环境也属于缓存的语义输入。
+- Required-Check: 取稳定本地日开始时间并同时用作memo依赖和筛选参数，避免计算/依赖采用不同时间口径；验证不改任务/队列的跨午夜、同日正常、持久意图保留和零秒级偏好存储读取，不用每秒全部重排掩盖遗漏。
+- Supersedes: none
+- Invalid-When: 更换本地日/时区口径、队列过滤所有者或缓存生命周期时须重验；不泛化所有memo需日期，不授权更改旧待同步意图或生成阻塞策略。

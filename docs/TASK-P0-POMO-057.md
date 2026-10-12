@@ -8,3 +8,5 @@
 - 正反验收：标题drag有抓手cursor/落点线/跨象限高亮；详情单击仍可用、chip选择仍正常。真实production renderer同象限上/下、跨非空及空象限、外部drop/cancel、刷新和冷重启、切换来源、存储失败；每个无效情况拒而正常路径仍通。一组多个番茄整体移动，done/credit/IDs保留；当前计时和历史记录不被安排修改；新任务/刷新不会丢失。右栏side-section gap12→约8、组间18→约14/right-col16→约12，字体/列宽/四象限占比不改，目视1440以上及窄窗口。
 - 资源：独占clone/build/dist与静默随机profile，无真实DB、账号、Edge、registry、端口或服务写入；UI HTML fixture使用合成任务与禁云写桩。一次前台有界交付；未知同根因两次停止对应步骤、查明可在范围修正；跨来源/身份或scope升级时暂停对应写。源码反向显式revert，偏好独立key可忽略回退原排序；发布新92不替换91，五资产与真实旧91→92更新检测，不自动下载安装重启。
 - Learning初判none：复用原生拖放与纯投影隔离，独立复核前出现可复用已验证候选则/root单写本模块Learning并登记证据；不写根Learning。开工/冻结/提交对比HEAD/写集/资源绿灯，不把非重叠漂移升级停工。
+- 独立复核R1（95f535）发现baseBoardTasks memo遗漏本地日：quick/remove投影按Date.now当天筛选。修复在既有render用稳定本地日开始时间作为memo依赖及projectQuickTasks now参数，同日秒render不排序/读存储，跨日无需改队列即可失效。新增允许tests/board-midnight-desktop.cjs、scripts/test-board-midnight-desktop.cjs和原始证据；实际生产renderer失败意图留队、同日仍通/跨日不继续投影配对。已打包未公开92保留不覆盖，按版本helper用下一未用preview号，不复用候选包/tag。修复后重新冻结/独立复核才能发布。
+- R1原始生产renderer旧92跨午夜精确失败（昨天quick仍显示、remove仍扣）；修复93同fixture3/3、队列字节不变、偏好存储读取0；344回归、拖动6+1再PASS。已形成可复用本地日过滤memo失效教训，新增明确允许本模块Learning.md，由/root同R1代码commit记录LEARN-P0-POMO-057-01，独立复核接受前不封版；根Learning不写。
