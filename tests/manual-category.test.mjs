@@ -5,11 +5,13 @@ import {
   manualWindow,
   manualPeriodDefaults,
   adjustedManualMinutes,
+  focusTimeLabel,
 } from "../app/renderer/src/focus/manualRecord.ts";
 test("endpoint duration recovers from intermediate typing, adds five minutes and deducts actual pauses without changing count",()=>{
  const start=Date.parse('2026-10-12T08:58:08+08:00'),end=Date.parse('2026-10-12T09:23:15+08:00'),initial={startedAt:start,endedAt:end,elapsedSeconds:1507,acceptedSeconds:1507,completedCount:1,segments:[{start,end}]},anchor={seconds:1507,available:1507};
  assert.ok(adjustedManualMinutes(initial,start,start+247000,anchor)<4.12);
  assert.ok(Math.abs(adjustedManualMinutes(initial,start,end+300000,anchor)*60-1807)<0.0001);
+ assert.equal(focusTimeLabel(adjustedManualMinutes(initial,start,end+300000,anchor)*60),'30 分 7 秒');
  const paused={...initial,elapsedSeconds:1207,acceptedSeconds:1207,segments:[{start,end:start+600000},{start:start+900000,end}]};
  assert.ok(Math.abs(adjustedManualMinutes(paused,start,end+300000,{seconds:1207,available:1207})*60-1507)<0.0001);
  assert.equal(initial.completedCount,1);

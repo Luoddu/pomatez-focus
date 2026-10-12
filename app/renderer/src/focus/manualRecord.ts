@@ -72,7 +72,7 @@ export function focusTimeLabel(seconds: number) {
 // input events must not permanently shrink the duration before typing finishes.
 export function adjustedManualMinutes(initial: FocusSession, startedAt: number, endedAt: number, anchor: {seconds:number;available:number}) {
   const available = manualWindow(initial,startedAt,endedAt,anchor.seconds).availableSeconds;
-  return Math.floor(Math.max(0,Math.min(available,anchor.seconds+Math.max(0,available-anchor.available)))*1000000/60)/1000000;
+  return Math.max(0,Math.min(available,anchor.seconds+Math.max(0,available-anchor.available)))/60;
 }
 
 export function manualRecord(input: {
