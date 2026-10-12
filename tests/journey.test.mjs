@@ -247,6 +247,7 @@ test("bad storage preserved; bounds/duplicates reject; valid storage stays writa
     () =>
       writeJourney(
         {
+          getItem: () => null,
           setItem: () => {
             throw Error("quota");
           },
@@ -255,8 +256,10 @@ test("bad storage preserved; bounds/duplicates reject; valid storage stays writa
       ),
     /quota/
   );
-  writeJourney(s, plan());
-  assert.equal(readJourney(s, "local", day).stages.length, 5);
+  const healthy = storage();
+  writeJourney(healthy, plan());
+  assert.equal(readJourney(healthy, "local", day).stages.length, 5);
+  assert.equal(s.getItem(k), "{bad");
 });
 test("road is 100 tomatoes with independent 25-unit flags", () => {
   assert.deepEqual(journeyRoad(282), { reached: 200, next: 300 });

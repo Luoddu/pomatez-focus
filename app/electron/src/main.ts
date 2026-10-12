@@ -17,6 +17,7 @@ import { ActivityWatchRest } from "./focus/activitywatch";
 import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
 import { BrowserControl, FarmPresence } from "./focus/browserControl";
+import { JourneyGateway } from "./focus/journeyGateway";
 const headless = process.env.POMATEZ_HEADLESS === "1";
 // Unattended tests must never play timer/reminder sounds on the user's desktop.
 // Set both Chromium's startup switch and the public per-contents audio mute.
@@ -36,12 +37,18 @@ app.commandLine.appendSwitch(
   "autoplay-policy",
   "no-user-gesture-required"
 );
-const single = app.requestSingleInstanceLock();
+const journeyArg = process.argv.indexOf('--journey-api');
+const journeyRequestId = journeyArg >= 0 ? process.argv[journeyArg+1] : null;
+const single = app.requestSingleInstanceLock(journeyArg>=0?{journeyRequestId}:{});
 let win: BrowserWindow | null = null,
   tray: Tray | null = null,
   quitting = false,
   farmReady = false;
 const service = new FocusService();
+export const journeyGateway = new JourneyGateway(app.getPath('userData'), request => {
+  if(!win || win.isDestroyed() || !farmReady) throw Error('Farm unavailable');
+  win.webContents.send('focus:journey-request',request);
+});
 // 生成进度：真实阶段事件从 service 转发到渲染层（窗口未就绪时丢弃即可，
 // 渲染层的初始「正在连接飞书…」不依赖该通道）
 service.onGenerateProgress = (p) =>
@@ -97,7 +104,7 @@ const handler = (name: string, fn: (value: any) => any) =>
       return { ok: false, error: e.message || "操作失败" };
     }
   });
-if (!single) app.quit();
+if (!single || journeyArg>=0) app.quit();
 else {
   // Native roles preserve Command+C/V/Q on macOS; Windows keeps its existing UI.
   Menu.setApplicationMenu(
@@ -109,7 +116,11 @@ else {
         ])
       : null
   );
-  app.on("second-instance", show);
+  app.on("second-instance", (_event, argv, _cwd, data:any) => {
+    const at=argv.indexOf('--journey-api');
+    if(at>=0 || data?.journeyRequestId!==undefined) { void journeyGateway.dispatch(data?.journeyRequestId ?? argv[at+1]); return; }
+    show();
+  });
   app
     .whenReady()
     .then(async () => {
@@ -174,6 +185,7 @@ else {
         item.setSavePath(file);
       });
       handler("status", () => service.status());
+      handler('journeyResult', value => journeyGateway.complete(value));
       handler("configure", (value) => service.configure(value));
       handler("today", () => service.today());
       handler("generateToday", () => service.generateToday());
@@ -369,6 +381,7 @@ else {
       }
       win.once("ready-to-show", show);
       await win.loadFile(path.join(__dirname, "index.html"));
+      journeyGateway.start(process.execPath,app.isPackaged?undefined:process.argv[1]);
       // Existing hidden regressions stay independent of personal browser data.
       // ActivityWatch desktop tests explicitly start the same monitor with an
       // isolated loopback fixture; normal desktop starts it automatically.
@@ -399,6 +412,7 @@ else {
     });
 }
 app.on("before-quit", () => {
+  journeyGateway.close();
   quitting = true;
   restMonitor.stop();
   restPopup.close();

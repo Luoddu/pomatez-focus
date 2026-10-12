@@ -1,0 +1,24 @@
+const {app,BrowserWindow}=require('electron'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
+if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('isolated silent profile required');
+const {FocusService}=require('../app/electron/build/focus/service');
+const source='synthetic-journey-api',task={id:'synthetic-plan',taskId:'stable-task',source:'feishu',sourceKey:source,title:'合成主线任务',goalSeconds:1500,quadrant:'iu'},today=new Date();today.setHours(0,0,0,0);
+FocusService.prototype.status=()=>({configured:true,sourceKey:source});FocusService.prototype.today=async()=>[task];FocusService.prototype.history=async()=>({sourceKey:source,missing:0,records:[]});FocusService.prototype.dailyReviews=async()=>({sourceKey:source,reviews:{}});FocusService.prototype.generateToday=async()=>({created:0,eligibleTasks:0,blocked:0});
+const main=require('../app/electron/build/main'),{call}=require('../app/electron/src/assets/journey-client.cjs');
+const deadline=setTimeout(()=>app.exit(2),55000),wait=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{try{
+ const until=async f=>{for(let n=0;n<150;n++){if(await f())return;await wait(40)}throw Error('UI timeout')};let farm;
+ await until(()=>{farm=BrowserWindow.getAllWindows()[0];return farm&&!farm.webContents.isLoadingMainFrame()&&fs.existsSync(path.join(main.journeyGateway.directory,'status.json'))});const js=s=>farm.webContents.executeJavaScript(s,true);
+ await until(()=>js("!!document.querySelector('[data-journey-slot]')"));
+ const day=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`,read=()=>({protocol:1,requestId:randomUUID(),op:'read',day});
+ let r=await call(read(),process.env.POMATEZ_PROFILE);assert.equal(r.error,undefined,JSON.stringify(r));assert.equal(r.tasks.length,1);const first=r.journey.stages[0].slots[0],second=r.journey.stages[1];
+ const before=await js("localStorage.getItem('pomatez-focus-v1')");
+ const q={protocol:1,requestId:randomUUID(),op:'write',day,expectedRevision:r.revision,operations:[{type:'assign',slotId:first.id,taskId:r.tasks[0].id},{type:'move',slotId:first.id,stageId:second.id,beforeSlotId:second.slots[0].id},{type:'stage',stageId:second.id,time:13,restActions:['meal','nap']}]};
+ const saved=await call(q,process.env.POMATEZ_PROFILE);assert.equal(saved.error,undefined,JSON.stringify(saved));assert.equal(saved.journey.stages[1].slots[0].id,first.id);
+ await until(()=>js(`document.querySelector('[data-journey-slot="${first.id}"]')?.title.includes('合成主线任务')`));
+ assert.equal((await call(q,process.env.POMATEZ_PROFILE)).replayed,true);
+ const wrong={...q,requestId:randomUUID(),operations:[{type:'end',hour:22}]};assert.equal((await call(wrong,process.env.POMATEZ_PROFILE)).error.code,'CONFLICT');
+ assert.equal(await js("localStorage.getItem('pomatez-focus-v1')"),before);
+ const foreign=new BrowserWindow({show:false,webPreferences:{preload:path.resolve(__dirname,'../app/electron/build/preload.js'),contextIsolation:true,sandbox:true}});await foreign.loadURL('about:blank');await assert.rejects(foreign.webContents.executeJavaScript("window.focusApi.journeyResult({ticket:'x',response:{}})"));foreign.destroy();
+ assert.equal(farm.isVisible(),false);assert.equal(farm.webContents.isAudioMuted(),true);
+ const out={checks:['real current-user stdio client/secondary Electron instance to primary/main/preload/renderer','stable task assignment/order/rest/time persisted; original UI notified and readback matches','identical retry deduplicated; stale CAS refused; focus timer store unchanged','foreign renderer IPC denied; valid primary call still succeeds'],passed:4,silent:true,ports:0};fs.writeFileSync(path.resolve(__dirname,'../artifacts/p054-desktop.json'),JSON.stringify(out,null,2));console.log(JSON.stringify(out));clearTimeout(deadline);app.exit(0);
+ }catch(e){console.error(e);clearTimeout(deadline);app.exit(1)}});

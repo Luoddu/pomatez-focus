@@ -248,12 +248,27 @@ export function readJourney(storage, scope, day) {
   if (raw.length > 100000) throw Error("旅程数据过大；原数据已保留");
   return validateJourney(JSON.parse(raw), scope, day);
 }
-export function writeJourney(storage, plan) {
+export function journeyMetadata(storage, scope, day) {
+  const raw = storage.getItem(journeyKey(scope, day));
+  if (raw === null) return { revision: null, receipts: [] };
+  if (raw.length > 100000) throw Error("旅程数据过大；原数据已保留");
+  const value = JSON.parse(raw), revision = value._revision ?? null, receipts = value._receipts ?? [];
+  if (!(revision === null || /^[a-f0-9-]{36}$/.test(revision)) || !Array.isArray(receipts) || receipts.length > 256 ||
+      receipts.some(r => !r || !/^[a-f0-9-]{36}$/.test(r.id) || !/^[a-f0-9]{64}$/.test(r.hash) || !/^[a-f0-9-]{36}$/.test(r.revision)) ||
+      new Set(receipts.map(r => r.id)).size !== receipts.length) throw Error("旅程接口元数据损坏；原数据已保留");
+  return { revision, receipts };
+}
+export function writeJourney(storage, plan, receipt) {
   const valid = validateJourney(plan, plan.scope, plan.day);
-  storage.setItem(
-    journeyKey(plan.scope, plan.day),
-    JSON.stringify(valid)
-  );
+  const key = journeyKey(plan.scope, plan.day), raw = storage.getItem(key), meta = journeyMetadata(storage, plan.scope, plan.day);
+  const changed = !raw || JSON.stringify(validateJourney(JSON.parse(raw), plan.scope, plan.day)) !== JSON.stringify(valid);
+  if (receipt && (meta.receipts.length >= 256 || meta.receipts.some(r => r.id === receipt.id) ||
+      !/^[a-f0-9-]{36}$/.test(receipt.id) || !/^[a-f0-9]{64}$/.test(receipt.hash))) throw Error("旅程写入回执无效或已满");
+  const revision = changed || receipt || !meta.revision ? crypto.randomUUID() : meta.revision;
+  const receipts = receipt ? [...meta.receipts, { ...receipt, revision }] : meta.receipts;
+  const value = JSON.stringify({ ...valid, _revision: revision, _receipts: receipts });
+  if (value.length > 100000) throw Error("旅程数据过大；原数据已保留");
+  if (raw !== value) storage.setItem(key, value);
   return valid;
 }
 function eligible(r, plan) {

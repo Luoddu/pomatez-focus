@@ -5,6 +5,12 @@ const invoke = async (name: string, value?: any) => {
   return reply.value;
 };
 contextBridge.exposeInMainWorld("focusApi", {
+  journeyResult: (value:any) => invoke('journeyResult',value),
+  onJourneyRequest: (callback:(request:any)=>void) => {
+    const listener=(_event:any,request:any)=>callback(request);
+    ipcRenderer.on('focus:journey-request',listener);
+    return ()=>ipcRenderer.removeListener('focus:journey-request',listener);
+  },
   nativeRestReminder: true,
   restActionResult: (value: any) => invoke("restActionResult", value),
   onRestAction: (callback: (request: any) => void) => {

@@ -71,9 +71,11 @@ export function readJourney(
   day: string
 ): Journey;
 export function writeJourney(
-  storage: Pick<Storage, "setItem">,
-  plan: Journey
+  storage: Pick<Storage, "getItem" | "setItem">,
+  plan: Journey,
+  receipt?: { id: string; hash: string }
 ): Journey;
+export function journeyMetadata(storage: Pick<Storage,"getItem">, scope: string, day: string): {revision:string|null; receipts:{id:string;hash:string;revision:string}[]};
 export function completion(
   plan: Journey,
   records: FocusSession[]

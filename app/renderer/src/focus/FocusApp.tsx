@@ -24,6 +24,7 @@ import {
 } from "./editQueue";
 import { recolorSession } from "./classification.js";
 import { Journey, journeyDay, readJourney, reconcileJourney, gymRestTarget } from "./journey.js";
+import { createJourneyApi } from './journeyApi.js';
 import { loadReviews, saveReviews } from "./reviewCache";
 import {
   projectQuickTasks,
@@ -1677,6 +1678,20 @@ export default function FocusApp() {
   const [journeyRefresh, setJourneyRefresh] = useState(0);
   const reportJourney = useCallback((plan: Journey) => setJourneyProjection(prev => JSON.stringify(prev) === JSON.stringify(plan) ? prev : plan), []);
   const currentJourneyDay = journeyDay(), currentJourneyScope = sourceKey || "local";
+  const journeyContext=useRef<()=>any>(()=>null);
+  journeyContext.current=()=>{const snapshot=timer.getSnapshot();return {scope:currentJourneyScope,ready:connectionReady&&timer.ready&&!timer.blocked&&!loadingTasks,records:snapshot.records,active:snapshot.active,tasks:boardTasks,restLog:readRestLog(localStorage,restScope)};};
+  useEffect(()=>{
+    const native=(window as any).focusApi;
+    if(!native?.onJourneyRequest) return;
+    const execute=createJourneyApi(localStorage,()=>journeyContext.current(),plan=>{
+      if(plan.day===journeyDay()) reportJourney(plan);
+      setJourneyRefresh(v=>v+1);
+    });
+    return native.onJourneyRequest(async({ticket,request}:any)=>{
+      const response=await execute(request);
+      try {await native.journeyResult({ticket,response});} catch (_) { /* main timed out/closed; CAS and receipt protect retry */ }
+    });
+  },[reportJourney]);
   useEffect(() => {
     if (!connectionReady || !timer.ready || timer.blocked) { setJourneyProjection(null); return; }
     try {
