@@ -292,7 +292,7 @@ app.whenReady().then(async () => {
     );
     assert.ok(
       await js(
-        "document.querySelector('.manual-time-hint').textContent.includes('自动调小')"
+        "!document.querySelector('.manual-time-hint').textContent.includes('自动调小')"
       )
     );
     await input("#manual-end", local);
@@ -300,7 +300,7 @@ app.whenReady().then(async () => {
       await js(
         "Number(document.querySelector('#manual-minutes').value)"
       ),
-      15
+      30
     );
     await input("#manual-minutes", "31");
     await click("保存修改");
@@ -315,7 +315,7 @@ app.whenReady().then(async () => {
       false
     );
     checks.push(
-      "shorter end clamps duration without changing count; extending does not inflate focus; explicit maximum and correction work"
+      "endpoint edits use explicit-duration anchor and recorded pauses; no auto-shrunk hint; count stays independent"
     );
     await click("保存修改");
     await until(
@@ -344,7 +344,7 @@ app.whenReady().then(async () => {
     await js("document.querySelector('.record-edit').click()");
     await until(() => js("Boolean(document.querySelector('#manual-end'))"));
     await input("#manual-end", await js(`(()=>{const d=new Date(${start + 2400000});d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)})()`));
-    await input("#manual-minutes", "40");
+    assert.equal(await js("Number(document.querySelector('#manual-minutes').value)"),40);
     await click("保存修改");
     await until(async () => (await client.history()).records[0].acceptedSeconds === 2400);
     assert.equal((await client.history()).records[0].completedCount, 1);
@@ -391,6 +391,8 @@ app.whenReady().then(async () => {
     await until(() =>
       js("Boolean(document.querySelector('.stats-page'))")
     );
+    // Overnight corrected record can belong to the previous week on Monday.
+    await js("[...document.querySelectorAll('.stats-tab')].find(b=>b.textContent.trim()==='月').click()");
     await click("分类");
     await until(() =>
       js("document.querySelectorAll('.bar-segment').length>0")

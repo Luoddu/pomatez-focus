@@ -15,7 +15,7 @@ Windows 当前用户运行中的番茄农场提供 stdin/stdout JSON 客户端�
 
 stdin 只接收一个 JSON（最多30KB），stdout 只输出一个 JSON；成功退出0，错误退出1。调用期间短暂启动第二个 Electron 进程递交 ID 后即退出，主农场不弹出/抢焦点。客户端最多等待12秒；主进程页面应答10秒。不运行时返回 TRANSPORT，不自动打开农场。
 
-用户数据目录下 `journey-api/status.json` 用于发现当前实例。客户端默认 `%APPDATA%/pomatez-focus`，命令行不接受任意配置路径、执行命令或主机地址。该目录继承 Windows 当前用户 AppData 权限；同用户进程/管理员在本机信任域内。instance 标识仅防止跨重启误投，不是秘密或独立认证。不要把运行目录放到共享盘、NAS、公开目录；接口不用于远程用户或其他机器。测试专用 `call(request, profile)` 只用于隔离合成 profile，Hermes 使用默认入口。
+用户数据目录下 `journey-api/status.json` 用于发现当前实例。客户端默认 `%APPDATA%/pomatez-focus`，命令行不接受任意配置路径、执行命令或主机地址。每次调用生成独立transportId文件，与持久requestId分开；崩溃残留或两个同ID并发重试不会争用/删除彼此回应。该目录继承 Windows 当前用户 AppData 权限；同用户进程/管理员在本机信任域内。instance 标识仅防止跨重启误投，不是秘密或独立认证。不要把运行目录放到共享盘、NAS、公开目录；接口不用于远程用户或其他机器。测试专用 `call(request, profile)` 只用于隔离合成 profile，Hermes 使用默认入口。
 
 ## 读取结果
 

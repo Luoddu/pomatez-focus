@@ -10,3 +10,4 @@
 - 预算：一次有界前台交付，同根因未知两次停止对应步骤，网络只读瞬时最多一次重试；无后台任务或新Agent。关键写入/提交/发布前核HEAD/写集/单worktree资源，绿继续/黄仅共享控制只读/红仅冲突步骤暂停。固定官方机制薄适配、无新运行依赖。回滚源码revert；metadata向后兼容原Journey schema，不迁移计时或历史；关闭App关闭接口，原CLI调用不得在退出后启动新App。发布沿模块AGENTS五资产、固定源tag、旧87真实更新器验新版而不下载/安装。
 - Learning判断none（开工）：直接复用既有所有权/公开单实例；检查点若命中新教训再候选/复核，REVIEW前处置。详细原始结果进acceptance与ignored artifacts，不写根状态或私人路径。
 - 兼容回归补充允许tests/journey.test.mjs：存储失败fixture原仅setItem，新增元数据需真实Storage getItem/setItem接口；补齐fixture读取，不改变既有拒写断言。
+- 用户追加（2026-10-12）：手动结束09:23→09:28应自动加5分钟，不能被datetime输入中间值永久缩成4.11；删“时长已自动调小……”提示。允许app/renderer/src/focus/manualRecord.ts、components/ManualEntry.tsx、tests/manual-category.test.mjs、tests/category-review-desktop.cjs，纯新增范围沿P053暂停算法，显式时长为锚点计算有效窗口差，番茄数不变；精确秒、中间输入恢复/暂停扣除和实际保存列入验收。

@@ -7,6 +7,7 @@ import {
   manualWindow,
   focusTimeLabel,
   manualPeriodDefaults,
+  adjustedManualMinutes,
 } from "../manualRecord";
 
 // datetime-local 需要本地时区的 YYYY-MM-DDTHH:mm
@@ -46,7 +47,8 @@ export default function ManualEntry({
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   const [error, setError] = useState("");
   const [category, setCategory] = useState<ProjectType | "">("");
-  const [adjusted, setAdjusted] = useState(false);
+  const durationAnchor = useRef({seconds:initial?.acceptedSeconds ?? 1500,
+    available:initial ? manualWindow(initial,initial.startedAt,initial.endedAt!,initial.acceptedSeconds ?? 1500).availableSeconds : 1500});
   const timestamps = (startValue: string, endValue: string) => ({
     startedAt:
       initial && startValue === localInputValue(initial.startedAt)
@@ -83,17 +85,7 @@ export default function ManualEntry({
       endedAt < startedAt
     )
       return;
-    const limit = manualWindow(
-      initial,
-      startedAt,
-      endedAt,
-      minutes * 60
-    ).availableSeconds;
-    if (minutes * 60 > limit) {
-      // 向下保留两位分钟，避免四舍五入后再次超过实际有效时间。
-      setMinutes(Math.floor((limit / 60) * 100) / 100);
-      setAdjusted(true);
-    }
+    setMinutes(adjustedManualMinutes(initial,startedAt,endedAt,durationAnchor.current));
   };
   const maxWhen = useMemo(() => localInputValue(Date.now()), []);
   const groups = useMemo(
@@ -119,7 +111,7 @@ export default function ManualEntry({
     const mins = value;
     setMinutes(mins);
     setError("");
-    setAdjusted(false);
+    durationAnchor.current={seconds:mins*60,available};
   };
   const changeCount = (value: number) => {
     const next = Math.min(100, Math.max(0, Math.round(value) || 0));
@@ -302,7 +294,6 @@ export default function ManualEntry({
         current.endedAt >= current.startedAt && (
           <div className="manual-time-hint" role="status">
             此时段最多可计入 {focusTimeLabel(available)}（已扣除暂停）。
-            {adjusted && "时长已自动调小，番茄数保持不变；可继续微调。"}
           </div>
         )}
       <div className="manual-row">

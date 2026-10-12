@@ -20,11 +20,12 @@ export class JourneyGateway {
   }
   async dispatch(id:any) {
     if (!ID.test(id||'') || !this.active) return;
-    let reply:any;
+    let reply:any,requestId:string|null=null;
     try {
       if(this.pending.size>=16) throw Error('API queue full');
       const envelope=read(path.join(this.directory,'requests',id+'.json'),32768);
-      if(!envelope||Object.keys(envelope).some(k=>!['instance','request'].includes(k))||envelope.instance!==this.instance||envelope.request?.requestId!==id) throw Error('Request instance mismatch');
+      if(!envelope||Object.keys(envelope).some(k=>!['instance','request'].includes(k))||envelope.instance!==this.instance||!ID.test(envelope.request?.requestId||'')) throw Error('Request instance mismatch');
+      requestId=envelope.request.requestId;
       const ticket=crypto.randomUUID();
       reply=await new Promise(resolve=>{
         const timer=setTimeout(()=>{this.pending.delete(ticket);resolve({error:{code:'TIMEOUT',message:'旅程页面未就绪或操作超时'}})},10000);
@@ -32,7 +33,7 @@ export class JourneyGateway {
         try { this.send({ticket,request:envelope.request}); } catch (_) { clearTimeout(timer);this.pending.delete(ticket);resolve({error:{code:'NOT_READY',message:'农场页面未就绪'}}); }
       });
     } catch(e:any) { reply={error:{code:'INVALID',message:e.message}}; }
-    try { if(this.active) atomic(path.join(this.directory,'responses',id+'.json'),{requestId:id,...reply}); } catch (_) { /* caller times out; no replay */ }
+    try { if(this.active) atomic(path.join(this.directory,'responses',id+'.json'),{transportId:id,requestId,...reply}); } catch (_) { /* caller times out; no replay */ }
   }
   complete(value:any) {
     if(!value || !ID.test(value.ticket||'') || JSON.stringify(value).length>200000) throw Error('Invalid API response');

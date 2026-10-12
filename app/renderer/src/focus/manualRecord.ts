@@ -68,6 +68,13 @@ export function focusTimeLabel(seconds: number) {
   return `${Math.floor(whole / 60)} 分 ${whole % 60} 秒`;
 }
 
+// Use the last explicit duration edit as the anchor. Intermediate datetime
+// input events must not permanently shrink the duration before typing finishes.
+export function adjustedManualMinutes(initial: FocusSession, startedAt: number, endedAt: number, anchor: {seconds:number;available:number}) {
+  const available = manualWindow(initial,startedAt,endedAt,anchor.seconds).availableSeconds;
+  return Math.floor(Math.max(0,Math.min(available,anchor.seconds+Math.max(0,available-anchor.available)))*1000000/60)/1000000;
+}
+
 export function manualRecord(input: {
   initial?: FocusSession;
   task: FocusTask;

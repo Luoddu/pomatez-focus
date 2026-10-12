@@ -412,6 +412,8 @@ else {
     });
 }
 app.on("before-quit", () => {
+  // Secondary handoff processes never own the running App's monitor/projections.
+  if (!single || journeyArg>=0) return;
   journeyGateway.close();
   quitting = true;
   restMonitor.stop();
