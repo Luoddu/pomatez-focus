@@ -5,7 +5,7 @@ function shape(v, keys) { if (!v || typeof v !== 'object' || Array.isArray(v) ||
 const stableTaskId = r => `${r.source}:${encodeURIComponent(r.sourceKey || '')}:${encodeURIComponent(r.key)}`;
 export function validateJourneyRequest(r) {
   shape(r,['protocol','requestId','op','day','expectedRevision','operations']);
-  if (r.protocol !== 1 || !uuid.test(r.requestId || '') || !['read','write'].includes(r.op) || typeof r.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.day) || r.day < '2000-01-01' || r.day > '2100-12-31' || new Date(r.day+'T12:00:00Z').toISOString().slice(0,10) !== r.day) fail('INVALID','协议、日期或请求ID无效');
+  if (r.protocol !== 1 || !uuid.test(r.requestId || '') || !['read','write'].includes(r.op) || typeof r.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.day) || r.day < '2000-01-01' || r.day > '2100-12-31' || !Number.isFinite(new Date(r.day+'T12:00:00Z').getTime()) || new Date(r.day+'T12:00:00Z').toISOString().slice(0,10) !== r.day) fail('INVALID','协议、日期或请求ID无效');
   if (r.op === 'read') { if ('operations' in r || 'expectedRevision' in r) fail('INVALID','读取不能携带写入字段'); return r; }
   if (!uuid.test(r.expectedRevision || '') || !Array.isArray(r.operations) || !r.operations.length || r.operations.length > 100) fail('INVALID','写入需版本和1–100项操作');
   for (const o of r.operations) {
@@ -31,9 +31,13 @@ export function createJourneyApi(storage, getContext, notify = () => {}) {
     let plan=reconcileJourney(readJourney(storage,c.scope,r.day),c.records,c.active);
     if (r.op === 'read') {
       // Persist default IDs and legacy metadata once; all subsequent reads retain them.
-      plan=writeJourney(storage,plan); notify(plan); return result(readJourney(storage,c.scope,r.day),c);
+      plan=writeJourney(storage,plan);
+      const back=readJourney(storage,c.scope,r.day);
+      if(JSON.stringify(back)!==JSON.stringify(plan) || !journeyMetadata(storage,c.scope,r.day).revision) fail('SAVE_FAILED','旅程初始化回读未确认');
+      notify(back); return result(back,c);
     }
     const hash=await digest(r), latest=context();
+    if(journeyDay()!==today) fail('CONFLICT','日期已变化，请重新读取');
     if (latest.scope !== c.scope || storage.getItem(key) !== raw || JSON.stringify([latest.records,latest.active,latest.restLog]) !== fingerprint) fail('CONFLICT','读取期间状态已变化，请重新读取');
     const meta=journeyMetadata(storage,c.scope,r.day), receipt=meta.receipts.find(v=>v.id===r.requestId);
     if (receipt) { if (receipt.hash !== hash) fail('ID_REUSED','请求ID已用于其他内容'); return result(plan,latest,true,receipt.revision); }

@@ -15,12 +15,12 @@ const {
 } = require("../app/electron/build/focus/activitywatch");
 // Keep production main and renderer on the same advancing noon test clock.
 // Synthetic AW already uses noon; real 00:xx backfills otherwise cross yesterday.
-function installNoonClock() {
+function installNoonClock(fixedOffset) {
   const RealDate = Date;
   const now = RealDate.now();
   const noon = new RealDate(now);
   noon.setHours(12, 0, 0, 0);
-  const offset = noon.getTime() - now;
+  const offset = fixedOffset ?? noon.getTime() - now;
   globalThis.Date = class extends RealDate {
     constructor(...args) {
       super(...(args.length ? args : [RealDate.now() + offset]));
@@ -29,8 +29,9 @@ function installNoonClock() {
       return RealDate.now() + offset;
     }
   };
+  return offset;
 }
-installNoonClock();
+const fixtureClockOffset=installNoonClock();
 const root = path.resolve(__dirname, "..");
 fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 let clock = new Date().setHours(12, 0, 0, 0),
@@ -251,9 +252,11 @@ app.whenReady().then(async () => {
       if (text === "去睡觉" || text === "去健身" || text === "开始下一个番茄")
         await until(() => !popup());
     };
-    await js(`(${installNoonClock.toString()})()`, win);
+    const fixtureClockSource=`(${installNoonClock.toString()})(${fixtureClockOffset})`;
+    await js(fixtureClockSource, win);
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand("Page.enable");
+    await win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument',{source:fixtureClockSource});
     const capture = async (name) => {
       console.log("Capture:", name);
       win.webContents.invalidate();
@@ -412,6 +415,7 @@ app.whenReady().then(async () => {
     await until(()=>js(`!!document.querySelector('.journey-card .journey-tomato')`,win));
     checks.push("current-day gym projection updates on tomorrow view and cold compact reload; corrupt plan disables gym without reset, restored valid plan works");
     await click("开始专注");
+    assert.ok(await js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).active",win),await js("JSON.stringify({button:document.querySelector('.btn-begin')?.disabled,note:document.querySelector('.toast')?.textContent,state:JSON.parse(localStorage.getItem('pomatez-focus-v1'))})",win));
     bSeconds = 1080; xSeconds = 120;
     await restMonitor.refresh();
     await until(() => popup() && !popup().webContents.isLoadingMainFrame());
@@ -420,7 +424,7 @@ app.whenReady().then(async () => {
     assert.equal(await js(`[...document.querySelectorAll('button')].filter(b=>!b.hidden).length`,popup()),3);
     await capture("scientific-focus-gym-reminder");
     fs.writeFileSync(path.join(root,"artifacts/scientific-focus-native-gym.png"),(await popup().webContents.capturePage()).toPNG());
-    await js(`window.gymOriginalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-journey-v1:'))throw Error('Synthetic gym quota');return window.gymOriginalSet.call(this,k,v)};void 0`,win);
+    await js(`window.gymOriginalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v'))throw Error('Synthetic gym quota');return window.gymOriginalSet.call(this,k,v)};void 0`,win);
     await js(`document.querySelector('[data-action="gym"]').click()`,popup());
     await until(()=>js(`document.querySelector('p').textContent.includes('操作未完成')`,popup()));
     assert.equal(await js(`JSON.parse(localStorage.getItem('pomatez-focus-v1')).active.status`,win),"active");
@@ -428,9 +432,10 @@ app.whenReady().then(async () => {
     await js(`Storage.prototype.setItem=window.gymOriginalSet;void 0`,win);
     await click("去健身");
     assert.equal(await js(`JSON.parse(localStorage.getItem('pomatez-focus-v1')).active.status`,win),"paused");
-    assert.ok(await js(`(()=>{const e=document.querySelector('.journey-card');const p=JSON.parse(localStorage.getItem('pomatez-journey-v1:'+encodeURIComponent(e.dataset.scope)+':'+e.dataset.day));return p.restingAction.endsWith(':1')})()`,win));
+    assert.ok(await js(`(()=>{const e=document.querySelector('[data-rest-kind=gym][data-rest-state=ongoing]');return !!e && JSON.parse(localStorage.getItem('pomatez-rest-log-v2:local')).events.some(v=>v.kind==='gym'&&v.endedAt===null)})()`,win));
     await click("结束"); await click("确认结束"); await click("放弃本次");
-    await click("继续：健身");
+    await click("健身记录");
+    await click("练完了");
     await until(() => restMonitor.snapshot().progress?.gymAvailable === false);
     bSeconds = 1380;
     await restMonitor.refresh();
@@ -556,7 +561,7 @@ app.whenReady().then(async () => {
       await js(
         `document.querySelectorAll('.rest-settings input').length`
       ),
-      3
+      5
     );
     const strategyGeometry = await js(
       `(()=>{const r=document.querySelector('.rest-card').getBoundingClientRect(), m=document.querySelector('.heatmap').getBoundingClientRect();return {height:r.height,calendar:m.height,right:r.right,viewport:innerWidth}})()`

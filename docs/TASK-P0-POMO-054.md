@@ -11,3 +11,5 @@
 - Learning判断none（开工）：直接复用既有所有权/公开单实例；检查点若命中新教训再候选/复核，REVIEW前处置。详细原始结果进acceptance与ignored artifacts，不写根状态或私人路径。
 - 兼容回归补充允许tests/journey.test.mjs：存储失败fixture原仅setItem，新增元数据需真实Storage getItem/setItem接口；补齐fixture读取，不改变既有拒写断言。
 - 用户追加（2026-10-12）：手动结束09:23→09:28应自动加5分钟，不能被datetime输入中间值永久缩成4.11；删“时长已自动调小……”提示。允许app/renderer/src/focus/manualRecord.ts、components/ManualEntry.tsx、tests/manual-category.test.mjs、tests/category-review-desktop.cjs，纯新增范围沿P053暂停算法，显式时长为锚点计算有效窗口差，番茄数不变；精确秒、中间输入恢复/暂停扣除和实际保存列入验收。
+- 兼容fixture允许tests/activitywatch-desktop.cjs：原测试只在首load装noon clock，reload恢复真实时钟导致“系统时间早于休息开始”；固定同一offset注入新document。现行实际休息所有者已为rest-log-v2，负例必须注入该store而非旧journey写路径；操作结束健身走实际按钮。新增策略输入数为5；不调整产品运行时钟/休息逻辑。
+- 复核根级生命周期修正允许app/electron/src/assets/browser-control/background.js、tests/browser-control.test.cjs：P053单连接修复后同类竞态沿全链查明，旧valid等待storage→disconnect异步clear→新port B→旧clear读取global current并向新port发无key receipt，host拒并ready=false。根修正：所有valid/release共用串行链，每个事件捕获port+epoch、局部decision快照；跨每个await复核所有权，旧错误不能stop新port。断连立即清本地租约但旧异步release不得修改新连接。原生host严格匹配key不改，完整回调交错VM+真实stdio正常B回执正反纳入验收；无新第三方依赖/生命周期绕路。

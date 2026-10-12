@@ -44,3 +44,9 @@ test('readiness, malformed dates/unknown fields/history write and changes during
  const r=await f.call(read()),q=write(r,[{type:'end',hour:22}]);const promise=f.call(q);queueMicrotask(()=>{f.context.active={id:'new-active',startedAt:Date.now(),task:f.context.tasks[0]}});assert.equal((await promise).error.code,'CONFLICT');
  assert.equal((await f.call({...q,day:'2000-01-01'})).error.code,'READ_ONLY');assert.equal((await f.call(read())).error,undefined);
 });
+test('initialization requires real save/readback and midnight invalidates pending writes; next-day operations still pass',async()=>{
+ const f=fixture(),set=f.storage.setItem;f.storage.setItem=()=>{};assert.equal((await f.call(read())).error.code,'SAVE_FAILED');f.storage.setItem=set;
+ const r=await f.call(read()),q=write(r,[{type:'end',hour:22}]),RealDate=Date;
+ try {const pending=f.call(q);queueMicrotask(()=>{globalThis.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[RealDate.now()+86400000]))}static now(){return RealDate.now()+86400000}}});assert.equal((await pending).error.code,'CONFLICT');assert.equal((await f.call(read())).error,undefined);}finally{globalThis.Date=RealDate}
+ assert.equal((await f.call(write(await f.call(read()),[{type:'end',hour:23}]))).error,undefined);
+});

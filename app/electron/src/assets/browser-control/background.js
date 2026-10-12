@@ -16,18 +16,24 @@ if(typeof module!=="undefined") module.exports={target,decide};
 else {
   let port=null,timer=null,tries=0,retry=null,connecting=null,epoch=0,current={day:"",key:"",until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}},serial=Promise.resolve();
   async function tabs() { return chrome.tabs.query({url:TARGETS}); }
-  async function apply(state,expected=null) {
-    if(expected&&port!==expected)return;
-    current=decide(state,current,Date.now());
-    await chrome.storage.session.set({control:current});
+  const owns=(expected,turn)=>turn===epoch&&port===expected;
+  async function apply(state,expected,turn) {
+    if(!owns(expected,turn))return;
+    const decision=decide(state,current,Date.now());
     let count=0;
     for(const tab of await tabs()) {
-      if(expected&&port!==expected)return;
-      try { const result=await chrome.tabs.sendMessage(tab.id,{type:"control",...current.control,pause:current.control.pause&&(tab.active||tab.audible)}); count+=result?.pausedCount||0; } catch (_) {}
+      if(!owns(expected,turn))return;
+      try { const result=await chrome.tabs.sendMessage(tab.id,{type:"control",...decision.control,pause:decision.control.pause&&(tab.active||tab.audible)}); count+=result?.pausedCount||0; } catch (_) {}
     }
-    if(current.control.pause && port && (!expected||port===expected)) port.postMessage({type:"receipt",key:state.reminderKey,pausedCount:Math.min(100,count)});
+    if(!owns(expected,turn))return;
+    current=decision;
+    await chrome.storage.session.set({control:decision});
+    if(!owns(expected,turn))return;
+    if(decision.control.pause && expected && typeof state.reminderKey==="string") expected.postMessage({type:"receipt",key:state.reminderKey,pausedCount:Math.min(100,count)});
   }
-  function stop() { epoch++;if(timer)clearInterval(timer);timer=null; const p=port;port=null;if(p)p.disconnect();void apply({v:1,ready:false}); }
+  function enqueue(state,expected,turn=epoch) { serial=serial.then(()=>apply(state,expected,turn)).catch(()=>{if(owns(expected,turn))stop();}); }
+  function release() { epoch++;port=null;current={...current,until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
+  function stop() { const p=port;release();if(p)p.disconnect(); }
   function connect() {
     if(port)return Promise.resolve();if(connecting)return connecting;
     const turn=epoch;
@@ -38,8 +44,8 @@ else {
     if(!(await tabs()).length || port || turn!==epoch) return;
     if(retry)clearTimeout(retry);retry=null;
     const p=port=chrome.runtime.connectNative(HOST);
-    p.onMessage.addListener(state=>{if(port!==p)return;tries=0;serial=serial.then(()=>apply(state,p)).catch(()=>stop());});
-    p.onDisconnect.addListener(()=>{void chrome.runtime.lastError;if(port!==p)return;epoch++;port=null;if(timer)clearInterval(timer);timer=null;void apply({v:1,ready:false});if(++tries<=3)retry=setTimeout(()=>void connect(),tries*10000);});
+    p.onMessage.addListener(state=>{if(port!==p)return;tries=0;enqueue(state,p);});
+    p.onDisconnect.addListener(()=>{void chrome.runtime.lastError;if(port!==p)return;release();if(++tries<=3)retry=setTimeout(()=>void connect(),tries*10000);});
     p.postMessage({type:"status"}); timer=setInterval(()=>{if(port)port.postMessage({type:"status"});},5000);
   }
   chrome.runtime.onMessage.addListener((v,sender,reply)=>{

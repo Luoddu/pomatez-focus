@@ -14,6 +14,21 @@ test('real service-worker concurrent activation/connect is single-flight; discon
  callbacks.message1({v:1,ready:true});await flush();assert.equal(nativeCalls,2);
 });
 function state(now){const d=new Date(now),day=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;return {status:'recording',settings:{supervise:true,quotaMinutes:60},live:{checkedAt:now,expiresAt:now+7000,site:'bilibili'},usage:{day,totalSeconds:300},reminder:{key:'test/5'}};}
+test('full worker lifecycle: delayed old storage/clear cannot receipt or release new B; live native host accepts B receipt',async()=>{
+ const vm=require('node:vm'),callbacks={},messages=[],receipts=[],stores=[],ports=[];let n=0;
+ const event=name=>({addListener:f=>callbacks[name]=f}),list=[{id:1,url:'https://www.bilibili.com/synthetic',active:true}];
+ const chrome={runtime:{lastError:null,onMessage:event('request'),onStartup:event('startup'),onInstalled:event('installed'),connectNative:()=>{const k=++n,p={onMessage:event('message'+k),onDisconnect:event('disconnect'+k),postMessage:v=>{if(v.type==='receipt')receipts.push({port:k,...v})},disconnect:()=>{}};ports.push(p);return p;}},tabs:{query:async()=>list,sendMessage:async(_id,v)=>{messages.push(v);return {pausedCount:v.pause?1:0}},onUpdated:event('updated'),onActivated:event('activated'),onRemoved:event('removed')},storage:{session:{get:async()=>({}),set:()=>new Promise(r=>stores.push(r))}}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'app/electron/src/assets/browser-control/background.js'),'utf8'),{chrome,URL,Date,Promise,setInterval:()=>1,clearInterval:()=>{},setTimeout:()=>1,clearTimeout:()=>{}});
+ const flush=()=>new Promise(r=>setImmediate(r)),now=Date.now(),a={v:1,ready:true,supervise:true,expiresAt:now+7000,day:state(now).usage.day,mode:'pause',cooldownMinutes:2,reminderKey:'old/A'};
+ await flush();callbacks.message1(a);await flush();assert.equal(stores.length,1);
+ callbacks.disconnect1();callbacks.activated();await flush();assert.equal(n,2);callbacks.message2({...a,reminderKey:'new/B'});await flush();
+ stores.shift()();await flush();while(stores.length){stores.shift()();await flush()}
+ assert.deepEqual(receipts,[{port:2,type:'receipt',key:'new/B',pausedCount:1}]);assert.equal(messages.filter(v=>!v.pause&&v.expiresAt===0).length,0);
+ let displayed;callbacks.request({type:'getControl'},{tab:list[0]},v=>displayed=v);assert.equal(displayed.expiresAt,a.expiresAt);
+ const dir=temp(),control=new BrowserControl(dir,build),s=state(now);s.reminder.key='new/B';control.publish(s);
+ const child=host(dir,'chrome-extension://'+'a'.repeat(32)+'/'),exit=new Promise(r=>child.on('exit',r)),reply=new Promise(r=>child.stdout.once('data',r)),body=Buffer.from(JSON.stringify({type:'receipt',key:receipts[0].key,pausedCount:receipts[0].pausedCount})),header=Buffer.alloc(4);header.writeUInt32LE(body.length);child.stdin.write(Buffer.concat([header,body]));const bytes=await reply,paused=control.snapshot().pausedCount;child.stdin.end();assert.equal(await exit,0);assert.equal(JSON.parse(bytes.subarray(4)).ready,true,bytes.subarray(4).toString());assert.equal(paused,1);
+ callbacks.disconnect2();await flush();while(stores.length){stores.shift()();await flush()}callbacks.request({type:'getControl'},{tab:list[0]},v=>displayed=v);assert.equal(displayed.expiresAt,0);
+});
 test('four intervention modes clear on expiry/off/day; normal pause and cooldown allow correct continuation',()=>{
  const now=Date.now(),base={v:1,ready:true,supervise:true,expiresAt:now+7000,day:'2026-10-12',mode:'pause',cooldownMinutes:2,reminderKey:'test/5',quotaSpent:false},old={day:'',key:'',until:0};
  const p=decide(base,old,now);assert.equal(p.control.pause,true);assert.equal(p.control.blockedUntil,0);assert.equal(decide(base,p,now+1000).control.pause,false);
