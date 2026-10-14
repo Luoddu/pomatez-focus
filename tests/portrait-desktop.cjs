@@ -114,7 +114,7 @@ app
     await wait(100);
     const portrait = await js(`(()=>{
       const cs=getComputedStyle(document.querySelector('.content'));
-      const grid=getComputedStyle(document.querySelector('.stat-grid'));
+      const grid=getComputedStyle(document.querySelector('.right-col'));
       const farm=document.querySelector('.farm-field').getBoundingClientRect();
       const bar=getComputedStyle(document.querySelector('.action-bar'));
       const stats=[...document.querySelectorAll('.stat')];
@@ -127,7 +127,7 @@ app
       const recs=getComputedStyle(document.querySelector('.records'));
       const recEl=document.querySelector('.records');
       const rc=document.querySelector('.right-col');
-      const sections=[...rc.querySelectorAll(':scope > .side-section, :scope > .rest-calendar-group')];
+      const sections=[rc.querySelector('.stat'),rc.querySelector('.calendar-section'),rc.querySelector('.records-section')];
       const r=sections.map(s=>s.getBoundingClientRect());
       const rcRect=rc.getBoundingClientRect();
       const days=[...document.querySelectorAll('.record-day')];
@@ -162,10 +162,10 @@ app
         todayEmpty:days[0].querySelectorAll('.record').length===0};
     })()`);
     check(
-      "portrait stacks panels in one column with paired overview and heatmap",
+      "portrait main stacks; left stats and right calendar stay side by side",
       () => {
         assert.equal(portrait.direction, "column");
-        assert.equal(portrait.columns, 2);
+        assert.equal(portrait.columns, 3);
         assert.equal(portrait.rightDisplay, "grid");
         assert.equal(
           portrait.sideBySide,

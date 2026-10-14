@@ -12,6 +12,13 @@ import { es } from "./translations/es";
 import { zh } from "./translations/zh";
 import { ja } from "./translations/ja";
 
+// Match the runtime string fallback with the supported i18next 22 type option.
+declare module "i18next" {
+  interface CustomTypeOptions {
+    returnNull: false;
+  }
+}
+
 const resources = {
   en: { translation: en },
   es: { translation: es },
@@ -29,6 +36,7 @@ const initialLanguage = storedLanguage
 
 i18n.use(initReactI18next).init({
   resources,
+  returnNull: false,
   lng: initialLanguage,
   fallbackLng: fallbackLanguage,
   supportedLngs: supportedLanguages.map((lang) => lang.code),

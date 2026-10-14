@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { WindowControls } from "./shared";
 import UpdatePanel from "./UpdatePanel";
+import WeightSettings from "./WeightSettings";
+import type { TomatoWeights } from "../weights";
 import { isSoundEnabled, setSoundEnabled, playRestEnd } from "../sound";
 
 export type FocusConfig = {
@@ -35,6 +37,7 @@ const FIELDS: {
 
 export default function SettingsPanel({
   config,
+  weights, weightsError, onWeights,
   connected,
   todayCount,
   quadrantField,
@@ -54,6 +57,9 @@ export default function SettingsPanel({
   onToggleCompact,
 }: {
   config: FocusConfig;
+  weights: TomatoWeights;
+  weightsError: string;
+  onWeights: (value: TomatoWeights) => void;
   connected: boolean;
   todayCount: number | null;
   quadrantField: string | null;
@@ -87,6 +93,7 @@ export default function SettingsPanel({
         <div className="settings-cols">
           <div className="settings-lane">
         <UpdatePanel />
+        <WeightSettings weights={weights} loadError={weightsError} onSave={onWeights} />
         <div className="card settings-card s-sync">
           <h3>同步状态</h3>
           <div className="sync-row">
@@ -145,7 +152,7 @@ export default function SettingsPanel({
         <div className="card settings-card s-about">
           <h3>关于</h3>
           <div className="about-line">
-            版本 <span className="ver">{process.env.REACT_APP_MAC_VERSION || "0.1.0-preview.93"}</span>
+            版本 <span className="ver">{process.env.REACT_APP_MAC_VERSION || "0.1.0-preview.94"}</span>
             <br />
             基于开源项目 pomatez 二次开发（MIT License，© roldanjr
             及贡献者）

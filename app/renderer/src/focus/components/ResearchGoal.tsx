@@ -7,11 +7,15 @@ import {
   saveResearchGoal,
 } from "../research";
 import { goalProgressRatio } from "../weekgoal";
+import { formatEffective } from "../weights";
+import type { TomatoWeights } from "../weights";
 
 export default function ResearchGoal({
   records,
+  weights,
 }: {
   records: FocusSession[];
+  weights?: TomatoWeights;
 }) {
   const [goals, setGoals] = useState(loadResearchGoals);
   const [open, setOpen] = useState(false);
@@ -33,7 +37,9 @@ export default function ResearchGoal({
       document.removeEventListener("pointerdown", dismiss);
     };
   }, []);
-  const count = researchWeeks(records, now, 1)[0].count;
+  const count = Math.round(
+    researchWeeks(records, now, 1)[0].count * (weights?.research ?? 1) * 100
+  ) / 100;
   const goal = researchGoal(now, goals);
   const show = () => {
     setInput(String(goal));
@@ -75,7 +81,7 @@ export default function ResearchGoal({
           style={{ width: `${goalProgressRatio(count, goal) * 100}%` }}
         />
         <span className="wg-text">
-          科研 <span className="wg-now">{count}</span>/<span className="wg-goal">{goal}</span>
+          科研 <span className="wg-now">{formatEffective(count)}</span>/<span className="wg-goal">{goal}</span>
           {count >= goal ? " ✓" : ""}
         </span>
       </button>

@@ -1252,3 +1252,21 @@ test("short suspend and duplicate resume reconcile full day once then return to 
   );
   assert.equal(monitor.snapshot().usage.totalSeconds, 615);
 });
+
+ test("effective credit controls supervision while raw completion and legacy bridge remain intact", async () => {
+  const f=fixture(), m=new ActivityWatchRest(dir(),()=>{},()=>{},f.request,f.now);
+  m.configure({quotaMinutes:60,supervise:true,pomodoroGoal:15,reminderMinutes:5});
+  m.reportProgress({day:dayKey(f.now()),completedCount:18,effectiveCount:14});
+  f.seconds(300);await m.refresh();
+  assert.equal(m.snapshot().progress.completedCount,18);
+  assert.equal(m.snapshot().progress.effectiveCount,14);
+  assert.equal(m.snapshot().reminder.kind,"focus");
+  m.reportProgress({day:dayKey(f.now()),completedCount:18,effectiveCount:15});
+  assert.equal(m.snapshot().reminder,null);
+  for(const effectiveCount of [-1,19,NaN,Infinity,14.111,"14",null])
+   assert.throws(()=>m.reportProgress({day:dayKey(f.now()),completedCount:18,effectiveCount}));
+  assert.equal(m.snapshot().progress.effectiveCount,15);
+  assert.throws(()=>m.reportProgress({day:dayKey(f.now()),completedCount:null,effectiveCount:0}));
+  m.reportProgress({day:dayKey(f.now()),completedCount:18});
+  assert.equal(m.snapshot().progress.effectiveCount,undefined);
+ });

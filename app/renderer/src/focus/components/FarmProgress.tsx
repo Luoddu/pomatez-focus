@@ -1,7 +1,8 @@
 import React from "react";
+import { formatEffective } from "../weights";
 import { journeyRoad } from "../journey.js";
 
-export default function FarmProgress({ total }: { total: number }) {
+export default function FarmProgress({ total, effective = false }: { total: number; effective?: boolean }) {
   const { reached, next } = journeyRoad(total);
   const progress = Math.max(
     0,
@@ -10,8 +11,8 @@ export default function FarmProgress({ total }: { total: number }) {
   return (
     <div
       className="farm-total-progress stat-totalbar"
-      title={`累计 ${total} 个番茄 · 每25个番茄一面小旗`}
-      aria-label={`累计${total}个番茄，每25个番茄一面小旗`}
+      title={`累计 ${formatEffective(total)} 个${effective ? "有效番茄" : "番茄"} · 每25个番茄一面小旗`}
+      aria-label={`累计${formatEffective(total)}个${effective ? "有效番茄" : "番茄"}，每25个番茄一面小旗`}
     >
       <span className="stb-from">{reached}</span>
       <div className="stb-main">
@@ -27,7 +28,7 @@ export default function FarmProgress({ total }: { total: number }) {
             }`}
             style={{ left: `${progress}%` }}
           >
-            {total}
+            {effective ? "有效 " : ""}{formatEffective(total)}
           </span>
           {[25, 50, 75, 100].map((offset) => (
             <span

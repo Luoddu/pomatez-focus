@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { api } from "./shared";
 import type { FocusSession } from "../session";
 import { dailyRestProgress } from "../restProgress";
+import { DEFAULT_WEIGHTS, TomatoWeights } from "../weights";
 import {
   durationText,
   displayUsage,
@@ -33,7 +34,7 @@ export type RestState = {
     pomodoroGoal: number;
     reminderMinutes: number;
   };
-  progress: { day: string; completedCount: number; gymAvailable?: boolean } | null;
+  progress: { day: string; completedCount: number; effectiveCount?: number; gymAvailable?: boolean } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
   message: string;
@@ -71,7 +72,8 @@ const initial: RestState = {
 export function useScientificRest(
   records: FocusSession[],
   ready: boolean,
-  gymAvailable = false
+  gymAvailable = false,
+  weights: TomatoWeights = DEFAULT_WEIGHTS
 ) {
   const [state, setState] = useState(initial);
   useEffect(() => {
@@ -108,9 +110,10 @@ export function useScientificRest(
       off();
     };
   }, []);
-  const { day: progressDay, completedCount } = dailyRestProgress(
+  const { day: progressDay, completedCount, effectiveCount } = dailyRestProgress(
     records,
-    state.updatedAt || Date.now()
+    state.updatedAt || Date.now(),
+    weights
   );
   const reportedCount = ready ? completedCount : null;
   useEffect(() => {
@@ -120,12 +123,13 @@ export function useScientificRest(
         .restProgress({
           day: progressDay,
           completedCount: reportedCount,
+          ...(ready ? { effectiveCount } : {}),
           gymAvailable: ready && gymAvailable,
         })
         .catch(() => {});
     // Progress is a projection of the timer's confirmed records, including edits
     // and cloud merges. No independent daily counter or polling timer is needed.
-  }, [progressDay, reportedCount, ready, gymAvailable]);
+  }, [progressDay, reportedCount, effectiveCount, ready, gymAvailable]);
   return state;
 }
 const minutes = (seconds: number) =>
@@ -696,8 +700,8 @@ export function ScientificRestReminder({
         <p id="rest-reminder-line">
           {error ||
             (reminder.kind === "focus"
-              ? `已看 ${reminder.watchedMinutes} 分钟，番茄 ${
-                  state.progress?.completedCount ??
+              ? `已看 ${reminder.watchedMinutes} 分钟，${state.progress?.effectiveCount !== undefined && state.progress.effectiveCount !== state.progress.completedCount ? "有效番茄" : "番茄"} ${
+                  state.progress?.effectiveCount ?? state.progress?.completedCount ??
                   reminder.completedCount
                 }/${
                   state.settings.pomodoroGoal

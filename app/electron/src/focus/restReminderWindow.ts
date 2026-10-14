@@ -29,7 +29,7 @@ export class RestReminderWindow {
     const previousKey=this.current?.key;
     this.takeFocus=state.browserControl?.policy?.mode!=="mirror";
     this.current = { key: reminder.key, gymAvailable: state.progress?.day === state.usage?.day && state.progress?.gymAvailable === true, line: reminder.kind === "focus"
-      ? `已看 ${reminder.watchedMinutes} 分钟，番茄 ${state.progress?.completedCount ?? reminder.completedCount}/${state.settings.pomodoroGoal}：去睡觉，或回到科研主线。`
+      ? `已看 ${reminder.watchedMinutes} 分钟，${state.progress?.effectiveCount !== undefined && state.progress.effectiveCount !== state.progress.completedCount ? "有效番茄" : "番茄"} ${state.progress?.effectiveCount ?? state.progress?.completedCount ?? reminder.completedCount}/${state.settings.pomodoroGoal}：去睡觉，或回到科研主线。`
       : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。` };
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send("rest-reminder:state", this.snapshot());

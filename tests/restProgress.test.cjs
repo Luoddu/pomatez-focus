@@ -14,7 +14,7 @@ const code = ts.transpileModule(fs.readFileSync(source, "utf8"), {
 }).outputText;
 const exportsForTest = {};
 new Function("require", "exports", code)(
-  (name) => require(path.resolve(path.dirname(source), name + ".ts")),
+  (name) => require(path.resolve(path.dirname(source), name.endsWith(".js") ? name : name + ".ts")),
   exportsForTest
 );
 const { dailyRestProgress } = exportsForTest;

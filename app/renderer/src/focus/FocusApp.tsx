@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { CounterContext } from "contexts/CounterContext";
+import { DEFAULT_WEIGHTS, loadWeights, saveWeights, effectiveCount, effectiveWeekCount, TomatoWeights } from "./weights";
 import {
   FocusSession,
   FocusTask,
@@ -236,7 +237,17 @@ const withActualGym = (plan: Journey, log: RestLog | null) => ({...plan,
   passedActions:[...plan.passedActions, ...(log?.scope === plan.scope ? log.events.filter(e =>
     e.kind === "gym" && e.presetKey && journeyDay(e.startedAt) === plan.day).map(e => e.presetKey!) : [])]});
 
+
 export default function FocusApp() {
+  const [weightState, setWeightState] = useState(() => {
+    try { return { value: loadWeights(localStorage), error: "" }; }
+    catch (e) { return { value: { ...DEFAULT_WEIGHTS }, error: (e as Error).message }; }
+  });
+  const weights = weightState.value;
+  const persistWeights = (value: TomatoWeights) => {
+    const saved = saveWeights(localStorage, value);
+    setWeightState({ value: saved, error: "" });
+  };
   const timer = useContext(CounterContext);
   const [tasks, setTasks] = useState<FocusTask[]>(() =>
       api() ? [] : demoTasks
@@ -1726,7 +1737,7 @@ export default function FocusApp() {
   const gymAvailable = useMemo(() => !!(connectionReady && journeyProjection && journeyProjection.day === currentJourneyDay &&
     journeyProjection.scope === currentJourneyScope && gymRestTarget(withActualGym(journeyProjection, actualRestLog), shownRecords)),
     [connectionReady, journeyProjection, currentJourneyDay, currentJourneyScope, actualRestLog, shownRecords]);
-  const restState = useScientificRest(timer.records, timer.ready && !timer.blocked, gymAvailable);
+  const restState = useScientificRest(timer.records, timer.ready && !timer.blocked, gymAvailable, weights);
   const goGym = gymAvailable ? () => {
     if (!timer.ready || timer.blocked || !connectionReady) throw Error("旅程尚未就绪");
     const snapshot = timer.getSnapshot();
@@ -1752,6 +1763,7 @@ export default function FocusApp() {
     return (
       <div className="focus-app compact">
         {restReminder}
+      {weightState.error && <div role="alert" className="outbox-status weight-config-error">{weightState.error}；当前使用原始数量，请在设置中保存比例。</div>}
         <MiniView
           active={active}
           taskTitle={
@@ -1777,9 +1789,13 @@ export default function FocusApp() {
   return (
     <div className="focus-app">
       {restReminder}
+      {weightState.error && <div role="alert" className="outbox-status weight-config-error">{weightState.error}；当前使用原始数量，请在设置中保存比例。</div>}
       {settingsOpen ? (
         <SettingsPanel
           config={config}
+          weights={weights}
+          weightsError={weightState.error}
+          onWeights={persistWeights}
           connected={connected}
           todayCount={todayCount}
           quadrantField={quadrantField}
@@ -1904,6 +1920,7 @@ export default function FocusApp() {
               canBreak={timer.records.length > 0}
               restSeconds={timer.restSeconds}
               totalTomatoes={totalTomatoes}
+              effectiveTotal={effectiveCount(shownRecords, weights)}
               weekTomatoes={weeklyTomatoes}
               weekTones={weekTones}
               pileTones={pileTones}
@@ -1925,6 +1942,7 @@ export default function FocusApp() {
           )}
           <HistoryPanel
             restState={restState}
+            weights={weights}
             journey={{
               scope: sourceKey || "local",
               ready: timer.ready && !timer.blocked && connectionReady,

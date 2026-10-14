@@ -295,6 +295,7 @@ export default function QuadrantBoard({
   canBreak,
   restSeconds,
   totalTomatoes,
+  effectiveTotal,
   weekTomatoes,
   weekTones,
   pileTones,
@@ -323,6 +324,7 @@ export default function QuadrantBoard({
   canBreak: boolean;
   restSeconds: number;
   totalTomatoes: number;
+  effectiveTotal?: number;
   weekTomatoes: number;
   weekTones: string[];
   pileTones: string[];
@@ -431,6 +433,7 @@ export default function QuadrantBoard({
       </div>
       <FarmField
         total={totalTomatoes}
+        effectiveTotal={effectiveTotal}
         week={weekTomatoes}
         tones={weekTones}
         pileTones={pileTones}

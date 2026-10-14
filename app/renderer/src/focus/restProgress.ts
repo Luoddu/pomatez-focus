@@ -1,10 +1,12 @@
 import type { FocusSession } from "./session";
+import { effectiveCount, TomatoWeights } from "./weights.js";
 import { inRange, summarize } from "./stats";
 
 // Same saved-record/start-date convention as the calendar; no demo overlay.
 export function dailyRestProgress(
   records: FocusSession[],
-  now: number
+  now: number,
+  weights?: TomatoWeights
 ) {
   const date = new Date(now);
   const start = new Date(
@@ -23,5 +25,6 @@ export function dailyRestProgress(
       "0"
     )}-${String(date.getDate()).padStart(2, "0")}`,
     completedCount: summarize(inRange(records, { start, end })).count,
+    ...(weights ? { effectiveCount: effectiveCount(inRange(records, { start, end }), weights) } : {}),
   };
 }

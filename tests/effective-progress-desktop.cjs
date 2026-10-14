@@ -1,0 +1,52 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+const { spawnSync } = require('node:child_process');
+if (!process.versions.electron) {
+  const env = {...process.env, POMATEZ_HEADLESS:'1', POMATEZ_PROFILE:fs.mkdtempSync(path.join(os.tmpdir(),'pomo-effective-bridge-'))};
+  delete env.ELECTRON_RUN_AS_NODE;
+  const result=spawnSync(require('electron'),[__filename],{env,cwd:path.resolve(__dirname,'..'),windowsHide:true,stdio:'inherit',timeout:45000});
+  if(result.error)throw result.error;process.exit(result.status ?? 1);
+}
+if(process.env.POMATEZ_HEADLESS!=='1' || !process.env.POMATEZ_PROFILE)throw Error('isolated headless profile required');
+const {app,BrowserWindow,session}=require('electron');
+require('../app/electron/build/main');
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const deadline=setTimeout(()=>app.exit(2),35000);
+app.whenReady().then(async()=>{
+  session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,callback)=>callback({cancel:true}));
+  let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoadingMainFrame())break;await wait(100);}
+  assert.ok(win);assert.equal(win.isVisible(),false);
+  const js=async s=>{try{return await win.webContents.executeJavaScript(s,true);}catch(e){console.error("Failed fixture step:",s);throw e;}};
+  const today=new Date();today.setHours(0,0,0,0);
+  const record=(id,count,type)=>({id,task:{id,title:'Synthetic',source:'local',projectType:type},startedAt:+today+3600000,endedAt:+today+3600000+count*1500000,plannedSeconds:1500,elapsedSeconds:count*1500,acceptedSeconds:count*1500,completedCount:count,status:'saved',sync:'local'});
+  const records=[record('synthetic-research',8,'research'),record('synthetic-misc',10,'misc')];
+  const rates={research:1,delivery:1,longterm:1,software:1,personal:1,misc:0.6,unclassified:1};
+  win.webContents.debugger.attach("1.3");
+  await win.webContents.debugger.sendCommand("Page.enable");
+  const seed = await win.webContents.debugger.sendCommand("Page.addScriptToEvaluateOnNewDocument",{source:`localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records}))});localStorage.setItem('pomatez-focus-tomato-weights-v1',${JSON.stringify(JSON.stringify({version:1,weights:rates}))})`});
+  const loaded=new Promise(r=>win.webContents.once('did-finish-load',r));win.webContents.reload();await loaded;await wait(700);
+  await win.webContents.debugger.sendCommand("Page.removeScriptToEvaluateOnNewDocument",{identifier:seed.identifier});win.webContents.debugger.detach();
+  const before=await js(`({primary:document.querySelector('[data-stat="今日番茄"] strong').textContent,label:document.querySelector('[data-stat="今日番茄"] > span').textContent,actual:document.querySelector('.actual-tomatoes').textContent})`);
+  before.progress=await js("window.focusApi.restState()");
+  assert.equal(before.primary,'14');assert.equal(before.label,'有效番茄');assert.equal(before.actual.trim(),'今日番茄：18');
+  assert.equal(before.progress.progress.completedCount,18);assert.equal(before.progress.progress.effectiveCount,14);
+  await js(`document.querySelector('.win-controls button[aria-label="设置"]').click()`);await wait(150);
+  console.log("Settings fixture:",await js("({weights:!!document.querySelector('.s-weights'),buttons:[...document.querySelectorAll('.s-weights button')].map(b=>b.textContent)})"));
+  await js(`document.querySelector('.s-weights button:nth-of-type(2)').click();document.querySelector('.s-weights button:last-of-type').click()`);await wait(150);
+  const saved=await js(`JSON.parse(localStorage.getItem('pomatez-focus-tomato-weights-v1')).weights`);assert.equal(saved.misc,1);
+  await js(`document.querySelector('.win-controls button[aria-label="设置"]').click()`);await wait(350);
+  assert.equal(await js(`document.querySelector('.actual-tomatoes')===null`),true);
+  assert.equal(await js(`document.querySelector('[data-stat="今日番茄"] strong').textContent`),'18');
+  assert.equal(await js(`document.querySelector('[data-stat="今日番茄"] > span').textContent`),'今日番茄');
+  assert.equal((await js('window.focusApi.restState()')).progress.effectiveCount,18);
+  assert.deepEqual(await js(`JSON.parse(localStorage.getItem('pomatez-focus-v1')).records.map(r=>({id:r.id,count:r.completedCount,seconds:r.acceptedSeconds}))`),records.map(r=>({id:r.id,count:r.completedCount,seconds:r.acceptedSeconds})));
+  await js("localStorage.setItem('pomatez-focus-tomato-weights-v1','null')");
+  const corruptLoaded=new Promise(r=>win.webContents.once('did-finish-load',r));win.webContents.reload();await corruptLoaded;await wait(350);
+  assert.equal(await js("!!document.querySelector('.weight-config-error') && document.querySelector('.weight-config-error').textContent.includes('当前使用原始数量')"),true);
+  await js("document.querySelector('.win-controls button[aria-label=设置]').click()");await wait(100);
+  await js("document.querySelector('.s-weights button:last-of-type').click()");await wait(100);
+  assert.equal(await js("document.querySelector('.weight-config-error')===null"),true);
+  assert.equal(win.isVisible(),false);
+  console.log('PASS: real main/preload/App storage, raw 18 / effective 14 bridge, saved all-one restore, preserved records, hidden isolated profile');
+  clearTimeout(deadline);app.exit(0);
+}).catch(e=>{console.error(e.stack);clearTimeout(deadline);app.exit(1);});

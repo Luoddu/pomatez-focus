@@ -1039,6 +1039,7 @@ const Pile = ({
 
 export default function FarmField({
   total,
+  effectiveTotal = total,
   week,
   tones,
   pileTones,
@@ -1048,6 +1049,7 @@ export default function FarmField({
   journalConnected = false,
 }: {
   total: number;
+  effectiveTotal?: number;
   week: number;
   tones: string[]; // 本周保存记录的颜色序列
   pileTones: string[]; // 最近至多 21 个已保存番茄的颜色序列
@@ -1123,7 +1125,7 @@ export default function FarmField({
         </span>
         {caption}
       </div>
-      <FarmProgress total={total}/>
+      <FarmProgress total={effectiveTotal} effective={effectiveTotal !== total}/>
       </div>
       {/* 分层场景：天空层随卡片高度舒展，地面层保持 720:150 比例锚底，
           窗口拉高时空白被天空有机吃掉而不拉伸变形 */}

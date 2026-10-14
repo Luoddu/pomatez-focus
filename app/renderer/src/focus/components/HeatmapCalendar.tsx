@@ -11,6 +11,8 @@ import { LogoIcon } from "./shared";
 import { holidayDay, holidayMessage } from "../wellbeing.js";
 import TodayTimeHeatmap from "./TodayTimeHeatmap";
 
+import { effectiveWeekCount, formatEffective, TomatoWeights } from "../weights";
+
 const GOLD_TONE = "#e8a917";
 
 // 番茄月历：GitHub 贡献图式转置（列=周、行=周一~周日），当前周固定最右列，
@@ -54,9 +56,11 @@ const tier = (count: number) =>
 export default function HeatmapCalendar({
   records,
   goals = {},
+  weights,
 }: {
   records: FocusSession[];
   goals?: Record<string, number>;
+  weights?: TomatoWeights;
 }) {
   const [tip, setTip] = useState<{
     text: string;
@@ -70,7 +74,7 @@ export default function HeatmapCalendar({
     let earliest: number | null = null;
     const saved = records.filter((r) => r.status === "saved");
     // 周聚合用与农场相同的北京时间周口径，目标判定跨组件一致
-    const byWeek = new Map(Object.entries(weekTotals(saved)));
+    const byWeek = new Map(Object.keys(weekTotals(saved)).map(key => [key, effectiveWeekCount(saved, Date.parse(key + "T12:00:00+08:00"), weights)]));
     for (const r of saved) {
       const d = dayStart(new Date(r.startedAt));
       const key = dayKey(d);
@@ -113,7 +117,7 @@ export default function HeatmapCalendar({
       weeks.push({ key: dayKey(monday), label, days });
     }
     return { weeks, byDay, byWeek, todayTs: today.getTime() };
-  }, [records]);
+  }, [records, weights]);
   // 默认停在最新（最右）一周；新记录到来也回到最右
   useEffect(() => {
     const el = scrollRef.current;
@@ -157,7 +161,7 @@ export default function HeatmapCalendar({
           <div
             className="hm-grid"
             style={{
-              gridTemplateColumns: `var(--hm-dow-w, 16px) repeat(${weeks.length}, var(--hm-cell, 13px))`,
+              gridTemplateColumns: `var(--hm-dow-w, 16px) repeat(${weeks.length}, var(--hm-column, var(--hm-cell, 13px)))`,
             }}
           >
             <span className="hm-corner" />
@@ -235,9 +239,9 @@ export default function HeatmapCalendar({
                   {total > 0 && (
                     <span
                       className="hm-week-total"
-                      title={`本周共 ${total} 个番茄`}
+                      title={`本周有效 ${formatEffective(total)} 个番茄`}
                     >
-                      {total}
+                      {formatEffective(total)}
                     </span>
                   )}
                   {met && (

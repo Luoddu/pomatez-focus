@@ -17,7 +17,6 @@ import {
   PROJECT_TONES,
   tomatoCategoryLabel,
   harvestTier,
-  weekTomatoes,
   crossedFlags,
 } from "../week";
 import {
@@ -43,6 +42,14 @@ import ManualEntry from "./ManualEntry";
 import { dailyFocusTheme } from "../stats";
 import { PROJECT_TYPES, recordCategory } from "../classification.js";
 import { reviewDayKey, reviewTheme } from "../reviewCache";
+import {
+  DEFAULT_WEIGHTS,
+  effectiveCount,
+  effectiveWeekCount,
+  formatEffective,
+  hasDiscountedRecords,
+} from "../weights";
+import type { TomatoWeights } from "../weights";
 
 const WEEK_CHARS = "日一二三四五六";
 const dayLabel = (value: number) => {
@@ -165,8 +172,10 @@ export default function HistoryPanel({
   onMilestone,
   restState,
   journey,
+  weights,
 }: {
   records: FocusSession[];
+  weights?: TomatoWeights;
   pendingCount: number;
   canSync: boolean;
   syncBusy: boolean;
@@ -233,23 +242,30 @@ export default function HistoryPanel({
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [goalError, setGoalError] = useState("");
-  const weekTotal = weekTomatoes(records, Date.now());
+  const weekTotal = effectiveWeekCount(records, Date.now(), weights);
+  // Compare values, not prop identity: an equivalent settings object is no change.
+  const weightsKey = JSON.stringify({ ...DEFAULT_WEIGHTS, ...weights });
   const currentGoal = goals[weekKeyOf(Date.now())] ?? WEEK_GOAL_DEFAULT;
   const weekMet = goalMet(weekTotal, currentGoal);
   // 达成庆祝只在「本会话内由未达成变成达成」时触发一次；
   // 挂载基线已达成（历史达成/重开 App）不重复播报
-  const celebratedRef = useRef<string | null>(null);
+  const celebratedRef = useRef<{
+    week: string;
+    weightsKey: string;
+    celebrated: boolean;
+  } | null>(null);
   useEffect(() => {
     const key = weekKeyOf(Date.now());
-    if (celebratedRef.current === null) {
-      celebratedRef.current = weekMet ? key : "";
+    const baseline = celebratedRef.current;
+    if (!baseline || baseline.week !== key || baseline.weightsKey !== weightsKey) {
+      celebratedRef.current = { week: key, weightsKey, celebrated: weekMet };
       return;
     }
-    if (weekMet && celebratedRef.current !== key) {
-      celebratedRef.current = key;
+    if (weekMet && !baseline.celebrated) {
+      baseline.celebrated = true;
       onWeekGoalMet?.(weekTotal, currentGoal);
     }
-  }, [weekMet, weekTotal, currentGoal, onWeekGoalMet]);
+  }, [weekMet, weekTotal, currentGoal, onWeekGoalMet, weightsKey]);
   const saveGoal = () => {
     const value = Number(goalInput);
     if (!isValidGoal(value)) {
@@ -274,25 +290,26 @@ export default function HistoryPanel({
   const shownTodaySeconds = useCountUp(
     sum(todayRecords, (r) => r.acceptedSeconds || 0)
   );
-  const shownWeekTotal = useCountUp(weekTotal);
-  const totalTomatoes = sum(records, (r) => r.completedCount || 0);
-  const todayTier = harvestTier(shownTodayTomatoes);
+  // The existing count-up hook interpolates integers; effective values must not round up.
+  const shownWeekTotal = formatEffective(weekTotal);
+  const todayEffective = effectiveCount(todayRecords, weights);
+  const todayDiscounted = hasDiscountedRecords(todayRecords, weights);
+  const totalTomatoes = effectiveCount(records, weights);
+  const todayTier = harvestTier(todayDiscounted ? todayEffective : shownTodayTomatoes);
   // Preserve existing milestone notifications; the compact farm bar needs no timer.
-  const milestoneBase = useRef<number | null>(null);
+  const milestoneBase = useRef<{ total: number; weightsKey: string } | null>(null);
   useEffect(() => {
-    if (milestoneBase.current === null) {
-      milestoneBase.current = totalTomatoes;
+    if (!milestoneBase.current || milestoneBase.current.weightsKey !== weightsKey) {
+      milestoneBase.current = { total: totalTomatoes, weightsKey };
       return;
     }
-    const prev = milestoneBase.current;
-    milestoneBase.current = totalTomatoes;
+    const prev = milestoneBase.current.total;
+    milestoneBase.current.total = totalTomatoes;
     const crossed = crossedFlags(prev, totalTomatoes);
     if (!crossed.length) return;
     const top = crossed[crossed.length - 1];
     onMilestone?.(top);
-    // flags/next 由 totalTomatoes 派生，只需盯总数
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalTomatoes]);
+  }, [totalTomatoes, weightsKey, onMilestone]);
   const stats: {
     label: string;
     value: string;
@@ -300,7 +317,7 @@ export default function HistoryPanel({
   }[] = [
     {
       label: "今日番茄",
-      value: String(shownTodayTomatoes),
+      value: todayDiscounted ? formatEffective(todayEffective) : String(shownTodayTomatoes),
       tier: todayTier,
     },
     { label: "今日专注时长", value: durationText(shownTodaySeconds) },
@@ -321,7 +338,7 @@ export default function HistoryPanel({
     groups.unshift({ date: todayKey, records: [] });
   return (
     <div className={`right-col${entryOpen || editRecord ? " is-editing-record" : ""}`}>
-      <div className="side-section">
+      <div className="side-section overview-section">
         <div className="side-title">
           概览
           <span className="side-title-actions">
@@ -399,7 +416,12 @@ export default function HistoryPanel({
               >
                 {value}
               </strong>
-              <span>{label}</span>
+              <span>{label === "今日番茄" && todayDiscounted ? "有效番茄" : label}</span>
+              {label === "今日番茄" && todayDiscounted && (
+                <span className="actual-tomatoes">
+                  今日番茄：{shownTodayTomatoes}
+                </span>
+              )}
             </div>
           ))}
           <TodayJourney records={records} tasks={tasks} controls={journey} />
@@ -408,10 +430,10 @@ export default function HistoryPanel({
       </div>
       <div className="rest-calendar-group">
       <ScientificRest state={restState} />
-      <div className="side-section">
+      <div className="side-section calendar-section">
         <div className="side-title research-goals-title">
           番茄月历
-          <ResearchGoal records={records} />
+          <ResearchGoal records={records} weights={weights} />
           <span
             className="weekgoal"
             onMouseEnter={() => {
@@ -492,7 +514,7 @@ export default function HistoryPanel({
             )}
           </span>
         </div>
-        <HeatmapCalendar records={records} goals={goals} />
+        <HeatmapCalendar records={records} goals={goals} weights={weights} />
       </div>
       </div>
       <div className="side-section records-section">

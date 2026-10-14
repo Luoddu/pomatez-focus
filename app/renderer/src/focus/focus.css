@@ -850,6 +850,17 @@ input:focus-visible {
 }
 /* Local ActivityWatch mirror, kept in the calendar column. */
 .rest-calendar-group { display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: none; }
+.stat .actual-tomatoes { margin-top: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.settings-col .s-weights { min-width: 0; order: 4; }
+.s-weights .field-hint { margin: 8px 0; font-size: 12px; line-height: 1.5; }
+.weight-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.weight-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 13px; }
+.weight-field > span { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.weight-field i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.weight-field input { width: 72px; min-width: 0; flex: none; height: 34px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--text); background: var(--card); font: inherit; font-variant-numeric: tabular-nums; }
+.s-weights .sync-row { flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.s-weights .btn-small { height: 34px; padding: 0 12px; font-size: 12px; }
+@media (max-width: 600px) { .weight-fields { grid-template-columns: minmax(0, 1fr); } }
 .rest-heading { display: inline-flex; align-items: center; gap: 6px; }
 .rest-refresh { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 3px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
 .rest-refresh svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
@@ -2435,7 +2446,7 @@ input:focus-visible {
   }
 }
 
-/* ── 竖屏增强：宽度足够时四象限放大、概览与月历并排、农场给固定高度不被纵排压没 ── */
+/* ── 竖屏增强：宽度足够时四象限放大、农场给固定高度不被纵排压没 ── */
 @media (orientation: portrait) and (min-width: 901px) {
   /* 四象限整体放大约 1.25 倍：任务名、序号方块、象限标签与计数同步调大 */
   .quadrants {
@@ -2502,18 +2513,6 @@ input:focus-visible {
   .quad-empty {
     font-size: 15px;
   }
-  /* 概览与月历左右并排，记录通栏在下方 */
-  .right-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-    align-items: stretch;
-    flex: 1;
-    min-height: 680px;
-  }
-  .side-section.records-section {
-    grid-column: 1 / -1;
-  }
   .right-col .side-title {
     flex-wrap: wrap;
     row-gap: 6px;
@@ -2545,7 +2544,7 @@ input:focus-visible {
   }
   .records {
     height: 100%;
-    min-height: 360px;
+    min-height: 0;
     max-height: none;
     padding: 10px 12px;
     overflow-x: hidden;
@@ -4675,3 +4674,97 @@ button.stats-range-label:hover {
 .farm-total-progress .stb-track { height:4px; }
 .farm-total-progress .stb-from, .farm-total-progress .stb-to { font-size:10px; }
 @media (max-width:650px) { .journey-dialog { padding:14px; } .journey-default { margin-left:0; } .journey-template-picker select { max-width:180px; } }
+
+/* Reorder existing children without mounting a second scientific-rest monitor. */
+@media (max-width: 900px), (orientation: portrait) {
+  .right-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, calc(50% - 5px));
+    grid-template-rows: repeat(5, auto);
+    align-items: start;
+    gap: 10px;
+    flex: none;
+    min-height: 0;
+  }
+  .right-col > .overview-section,
+  .overview-section > .stat-grid,
+  .right-col > .rest-calendar-group {
+    display: contents;
+  }
+  .overview-section > .side-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .calendar-section {
+    grid-column: 3;
+    grid-row: 2 / 5;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+  }
+  .overview-section .stat {
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    align-self: stretch;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .overview-section .stat[data-stat="今日番茄"] { grid-column: 1; }
+  .overview-section .stat[data-stat="今日专注时长"] { grid-column: 2; }
+  .overview-section .stat strong,
+  .overview-section .stat strong.long {
+    font-size: clamp(16px, 2.2vw, 24px);
+    white-space: normal;
+  }
+  .overview-section .stat span { overflow-wrap: anywhere; }
+  .rest-calendar-group > .scientific-rest {
+    grid-column: 1 / 3;
+    grid-row: 3;
+    min-width: 0;
+    gap: 4px;
+  }
+  .scientific-rest .rest-card { padding: 8px; }
+  .scientific-rest .rest-quota { height: 104px; gap: 8px; }
+  .scientific-rest .rest-ring { max-width: 104px; }
+  .scientific-rest .rest-controls { padding: 0; }
+  .scientific-rest .rest-sites { gap: 5px; }
+  .scientific-rest .rest-sites > div { flex-wrap: wrap; white-space: normal; }
+  .scientific-rest .rest-links { flex-wrap: wrap; gap: 4px; }
+  .overview-section .journey-card {
+    grid-column: 1 / 3;
+    grid-row: 4;
+  }
+  .right-col > .records-section {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    min-width: 0;
+  }
+  .right-col .records { height: auto; min-height: 0; max-height: 320px; }
+}
+
+@media (max-width: 600px) {
+  .scientific-rest .rest-quota {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .scientific-rest .rest-ring { max-width: 80px; }
+}
+
+@media (max-width: 900px), (orientation: portrait) {
+ .calendar-section .heatmap { flex: 1; min-height: 0; display: flex; align-items: center; }
+ .calendar-section .heatmap-content { width: 100%; }
+ .calendar-section .hm-grid { min-width: max-content; --hm-column: var(--hm-cell, 13px); }
+ .calendar-section .hm-cell, .calendar-section .hm-badge-slot { width: 100%; }
+}
+
+.calendar-section .hm-scroll { scrollbar-width: thin; scrollbar-color: #d5dae2 transparent; }
+.calendar-section .hm-scroll::-webkit-scrollbar { height: 5px; }
+.calendar-section .hm-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 5px; }

@@ -23,7 +23,7 @@ export type Usage = {
 };
 export type RestState = {
   settings: RestSettings;
-  progress: { day: string; completedCount: number; gymAvailable?: boolean } | null;
+  progress: { day: string; completedCount: number; effectiveCount?: number; gymAvailable?: boolean } | null;
   usage: Usage | null;
   status: "connecting" | "recording" | "interrupted";
   message: string;
@@ -588,6 +588,8 @@ export class ActivityWatchRest {
       !value ||
       value.day !== dayKey(this.now()) ||
       (value.gymAvailable !== undefined && typeof value.gymAvailable !== "boolean") ||
+      (value.effectiveCount !== undefined &&
+        (value.completedCount === null || !Number.isFinite(value.effectiveCount) || value.effectiveCount < 0 || value.effectiveCount > value.completedCount || Math.abs(value.effectiveCount * 100 - Math.round(value.effectiveCount * 100)) > 1e-7)) ||
       (value.completedCount !== null &&
         (!Number.isSafeInteger(value.completedCount) ||
           value.completedCount < 0 ||
@@ -605,10 +607,11 @@ export class ActivityWatchRest {
     this.state.progress = {
       day: value.day,
       completedCount: value.completedCount,
+      ...(value.effectiveCount === undefined ? {} : { effectiveCount: value.effectiveCount }),
       ...(value.gymAvailable === undefined ? {} : {gymAvailable:value.gymAvailable}),
     };
     if (
-      value.completedCount >= this.state.settings.pomodoroGoal &&
+      (value.effectiveCount ?? value.completedCount) >= this.state.settings.pomodoroGoal &&
       this.state.reminder?.kind === "focus"
     )
       this.state.reminder = null;
@@ -905,7 +908,7 @@ export class ActivityWatchRest {
       const quotaCrossed = u.totalSeconds > quota * 60 + 0.000001;
       const count =
         this.state.progress?.day === day
-          ? this.state.progress.completedCount
+          ? (this.state.progress.effectiveCount ?? this.state.progress.completedCount)
           : null;
       if (this.storageOk) {
         const before = { ...this.ledger },
