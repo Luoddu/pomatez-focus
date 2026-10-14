@@ -68,11 +68,13 @@ export function saveWeekGoal(
     );
   const goals = { ...loadWeekGoals(storageKey), [weekKeyOf(now)]: goal };
   try {
-    localStorage.setItem(storageKey, JSON.stringify(goals));
-    if (typeof window !== "undefined") window.dispatchEvent(new Event("pomatez:preferences-changed"));
+    const encoded=JSON.stringify(goals);
+    localStorage.setItem(storageKey,encoded);
+    if(localStorage.getItem(storageKey)!==encoded)throw Error("readback failed");
   } catch {
-    /* 私密模式等写入失败时按当次内存态处理 */
+    throw Error("周目标未能保存，请检查本机存储后重试");
   }
+  if(typeof window!=="undefined")window.dispatchEvent(new Event("pomatez:preferences-changed"));
   return goals;
 }
 

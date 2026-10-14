@@ -36,8 +36,9 @@ app.whenReady().then(async()=>{
  const record=(id,count,type)=>({id,task:{id,title:'Synthetic',source:'local',projectType:type},startedAt:+today+3600000,endedAt:+today+3600000+count*1500000,plannedSeconds:1500,elapsedSeconds:count*1500,acceptedSeconds:count*1500,completedCount:count,status:'saved',sync:'local'});
  const records=[record('synthetic-research',8,'research'),record('synthetic-misc',10,'misc')];
  const active={id:randomUUID(),task:{id:'active-synthetic',title:'Active fixture',source:'local'},startedAt:+today+7200000,elapsedSeconds:123,plannedSeconds:1500,status:'paused',sync:'local',segmentOpen:false};
- await js(`localStorage.clear();localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active,records}))})`);
- const loaded=new Promise(r=>win.webContents.once('did-finish-load',r));win.webContents.reload();await loaded;await wait(700);
+ win.webContents.debugger.attach('1.3');await win.webContents.debugger.sendCommand('Page.enable');
+ const seed=await win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.clear();localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active,records}))})`});
+ const loaded=new Promise(r=>win.webContents.once('did-finish-load',r));win.webContents.reload();await loaded;await win.webContents.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument',{identifier:seed.identifier});await wait(700);
  assert.equal(await js("document.querySelector('[data-stat=\"今日番茄\"] strong').textContent"),'18');
  assert.equal(await js("document.querySelector('.outbox-status').textContent.includes('全局偏好')"),true);
  await js("document.querySelector('.win-controls button[aria-label=设置]').click()");await wait(100);
@@ -50,14 +51,14 @@ app.whenReady().then(async()=>{
  for(const size of [{width:1080,height:1600},{width:1440,height:900}]){
   win.setSize(size.width,size.height);await wait(80);assert.equal(await js("document.documentElement.scrollWidth <= window.innerWidth"),true);
  }
- const state=await js('window.focusApi.restState()');
+ const state=await js('window.focusApi.restState()');assert.equal(state.progress.effectiveCount,14);
  const newRest={...state.settings,quotaMinutes:90};
  await js(`window.focusApi.applyDevicePreference(${JSON.stringify({sourceKey,key:'rest',value:newRest,expected:state.settings})})`);
  assert.equal((await js('window.focusApi.restState()')).settings.quotaMinutes,90);
  await assert.rejects(js(`window.focusApi.applyDevicePreference(${JSON.stringify({sourceKey,key:'rest',value:state.settings,expected:state.settings})})`));
  await assert.rejects(js("window.focusApi.readPreferences({sourceKey:'wrong-base'})"));
  await assert.rejects(js(`window.focusApi.savePreference(${JSON.stringify({sourceKey,entry:entry('timer',{focusMinutes:0,restMinutes:5})})})`));
- const actualRecords=await js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).records");assert.deepEqual(actualRecords,records);
+ const actualRecords=await js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).records");assert.deepEqual(actualRecords.sort((a,b)=>a.id.localeCompare(b.id)),records.slice().sort((a,b)=>a.id.localeCompare(b.id)));
  const afterActive=await js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).active");for(const k of ['id','startedAt','elapsedSeconds','plannedSeconds'])assert.equal(afterActive[k],active[k]);
  const screenshot=await win.webContents.capturePage();fs.writeFileSync(path.resolve('artifacts/preference-settings.png'),screenshot.toPNG());
  assert.equal(win.isVisible(),false);
