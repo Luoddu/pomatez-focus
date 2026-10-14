@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { FocusSession } from "../session";
 import FarmCompanion from "./FarmCompanion";
 import FarmProgress from "./FarmProgress";
+import { effectiveRecords, formatEffective, TomatoWeights } from "../weights";
 import { holidayDay } from "../wellbeing.js";
 import {
   PLANT_STAGES,
@@ -972,7 +973,7 @@ const Pile = ({
   const sideBaskets = n >= 100 ? 2 : n >= 30 ? 1 : 0;
   return (
     <g className="farm-pile" transform="translate(44 118)">
-      <title>{`累计收获 ${n} 个`}</title>
+      <title>{`累计收获 ${formatEffective(total)} 个`}</title>
       {/* 立在卡片留白上的淡淡地影，不接地壤带 */}
       <ellipse
         cx="6"
@@ -1031,7 +1032,7 @@ const Pile = ({
       ))}
       <MilestoneFlag reached={milestone.reached} />
       <text className="farm-pile-text" x="6" y="18" textAnchor="middle">
-        累计收获 {n}
+        累计收获 {formatEffective(total)}
       </text>
     </g>
   );
@@ -1045,6 +1046,7 @@ export default function FarmField({
   pileTones,
   now,
   records = [],
+  weights,
   journalSource = "",
   journalConnected = false,
 }: {
@@ -1055,6 +1057,7 @@ export default function FarmField({
   pileTones: string[]; // 最近至多 21 个已保存番茄的颜色序列
   now?: number;
   records?: FocusSession[];
+  weights?: TomatoWeights;
   journalSource?: string;
   journalConnected?: boolean;
 }) {
@@ -1097,8 +1100,8 @@ export default function FarmField({
   const harvest = weekHarvest(week);
   const caption =
     harvest.plants === 0
-      ? `本周收获 ${week} 个 · 累计收获 ${total}`
-      : `${harvest.stage} · 本周收获 ${week} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${total}`;
+      ? `本周收获 ${formatEffective(week)} 个 · 累计收获 ${formatEffective(effectiveTotal)}`
+      : `${harvest.stage} · 本周收获 ${formatEffective(week)} 个 · 田里 ${harvest.plants} 株 · 累计收获 ${formatEffective(effectiveTotal)}`;
   const toneFrom = (list: string[]) => (k: number) =>
     list.length ? list[k % list.length] : UNCLASSIFIED_TOMATO_TONE;
   const fieldTone = toneFrom(tones);
@@ -1344,14 +1347,14 @@ export default function FarmField({
               其上再叠节气点景（细雨 / 露珠） */}
           <SeasonLayer season={season} />
           <TermOverlayLayer overlay={overlay} />
-          <Pile total={total} toneAt={pileTone} />
+          <Pile total={effectiveTotal} toneAt={pileTone} />
         </svg>
       </div>
       <FarmCompanion
         anchor={scarecrow}
         open={talkOpen}
         onOpenChange={setTalkOpen}
-        records={records}
+        records={effectiveRecords(records, weights)}
         now={at}
         sourceKey={journalSource}
         connected={journalConnected}

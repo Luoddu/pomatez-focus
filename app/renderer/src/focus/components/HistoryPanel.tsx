@@ -45,6 +45,7 @@ import { reviewDayKey, reviewTheme } from "../reviewCache";
 import {
   DEFAULT_WEIGHTS,
   effectiveCount,
+  effectiveRecords,
   effectiveWeekCount,
   formatEffective,
   hasDiscountedRecords,
@@ -417,14 +418,9 @@ export default function HistoryPanel({
                 {value}
               </strong>
               <span>{label === "今日番茄" && todayDiscounted ? "有效番茄" : label}</span>
-              {label === "今日番茄" && todayDiscounted && (
-                <span className="actual-tomatoes">
-                  今日番茄：{shownTodayTomatoes}
-                </span>
-              )}
             </div>
           ))}
-          <TodayJourney records={records} tasks={tasks} controls={journey} />
+          <TodayJourney records={records} weights={weights} tasks={tasks} controls={journey} />
         </div>
 
       </div>
@@ -594,7 +590,7 @@ export default function HistoryPanel({
                     const theme =
                       group.date === todayKey ||
                       openDays.includes(group.date)
-                        ? dailyFocusTheme(group.records)
+                        ? dailyFocusTheme(effectiveRecords(group.records, weights))
                         : null;
                     return theme ? (
                       <span
@@ -606,16 +602,13 @@ export default function HistoryPanel({
                     ) : null;
                   })()}
                   {(() => {
-                    const dayCount = group.records.reduce(
-                      (total, r) => total + (r.completedCount || 0),
-                      0
-                    );
+                    const dayCount = effectiveCount(group.records, weights);
                     const tier = harvestTier(dayCount);
                     return (
                       <span
                         className={`day-total${tier ? ` ${tier}` : ""}`}
                       >
-                        共 {dayCount} 个番茄
+                        共 {formatEffective(dayCount)} 个番茄
                       </span>
                     );
                   })()}
@@ -766,7 +759,7 @@ export default function HistoryPanel({
                               </span>
                             </div>
                             <div className="r-sub">
-                              完成 {r.completedCount} 个 ·{" "}
+                              {hasDiscountedRecords([r], weights) ? "有效" : "完成"} {formatEffective(effectiveCount([r], weights))} 个 ·{" "}
                               <SyncBadge record={r} />
                               {onEdit && (
                                 <button

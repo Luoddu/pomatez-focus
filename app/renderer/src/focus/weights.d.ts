@@ -11,3 +11,9 @@ export function effectiveCount(records: FocusSession[], weights?: TomatoWeights)
 export function effectiveWeekCount(records: FocusSession[], now: number, weights?: TomatoWeights): number;
 export function hasDiscountedRecords(records: FocusSession[], weights?: TomatoWeights): boolean;
 export function formatEffective(n: number): string;
+
+export function tomatoWeight(record: Pick<FocusSession, "task" | "colorOverride">, weights?: TomatoWeights): number;
+export function effectiveRecords(records: FocusSession[], weights?: TomatoWeights): FocusSession[];
+export function effectiveToneRecords(records: FocusSession[], weights?: TomatoWeights, limit?: number): FocusSession[];
+
+export function effectiveTaskProgress(task: FocusSession["task"], records: FocusSession[], now: number, weights?: TomatoWeights): {done:number; planned:number; missing:number};

@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { CounterContext } from "contexts/CounterContext";
-import { DEFAULT_WEIGHTS, loadWeights, saveWeights, effectiveCount, effectiveWeekCount, TomatoWeights } from "./weights";
+import { DEFAULT_WEIGHTS, loadWeights, saveWeights, effectiveCount, effectiveWeekCount, effectiveToneRecords, TomatoWeights } from "./weights";
 import {
   FocusSession,
   FocusTask,
@@ -57,9 +57,8 @@ import {
   parseTitle,
 } from "./components/shared";
 import {
-  weekTomatoes,
-  tomatoToneList,
-  recentTomatoToneList,
+  beijingWeekStart,
+  tomatoRecordTone,
 } from "./week";
 import { CompletionQueue } from "./completionQueue";
 import { playTimeUp } from "./sound";
@@ -515,18 +514,18 @@ export default function FocusApp() {
         } as Record<string, number>
       )[genStage.stage] ?? 8;
   const weeklyTomatoes = useMemo(
-    () => weekTomatoes(shownRecords, farmNow ?? Date.now()),
-    [shownRecords, farmNow]
+    () => effectiveWeekCount(shownRecords, farmNow ?? Date.now(), weights),
+    [shownRecords, farmNow, weights]
   );
   // 田里果实显示本周项目色；果筐总数仍是累计收获，最多 21 颗可见果实
   // 显示最近收获的项目色，避免旧颜色长期占据整个果筐。
   const weekTones = useMemo(
-    () => tomatoToneList(shownRecords, farmNow ?? Date.now()),
-    [shownRecords, farmNow]
+    () => effectiveToneRecords(shownRecords.filter(r => r.startedAt >= beijingWeekStart(farmNow ?? Date.now()) && r.startedAt < beijingWeekStart(farmNow ?? Date.now()) + 7 * 86400000), weights, 64).map(tomatoRecordTone),
+    [shownRecords, farmNow, weights]
   );
   const pileTones = useMemo(
-    () => recentTomatoToneList(shownRecords),
-    [shownRecords]
+    () => effectiveToneRecords(shownRecords, weights, 21).map(tomatoRecordTone),
+    [shownRecords, weights]
   );
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
@@ -1830,6 +1829,7 @@ export default function FocusApp() {
         />
       ) : statsOpen ? (
         <StatsPanel
+          weights={weights}
           records={shownRecords}
           onClose={() => setStatsOpen(false)}
           {...windowControls}
@@ -1936,6 +1936,7 @@ export default function FocusApp() {
               onAddTask={addQuickTask}
               loadProjects={loadProjects}
               records={shownRecords}
+              weights={weights}
               journalSource={sourceKey || ""}
               journalConnected={connected}
             />

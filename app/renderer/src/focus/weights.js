@@ -50,3 +50,40 @@ export function effectiveWeekCount(records, now, weights = DEFAULT_WEIGHTS) {
   return effectiveCount(records.filter(r => r.startedAt >= start && r.startedAt < start + 7 * 86400000), weights);
 }
 export const formatEffective = n => Number(n.toFixed(2)).toString();
+
+export function tomatoWeight(record, weights = DEFAULT_WEIGHTS) {
+  return rate(record, validateWeights(weights));
+}
+// View-only copies. Never pass these back to timer, editing, or cloud persistence.
+export function effectiveRecords(records, weights = DEFAULT_WEIGHTS) {
+  const valid = validateWeights(weights);
+  return records.map(r => ({ ...r, completedCount: saved(r) ? r.completedCount * Math.round(rate(r, valid) * 100) / 100 : 0 }));
+}
+// A visual unit follows cumulative weighted mass, not ceil(each raw record).
+export function effectiveToneRecords(records, weights = DEFAULT_WEIGHTS, limit = Infinity) {
+  const valid = validateWeights(weights);
+  const segments = records.filter(saved).slice().sort((a,b) => a.startedAt-b.startedAt)
+    .map(r => ({record:r, cents:r.completedCount*Math.round(rate(r,valid)*100)})).filter(s => s.cents>0);
+  const total = segments.reduce((n,s)=>n+s.cents,0), units=Math.ceil(total/100);
+  const start = Number.isFinite(limit) ? Math.max(0,units-Math.max(0,Math.floor(limit))) : 0;
+  const result=[];let cursor=0,end=segments[0]?.cents||0;
+  for(let i=start;i<units;i++) {
+    const point=Math.min(total-1,i*100+Math.min(50,(total-i*100)/2));
+    while(cursor<segments.length-1 && point>=end)end+=segments[++cursor].cents;
+    result.push(segments[cursor].record);
+  }
+  return result;
+}
+
+// Cloud confirmed totals can precede detailed history on another machine.
+export function effectiveTaskProgress(task, records, now, weights = DEFAULT_WEIGHTS) {
+  const valid=validateWeights(weights), day=new Date(now);day.setHours(0,0,0,0);
+  const end=new Date(day);end.setDate(end.getDate()+1);
+  const known=records.filter(r=>saved(r) && r.startedAt>=day.getTime() && r.startedAt<end.getTime()
+    && !!task.taskId && r.task.taskId===task.taskId && r.task.source===task.source && r.task.sourceKey===task.sourceKey);
+  const rawDone=Math.max(0,task.doneToday||0), rawPlanned=Math.max(0,task.plannedToday||0);
+  const knownRaw=known.reduce((n,r)=>n+r.completedCount,0), missing=Math.max(0,rawDone-knownRaw);
+  const cents=known.reduce((n,r)=>n+r.completedCount*Math.round(rate(r,valid)*100),0)
+    + Math.round(missing*100)*Math.round(rate({task},valid)*100)/100;
+  return {done:Math.round(cents)/100, planned:Math.round(rawPlanned*Math.round(rate({task},valid)*100))/100, missing};
+}

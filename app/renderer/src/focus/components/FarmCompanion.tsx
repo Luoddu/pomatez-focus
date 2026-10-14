@@ -230,10 +230,10 @@ export default function FarmCompanion({
   const todayRecords = records.filter(
     (r) => beijingDate(r.startedAt) === today
   );
-  const count = todayRecords.reduce(
+  const count = Math.round(todayRecords.reduce(
     (n, r) => n + (r.completedCount || 0),
     0
-  );
+  ) * 100) / 100;
   const routine = routineSummary(todayRecords);
   const greeting = companionGreeting(
     now,

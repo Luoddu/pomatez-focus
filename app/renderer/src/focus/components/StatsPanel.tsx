@@ -27,15 +27,18 @@ import type { CategoryFilter } from "../classification.js";
 import { renderShareCardPng, shareCardModel } from "../shareCard";
 import { WindowControls, durationText } from "./shared";
 import StatsTrendChart from "./StatsTrendChart";
+import { effectiveRecords, formatEffective } from "../weights";
+import type { TomatoWeights } from "../weights";
 
 const WEEK_CHARS = "一二三四五六日";
 
 // 热力格分档（番茄数，跨格分摊可能带小数）：0 / <0.5 / <1 / <2 / <4 / ≥4，
 // 与月历同一番茄红色系
-const heatTier = (v: number) =>
-  v <= 0 ? 0 : v < 0.5 ? 1 : v < 1 ? 2 : v < 2 ? 3 : v < 4 ? 4 : 5;
-const countText = (v: number) =>
-  v >= 10 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1);
+const heatTier = (v: number) => {
+  const count = Number(formatEffective(v));
+  return count <= 0 ? 0 : count < 0.5 ? 1 : count < 1 ? 2 : count < 2 ? 3 : count < 4 ? 4 : 5;
+};
+const countText = formatEffective;
 const slotLabel = (col: number) =>
   `${String(Math.floor(col / 2)).padStart(2, "0")}:${
     col % 2 ? "30" : "00"
@@ -50,17 +53,25 @@ const BAR_TITLE: Record<RangeKey, string> = {
 
 export default function StatsPanel({
   records,
+  weights,
   onClose,
   settingsOpen,
   onToggleSettings,
   onToggleCompact,
 }: {
   records: FocusSession[];
+  weights?: TomatoWeights;
   onClose: () => void;
   settingsOpen: boolean;
   onToggleSettings: () => void;
   onToggleCompact: () => void;
 }) {
+  // Only this boundary applies coefficients; all stats helpers consume this
+  // immutable display projection with the original timing fields preserved.
+  const displayedRecords = useMemo(
+    () => effectiveRecords(records, weights),
+    [records, weights]
+  );
   const [rangeKey, setRangeKey] = useState<RangeKey>("week");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [harvestView, setHarvestView] = useState<"total" | "category">(
@@ -83,24 +94,33 @@ export default function StatsPanel({
   );
   const current = isCurrentRange(range, now);
   const scoped = useMemo(
-    () => inRange(records, range),
-    [records, range]
+    () => inRange(displayedRecords, range),
+    [displayedRecords, range]
   );
-  const summary = useMemo(() => summarize(scoped), [scoped]);
+  const summary = useMemo(() => {
+    const result = summarize(scoped);
+    return { ...result, count: Number(formatEffective(result.count)) };
+  }, [scoped]);
   // 趋势随区间翻页锚定该区间末日；当前区间锚定今天。
   const trendAnchor = Math.min(now, range.end - 1);
   // 连续天数是全历史口径（不只是当前区间），切换区间不跳动
   const streak = useMemo(
-    () => currentStreak(records, now),
-    [records, now]
+    () => currentStreak(displayedRecords, now),
+    [displayedRecords, now]
   );
   const buckets = useMemo(
-    () => categoryBuckets(scoped, range, now),
+    () => categoryBuckets(scoped, range, now).map((bucket) => ({
+      ...bucket,
+      count: Number(formatEffective(bucket.count)),
+      categories: bucket.categories.map((item) => ({
+        ...item, count: Number(formatEffective(item.count)),
+      })),
+    })),
     [scoped, range, now]
   );
   const trendPoints = useMemo(
-    () => focusDurationTrend(records, trendAnchor, category),
-    [records, trendAnchor, category]
+    () => focusDurationTrend(displayedRecords, trendAnchor, category),
+    [displayedRecords, trendAnchor, category]
   );
   const heat = useMemo(
     () => halfHourMatrix(scoped, range),
@@ -114,7 +134,8 @@ export default function StatsPanel({
   // 分享卡片：离屏渲染当前区间的成就图 PNG 并导出；
   // 测试钩子 __SHARE_CARD_HOOK__ 置位时只记录 dataURL 长度，不触发下载
   const onShare = () => {
-    const model = shareCardModel(records, range, now);
+    // shareCardModel owns its projection: never pass displayedRecords here.
+    const model = shareCardModel(records, range, now, weights);
     const dataUrl = renderShareCardPng(model);
     if ((window as any).__SHARE_CARD_HOOK__) {
       (window as any).__shareCardPng = dataUrl;
@@ -208,7 +229,7 @@ export default function StatsPanel({
         />
       </div>
       <ResearchProgress
-        records={records}
+        records={displayedRecords}
         now={now}
         onTrend={() => {
           setCategory("research");
@@ -266,7 +287,7 @@ export default function StatsPanel({
                   <div className="st-row">
                     <span className="st-label">番茄</span>
                     <div className="st-value">
-                      <strong>{summary.count}</strong>
+                      <strong>{formatEffective(summary.count)}</strong>
                     </div>
                   </div>
                   <div className="st-row">
@@ -286,7 +307,7 @@ export default function StatsPanel({
                   <div className="st-row">
                     <span className="st-label">日均番茄</span>
                     <div className="st-value">
-                      <strong>{summary.avgCount}</strong>
+                      <strong>{formatEffective(summary.activeDays ? summary.count / summary.activeDays : 0)}</strong>
                     </div>
                   </div>
                   <div className="st-row streak">
@@ -335,7 +356,7 @@ export default function StatsPanel({
                     return (
                       <div className="bar-col" key={i}>
                         {buckets.length <= 14 && b.count > 0 && (
-                          <span className="bar-val">{b.count}</span>
+                          <span className="bar-val">{formatEffective(b.count)}</span>
                         )}
                         <div
                           className={`bar${b.isToday ? " today" : ""}${
@@ -353,7 +374,7 @@ export default function StatsPanel({
                                 : undefined,
                           }}
                           title={`${b.label} · ${
-                            b.count
+                            formatEffective(b.count)
                           } 个番茄 · ${durationText(b.seconds)}`}
                         >
                           {harvestView === "category" &&
@@ -375,7 +396,7 @@ export default function StatsPanel({
                                     c.category === "unclassified"
                                       ? "未分类"
                                       : PROJECT_LABELS[c.category]
-                                  } · ${c.count} 个（${Math.round(
+                                  } · ${formatEffective(c.count)} 个（${Math.round(
                                     (c.count / b.count) * 100
                                   )}%）· ${durationText(c.seconds)}`}
                                 />

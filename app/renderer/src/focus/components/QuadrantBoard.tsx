@@ -10,6 +10,7 @@ import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import { chipWindow } from "../chipWindow";
 import FarmField from "./FarmField";
 import TaskTitle from "./TaskTitle";
+import { effectiveTaskProgress, formatEffective, TomatoWeights } from "../weights";
 
 // 已收格子的视觉上限：计划数很大时只画前 12 格，文字仍显示真实 x/y
 const HARVEST_CELLS_MAX = 12;
@@ -29,6 +30,8 @@ const GroupList = ({
   onMove,
   quadrant,
   onDragChange,
+  records,
+  weights,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -42,6 +45,8 @@ const GroupList = ({
   onMove?: Move;
   quadrant: FocusQuadrant;
   onDragChange: (key: string) => void;
+  records: FocusSession[];
+  weights?: TomatoWeights;
 }) => {
   const [hover, setHover] = useState("");
   const [landing, setLanding] = useState<{key: string; after: boolean} | null>(null);
@@ -66,15 +71,16 @@ const GroupList = ({
         );
         const rows = group.tasks.filter((t) => t.kind !== "done");
         const info = group.tasks.find((t) => t.plannedToday != null);
-        const done = info?.doneToday ?? 0;
-        const planned = info?.plannedToday ?? rows.length;
+        const rawDone = info?.doneToday ?? 0;
+        const rawPlanned = info?.plannedToday ?? rows.length;
+        const {done, planned, missing} = effectiveTaskProgress({...group.tasks[0], doneToday:rawDone, plannedToday:rawPlanned}, records, Date.now(), weights);
         const pending = rows.filter(
           (t) =>
             t.kind !== "pending" &&
             !t.creditedSeconds &&
             !t.appliedSessionIds?.length
         ).length;
-        const complete = planned > 0 && done >= planned;
+        const complete = rawPlanned > 0 && rawDone >= rawPlanned;
         const taskId = group.tasks[0]?.taskId || "";
         const canAdjust =
           !!onAdjust &&
@@ -221,19 +227,20 @@ const GroupList = ({
               {/* 已收进度：文字在上、红色记数格在下，仍驻行尾右侧 */}
               <span
                 className={`harvest-mini ${complete ? "done" : ""}`}
-                title={`今日已收 ${done} 个，共计划 ${planned} 个`}
+                title={`今日有效已收 ${formatEffective(done)} 个，共计划 ${formatEffective(planned)} 个${missing ? "（部分明细尚未加载，缺失部分按任务项目比例折算）" : ""}`}
               >
                 <span className="hm-text">
-                  已收 {done}/{planned}
+                  已收 {formatEffective(done)}/{formatEffective(planned)}
                   {complete ? " ✓" : ""}
                 </span>
                 <span className="cells">
                   {Array.from(
-                    { length: Math.min(planned, HARVEST_CELLS_MAX) },
+                    { length: Math.min(Math.ceil(planned), HARVEST_CELLS_MAX) },
                     (_, i) => (
                       <span
                         key={i}
                         className={`cell ${i < done ? "on" : ""}`}
+                        style={{ opacity: i < done ? Math.min(1, done-i) : undefined }}
                       />
                     )
                   )}
@@ -307,6 +314,7 @@ export default function QuadrantBoard({
   onAddTask,
   loadProjects,
   records,
+  weights,
   journalSource,
   journalConnected,
   boardScope = null,
@@ -341,6 +349,7 @@ export default function QuadrantBoard({
   ) => void;
   loadProjects?: () => Promise<FocusProject[]>;
   records: FocusSession[];
+  weights?: TomatoWeights;
   journalSource: string;
   journalConnected: boolean;
   boardScope?: string | null;
@@ -411,6 +420,8 @@ export default function QuadrantBoard({
                       />
                     )}
                     <GroupList
+                      records={records}
+                      weights={weights}
                       tasks={list}
                       selected={selected}
                       onSelect={onSelect}
@@ -432,6 +443,7 @@ export default function QuadrantBoard({
         })}
       </div>
       <FarmField
+        weights={weights}
         total={totalTomatoes}
         effectiveTotal={effectiveTotal}
         week={weekTomatoes}

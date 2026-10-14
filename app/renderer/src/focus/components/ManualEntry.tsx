@@ -234,7 +234,7 @@ export default function ManualEntry({
         />
       </div>
       <div className="manual-row">
-        <label>番茄数</label>
+        <label>实际番茄数（折算前）</label>
         <span className="stepper">
           <button
             aria-label="减少补记番茄数"

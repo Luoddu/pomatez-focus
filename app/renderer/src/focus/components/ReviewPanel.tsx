@@ -53,7 +53,7 @@ export default function ReviewPanel({
         <h2>本次专注已结束</h2>
         <div className="review-overview">
           本次专注 {Math.round(active.elapsedSeconds / 60)} 分钟 ·
-          自动累计 {completed} 个番茄
+          实际累计 {completed} 个番茄
         </div>
         <div className="review-task">
           {active.task.kind === "free"
@@ -102,7 +102,7 @@ export default function ReviewPanel({
           </div>
         )}
         <div className="form-row">
-          <label>完成番茄数</label>
+          <label>实际完成番茄数（折算前）</label>
           <span
             className="quick-counts"
             role="group"

@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FocusSession } from "../session";
-import { beijingWeekStart } from "../week";
 import {
   WEEK_GOAL_DEFAULT,
   goalMet,
   weekKeyOf,
-  weekTotals,
 } from "../weekgoal";
 import { LogoIcon } from "./shared";
 import { holidayDay, holidayMessage } from "../wellbeing.js";
 import TodayTimeHeatmap from "./TodayTimeHeatmap";
 
-import { effectiveWeekCount, formatEffective, TomatoWeights } from "../weights";
+import { effectiveCount, formatEffective } from "../weights";
+import type { TomatoWeights } from "../weights";
 
 const GOLD_TONE = "#e8a917";
 
@@ -43,7 +42,7 @@ const holidayOf = (d: Date) =>
 const tier = (count: number) =>
   count <= 0
     ? 0
-    : count === 1
+    : count <= 1
     ? 1
     : count <= 3
     ? 2
@@ -73,18 +72,32 @@ export default function HeatmapCalendar({
     const byDay = new Map<string, DayStat>();
     let earliest: number | null = null;
     const saved = records.filter((r) => r.status === "saved");
-    // 周聚合用与农场相同的北京时间周口径，目标判定跨组件一致
-    const byWeek = new Map(Object.keys(weekTotals(saved)).map(key => [key, effectiveWeekCount(saved, Date.parse(key + "T12:00:00+08:00"), weights)]));
+    // Group original records, then apply coefficients once per day/week. This
+    // keeps hundredths exact and retains real timestamps and duration fields.
+    const dayRecords = new Map<string, FocusSession[]>();
+    const weekRecords = new Map<string, FocusSession[]>();
     for (const r of saved) {
       const d = dayStart(new Date(r.startedAt));
       const key = dayKey(d);
       const stat = byDay.get(key) || { count: 0, seconds: 0 };
-      stat.count += r.completedCount || 0;
+      const daily = dayRecords.get(key) || [];
+      daily.push(r);
+      dayRecords.set(key, daily);
+      const weekKey = weekKeyOf(r.startedAt);
+      const weekly = weekRecords.get(weekKey) || [];
+      weekly.push(r);
+      weekRecords.set(weekKey, weekly);
       stat.seconds += r.acceptedSeconds || r.elapsedSeconds || 0;
       byDay.set(key, stat);
       if (earliest === null || d.getTime() < earliest)
         earliest = d.getTime();
     }
+    byDay.forEach((stat, key) => {
+      stat.count = effectiveCount(dayRecords.get(key) || [], weights);
+    });
+    const byWeek = new Map(
+      Array.from(weekRecords, ([key, originals]) => [key, effectiveCount(originals, weights)])
+    );
     const today = dayStart(new Date());
     const lastMonday = mondayOf(today);
     const firstMonday = earliest
@@ -131,8 +144,8 @@ export default function HeatmapCalendar({
     const rect = e.currentTarget.getBoundingClientRect();
     const date = `${day.getMonth() + 1}月${day.getDate()}日`;
     const detail =
-      stat && stat.count > 0
-        ? `${date} · ${stat.count} 个番茄 · ${Math.round(
+      stat && (stat.count > 0 || stat.seconds > 0)
+        ? `${date} · ${formatEffective(stat.count)} 个番茄 · ${Math.round(
             stat.seconds / 60
           )} 分钟`
         : `${date} · 暂无收获`;
@@ -206,7 +219,7 @@ export default function HeatmapCalendar({
                           ? `${holiday.name} · ${holidayMessage(
                               holiday,
                               count
-                            )}${count > 0 ? ` · ${count} 个番茄` : ""}`
+                            )}${count > 0 ? ` · ${formatEffective(count)} 个番茄` : ""}`
                           : undefined
                       }
                       data-count={future ? "" : count}
@@ -217,7 +230,7 @@ export default function HeatmapCalendar({
                       }
                       onMouseLeave={() => setTip(null)}
                     >
-                      {!future && count > 0 ? count : ""}
+                      {!future && count > 0 ? formatEffective(count) : ""}
                     </span>
                   );
                 })}
@@ -247,7 +260,7 @@ export default function HeatmapCalendar({
                   {met && (
                     <span
                       className="hm-badge"
-                      title={`本周目标已达成（${total} 个）`}
+                      title={`本周目标已达成（${formatEffective(total)} 个）`}
                     >
                       <LogoIcon size={12} tone={GOLD_TONE} />
                     </span>
@@ -257,7 +270,7 @@ export default function HeatmapCalendar({
             })}
           </div>
         </div>
-        <TodayTimeHeatmap records={records} />
+        <TodayTimeHeatmap records={records} weights={weights} />
       </div>
       {tip && (
         <div

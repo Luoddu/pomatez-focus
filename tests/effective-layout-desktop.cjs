@@ -172,8 +172,8 @@ app.whenReady().then(async () => {
     events:fixture.events,
   })`);
   let value = await values();
-  check("8 research + 10 misc at 0.6 = 14; effective primary and raw secondary; time preserved; goal 15 blocked", () => {
-    assert.equal(value.today, "14"); assert.equal(value.label, "有效番茄"); assert.equal(value.actual, "今日番茄：18"); assert.equal(value.tier, "high");
+  check("8 research + 10 misc at 0.6 = 14; effective primary without raw duplicate; time preserved; goal 15 blocked", () => {
+    assert.equal(value.today, "14"); assert.equal(value.label, "有效番茄"); assert.equal(value.actual, null); assert.equal(value.tier, "high");
     assert.equal(value.time, "7 小时 30 分钟"); assert.equal(value.week, "14");
     assert.equal(value.weekMet, false); assert.equal(value.research, "8");
     assert.deepEqual(value.events.week, []);
@@ -189,7 +189,7 @@ app.whenReady().then(async () => {
   await js("fixture.update({weights:{research:0.58,delivery:1,longterm:1,software:1,personal:1,misc:0,unclassified:1}})");
   await wait(50); value = await values();
   check("zero coefficient still shows effective row; fractional research stays fractional", () => {
-    assert.equal(value.today, "4.64"); assert.equal(value.actual, "今日番茄：18"); assert.equal(value.label, "有效番茄"); assert.equal(value.tier, null);
+    assert.equal(value.today, "4.64"); assert.equal(value.actual, null); assert.equal(value.label, "有效番茄"); assert.equal(value.tier, null);
     assert.equal(value.research, "4.64"); assert.equal(value.researchMet, false);
   });
   await js("fixture.update({records:[fixture.record('research',50,'research')]})"); await wait(700);
@@ -273,7 +273,7 @@ app.whenReady().then(async () => {
   check("real WeightSettings shortcut applies only on save: raw 18 to effective 14, no celebration replay", () => {
     assert.equal(beforeSave.today,"18"); assert.equal(beforeSave.week,"18");
     assert.equal(saved.today,"14"); assert.equal(saved.label,"有效番茄"); assert.equal(saved.week,"14");
-    assert.equal(saved.actual,"今日番茄：18"); assert.equal(saved.tier,"high"); assert.equal(stored.weights.misc,0.6);
+    assert.equal(saved.actual,null); assert.equal(saved.tier,"high"); assert.equal(stored.weights.misc,0.6);
     assert.deepEqual(saved.events.week,beforeSave.events.week);
     assert.deepEqual(saved.events.milestone,beforeSave.events.milestone);
   });

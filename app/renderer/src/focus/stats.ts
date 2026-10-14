@@ -15,6 +15,10 @@ export const RANGE_LABELS: Record<RangeKey, string> = {
 
 const DAY = 86400000;
 const HALF_HOUR = 1800000;
+// Display projections contain hundredths. Add integer cents so repeated 0.29
+// remains exactly 0.87/29 at aggregate boundaries; duration math is unchanged.
+const addCounts = (left: number, right: number) =>
+  (Math.round(left * 100) + Math.round(right * 100)) / 100;
 
 const dayStart = (ms: number) => {
   const d = new Date(ms);
@@ -113,7 +117,7 @@ export function annualHeatmap(
     if (date.getFullYear() !== year) continue;
     const key = dayStart(record.startedAt);
     const value = byDay.get(key) || { count: 0, seconds: 0 };
-    value.count += record.completedCount || 0;
+    value.count = addCounts(value.count, record.completedCount || 0);
     value.seconds += record.acceptedSeconds || 0;
     byDay.set(key, value);
   }
@@ -154,12 +158,12 @@ export function summarize(records: FocusSession[]): Summary {
   for (const r of records) {
     const c = r.completedCount || 0;
     const s = r.acceptedSeconds || 0;
-    count += c;
+    count = addCounts(count, c);
     seconds += s;
     if (c <= 0 && s <= 0) continue;
     const key = dayStart(r.startedAt);
     const day = byDay.get(key) || { count: 0, seconds: 0 };
-    day.count += c;
+    day.count = addCounts(day.count, c);
     day.seconds += s;
     byDay.set(key, day);
   }
@@ -251,7 +255,7 @@ export function barBuckets(
   for (const r of records) {
     const i = bucketOf(r.startedAt);
     if (i < 0 || i >= buckets.length) continue;
-    buckets[i].count += r.completedCount || 0;
+    buckets[i].count = addCounts(buckets[i].count, r.completedCount || 0);
     buckets[i].seconds += r.acceptedSeconds || 0;
   }
   return buckets;
@@ -366,7 +370,7 @@ export function dailyFocusTheme(
     const title = baseName(r.task.title).trim() || "自由专注";
     const item = totals.get(title) || { seconds: 0, count: 0 };
     item.seconds += Math.max(0, r.acceptedSeconds || 0);
-    item.count += Math.max(0, r.completedCount || 0);
+    item.count = addCounts(item.count, Math.max(0, r.completedCount || 0));
     totals.set(title, item);
   }
   const top = Array.from(totals.entries()).sort(
@@ -440,7 +444,7 @@ export function topTasks(
       seconds: 0,
       quadrant: r.task?.quadrant,
     };
-    item.count += r.completedCount || 0;
+    item.count = addCounts(item.count, r.completedCount || 0);
     item.seconds += r.acceptedSeconds || 0;
     map.set(name, item);
   }
@@ -459,7 +463,7 @@ export type Daypart = {
   key: "night" | "morning" | "afternoon" | "evening";
   label: string;
   hours: string;
-  count: number; // 番茄数（跨格分摊可能带小数，展示层自行取整）
+  count: number; // 番茄数（跨格分摊可能带小数，展示层保留两位）
 };
 const DAYPART_DEFS: Omit<Daypart, "count">[] = [
   { key: "night", label: "深夜", hours: "0–6 点" },

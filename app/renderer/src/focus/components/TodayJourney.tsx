@@ -19,6 +19,7 @@ import {
 } from "../journey.js";
 import { parseTitle, LogoIcon } from "./shared";
 import { tomatoRecordTone } from "../week";
+import { tomatoWeight, formatEffective, TomatoWeights } from "../weights";
 import {
   JourneyRestIcon,
   JourneyOutline,
@@ -60,10 +61,12 @@ export default function TodayJourney({
   records,
   tasks,
   controls,
+  weights,
 }: {
   records: FocusSession[];
   tasks: FocusTask[];
   controls: JourneyControls;
+  weights?: TomatoWeights;
 }) {
   const [offset, setOffset] = useState(0),
     [plan, setPlan] = useState<Journey | null>(null),
@@ -496,6 +499,7 @@ export default function TodayJourney({
                         key={p.id}
                         data-journey-slot={p.id}
                         data-complete={!!actual}
+                        data-effective-count={actual ? tomatoWeight(actual, weights) : undefined}
                         data-active={running}
                         className={`journey-tomato${
                           actual ? " is-complete" : ""
@@ -503,7 +507,7 @@ export default function TodayJourney({
                         draggable={!actual && !running}
                         title={`${i + 1}段 · 第${j + 1}个 · ${
                           actual
-                            ? "已完成：" +
+                            ? `有效 ${formatEffective(tomatoWeight(actual, weights))} 个：` +
                               parseTitle(actual.task.title).name
                             : running
                             ? "进行中：" +
@@ -539,14 +543,14 @@ export default function TodayJourney({
                         }}
                       >
                         {actual || running ? (
-                          <LogoIcon
+                          <span style={{ opacity: actual ? tomatoWeight(actual, weights) : 1 }}><LogoIcon
                             size={22}
                             tone={
                               actual
                                 ? tomatoRecordTone(actual)
                                 : "#e2ab52"
                             }
-                          />
+                          /></span>
                         ) : (
                           <JourneyOutline size={22} />
                         )}

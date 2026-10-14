@@ -34,9 +34,9 @@ export function researchWeeks(
       (r) => recordCategory(r) === "research"
     );
     const count = research.reduce(
-      (n, r) => n + (r.completedCount || 0),
+      (n, r) => n + Math.round((r.completedCount || 0) * 100),
       0
-    );
+    ) / 100;
     const seconds = research.reduce(
       (n, r) => n + (r.acceptedSeconds || 0),
       0

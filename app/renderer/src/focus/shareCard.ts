@@ -20,6 +20,8 @@ import {
 } from "./week";
 import { termInfo } from "./solarTerms";
 import type { FocusSession } from "./session";
+import { effectiveRecords, formatEffective } from "./weights.js";
+import type { TomatoWeights } from "./weights";
 
 // 与 focus.css 的 hm-t0..5 同一番茄红热力色板
 export const HEAT_COLORS = [
@@ -30,8 +32,10 @@ export const HEAT_COLORS = [
   "#e5533f",
   "#c22f1f",
 ];
-export const heatTier = (v: number) =>
-  v <= 0 ? 0 : v < 0.5 ? 1 : v < 1 ? 2 : v < 2 ? 3 : v < 4 ? 4 : 5;
+export const heatTier = (v: number) => {
+  const count = Number(formatEffective(v));
+  return count <= 0 ? 0 : count < 0.5 ? 1 : count < 1 ? 2 : count < 2 ? 3 : count < 4 ? 4 : 5;
+};
 
 const WEEK_CHARS = "一二三四五六日";
 const RANGE_NAME: Record<RangeKey, string> = {
@@ -71,25 +75,28 @@ export type ShareCardModel = {
 export function shareCardModel(
   records: FocusSession[],
   range: RangeInfo,
-  now: number
+  now: number,
+  weights?: TomatoWeights
 ): ShareCardModel {
-  const scoped = inRange(records, range);
+  // Public callers supply raw records. Never weight an already-derived view.
+  const displayedRecords = effectiveRecords(records, weights);
+  const scoped = inRange(displayedRecords, range);
   const summary = summarize(scoped);
-  const streak = currentStreak(records, now);
+  const streak = currentStreak(displayedRecords, now);
   const buckets = barBuckets(scoped, range, now).map((b) => ({
     label: b.label,
-    count: b.count,
+    count: Number(formatEffective(b.count)),
   }));
   const heat = halfHourMatrix(scoped, range);
   const dayparts = daypartSplit(heat).map((d) => ({
     label: d.label,
-    count: d.count,
+    count: Number(formatEffective(d.count)),
   }));
   const quadCounts = quadrantCounts(scoped);
   const quads = QUADRANT_KEYS.map((key) => ({
     key,
     tone: QUADRANT_TONES[key],
-    count: quadCounts[key],
+    count: Number(formatEffective(quadCounts[key])),
   }));
   // 黄金时段：热力矩阵最高格
   let goldenLabel: string | null = null;
@@ -105,29 +112,30 @@ export function shareCardModel(
     })
   );
   const term = termInfo(now);
-  const total = summarize(records.filter((r) => r.status === "saved"));
-  const milestone = totalMilestone(total.count);
+  const total = summarize(displayedRecords.filter((r) => r.status === "saved"));
+  const totalAll = Number(formatEffective(total.count));
+  const milestone = totalMilestone(totalAll);
   return {
     rangeName: RANGE_NAME[range.key],
     rangeLabel: range.label,
     barTitle: BAR_TITLE[range.key],
     termName: term.name,
     termDay: term.dayOfTerm,
-    count: summary.count,
+    count: Number(formatEffective(summary.count)),
     seconds: summary.seconds,
     activeDays: summary.activeDays,
     streak,
     bestDayLabel: summary.bestDay
       ? `${new Date(summary.bestDay.date).getMonth() + 1}.${new Date(
           summary.bestDay.date
-        ).getDate()} · ${summary.bestDay.count} 个`
+        ).getDate()} · ${formatEffective(summary.bestDay.count)} 个`
       : null,
     goldenLabel,
     buckets,
     heat: heat.rows,
     dayparts,
     quads,
-    totalAll: total.count,
+    totalAll,
     milestoneReached: milestone.reached,
     milestoneNext: milestone.next,
   };
@@ -210,8 +218,8 @@ export function drawShareCard(
   y += 78;
   g.fillStyle = "#2b2620";
   g.font = `800 132px ${FONT}`;
-  g.fillText(String(model.count), M, y + 40);
-  const numW = g.measureText(String(model.count)).width;
+  g.fillText(formatEffective(model.count), M, y + 40);
+  const numW = g.measureText(formatEffective(model.count)).width;
   g.font = `600 34px ${FONT}`;
   g.fillStyle = "#a09385";
   g.fillText("个番茄", M + numW + 18, y + 40);
@@ -400,7 +408,7 @@ export function drawShareCard(
       g.fillStyle = "#7d7166";
       g.font = `500 22px ${FONT}`;
       g.textAlign = "right";
-      g.fillText(`${Math.round(it.count)}`, x + halfW - 30, ry + rh - 2);
+      g.fillText(formatEffective(it.count), x + halfW - 30, ry + rh - 2);
       g.textAlign = "left";
     });
   }
@@ -412,8 +420,8 @@ export function drawShareCard(
   g.font = `500 26px ${FONT}`;
   const remain = model.milestoneNext - model.totalAll;
   g.fillText(
-    `累计收获 ${model.totalAll} 个番茄` +
-      (remain > 0 ? ` · 距 ${model.milestoneNext} 里程碑还差 ${remain} 个` : ""),
+    `累计收获 ${formatEffective(model.totalAll)} 个番茄` +
+      (remain > 0 ? ` · 距 ${model.milestoneNext} 里程碑还差 ${formatEffective(remain)} 个` : ""),
     M,
     y
   );

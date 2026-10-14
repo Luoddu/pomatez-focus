@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { FocusSession } from "../session";
 import { halfHourMatrix } from "../stats";
+import { effectiveRecords, formatEffective } from "../weights";
+import type { TomatoWeights } from "../weights";
 
 const timeLabel = (slot: number) =>
   `${String(Math.floor(slot / 2)).padStart(2, "0")}:${
@@ -12,8 +14,10 @@ const tier = (v: number) =>
 // 与统计页共用 saved 番茄的半小时分摊口径；只显示本地今天。
 export default function TodayTimeHeatmap({
   records,
+  weights,
 }: {
   records: FocusSession[];
+  weights?: TomatoWeights;
 }) {
   const now = new Date();
   const start = new Date(
@@ -29,10 +33,10 @@ export default function TodayTimeHeatmap({
   const matrix = useMemo(
     () =>
       halfHourMatrix(
-        records.filter((r) => r.status === "saved"),
+        effectiveRecords(records, weights).filter((r) => r.status === "saved"),
         { start, end }
       ),
-    [records, start, end]
+    [records, weights, start, end]
   );
   const slots = matrix.rows[(now.getDay() + 6) % 7];
   const viewport = useRef<HTMLDivElement>(null);
@@ -76,14 +80,14 @@ export default function TodayTimeHeatmap({
           </div>
           <div className="today-heatmap-slots">
             {slots.map((value, slot) => {
-              const count = Number(value.toFixed(2));
+              const count = formatEffective(value);
               const detail = `${timeLabel(slot)}–${timeLabel(
                 slot + 1
               )} · ${count} 个番茄`;
               return (
                 <span
                   key={slot}
-                  className={`today-heatmap-cell hm-t${tier(value)}`}
+                  className={`today-heatmap-cell hm-t${tier(Number(count))}`}
                   data-slot={slot}
                   data-count={value}
                   title={detail}
