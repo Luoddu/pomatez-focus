@@ -5,6 +5,7 @@ import { recolorSession } from "focus/classification.js";
 import { bindQuickSessions } from "focus/quickTasks";
 import type { QuickTask } from "focus/editQueue";
 import { playTimeUp, playRestEnd } from "focus/sound";
+import { loadTimerPreferences } from "focus/preferences";
 import {
   FocusSession,
   ProjectType,
@@ -36,6 +37,7 @@ type CounterProps = {
   error: string;
   blocked: boolean;
   restSeconds: number;
+  restDuration: number;
   begin: (task: FocusTask, minutes: number, sessionId?: string) => void;
   changeTask: (task: FocusTask) => boolean;
   pause: () => void;
@@ -76,6 +78,7 @@ const CounterProvider: React.FC = ({ children }) => {
   const lastTick = useRef(performance.now());
   const lastSave = useRef(0);
   const [restSeconds, setRestSeconds] = useState(0);
+  const [restDuration,setRestDuration]=useState(300);
   const restRef = useRef(0);
   const notified = useRef(false);
   const publish = useCallback((next: Data, save = true) => {
@@ -403,8 +406,10 @@ const CounterProvider: React.FC = ({ children }) => {
   const startBreak = () =>
     action(() => {
       if (dataRef.current.active) throw new Error("请先保存当前专注");
-      restRef.current = 300;
-      setRestSeconds(300);
+      const seconds = loadTimerPreferences(localStorage).restMinutes * 60;
+      restRef.current = seconds;
+      setRestDuration(seconds);
+      setRestSeconds(seconds);
       lastTick.current = performance.now();
       setNotice("休息中，休息时间不计入专注。");
     });
@@ -487,6 +492,7 @@ const CounterProvider: React.FC = ({ children }) => {
         error,
         blocked: fatal.current,
         restSeconds,
+        restDuration,
         begin,
         changeTask,
         pause,

@@ -13,10 +13,10 @@ import path from "path";
 import fs from "fs";
 import { FocusService } from "./focus/service";
 import { FocusUpdater } from "./focus/updater";
-import { ActivityWatchRest } from "./focus/activitywatch";
+import { ActivityWatchRest, validSettings } from "./focus/activitywatch";
 import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
-import { BrowserControl, FarmPresence } from "./focus/browserControl";
+import { BrowserControl, FarmPresence, validBrowserPolicy } from "./focus/browserControl";
 import { JourneyGateway } from "./focus/journeyGateway";
 const headless = process.env.POMATEZ_HEADLESS === "1";
 // Unattended tests must never play timer/reminder sounds on the user's desktop.
@@ -207,6 +207,21 @@ else {
         service.archiveHistory(value)
       );
       handler("journal", () => service.journal());
+      handler("readPreferences", (value) => service.readPreferences(value));
+      handler("savePreference", (value) => service.savePreference(value));
+      handler("applyDevicePreference", (value) => {
+        if (!value || value.sourceKey !== service.status().sourceKey) throw Error("飞书来源已切换");
+        const canonical=(v:any)=>JSON.stringify(v,Object.keys(v||{}).sort());
+        if(value.key === "rest"){
+          if(canonical(restMonitor.snapshot().settings)!==canonical(value.expected))throw Error("本机休息规则已变化");
+          return restMonitor.configure(validSettings(value.value));
+        }
+        if(value.key === "browser"){
+          if(canonical(browserControl.policy)!==canonical(value.expected))throw Error("本机干预规则已变化");
+          const reply=browserControl.configure(validBrowserPolicy(value.value));publishRest(restMonitor.snapshot());return reply;
+        }
+        throw Error("不支持的设备偏好");
+      });
       handler("restState", () => ({...restMonitor.snapshot(),browserControl:browserControl.snapshot()}));
       handler("browserConfigure", value => { browserControl.configure(value); return publishRest(restMonitor.snapshot()); });
       handler("browserSetup", async () => {

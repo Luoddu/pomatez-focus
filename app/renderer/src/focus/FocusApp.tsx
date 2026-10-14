@@ -8,6 +8,9 @@ import React, {
 } from "react";
 import { CounterContext } from "contexts/CounterContext";
 import { DEFAULT_WEIGHTS, loadWeights, saveWeights, effectiveCount, effectiveWeekCount, effectiveToneRecords, TomatoWeights } from "./weights";
+import { loadTimerPreferences, saveTimerPreferences, PREFERENCES_CHANGED } from "./preferences";
+import { usePreferenceSync } from "./usePreferenceSync";
+import PreferenceSyncSettings from "./components/PreferenceSyncSettings";
 import {
   FocusSession,
   FocusTask,
@@ -246,6 +249,7 @@ export default function FocusApp() {
   const persistWeights = (value: TomatoWeights) => {
     const saved = saveWeights(localStorage, value);
     setWeightState({ value: saved, error: "" });
+    window.dispatchEvent(new Event(PREFERENCES_CHANGED));
   };
   const timer = useContext(CounterContext);
   const [tasks, setTasks] = useState<FocusTask[]>(() =>
@@ -256,8 +260,17 @@ export default function FocusApp() {
   const [connectionReady, setConnectionReady] = useState(() => !api());
   const taskScope = useRef<string | null>(null);
   const cacheWarningShown = useRef(false);
-  const [minutes, setMinutes] = useState(25),
-    [compact, setCompact] = useState(false),
+  const [timerPreferences, setTimerPreferences] = useState(() => {
+    try { return loadTimerPreferences(localStorage); } catch { return {focusMinutes:25,restMinutes:5}; }
+  });
+  const minutes = timerPreferences.focusMinutes;
+  const [timerPreferenceError,setTimerPreferenceError]=useState("");
+  const setTimerPreference = (value: any) => {
+    try { setTimerPreferences(saveTimerPreferences(localStorage,value));setTimerPreferenceError("");window.dispatchEvent(new Event(PREFERENCES_CHANGED)); }
+    catch(e){setTimerPreferenceError((e as Error).message);}
+  };
+  const setMinutes = (value:number) => setTimerPreference({...timerPreferences,focusMinutes:value});
+  const [compact, setCompact] = useState(false),
     [pinned, setPinned] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false),
     [statsOpen, setStatsOpen] = useState(false),
@@ -265,6 +278,15 @@ export default function FocusApp() {
     [sourceKey, setSourceKey] = useState<string | null>(null),
     [todayCount, setTodayCount] = useState<number | null>(null),
     [quadrantField, setQuadrantField] = useState<string | null>(null);
+  const preferenceSync = usePreferenceSync(sourceKey,connected);
+  useEffect(()=>{
+    const reload=()=>{
+      try{setWeightState({value:loadWeights(localStorage),error:""});setTimerPreferences(loadTimerPreferences(localStorage));setTimerPreferenceError("");}
+      catch(e){setTimerPreferenceError((e as Error).message);}
+    };
+    window.addEventListener(PREFERENCES_CHANGED,reload);
+    return ()=>window.removeEventListener(PREFERENCES_CHANGED,reload);
+  },[]);
   // 右下角浮出 toast：信息 3 秒自消；需要处理的错误常驻、带关闭 ×
   const [toast, setToast] = useState<{
     id: number;
@@ -1789,12 +1811,14 @@ export default function FocusApp() {
     <div className="focus-app">
       {restReminder}
       {weightState.error && <div role="alert" className="outbox-status weight-config-error">{weightState.error}；当前使用原始数量，请在设置中保存比例。</div>}
+      {preferenceSync.status.conflicts.length>0 && !settingsOpen && <div className="outbox-status" role="alert">全局偏好有不同版本，请选择统一设置。<button className="btn-small outline" onClick={()=>setSettingsOpen(true)}>处理设置冲突</button></div>}
       {settingsOpen ? (
         <SettingsPanel
           config={config}
           weights={weights}
           weightsError={weightState.error}
           onWeights={persistWeights}
+          preferencePanel={<><PreferenceSyncSettings status={preferenceSync.status} connected={connected} onSync={preferenceSync.sync} onEnable={preferenceSync.enable} onDisable={preferenceSync.disable} onResolve={preferenceSync.resolve} timer={timerPreferences} onTimer={setTimerPreference} />{timerPreferenceError && <p role="alert">{timerPreferenceError}</p>}</>}
           connected={connected}
           todayCount={todayCount}
           quadrantField={quadrantField}
@@ -1906,6 +1930,8 @@ export default function FocusApp() {
               }
               minutes={minutes}
               onMinutes={setMinutes}
+              breakMinutes={timerPreferences.restMinutes}
+              restDuration={timer.restDuration}
               onBegin={() => {
                 // Bind free focus to the current Base, never a future connection.
                 beginTask(

@@ -1,6 +1,7 @@
 import React from "react";
 import { FocusSession, Mood, timeParts } from "../session";
 import { MoodPicker, parseTitle } from "./shared";
+import { loadTimerPreferences } from "../preferences";
 
 export default function ReviewPanel({
   active,
@@ -143,7 +144,7 @@ export default function ReviewPanel({
             记录番茄
           </button>
           <button className="btn-outline" onClick={onSaveRest}>
-            保存并休息 5 分钟
+            保存并休息 {loadTimerPreferences(localStorage).restMinutes} 分钟
           </button>
           <button
             className="btn-outline"

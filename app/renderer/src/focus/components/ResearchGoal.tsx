@@ -18,6 +18,7 @@ export default function ResearchGoal({
   weights?: TomatoWeights;
 }) {
   const [goals, setGoals] = useState(loadResearchGoals);
+  useEffect(()=>{const reload=()=>setGoals(loadResearchGoals());window.addEventListener("pomatez:preferences-changed",reload);return ()=>window.removeEventListener("pomatez:preferences-changed",reload);},[]);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");

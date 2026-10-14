@@ -240,6 +240,7 @@ export default function HistoryPanel({
   }, [colorMenu]);
   // 周目标：覆盖表（仅按周键），chip 显示本周已收/目标，悬浮开弹窗仅改本周
   const [goals, setGoals] = useState(loadWeekGoals);
+  useEffect(()=>{const reload=()=>setGoals(loadWeekGoals());window.addEventListener("pomatez:preferences-changed",reload);return ()=>window.removeEventListener("pomatez:preferences-changed",reload);},[]);
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [goalError, setGoalError] = useState("");

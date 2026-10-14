@@ -294,6 +294,8 @@ export default function QuadrantBoard({
   selected,
   onSelect,
   minutes,
+  breakMinutes = 5,
+  restDuration = 300,
   onMinutes,
   onBegin,
   onBreak,
@@ -324,6 +326,8 @@ export default function QuadrantBoard({
   selected: string;
   onSelect: (id: string) => void;
   minutes: number;
+  breakMinutes?: number;
+  restDuration?: number;
   onMinutes: (minutes: number) => void;
   onBegin: () => void;
   onBreak: () => void;
@@ -471,7 +475,7 @@ export default function QuadrantBoard({
           <div className="action-side-row">
             {canBreak && restSeconds <= 0 && (
               <button className="btn-text" onClick={onBreak}>
-                休息 5 分钟
+                休息 {breakMinutes} 分钟
               </button>
             )}
             {restSeconds > 0 && (
@@ -481,7 +485,7 @@ export default function QuadrantBoard({
                   style={{
                     width: `${Math.min(
                       100,
-                      Math.max(0, (restSeconds / 300) * 100)
+                      Math.max(0, (restSeconds / restDuration) * 100)
                     )}%`,
                   }}
                 />

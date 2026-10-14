@@ -2,6 +2,8 @@ import { app, safeStorage } from "electron";
 import fs from "fs";
 import path from "path";
 import https from "https";
+import { createHash } from "crypto";
+import { PrefsRepository } from "./preferences";
 import {
   Feishu,
   GenerateProgress,
@@ -97,6 +99,7 @@ export class FocusService {
     };
   }
   async configure(value: any) {
+    if(this.preferenceWriting)throw Error("偏好正在同步，请稍后更换连接");
     this.cryptoReady();
     const next = new Feishu(validateConnection(value), request);
     await next.resolve();
@@ -230,6 +233,52 @@ export class FocusService {
   }
   journal() {
     return this.connected().journal();
+  }
+  private preferenceWriting=false;
+  private preferenceRepositories=new WeakMap<Feishu,PrefsRepository>();
+  private preferencesClient(value:any){
+    const client=this.connected(),sourceKey=connectionKey(client.config);
+    if(!value || value.sourceKey!==sourceKey)throw Error("飞书来源已切换，未同步偏好");
+    let repository=this.preferenceRepositories.get(client);
+    if(!repository){
+      const source=client.preferenceSource();
+      const guard=()=>{if(this.client!==client)throw Error("飞书来源已切换");};
+      repository=new PrefsRepository({
+        root:()=>{guard();return source.root();},
+        findTable:async(name,required)=>{guard();return source.findTable(name,required);},
+        list:async(route)=>{guard();return source.list(route);},
+        call:async(method,route,body)=>{guard();return source.call(method,route,body);},
+      },{allowCreate:true,beforeCreate:(root)=>{
+        const file=path.join(app.getPath("userData"),"preference-table-creation.json");
+        const key=createHash("sha256").update(root).digest("hex");
+        let attempts:Record<string,boolean>={};
+        if(fs.existsSync(file)){
+          if(fs.statSync(file).size>8192)throw Error("偏好建表状态过大，未覆盖");
+          attempts=JSON.parse(fs.readFileSync(file,"utf8"));
+          if(!attempts || Array.isArray(attempts) || typeof attempts!=="object" || Object.entries(attempts).some(([k,v])=>!/^[a-f0-9]{64}$/.test(k)||v!==true))throw Error("偏好建表状态损坏，未覆盖");
+        }
+        if(attempts[key])throw Error("偏好表创建结果待确认，请在飞书检查“农场偏好”表后重试同步");
+        attempts[key]=true;
+        fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+".tmp",JSON.stringify(attempts),{mode:0o600});fs.renameSync(file+".tmp",file);
+      }});
+      this.preferenceRepositories.set(client,repository);
+    }
+    return {repository,client,sourceKey};
+  }
+  async readPreferences(value:any){
+    const {repository,client,sourceKey}=this.preferencesClient(value),reply=await repository.read();
+    if(this.client!==client)throw Error("飞书来源已切换");
+    return {...reply,sourceKey};
+  }
+  async savePreference(value:any){
+    if(this.preferenceWriting)throw Error("偏好正在同步，修改已保留");
+    const {repository,client,sourceKey}=this.preferencesClient(value);
+    this.preferenceWriting=true;
+    try{
+      const reply=await repository.save(value.entry);
+      if(this.client!==client)throw Error("飞书来源已切换");
+      return {...reply,sourceKey};
+    }finally{this.preferenceWriting=false;}
   }
   private journalWriting = false;
   async saveJournal(value: any) {

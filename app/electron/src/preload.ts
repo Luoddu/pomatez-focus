@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld("focusApi", {
     return () => ipcRenderer.removeListener("focus:rest-action", listener);
   },
   status: () => invoke("status"),
+  readPreferences: (value: any) => invoke("readPreferences",value),
+  savePreference: (value: any) => invoke("savePreference",value),
+  applyDevicePreference: (value: any) => invoke("applyDevicePreference",value),
   restState: () => invoke("restState"),
   restRefresh: () => invoke("restRefresh"),
   restSettings: (value: any) => invoke("restSettings", value),

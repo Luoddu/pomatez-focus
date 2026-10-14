@@ -4768,3 +4768,6 @@ button.stats-range-label:hover {
 .calendar-section .hm-scroll { scrollbar-width: thin; scrollbar-color: #d5dae2 transparent; }
 .calendar-section .hm-scroll::-webkit-scrollbar { height: 5px; }
 .calendar-section .hm-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 5px; }
+.preference-conflict { margin-top:12px; padding:12px; border:1px solid #ecd8b5; border-radius:12px; background:#fffaf2; }
+.preference-conflict details { margin:8px 0; font-size:12px; color:#7a6a55; overflow-wrap:anywhere; }
+.preference-conflict .sync-row { flex-wrap:wrap; gap:8px; }

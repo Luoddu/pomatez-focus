@@ -239,6 +239,14 @@ export function sessionFields(r: any) {
 }
 export class Feishu {
   private token = "";
+  preferenceSource() {
+    return {
+      root: () => this.root(),
+      findTable: (name: string, required = true) => this.findTable(name,required),
+      list: (route: string) => this.list(route),
+      call: (method: "POST", route: string, body: unknown) => this.call(method,route,body),
+    };
+  }
   private expires = 0;
   private inFlight = new Map<string, Promise<any>>();
   private planQueue: Promise<any> = Promise.resolve();

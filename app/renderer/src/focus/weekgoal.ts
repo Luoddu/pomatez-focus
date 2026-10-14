@@ -69,6 +69,7 @@ export function saveWeekGoal(
   const goals = { ...loadWeekGoals(storageKey), [weekKeyOf(now)]: goal };
   try {
     localStorage.setItem(storageKey, JSON.stringify(goals));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("pomatez:preferences-changed"));
   } catch {
     /* 私密模式等写入失败时按当次内存态处理 */
   }
