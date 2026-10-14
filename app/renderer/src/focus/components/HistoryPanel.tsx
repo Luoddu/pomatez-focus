@@ -39,6 +39,7 @@ import {
 } from "./shared";
 import HeatmapCalendar from "./HeatmapCalendar";
 import ManualEntry from "./ManualEntry";
+import ManualEntryDialog from "./ManualEntryDialog";
 import { dailyFocusTheme } from "../stats";
 import { PROJECT_TYPES, recordCategory } from "../classification.js";
 import { reviewDayKey, reviewTheme } from "../reviewCache";
@@ -339,7 +340,7 @@ export default function HistoryPanel({
   if (!groups.length || groups[0].date !== todayKey)
     groups.unshift({ date: todayKey, records: [] });
   return (
-    <div className={`right-col${entryOpen || editRecord ? " is-editing-record" : ""}`}>
+    <div className="right-col">
       <div className="side-section overview-section">
         <div className="side-title">
           概览
@@ -550,6 +551,7 @@ export default function HistoryPanel({
           </span>
         </div>
         {entryOpen && (
+          <ManualEntryDialog title="补记专注" onClose={()=>setEntryOpen(false)}>
           <ManualEntry
             tasks={tasks}
             onSave={(record) => {
@@ -558,8 +560,10 @@ export default function HistoryPanel({
             }}
             onCancel={() => setEntryOpen(false)}
           />
+          </ManualEntryDialog>
         )}
         {editRecord && onEdit && (
+          <ManualEntryDialog title="修改专注" onClose={()=>setEditRecord(null)}>
           <ManualEntry
             key={editRecord.id}
             initial={editRecord}
@@ -570,6 +574,7 @@ export default function HistoryPanel({
             }}
             onCancel={() => setEditRecord(null)}
           />
+          </ManualEntryDialog>
         )}
         <div className="card records">
           {groups

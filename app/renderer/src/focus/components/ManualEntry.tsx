@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { FocusSession, FocusTask, Mood, ProjectType } from "../session";
 import CategorySelect from "./CategorySelect";
 import { MoodPicker, parseTitle } from "./shared";
@@ -29,9 +29,6 @@ export default function ManualEntry({
   initial?: FocusSession;
 }) {
   const formRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    formRef.current?.scrollIntoView({ block: "nearest" });
-  }, []);
   const [taskId, setTaskId] = useState(initial?.task.id || "free");
   const [when, setWhen] = useState(() =>
     localInputValue(initial?.startedAt ?? Date.now() - 25 * 60000)

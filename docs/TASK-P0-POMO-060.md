@@ -1,5 +1,6 @@
 # P0-POMO-060 飞书全局偏好同步
 状态：IN_PROGRESS；负责人/root；唯一模块状态源本卡。
+用户追加授权：修复点击补记导致整体概览排版坍塌；原因为is-editing-record把右栏grid改flex，但竖屏display:contents子项仍依赖grid定位。允许HistoryPanel/ManualEntry/focus.css及新增ManualEntryDialog.tsx、manual-dialog-desktop.cjs：补记/编辑改独立模态表单，背景布局保持、键盘焦点/关闭恢复，字段操作和原始数据不改；与全局偏好一同96交付。
 接口补记：usePreferenceSync.ts为renderer连接生命周期hook；preference-bridge-desktop.cjs为真实main/preload/UI隔离验收，均属本卡同步接口与测试写集。beforeCreate持久化仅保存scope hash建表尝试标记，未知建表结果跨重启仍禁止盲重放。首次接云任何不同设置都明确选择（包括默认值）；已暂停不会自动重启；待应用云选择与待提交版本一起持久化，应用成功前不推进baseline。
 授权：用户2026-10-14要求设置跨电脑全局，并选择同步比例、周/科研目标、番茄/休息时长、科学休息规则；沿用默认源码推送/Windows预览发布授权。仅通过App已配置的飞书连接工作，无需复制凭证；不在Agent中解密或读真实连接/用户profile。
 基线：fdacad543c820a01b51a99c6d7e98e959aa75518；完整fetch/check:sync通过；独立release058 checkout任务分支task/p0-pomo-060-preference-sync。与059已DONE无重叠活动写者；无根共享服务/数据库/端口占用。
