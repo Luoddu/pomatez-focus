@@ -29,3 +29,13 @@ Git根因：无显式进程代理的大数据clone连接reset，现有系统代�
 正式clone检查点：352/352逻辑测试PASS（初次缺静态资源，按官方复制步骤补齐后通过）；完整renderer TypeScript PASS；相关ESLint PASS；国际化真实init回归PASS。依赖和迁移只读独立复核PASS，正式CRA构建/桌面/发行仍待本检查点之后验收。
 
 正式构建验收：官方build-focus（Rollup/TS/esbuild/CRA，无跳过检查）成功。真实生产桌面21项+重启PASS，生产横竖屏14项PASS，有效布局17项PASS，真实main/preload/App桥接PASS。旧安装preview93实际ASAR内的bundled FocusUpdater（源码26524e7a）在隔离profile访问公开preview源，发布前状态current93，errors=[]，自动下载/退出安装均false，无下载/安装。ASAR路径按Windows原生path.join读取，不改旧包。国际化兼容和功能迁移独立复核PASS；冻结最终源码后会再构建以得到clean HEAD provenance，五资产和93→94待发布后验收。
+
+## 最终发行验收：PASS / DONE
+
+发行源码4aa55c6d7cdb193a245cc8786deda91193eb5217，clean构建version0.1.0-preview.94。实际ASAR内66个build文件由独立reviewer与build逐一核对一致；updater bundle576901字节无裸electron-updater引用。打包App隐藏隔离smoke exit0 ready。源码经push:focus非强制更新公开主线，祖先及实时远端已复核。
+
+公开[preview.94](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.94) Release412478635：draft=false、prerelease=true、make_latest=false；稳定Latest仍preview51。annotated tag peeled SHA为上述发行源码。草稿→公开回读五资产ID保持一致，uploaded字节与GitHub SHA256 digest均与本地相同：setup75482058字节、blockmap79310、preview.yml405、source-version.json107、SHA256SUMS405。setup SHA256 4469dfa22beab727dc4ed7e2261244c39a1ac40b1a3f8c35bde4d7a23783a041；feed SHA512与实际setup一致；无便携包发布。公开安装包Range GET HTTP206返回1024字节，与本地前1024字节完全一致。
+
+旧安装93实际ASAR bundled FocusUpdater（源码26524e7a、bundle SHA256 4fabae8cebf6859d8c4907c12bc6eced4a83318ecfdd0247f1ac13f4cc2193eb）在相同隔离检查路径由current93变为available94；正确setup地址/字节/SHA512，errors=[]、downloads0、autoDownload/autoInstallOnAppQuit=false。未安装或重启用户App、未改真实profile/飞书/凭证。用户可在设置→软件更新→检查更新→下载更新并重启升级。
+
+独立Heisenberg最终复核PASS：源码/clean构建、成品与五资产、公开回读及93→94发现，无剩余发行阻断；原始日志/JSON在ignored artifacts保存，固定tag不因后置验收文档提交变化。学习判断none - 此次恢复固定依赖支持和既有代理/发行/派生视图机制，未产生需另登记的跨任务教训。回滚：旧93发行与已安装App未改；系数全1恢复原目标口径，原始记录保留。

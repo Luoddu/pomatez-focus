@@ -1,5 +1,5 @@
 # P0-POMO-058 有效番茄比例与竖屏概览
-状态：IN_PROGRESS（用户已明确授权修复同步/构建并推送发布）；唯一状态源本卡；负责人Codex，本模块不接入澄行根控制面。
+状态：DONE（实现、正式构建、推送、Windows preview.94发布及旧93更新发现均PASS）；唯一状态源本卡；负责人Codex，本模块不接入澄行根控制面。
 授权：2026-10-14用户要求按项目类别折算，明确15目标按有效番茄14尚差1；追加竖屏布局，折算日显示今日/有效双数。
 固定基线：GitHub API确认公开主线fbae4a769a0f1b7b586a585e35af0f608804fc4a，原生Git网络不可达；官方tarball SHA256ff78676d7f9b8ee222b3694526986e296064e43b0f9c0bc884c3af920e4a6463。本机preview93安装commit26524e7a。开发于独立快照，旧工作树/用户profile不写。
 目标：本机设置按科研/项目/长线/软件/个人/杂事/未分类0–1两位小数比例，默认均1确保旧行为，提供杂事0.6便捷设置；保存后按当前设置重算历史，只改变有效目标/累计里程碑和科学专注达标判断，原记录整数count、时长、云端明细、农场原始果实和统计趋势不改。科学专注桥增可选effectiveCount，兼容旧整数completedCount。
@@ -27,3 +27,5 @@ Git：源码快照允许形成独立本地受治理快照检查点，来源SHA�
 兼容修复固定来源：i18next v22.5.1 package.json声明typescript^4.9.3；react-i18next v12.3.1 package.json测试react16.14/typescript4.6.2，peer i18next>=19/react>=16.8，MIT。固定tag官方raw已核对，保留CRA5/TS4.9，回归原国际化调用。release058 clone基线fbae4a7，完整Gitfetch成功，当前进程使用既有系统代理；旧snapshot修改不合并历史。
 
 兼容修复补充允许i18n/index.ts：固定i18next22的CustomTypeOptions/returnNull公开扩展，运行时returnNull:false与类型一致，确保label/placeholder仍为字符串。共享shareables缺失只是未运行官方rollup前置，按build-focus既有顺序先构建，不改第三方包。
+
+最终交付：固定发行源码4aa55c6d7cdb193a245cc8786deda91193eb5217；preview94公开非draft prerelease/非Latest，五资产校验和93→94实际更新器通过，独立复核PASS。用户App尚未自动升级。后续仅追加验收文档，tag继续指向固定发行源码。Learning none，原因见验收。
