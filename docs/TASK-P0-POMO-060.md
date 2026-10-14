@@ -1,0 +1,11 @@
+# P0-POMO-060 飞书全局偏好同步
+状态：IN_PROGRESS；负责人/root；唯一模块状态源本卡。
+授权：用户2026-10-14要求设置跨电脑全局，并选择同步比例、周/科研目标、番茄/休息时长、科学休息规则；沿用默认源码推送/Windows预览发布授权。仅通过App已配置的飞书连接工作，无需复制凭证；不在Agent中解密或读真实连接/用户profile。
+基线：fdacad543c820a01b51a99c6d7e98e959aa75518；完整fetch/check:sync通过；独立release058 checkout任务分支task/p0-pomo-060-preference-sync。与059已DONE无重叠活动写者；无根共享服务/数据库/端口占用。
+范围：同一多维表格的专用“农场偏好”表通过公开bitable v1 API存储经白名单验证的偏好版本；按设置项分组保留不可变版本、父版本IDs，读取检测并发分叉，不以本机时钟静默覆盖。初次接入显式选择本机或云端值；离线保留本机和待提交版本，重试复用ID/client_token；切换来源隔离，旧版本保留，损坏/未来schema/同名字段不匹配报错不覆盖。启用后启动/窗口回前台/定时低频及本机设置变更同步，有停止/卸载清理。原始记录/时长/计时活动、窗口/浏览器安装/系统路径/凭证不进入偏好。
+组契约：weights=七类别0..1两位小数；weekGoals/researchGoals=周键到1..350整数；timer={focusMinutes:1..180,restMinutes:1..60}整数；rest={quotaMinutes,supervise,pomodoroGoal,reminderMinutes}按既有validSettings；browser={mode,cooldownMinutes,autoRaise}按既有validBrowserPolicy。首次创建专用表只能由App用户启用/保存触发，纯读取不得建表。凭证和sourceKey不进入公开Git。网络与App IPC仍使用现有主进程服务/可信sender。
+写集：docs/TASK-P0-POMO-060.md、ACCEPTANCE-P0-POMO-060.md；app/electron/src/focus/preferences.ts（Parfit独写）及feishu.ts/service.ts/main.ts/preload.ts（root独写）；app/renderer/src/focus/preferences.ts、preferenceSync.ts、components/PreferenceSyncSettings.tsx、SettingsPanel/WeightSettings/HistoryPanel/ResearchGoal/QuadrantBoard/ReviewPanel、FocusApp、weekgoal.ts、contexts/CounterContext.tsx、focus样式；相关types/tests/scripts受影响测试列表；版本仅electron/package.json/SettingsPanel。范围内新增协议辅助文件允许，但先在本卡登记。不改根控制文件、实际用户数据/Secret/Feishu业务行、旧工作树。
+四源：现状weights.js本机key、weekgoal/research本机key、timer25/休息300硬编码、scientificRest/main本机配置；第三方官方bitable v1 create record client_token uuidv4和一致性检查默认false（2025-07-21官方文档，2026-10-14读取 https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table-record/create ）；复用既有Feishu.call/list/journalTable、可信IPC、validSettings/browser配置/安全存储，不升级依赖；Learning与同类journal-api/feishu/bridge及发布95验收命中。
+验收正反：A改杂事0.6→B拉取0.6并同数；不同组互不覆盖，同组分叉可见且用户可选；离线保存/重启后正确重试且失去回复不重复创建；初次云空不自动用默认1替换当前比例，接旧云不静默丢本机修改；畸形/未知schema/重复ID/秘密字段拒绝，合法七类/目标/规则仍正常通；正在计时/休息不修改当前开始结束/剩余时间，新设置只影响下一次；原始记录字节不变；切源不跨表串写；TS/CRA/逻辑/真实桥接横竖UI、独立review、clean包与公开五资产/95更新器发现96。
+预算/分派：一工作周期，复用Parfit写纯后端协议模块+tests/preferences-api.test.cjs，接口由root注入已有Feishu传输；Heisenberg只读独立复核；root其余写集。无新增后台自动化/费用/第二服务；同步为App功能自身，关闭/断开清理。超预算/新权限需求明确报告，不扩大。
+回滚：本机停用同步继续沿用已缓存设置，旧95发行保留；云端版本只追加不删除/改业务行；固定版本发布不可替换。Learning判断在验收收口记录。
