@@ -27,3 +27,5 @@ Git根因：无显式进程代理的大数据clone连接reset，现有系统代�
 四源：当前源码/精确失败见上述；官方固定tag和锁定包见artifacts/official-i18n/manifest.json；复用系统代理helper、repo-sync、版本/构建/打包脚本，命中Learning草稿可见tag风险；同类portrait/updater/安装链验收沿用，按新布局调整几何断言且保留功能/负例。正式build/桌面/发行复核继续中。Learning判断none：本次为已有公开兼容和原生代理接口的恢复，暂无新可跨任务教训。
 
 正式clone检查点：352/352逻辑测试PASS（初次缺静态资源，按官方复制步骤补齐后通过）；完整renderer TypeScript PASS；相关ESLint PASS；国际化真实init回归PASS。依赖和迁移只读独立复核PASS，正式CRA构建/桌面/发行仍待本检查点之后验收。
+
+正式构建验收：官方build-focus（Rollup/TS/esbuild/CRA，无跳过检查）成功。真实生产桌面21项+重启PASS，生产横竖屏14项PASS，有效布局17项PASS，真实main/preload/App桥接PASS。旧安装preview93实际ASAR内的bundled FocusUpdater（源码26524e7a）在隔离profile访问公开preview源，发布前状态current93，errors=[]，自动下载/退出安装均false，无下载/安装。ASAR路径按Windows原生path.join读取，不改旧包。国际化兼容和功能迁移独立复核PASS；冻结最终源码后会再构建以得到clean HEAD provenance，五资产和93→94待发布后验收。
