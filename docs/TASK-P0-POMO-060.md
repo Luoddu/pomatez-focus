@@ -1,5 +1,5 @@
 # P0-POMO-060 飞书全局偏好同步
-状态：IN_PROGRESS；负责人/root；唯一模块状态源本卡。
+状态：DONE；负责人/root；唯一模块状态源本卡；验收见ACCEPTANCE-P0-POMO-060.md。
 用户追加授权：修复点击补记导致整体概览排版坍塌；原因为is-editing-record把右栏grid改flex，但竖屏display:contents子项仍依赖grid定位。允许HistoryPanel/ManualEntry/focus.css及新增ManualEntryDialog.tsx、manual-dialog-desktop.cjs：补记/编辑改独立模态表单，背景布局保持、键盘焦点/关闭恢复，字段操作和原始数据不改；与全局偏好一同96交付。
 接口补记：usePreferenceSync.ts为renderer连接生命周期hook；preference-bridge-desktop.cjs为真实main/preload/UI隔离验收，均属本卡同步接口与测试写集。beforeCreate持久化仅保存scope hash建表尝试标记，未知建表结果跨重启仍禁止盲重放。首次接云任何不同设置都明确选择（包括默认值）；已暂停不会自动重启；待应用云选择与待提交版本一起持久化，应用成功前不推进baseline。
 授权：用户2026-10-14要求设置跨电脑全局，并选择同步比例、周/科研目标、番茄/休息时长、科学休息规则；沿用默认源码推送/Windows预览发布授权。仅通过App已配置的飞书连接工作，无需复制凭证；不在Agent中解密或读真实连接/用户profile。
@@ -11,3 +11,5 @@
 验收正反：A改杂事0.6→B拉取0.6并同数；不同组互不覆盖，同组分叉可见且用户可选；离线保存/重启后正确重试且失去回复不重复创建；初次云空不自动用默认1替换当前比例，接旧云不静默丢本机修改；畸形/未知schema/重复ID/秘密字段拒绝，合法七类/目标/规则仍正常通；正在计时/休息不修改当前开始结束/剩余时间，新设置只影响下一次；原始记录字节不变；切源不跨表串写；TS/CRA/逻辑/真实桥接横竖UI、独立review、clean包与公开五资产/95更新器发现96。
 预算/分派：一工作周期，复用Parfit写纯后端协议模块+tests/preferences-api.test.cjs，接口由root注入已有Feishu传输；Heisenberg只读独立复核；root其余写集。无新增后台自动化/费用/第二服务；同步为App功能自身，关闭/断开清理。超预算/新权限需求明确报告，不扩大。
 回滚：本机停用同步继续沿用已缓存设置，旧95发行保留；云端版本只追加不删除/改业务行；固定版本发布不可替换。Learning判断在验收收口记录。
+
+完成：preview.96源码与安装包已公开，固定47b5169及五资产摘要、实际95→96更新发现通过；独立Heisenberg最终PASS。406逻辑/37偏好、生产bridge/desktop21+重启/portrait14、补记三窗几何与保存均PASS。真实云偏好由用户升级后在App启用；未自动安装或初始化。
