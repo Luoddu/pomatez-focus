@@ -4202,7 +4202,8 @@ button.stats-range-label:hover {
 .category-inherit { border: 1px dashed #a5a9b3; }
 .category-options {
   position: fixed;
-  z-index: 140;
+  /* Body portal must sit above the manual dialog backdrop (3000). */
+  z-index: 3001;
   box-sizing: border-box;
   max-height: calc(100vh - 16px);
   overflow-y: auto;

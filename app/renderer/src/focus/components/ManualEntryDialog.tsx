@@ -14,6 +14,7 @@ export default function ManualEntryDialog({title,onClose,children}:{title:string
     document.body.style.overflow="hidden";
     root.current?.querySelector<HTMLElement>("select,input,button")?.focus();
     const key=(e:KeyboardEvent)=>{
+      if(e.defaultPrevented)return;
       if(e.key==="Escape"){e.preventDefault();close.current();return;}
       if(e.key!=="Tab")return;
       const items=Array.from(root.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')||[]).filter(x=>x.getClientRects().length);
