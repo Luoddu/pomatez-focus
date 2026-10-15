@@ -13,7 +13,7 @@ let showCalls=0,trayCalls=0;
 if(routing){
  assert.equal(process.env.POMATEZ_HEADLESS,'0');
  const {EventEmitter}=require('node:events');
- Object.defineProperty(electron,'Tray',{value:class extends EventEmitter {constructor(){super();trayCalls++;}setToolTip(){}setContextMenu(){}destroy(){}}});
+ global.startupFakeTray=class extends EventEmitter {constructor(){super();trayCalls++;}setToolTip(){}setContextMenu(){}destroy(){}};
  BrowserWindow.prototype.show=function(){showCalls++;};BrowserWindow.prototype.focus=function(){};
  require('../app/electron/build/focus/activitywatch').ActivityWatchRest.prototype.start=function(){};
  require('../app/electron/build/focus/activitywatchRuntime').ActivityWatchRuntime.prototype.ensure=async()=>{};
@@ -24,7 +24,13 @@ if(routing){
 Object.defineProperty(app,'isPackaged',{get:()=>true});
 app.getLoginItemSettings=o=>({openAtLogin:managed.some(x=>JSON.stringify(x.args)===JSON.stringify(o.args)),launchItems:structuredClone(managed).map(x=>({...x,args:[]}))});
 app.setLoginItemSettings=v=>{writes++;managed=v.openAtLogin ? [{name:v.name,path:process.execPath,args:v.args,scope:'user',enabled:v.enabled}] : [];};
-require('../app/electron/build/main');
+if(routing){
+ const Module=require('node:module'),mainFile=path.resolve(__dirname,'../app/electron/build/main.js');
+ const facade={};for(const key of ['app','BrowserWindow','ipcMain','Menu','shell','powerMonitor','screen','nativeImage','dialog','session'])facade[key]=electron[key];facade.Tray=global.startupFakeTray;
+ const main=new Module(mainFile,module);main.filename=mainFile;main.paths=Module._nodeModulePaths(path.dirname(mainFile));
+ main.require=id=>id==='electron'?facade:Module.prototype.require.call(main,id);
+ try{main._compile(fs.readFileSync(mainFile,'utf8'),mainFile);}catch(error){console.error(error.stack);app.exit(1);}
+}else require('../app/electron/build/main');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),50000);
 app.whenReady().then(async()=>{
  session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoadingMainFrame())break;await wait(100);}assert.ok(win);const js=s=>win.webContents.executeJavaScript(s,true);
