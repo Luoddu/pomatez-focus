@@ -8,3 +8,7 @@
 验收正反：合法布尔开关enable/readback/disable及重启读取正常；无效输入/未打包/不支持平台拒绝且不调用OS写；Windows任务管理器禁用不显示已开启，普通启动行为不变；quoted Unicode带空格路径、idempotency、native回读失败显示错误；实际Electron原生API在随机唯一测试name/AppID下开启/禁用并清理，只碰测试owned启动项，不碰真实farm条目；headless production IPC/UI和tray参数/二次实例处理测试，计时/records不写；固定clean构建/包、五资产、实际96→97更新发现。
 预算/分派：一工作周期；复用Parfit仅独写tests/startup-native.cjs纯测试及其ignored日志（可实际原生临时启动项但必须随机ownname、finally清理，不重启/登录）；Heisenberg只读独立复核root源码和证据；root写其余。无后台自动化/额外服务/新费用。
 回滚：关闭开关移除本App启动项；旧96发行保留；无原始数据迁移。Learning最终验收判断；不写根共享Learning/Memory。
+
+原生验证修正：Electron34.5.8 browser_win.cc:175调用Chromium GetArgs，不返回--switch；launchItems.args为空不能判定flag丢失。按619-623完整命令比较openAtLogin确认quotedpath+固定args，与owned user launchItems path/name/TaskManager enabled结合。测试override name时AppUserModelId必须同名。允许模块Learning.md记录这一实际原生教训，根Learning/Memory仍不写。
+
+本轮角色：native worker01a13d85-03b2-7923-8248-84089c1df5f2，reviewer01a13d85-043d-7f61-91b4-9dc1ca566fbb；此前会话Agent已不存在，按原预算2个互不争写角色新建，未扩大写集。原生12项已PASS且cleaned=true；Learning候选061-01已纳入模块Learning.md同批提交。

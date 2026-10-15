@@ -58,3 +58,14 @@
 - Required-Check: 取稳定本地日开始时间并同时用作memo依赖和筛选参数，避免计算/依赖采用不同时间口径；验证不改任务/队列的跨午夜、同日正常、持久意图保留和零秒级偏好存储读取，不用每秒全部重排掩盖遗漏。
 - Supersedes: none
 - Invalid-When: 更换本地日/时区口径、队列过滤所有者或缓存生命周期时须重验；不泛化所有memo需日期，不授权更改旧待同步意图或生成阻塞策略。
+
+## LEARN-P0-POMO-061-01 - Windows自启动switch不出现在launchItems.args
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-061
+- Evidence: docs/ACCEPTANCE-P0-POMO-061.md; tests/startup-native.cjs; app/electron/src/focus/startup.ts
+- Applies-To: 本农场Electron34.5.8 Windows安装版自启动状态读取及后续相关修改
+- Lesson: 固定版browser_win.cc:175使用Chromium CommandLine.GetArgs，仅返回非switch参数。真实中文空格路径注册--start-in-tray后，launchItems.args为空，但openAtLogin为true；仅按args数组确认完整命令会错误报告冲突。固定版619-623的openAtLogin比较当前AppUserModelId的完整quoted path和args，结合该name/user/path对应launchItem.enabled才能区分本App的启动注册和任务管理器禁用。不能用executableWillLaunchAtLogin的any-args聚合代替本项。
+- Required-Check: get和set使用相同quoted path/args，测试name与进程AppUserModelId一致；原生随机owned项验证开启、TaskManager禁用、重新开启、关闭与清理，同时保留普通手动打开和自动托盘启动正反例。
+- Supersedes: none
+- Invalid-When: Electron/Chromium版本、Windows登录API或自启动命令策略变化时须重新验证；不泛化为所有平台或所有args字段都排除switch，也不授权读取或修改他人启动项。

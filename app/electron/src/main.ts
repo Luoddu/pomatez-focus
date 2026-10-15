@@ -18,6 +18,9 @@ import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
 import { BrowserControl, FarmPresence, validBrowserPolicy } from "./focus/browserControl";
 import { JourneyGateway } from "./focus/journeyGateway";
+import { StartupSettings, startsInTray } from "./focus/startup";
+const startInTray=startsInTray(process.argv);
+const startupSettings=new StartupSettings(app,{platform:process.platform,packaged:app.isPackaged,executable:process.execPath,portable:!!process.env.PORTABLE_EXECUTABLE_FILE});
 const headless = process.env.POMATEZ_HEADLESS === "1";
 // Unattended tests must never play timer/reminder sounds on the user's desktop.
 // Set both Chromium's startup switch and the public per-contents audio mute.
@@ -119,7 +122,7 @@ else {
   app.on("second-instance", (_event, argv, _cwd, data:any) => {
     const at=argv.indexOf('--journey-api');
     if(at>=0 || data?.journeyRequestId!==undefined) { void journeyGateway.dispatch(data?.journeyRequestId ?? argv[at+1]); return; }
-    show();
+    if(!startsInTray(argv))show();
   });
   app
     .whenReady()
@@ -207,6 +210,8 @@ else {
         service.archiveHistory(value)
       );
       handler("journal", () => service.journal());
+      handler("startupStatus", () => startupSettings.status());
+      handler("startupSet", (value) => startupSettings.configure(value));
       handler("readPreferences", (value) => service.readPreferences(value));
       handler("savePreference", (value) => service.savePreference(value));
       handler("applyDevicePreference", (value) => {
@@ -394,7 +399,7 @@ else {
           win?.isVisible() ? win.hide() : show()
         );
       }
-      win.once("ready-to-show", show);
+      if(!startInTray)win.once("ready-to-show", show);
       await win.loadFile(path.join(__dirname, "index.html"));
       journeyGateway.start(process.execPath,app.isPackaged?undefined:process.argv[1]);
       // Existing hidden regressions stay independent of personal browser data.

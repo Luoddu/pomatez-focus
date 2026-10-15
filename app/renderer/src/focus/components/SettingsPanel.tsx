@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { WindowControls } from "./shared";
 import UpdatePanel from "./UpdatePanel";
+import StartupSettings from "./StartupSettings";
 import WeightSettings from "./WeightSettings";
 import type { TomatoWeights } from "../weights";
 import { isSoundEnabled, setSoundEnabled, playRestEnd } from "../sound";
@@ -94,6 +95,7 @@ export default function SettingsPanel({
         <div className="settings-cols">
           <div className="settings-lane">
         <UpdatePanel />
+        <StartupSettings />
         {preferencePanel}
         <WeightSettings weights={weights} loadError={weightsError} onSave={onWeights} />
         <div className="card settings-card s-sync">
@@ -154,7 +156,7 @@ export default function SettingsPanel({
         <div className="card settings-card s-about">
           <h3>关于</h3>
           <div className="about-line">
-            版本 <span className="ver">{process.env.REACT_APP_MAC_VERSION || "0.1.0-preview.96"}</span>
+            版本 <span className="ver">{process.env.REACT_APP_MAC_VERSION || "0.1.0-preview.97"}</span>
             <br />
             基于开源项目 pomatez 二次开发（MIT License，© roldanjr
             及贡献者）
