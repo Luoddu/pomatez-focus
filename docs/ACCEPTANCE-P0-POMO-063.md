@@ -4,3 +4,5 @@
 聚焦26项PASS（21同步+5差异格式），全逻辑427/427PASS、renderer TS PASS，artifacts/p063-preference-tests.log、p063-all-tests.log、p063-renderer-types.log。覆盖同值旧parent pending重启、旧队列已被当前一致值取代、多heads相同/键顺序不同、云已含adoption值、不同待应用意图不得隐藏、CAS失配保留、精确ID内容不符拒绝；既有丢失回复/暂停/切源/持久化失败保护均仍通。
 中文差异只列变更字段，复用项目类别中文名；周目标日期/有效数量、分钟/开关/挡位使用中文；不同待处理值另列，多等值云heads只展示一份。没有原始英文JSON/内部ID。生产bridge/横竖窄屏及发布结果待补。
 Learning判断：本轮是已知产品值等价策略与中文差异展示修正，未发现需新增全局工程规范的第三方机制；将原始回归证据留在本验收/测试，不重复新增Learning。未写根Learning/Memory或真实飞书/用户profile。
+
+复核修复：独立reviewer发现P2空目标跨来源确认卡因差异字段为空被隐藏；已保留缺失云设置的中文说明和按钮，不放宽foreignKeys保护。新增真实React静态渲染与A→B缺失目标初始化回归，focused28/28、全逻辑429/429PASS。桥接首轮clean cbe8aa验证中文差异/相同待同步重载恢复/记录不变通过，最终修复提交后的clean构建与桥接待验证；测试实际窗口最小值设320×400，480窄窗确认无页面横向溢出。

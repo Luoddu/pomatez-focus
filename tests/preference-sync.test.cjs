@@ -100,3 +100,10 @@ test('equal pending target does not overwrite a newer local edit after adoption 
 test('equal values cannot hide an inconsistent exact ID receipt',async()=>{
  const cloud=[],a=device(cloud);await a.sync.synchronize(true);a.saveOffline=true;a.values.weights.misc=.6;await a.sync.synchronize();const cache=JSON.parse(a.storage.getItem('pomatez-focus-preference-sync-v1:base-A')),pending=cache.pending.weights;cloud.push({...clone(pending),at:pending.at+1});a.saveOffline=false;await a.sync.synchronize();assert.match(a.status.message,/回读不一致/);assert.equal(a.status.pending,1);
 });
+
+test('source switch with missing empty goals keeps an explicit initialization path',async()=>{
+ const ca=[],cb=[],storage=new Memory(),values=clone(PREFERENCE_DEFAULTS),a=device(ca,values,storage,'A');await a.sync.synchronize(true);a.sync.stop();
+ const seed=device(cb);await seed.sync.synchronize(true);for(let i=cb.length-1;i>=0;i--)if(['weekGoals','researchGoals'].includes(cb[i].key))cb.splice(i,1);
+ const b=device(cb,values,storage,'B');await b.sync.synchronize();assert.deepEqual(b.status.conflicts.map(c=>c.key),['weekGoals','researchGoals']);const before=cb.length;
+ await b.sync.synchronize(false,{key:'weekGoals'});assert.equal(cb.length,before+1);assert.deepEqual(b.status.conflicts.map(c=>c.key),['researchGoals']);assert.deepEqual(preferenceHeads(cb,'weekGoals')[0].value,{});
+});

@@ -11,3 +11,10 @@ test('weekly goals show dates, effective counts and absence without internal key
  const rows=diff('weekGoals',[{'2026-10-19':60},{'2026-10-26':15}]);assert.equal(rows.length,2);assert.equal(rows[0].label,'2026年10月19日当周目标');assert.deepEqual(rows[0].values,['60 个有效番茄','未设置']);
 });
 test('a distinct queued adoption remains visible even if both current sides agree',()=>assert.deepEqual(diff('weights',[{misc:1},{misc:.6},{misc:1}])[0].values,['1 倍（100%）','0.6 倍（60%）','1 倍（100%）']));
+
+test('empty goal conflicts keep missing-cloud explanation and resolution buttons',()=>{
+ const fs=require('node:fs'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const code=esbuild.buildSync({entryPoints:[path.resolve(__dirname,'../app/renderer/src/focus/components/PreferenceSyncSettings.tsx')],bundle:true,platform:'node',format:'cjs',external:['react'],write:false}).outputFiles[0].text,mod=new Module(__filename+'.ui',module);mod.paths=module.paths;mod._compile(code,__filename+'.ui');
+ const html=renderToStaticMarkup(React.createElement(mod.exports.default,{status:{enabled:true,syncing:false,pending:0,message:'请选择来源',conflicts:['weekGoals','researchGoals'].map(key=>({key,local:{},remote:[]}))},connected:true,onSync(){},onEnable(){},onDisable(){},onResolve(){},timer:{focusMinutes:25,restMinutes:5},onTimer(){}}));
+ assert.equal((html.match(/class="preference-conflict"/g)||[]).length,2);assert.equal((html.match(/保留本机设置/g)||[]).length,2);assert.match(html,/尚未在飞书保存/);assert.match(html,/本机也未设置具体目标/);
+});

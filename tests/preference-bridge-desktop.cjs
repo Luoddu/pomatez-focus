@@ -30,7 +30,7 @@ require('../app/electron/build/main');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),50000);
 app.whenReady().then(async()=>{
  session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));
- let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoadingMainFrame())break;await wait(100);}assert.ok(win);assert.equal(win.isVisible(),false);
+ let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoadingMainFrame())break;await wait(100);}assert.ok(win);assert.equal(win.isVisible(),false);win.setMinimumSize(320,400);
  const js=s=>win.webContents.executeJavaScript(s,true);
  const today=new Date();today.setHours(0,0,0,0);
  const record=(id,count,type)=>({id,task:{id,title:'Synthetic',source:'local',projectType:type},startedAt:+today+3600000,endedAt:+today+3600000+count*1500000,plannedSeconds:1500,elapsedSeconds:count*1500,acceptedSeconds:count*1500,completedCount:count,status:'saved',sync:'local'});
@@ -45,7 +45,7 @@ app.whenReady().then(async()=>{
  assert.equal(await js("document.querySelectorAll('.preference-conflict').length"),2);
  const differences=await js("[...document.querySelectorAll('.preference-conflict')].map(e=>({text:e.textContent,fields:[...e.querySelectorAll('.preference-difference > strong')].map(x=>x.textContent)}))");
  assert.deepEqual(differences[0].fields,['其他杂事']);assert.deepEqual(differences[1].fields,['默认番茄时长','休息时长']);assert.ok(differences[0].text.includes('1 倍（100%）'));assert.ok(differences[0].text.includes('0.6 倍（60%）'));assert.ok(differences.every(e=>!e.text.includes('"misc"')&&!e.text.includes('focusMinutes')));
- for(const [w,h] of [[1080,1600],[480,800]]){win.setSize(w,h);await wait(80);assert.equal(await js("document.documentElement.scrollWidth <= window.innerWidth"),true);await js("document.querySelector('.preference-conflict').scrollIntoView({block:'center'})");await wait(30);const shot=await win.webContents.capturePage();fs.writeFileSync(path.resolve(`artifacts/p063-preference-differences-${w}.png`),shot.toPNG());}
+ for(const [w,h] of [[1080,1600],[480,800]]){win.setSize(w,h);await wait(80);assert.equal(await js("document.documentElement.scrollWidth <= window.innerWidth"),true);await js("document.querySelector('.toast-close')?.click();document.querySelector('.preference-conflict').scrollIntoView({block:'start'})");await wait(30);const shot=await win.webContents.capturePage();fs.writeFileSync(path.resolve(`artifacts/p063-preference-differences-${w}.png`),shot.toPNG());}
  await js("document.querySelector('.preference-conflict .sync-row button:nth-of-type(2)').click()");await wait(350);
  assert.equal(await js("JSON.parse(localStorage.getItem('pomatez-focus-tomato-weights-v1')).weights.misc"),.6);
  await js("document.querySelector('.preference-conflict .sync-row button:nth-of-type(2)').click()");await wait(350);
