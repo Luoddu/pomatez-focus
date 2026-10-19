@@ -1,0 +1,6 @@
+# P0-POMO-063 偏好自动合并与中文差异验收
+状态：REVIEW；唯一状态源TASK-P0-POMO-063.md。
+四源/授权/范围/回滚见执行卡。新逻辑以当前本机和全部云heads值一致作为接受条件，清理过时待同步版本并记录实际head IDs，不新增云写/不删历史；精确ID回执先验真，待应用选择保留CAS保护，云已含其目标时引用实际heads完成确认。真正不同及待处理意图继续显式选择。
+聚焦26项PASS（21同步+5差异格式），全逻辑427/427PASS、renderer TS PASS，artifacts/p063-preference-tests.log、p063-all-tests.log、p063-renderer-types.log。覆盖同值旧parent pending重启、旧队列已被当前一致值取代、多heads相同/键顺序不同、云已含adoption值、不同待应用意图不得隐藏、CAS失配保留、精确ID内容不符拒绝；既有丢失回复/暂停/切源/持久化失败保护均仍通。
+中文差异只列变更字段，复用项目类别中文名；周目标日期/有效数量、分钟/开关/挡位使用中文；不同待处理值另列，多等值云heads只展示一份。没有原始英文JSON/内部ID。生产bridge/横竖窄屏及发布结果待补。
+Learning判断：本轮是已知产品值等价策略与中文差异展示修正，未发现需新增全局工程规范的第三方机制；将原始回归证据留在本验收/测试，不重复新增Learning。未写根Learning/Memory或真实飞书/用户profile。

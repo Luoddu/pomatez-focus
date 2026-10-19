@@ -2,7 +2,7 @@ import { PreferenceEntry, PreferenceKey, PreferenceValues, PREFERENCE_KEYS, pref
 
 type Baseline = { ids: string[]; value: any };
 type Cache = { version: 1; enabled: boolean; paused?: boolean; foreignKeys?: PreferenceKey[]; baseline: Partial<Record<PreferenceKey,Baseline>>; pending: Partial<Record<PreferenceKey,PreferenceEntry>>; adoptions?: Partial<Record<PreferenceKey,{id:string;expected:any}>> };
-export type PreferenceConflict = { key: PreferenceKey; local: any; remote: PreferenceEntry[] };
+export type PreferenceConflict = { key: PreferenceKey; local: any; remote: PreferenceEntry[]; pending?: any };
 export type PreferenceSyncStatus = { enabled: boolean; syncing: boolean; message: string; conflicts: PreferenceConflict[]; pending: number };
 type Ports = {
   read: () => Promise<PreferenceEntry[]>;
@@ -74,13 +74,23 @@ export class PreferenceSync {
     else if(this.cache.adoptions)delete this.cache.adoptions[key];
     this.persist();
   }
-  private async acknowledge(entry: PreferenceEntry,rows: PreferenceEntry[]) {
+  private conflict(key: PreferenceKey,local: any,remote: PreferenceEntry[]) {
+    const pending=this.cache.pending[key];
+    this.conflicts.push({key,local,remote,...(pending && !same(pending.value,local) ? {pending:pending.value} : {})});
+  }
+  private acceptEquivalent(key: PreferenceKey,local: any,heads: PreferenceEntry[]) {
+    this.cache.baseline[key]={ids:ids(heads),value:local};
+    delete this.cache.pending[key];
+    this.cache.foreignKeys=this.cache.foreignKeys?.filter(k=>k!==key);
+    this.persist();
+  }
+  private async acknowledge(entry: PreferenceEntry,rows: PreferenceEntry[],confirmedIds=[entry.id]) {
     const adoption=this.cache.adoptions?.[entry.key];
     if(adoption?.id===entry.id){
       const current=(await this.ports.local())[entry.key];
       if(!same(current,entry.value)){
         if(!same(current,adoption.expected)){
-          this.conflicts.push({key:entry.key,local:current,remote:preferenceHeads(rows,entry.key)});return false;
+          this.conflict(entry.key,current,preferenceHeads(rows,entry.key));return false;
         }
         await this.ports.apply(entry.key,entry.value,current);
         if(!same((await this.ports.local())[entry.key],entry.value))throw Error("云端偏好尚未应用，本机设置保留");
@@ -88,7 +98,7 @@ export class PreferenceSync {
       if(!this.live())return false;
       delete this.cache.adoptions![entry.key];
     }
-    this.cache.baseline[entry.key]={ids:[entry.id],value:entry.value};
+    this.cache.baseline[entry.key]={ids:confirmedIds,value:entry.value};
     delete this.cache.pending[entry.key];this.persist();return true;
   }
   async synchronize(enable=false,choice?: {key: PreferenceKey; entryId?: string}) {
@@ -108,13 +118,15 @@ export class PreferenceSync {
         let heads=preferenceHeads(rows,key), pending=this.cache.pending[key];
         let local=(await this.ports.local())[key];
         if(!this.live())return;
+        // Verify an exact-ID receipt even when equal values could otherwise hide it.
+        const queuedReceipt=pending && rows.find(e=>e.id===pending!.id);
+        if(queuedReceipt && !same(queuedReceipt,pending))throw Error("偏好版本回读不一致");
         // A local value inherited from another Base is never interpreted as an edit.
         if(this.cache.foreignKeys?.includes(key) && choice?.key!==key){
-          if(!pending && heads.length && heads.every(e=>same(e.value,local))){
-            this.cache.baseline[key]={ids:ids(heads),value:local};
-            this.cache.foreignKeys=this.cache.foreignKeys.filter(k=>k!==key);this.persist();continue;
+          if(!this.cache.adoptions?.[key] && heads.length && heads.every(e=>same(e.value,local))){
+            this.acceptEquivalent(key,local,heads);continue;
           }
-          this.conflicts.push({key,local,remote:heads});continue;
+          this.conflict(key,local,heads);continue;
         }
         // Lost response: acknowledge the exact queued version before doing anything else.
         if(pending && rows.some(e=>e.id===pending!.id)){
@@ -123,7 +135,12 @@ export class PreferenceSync {
           if(choice?.key!==key && !(await this.acknowledge(pending,rows)))continue;
           if(choice?.key!==key){pending=undefined;local=(await this.ports.local())[key];}
         }
-        const base=this.cache.baseline[key];
+        // Agreement on current values supersedes an obsolete unsent local edit.
+        // An explicit cloud adoption is a separate intent until its CAS succeeds.
+        if(choice?.key!==key && !this.cache.adoptions?.[key] && heads.length && heads.every(e=>same(e.value,local))){
+          this.acceptEquivalent(key,local,heads);continue;
+        }
+        let base=this.cache.baseline[key];
         if(choice?.key===key){
           // Never discard queued or local edits until a chosen replacement is durable.
           const selected=choice.entryId ? heads.find(e=>e.id===choice.entryId) : undefined;
@@ -132,8 +149,15 @@ export class PreferenceSync {
           this.prepare(key,selected ? selected.value : local,ids(heads),selected ? local : undefined);
           pending=this.cache.pending[key];
         }
+        if(pending && !same(ids(heads),pending.parents.slice().sort())){
+          if(heads.length && heads.every(e=>same(e.value,pending!.value))){
+            // The chosen value is already durable under other IDs; do not replay
+            // the obsolete parent set or invent a receipt for the queued ID.
+            if(!(await this.acknowledge(pending,rows,ids(heads))))continue;
+            pending=undefined;local=(await this.ports.local())[key];base=this.cache.baseline[key];
+          }else{this.conflict(key,local,heads);continue;}
+        }
         if(pending){
-          if(!same(ids(heads),pending.parents.slice().sort())){this.conflicts.push({key,local,remote:heads});continue;}
           this.persist(); // Durable exact-ID barrier before every external write.
           rows=await this.ports.save(pending);
           if(!this.live())return;
@@ -145,10 +169,10 @@ export class PreferenceSync {
         const equivalent=heads.length && heads.every(e=>same(e.value,heads[0].value));
         const remote=equivalent ? heads[0].value : undefined;
         if(heads.length && (!equivalent || (base && !same(local,base.value) && !same(remote,base.value) && !same(local,remote)))){
-          this.conflicts.push({key,local,remote:heads});continue;
+          this.conflict(key,local,heads);continue;
         }
         if(!base && heads.length && !same(local,remote)){
-          this.conflicts.push({key,local,remote:heads});continue;
+          this.conflict(key,local,heads);continue;
         }
         if(heads.length && (!base || same(local,base.value) || same(local,remote))){
           if(!same(local,remote))await this.ports.apply(key,remote,local);
@@ -173,7 +197,7 @@ export class PreferenceSync {
       }
       for(const key of PREFERENCE_KEYS){
         const heads=preferenceHeads(rows,key);
-        if(heads.length>1 && !heads.every(e=>same(e.value,heads[0].value)) && !this.conflicts.some(c=>c.key===key))this.conflicts.push({key,local:(await this.ports.local())[key],remote:heads});
+        if(heads.length>1 && !heads.every(e=>same(e.value,heads[0].value)) && !this.conflicts.some(c=>c.key===key))this.conflict(key,(await this.ports.local())[key],heads);
       }
       this.message=this.conflicts.length ? "部分偏好有不同修改，请选择保留哪一份" : "偏好已与飞书同步";
     } catch(e){if(this.live())this.message=`${(e as Error).message}；本机偏好和待同步修改保留`;}

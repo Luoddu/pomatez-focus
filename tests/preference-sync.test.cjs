@@ -9,7 +9,7 @@ function device(cloud,values=clone(PREFERENCE_DEFAULTS),storage=new Memory(),sco
  d.create=()=>new PreferenceSync(storage,scope,{
    local:async()=>clone(d.values),validScope:()=>d.live,uuid:randomUUID,notify:s=>d.status=s,
    read:async()=>{d.reads++;if(d.readDelay)await d.readDelay;if(d.offline)throw Error('offline');return clone(cloud);},
-   save:async e=>{if(d.offline)throw Error('offline');d.writes.push(clone(e));
+   save:async e=>{if(d.offline || d.saveOffline)throw Error('offline');d.writes.push(clone(e));
      const found=cloud.find(v=>v.id===e.id);if(found){assert.deepEqual(found,e);return clone(cloud);}
      assert.deepEqual(preferenceHeads(cloud,e.key).map(v=>v.id).sort(),e.parents.slice().sort());cloud.push(clone(e));
      if(d.lose){d.lose=false;throw Error('lost reply');}return clone(cloud);},
@@ -73,4 +73,30 @@ test('corrupt baseline/pending/adoption maps and future metadata reject without 
 test('week goal disk error and silent loss reject; valid save reads back and returns actual goal',()=>{
  const before=global.localStorage,s=new Memory();global.localStorage=s;
  try{const goal=m.exports.saveWeekGoal(Date.parse('2026-10-14T10:00:00+08:00'),15);assert.equal(goal['2026-10-12'],15);const raw=s.getItem('pomatez-focus-weekgoal-v1');s.setItem=()=>{throw Error('disk full');};assert.throws(()=>m.exports.saveWeekGoal(Date.now(),20));assert.equal(s.getItem('pomatez-focus-weekgoal-v1'),raw);s.setItem=()=>{};assert.throws(()=>m.exports.saveWeekGoal(Date.now(),20));}finally{global.localStorage=before;}
+});
+
+
+test('equal local and cloud values retire stale-parent pending after restart without writing a version',async()=>{
+ const cloud=[],a=device(cloud);await a.sync.synchronize(true);const b=device(cloud);await b.sync.synchronize();
+ a.saveOffline=true;a.values.weights.misc=.6;await a.sync.synchronize();assert.equal(a.status.pending,1);
+ b.values.weights.misc=.6;await b.sync.synchronize();const before=cloud.length;a.sync.stop();a.sync=a.create();a.saveOffline=false;
+ await a.sync.synchronize();assert.equal(a.status.conflicts.length,0);assert.equal(a.status.pending,0);assert.equal(cloud.length,before);await a.sync.synchronize();assert.equal(cloud.length,before);
+});
+test('current agreement supersedes an obsolete unsent value, preserving latest local choice',async()=>{
+ const cloud=[],a=device(cloud);await a.sync.synchronize(true);const b=device(cloud);await b.sync.synchronize();a.saveOffline=true;a.values.weights.misc=.6;await a.sync.synchronize();a.values.weights.misc=.8;b.values.weights.misc=.8;await b.sync.synchronize();const before=cloud.length;a.saveOffline=false;await a.sync.synchronize();assert.equal(a.status.pending,0);assert.equal(a.status.conflicts.length,0);assert.equal(a.values.weights.misc,.8);assert.equal(cloud.length,before);
+});
+test('equal sibling heads and reordered object fields need no choice or extra cloud event',async()=>{
+ const cloud=[],a=device(cloud);await a.sync.synchronize(true);const root=preferenceHeads(cloud,'weights')[0];for(let i=0;i<2;i++)cloud.push({...clone(root),id:randomUUID(),parents:[root.id],value:Object.fromEntries(Object.entries(root.value).reverse())});const before=cloud.length;await a.sync.synchronize();assert.equal(a.status.conflicts.length,0);assert.equal(cloud.length,before);a.values.weights.misc=.6;await a.sync.synchronize();assert.equal(preferenceHeads(cloud,'weights').length,1);assert.equal(preferenceHeads(cloud,'weights')[0].parents.length,2);
+});
+test('equal remote adoption completes CAS against actual head IDs without replaying stale parents',async()=>{
+ const cloud=[],a=device(cloud);a.values.weights.misc=.6;await a.sync.synchronize(true);const b=device(cloud);await b.sync.synchronize();const chosen=preferenceHeads(cloud,'weights')[0];b.saveOffline=true;await b.sync.synchronize(false,{key:'weights',entryId:chosen.id});assert.equal(b.status.pending,1);cloud.push({...clone(chosen),id:randomUUID(),parents:[chosen.id]});const before=cloud.length;b.saveOffline=false;await b.sync.synchronize();assert.equal(b.values.weights.misc,.6);assert.equal(b.status.pending,0);assert.equal(b.status.conflicts.length,0);assert.equal(cloud.length,before);
+});
+test('different queued adoption is exposed even when displayed local and latest cloud agree',async()=>{
+ const cloud=[],a=device(cloud);a.values.weights.misc=.6;await a.sync.synchronize(true);const b=device(cloud);await b.sync.synchronize();b.saveOffline=true;await b.sync.synchronize(false,{key:'weights',entryId:preferenceHeads(cloud,'weights')[0].id});a.values.weights.misc=1;await a.sync.synchronize();b.saveOffline=false;await b.sync.synchronize();const c=b.status.conflicts.find(c=>c.key==='weights');assert(c);assert.equal(c.local.misc,1);assert.equal(c.remote[0].value.misc,1);assert.equal(c.pending.misc,.6);assert.equal(b.status.pending,1);
+});
+test('equal pending target does not overwrite a newer local edit after adoption CAS mismatch',async()=>{
+ const cloud=[],a=device(cloud);a.values.weights.misc=.6;await a.sync.synchronize(true);const b=device(cloud);await b.sync.synchronize();b.saveOffline=true;await b.sync.synchronize(false,{key:'weights',entryId:preferenceHeads(cloud,'weights')[0].id});const root=preferenceHeads(cloud,'weights')[0];cloud.push({...clone(root),id:randomUUID(),parents:[root.id]});b.values.weights.misc=.8;b.saveOffline=false;const before=cloud.length;await b.sync.synchronize();assert.equal(b.values.weights.misc,.8);assert.equal(b.status.pending,1);assert.equal(b.status.conflicts.length,1);assert.equal(cloud.length,before);
+});
+test('equal values cannot hide an inconsistent exact ID receipt',async()=>{
+ const cloud=[],a=device(cloud);await a.sync.synchronize(true);a.saveOffline=true;a.values.weights.misc=.6;await a.sync.synchronize();const cache=JSON.parse(a.storage.getItem('pomatez-focus-preference-sync-v1:base-A')),pending=cache.pending.weights;cloud.push({...clone(pending),at:pending.at+1});a.saveOffline=false;await a.sync.synchronize();assert.match(a.status.message,/回读不一致/);assert.equal(a.status.pending,1);
 });

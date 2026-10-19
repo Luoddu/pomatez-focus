@@ -4758,3 +4758,11 @@ button.stats-range-label:hover {
 .preference-conflict { margin-top:12px; padding:12px; border:1px solid #ecd8b5; border-radius:12px; background:#fffaf2; }
 .preference-conflict details { margin:8px 0; font-size:12px; color:#7a6a55; overflow-wrap:anywhere; }
 .preference-conflict .sync-row { flex-wrap:wrap; gap:8px; }
+
+.preference-differences { display:grid; gap:8px; margin:12px 0; }
+.preference-difference { min-width:0; padding:10px; background:#fff; border:1px solid #efe6d9; border-radius:8px; }
+.preference-difference > strong { font-size:13px; }
+.preference-difference dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px; margin:8px 0 0; }
+.preference-difference dl > div { min-width:0; }
+.preference-difference dt { color:var(--muted); font-size:12px; }
+.preference-difference dd { margin:3px 0 0; font-size:13px; overflow-wrap:anywhere; }
