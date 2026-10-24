@@ -1,6 +1,6 @@
 # P0-POMO-064 计时中按任务选择自动关联番茄
 
-状态：IN_PROGRESS；owner/root，隔离番茄模块实现/既有授权发布，唯一状态本卡。基线871359126c58dc1577bc72536416ff79fe1709cc（公开99），已fetch/check:sync同源、clean、单worktree task/p0-pomo-064-task-picker；旧93任务分支保留，无merge/rebase或覆盖其他电脑修改。
+状态：DONE；owner/root，隔离番茄模块实现/既有授权发布，唯一状态本卡。基线871359126c58dc1577bc72536416ff79fe1709cc（公开99），已fetch/check:sync同源、clean、单worktree task/p0-pomo-064-task-picker；旧93任务分支保留，无merge/rebase或覆盖其他电脑修改。
 
 用户2026-10-24要求选择框只选任务，不逐个列出第几个番茄；自动关联相应可用槽位。截图为FocusTimer更换任务框。目标：一任务一选项、名称不带番茄序号；确认选别的任务自动选序号最小的未完成/非pending可用行，同当前任务保留当前行；时长/暂停/记录/精确planId照既有更换API。非目标：不改旅程/补记已分组的选择框，不改任务真相源/自动完成规则/云接口/同步偏好/账户权限或历史。
 
@@ -13,3 +13,5 @@
 资源与授权：本clone build/dist及随机合成profile独占；无真实DB/端口/个人Edge、注册或其他设备操作。沿用户默认推送源码+Windows preview安装更新5资产，不交便携包、不自动安装重启。发布使用干净固定源码、先draft/五资产哈希、同HEAD annotated tag后立即公开，不设Latest；前一真实已发布99 updater验证发现新版、0下载0安装。失败或独立复核未通过不发布；一轮有界实施，未知同因两次停对应尝试，超预算/新边界升级。
 
 回滚：显式revert本次选择框改动，无存储schema迁移；99原发行及asset不变，新版本修正不复用tag。开工/冻结/提交/发布复查HEAD/写集/资源；仅模块状态本卡，不写根路线图。Learning none初判：既有稳定ID分组和精确计时切换的薄UI映射，不制造新运行/权限机制；若复核产生候选须先明确处置再封版。
+
+收口：2026-10-24，冻结3cd33818dfa2e1ccf3a7d61cbf78826ad02a887b / preview.100；429/429逻辑、生产桌面六组正反、clean构建、201文件ASAR一致及静默隔离成品启动通过。既有review_scientific_rest源码、包源、公开交付三阶段独立PASS，Learning none认可。公开五资产/tag/旧99保留已验，真实公开99 updater发现100且0下载0安装；稳定Latest仍preview.51。证据与回滚见ACCEPTANCE-P0-POMO-064.md。
