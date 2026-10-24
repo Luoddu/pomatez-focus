@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask } from "../session";
 import { tomatoTone } from "../week";
-import { Ring, clock, parseTitle, quadrantMeta } from "./shared";
+import { Ring, clock, groupTasks, parseTitle, quadrantMeta } from "./shared";
 
 export default function FocusTimer({
   active,
@@ -35,6 +35,13 @@ export default function FocusTimer({
     (t) =>
       t.kind !== "done" && t.kind !== "pending" && t.kind !== "free"
   );
+  const groups = groupTasks(options);
+  const currentGroup = active.task.taskId || active.task.id;
+  const selectedRow = choice === "__free__"
+    ? "__free__"
+    : choice === currentGroup
+    ? active.task.id
+    : groups.find((group) => group.key === choice)?.tasks[0]?.id;
   useEffect(() => setConfirming(false), [active.id]);
   useEffect(() => {
     if (!confirming) return;
@@ -104,7 +111,7 @@ export default function FocusTimer({
                   setChoice(
                     active.task.kind === "free"
                       ? "__free__"
-                      : active.task.id
+                      : currentGroup
                   );
                   setChanging(true);
                 }}
@@ -121,27 +128,24 @@ export default function FocusTimer({
                 >
                   <option value="__free__">自由番茄</option>
                   {active.task.kind !== "free" &&
-                    !options.some((t) => t.id === active.task.id) && (
-                      <option value={active.task.id}>
-                        {active.task.title}（当前任务）
+                    !groups.some((group) => group.key === currentGroup) && (
+                      <option value={currentGroup}>
+                        {parsed.name}（当前任务）
                       </option>
                     )}
-                  {options.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {quadrantMeta(t.quadrant)?.label
-                        ? `[${quadrantMeta(t.quadrant)!.label}] `
-                        : ""}
-                      {t.title}
+                  {groups.map((group) => (
+                    <option key={group.key} value={group.key}>
+                      {group.name}
                     </option>
                   ))}
                 </select>
-                <p>已计时长保留，整段专注记到更换后的任务。</p>
+                <p>已计时长保留，整段专注记入所选任务；番茄序号自动安排。</p>
                 <div className="active-task-picker-actions">
                   <button
                     className="btn-text"
-                    disabled={blocked}
+                    disabled={blocked || !selectedRow}
                     onClick={() => {
-                      if (onChangeTask(choice)) setChanging(false);
+                      if (selectedRow && onChangeTask(selectedRow)) setChanging(false);
                     }}
                   >
                     确认更换

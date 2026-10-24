@@ -156,7 +156,7 @@ export default function SettingsPanel({
         <div className="card settings-card s-about">
           <h3>关于</h3>
           <div className="about-line">
-            版本 <span className="ver">{process.env.REACT_APP_MAC_VERSION || "0.1.0-preview.99"}</span>
+            版本 <span className="ver">{process.env.REACT_APP_MAC_VERSION || "0.1.0-preview.100"}</span>
             <br />
             基于开源项目 pomatez 二次开发（MIT License，© roldanjr
             及贡献者）
