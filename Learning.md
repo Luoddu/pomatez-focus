@@ -4,6 +4,17 @@
 
 仅保存本独立仓库已验证、可用于后续农场任务的工程教训；任务状态只看模块执行卡。本文件不写入、不替代澄行根Learning及根路线图。
 
+## LEARN-P0-POMO-065-01 - 持久恢复完成前不能进入首个控制决策
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-065
+- Evidence: docs/ACCEPTANCE-P0-POMO-065.md; tests/browser-control.test.cjs; app/electron/src/assets/browser-control/background.js
+- Applies-To: 本模块MV3 worker从storage.session恢复已处理提醒key和绝对冷静截止、同时存在activation/install/startup可重入连接入口的后续改动
+- Lesson: 冻结a4ba的正常恢复通过，但延迟storage.get并提前activation可先建原生连接，把同key旧剩余1分钟当新提醒写为完整5分钟；迟到恢复也不能立即撤销已下发页面控制。独立复核和主实现分别复现；a2beef用一次共享恢复Promise门禁让current恢复先于任何port/decision/write，deferred正反证明原截止不延长、新提醒仍通。
+- Required-Check: 所有可重入连接入口共同等待同一次恢复，等待后复核epoch/owner；测试挂起恢复时并发activation/install/startup无连接/写入，恢复后同key继续原截止、新key仍正常、仅一个轮询timer。恢复失败保持fail-open、无自动重试/timer/写入且诊断有界；不能只测get立即返回的正常顺序。
+- Supersedes: none
+- Invalid-When: 不再持久恢复去重key/绝对截止，或改为另一已验证原子恢复/事件串行机制时重验；不泛化为所有异步读取都必须阻塞UI，不授权增加浏览器权限或建立另一统计源。
+
 ## LEARN-P0-POMO-039-01 - 草稿不能替代旧版更新链路验证
 
 - Status: VALIDATED
