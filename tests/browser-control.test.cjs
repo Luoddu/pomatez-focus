@@ -34,10 +34,49 @@ test('four intervention modes clear on expiry/off/day; normal pause and cooldown
  const p=decide(base,old,now);assert.equal(p.control.pause,true);assert.equal(p.control.blockedUntil,0);assert.equal(decide(base,p,now+1000).control.pause,false);
  assert.equal(decide({...base,mode:'mirror'},old,now).control.pause,false);
  const c=decide({...base,mode:'cooldown'},old,now);assert.equal(c.control.blockedUntil,now+120000);assert.equal(decide({...base,ready:false},c,now).control.blockedUntil,0);
- assert.equal(decide({...base,supervise:false},c,now).until,0);
+ assert.equal(decide({...base,supervise:false},c,now).control.blockedUntil,0);
  const q=decide({...base,mode:'quota',quotaSpent:true},old,now);assert.ok(q.control.blockedUntil>now);
  assert.equal(decide({...base,mode:'quota',day:'2026-10-13'},q,now).control.blockedUntil,0);
  assert.equal(target('https://www.bilibili.com/video/synthetic'),true);assert.equal(target('https://bilibili.com.evil/'),false);assert.equal(target('https://example.com/'),false);
+});
+test('cooldown resumes its original deadline after supervision off or stale lease, never replays an expired reminder',()=>{
+ const now=Date.now(),base={v:1,ready:true,supervise:true,expiresAt:now+7000,day:'2026-10-25',mode:'cooldown',cooldownMinutes:5,reminderKey:'same/5',quotaSpent:false};
+ const first=decide(base,{day:'',key:'',until:0},now),end=now+300000;
+ for(const disabled of [{supervise:false},{ready:false},{expiresAt:now-1}]) {
+  const off=decide({...base,...disabled},first,now+1000);assert.equal(off.control.blockedUntil,0);assert.equal(off.control.pause,false);
+  const resumed=decide({...base,expiresAt:now+9000},off,now+2000);assert.equal(resumed.control.blockedUntil,end);assert.equal(resumed.control.pause,true);
+  const repeated=decide({...base,expiresAt:now+10000},resumed,now+3000);assert.equal(repeated.until,end);assert.equal(repeated.control.pause,false);
+  const expired=decide({...base,expiresAt:end+7000},off,end+1);assert.ok(expired.control.blockedUntil<=end);assert.equal(expired.control.pause,false);
+  const next=decide({...base,reminderKey:'next/10',expiresAt:end+7000},expired,end+2);assert.equal(next.control.blockedUntil,end+2+300000);assert.equal(next.control.pause,true);
+ }
+ const cleared=decide({...base,supervise:false,reminderKey:''},first,now+1000);
+ assert.equal(decide({...base,reminderKey:'',expiresAt:now+9000},cleared,now+2000).until,end,'configuration may clear pending reminder without cancelling existing deadline');
+ const tomorrow=decide({...base,day:'2026-10-26',reminderKey:''},cleared,now+2000);assert.equal(tomorrow.until,0);
+ const quota=decide({...base,mode:'quota',quotaSpent:true},{day:'',key:'',until:0},now);
+ assert.equal(decide(base,quota,now+1000).until,0,'quota deadline must not leak into cooldown');
+ const mirror=decide({...base,mode:'mirror'},first,now+1000);assert.equal(mirror.until,0);assert.equal(mirror.control.pause,false);
+ assert.equal(decide(base,mirror,now+2000).until,0,'explicit mode change cancels old cooldown');
+});
+test('real worker reconnect and session restart restore remaining cooldown without another timer or repeated penalty',async()=>{
+ const vm=require('node:vm'),source=fs.readFileSync(path.join(root,'app/electron/src/assets/browser-control/background.js'),'utf8');
+ let now=Date.now(),saved={},nativeCalls=0;const timers=new Set();
+ const boot=()=>{const callbacks={},messages=[],receipts=[];let timerId=0;
+  const event=name=>({addListener:f=>callbacks[name]=f});
+  const chrome={runtime:{lastError:null,onMessage:event('request'),onStartup:event('startup'),onInstalled:event('installed'),connectNative:()=>{const k=++nativeCalls;return {onMessage:event('message'+k),onDisconnect:event('disconnect'+k),postMessage:v=>{if(v.type==='receipt')receipts.push(v)},disconnect:()=>{}}}},tabs:{query:async()=>[{id:1,url:'https://www.bilibili.com/synthetic',active:true}],sendMessage:async(_id,v)=>{messages.push(v);return {pausedCount:v.blockedUntil>now?1:0}},onUpdated:event('updated'),onActivated:event('activated'),onRemoved:event('removed')},storage:{session:{get:async()=>saved,set:async v=>saved=structuredClone(v)}}};
+  vm.runInNewContext(source,{chrome,URL,Date:{now:()=>now},Promise,setInterval:()=>{const id=++timerId;timers.add(id);return id},clearInterval:id=>timers.delete(id),setTimeout:()=>0,clearTimeout:()=>{}});
+  return {callbacks,messages,receipts};
+ };
+ const flush=()=>new Promise(r=>setImmediate(r)),base={v:1,ready:true,supervise:true,expiresAt:now+7000,day:'2026-10-25',mode:'cooldown',cooldownMinutes:5,reminderKey:'resume/key'};
+ const first=boot();await flush();first.callbacks.message1(base);await flush();const end=now+300000;assert.equal(saved.control.until,end);
+ first.callbacks.message1({...base,supervise:false});await flush();assert.equal(first.messages.at(-1).blockedUntil,0);
+ now+=1000;first.callbacks.message1({...base,expiresAt:now+7000});await flush();assert.equal(first.messages.at(-1).blockedUntil,end);
+ first.callbacks.disconnect1();await flush();assert.equal(first.messages.at(-1).blockedUntil,0);assert.equal(timers.size,0);
+ first.callbacks.activated();await flush();assert.equal(nativeCalls,2);first.callbacks.message2({...base,expiresAt:now+7000});await flush();assert.equal(first.messages.at(-1).blockedUntil,end);assert.equal(first.receipts.at(-1).key,base.reminderKey);assert.equal(timers.size,1);
+ first.callbacks.disconnect2();await flush();assert.equal(timers.size,0);
+ const restarted=boot();await flush();restarted.callbacks.message3({...base,expiresAt:now+7000});await flush();assert.equal(restarted.messages.at(-1).blockedUntil,end);assert.equal(timers.size,1);
+ now=end+1;restarted.callbacks.message3({...base,expiresAt:now+7000});await flush();assert.ok(restarted.messages.at(-1).blockedUntil<=end);assert.equal(restarted.messages.at(-1).pause,false);
+ restarted.callbacks.message3({...base,reminderKey:'next/key',expiresAt:now+7000});await flush();assert.equal(restarted.messages.at(-1).blockedUntil,now+300000);
+ restarted.callbacks.disconnect3();await flush();assert.equal(timers.size,0);
 });
 test('farm raise keeps bounds and focus untouched, restores original pin on leave and disabled policy',()=>{
  let pin=false,shows=0,moves=0,focus=0;const bounds={x:20,y:40,width:800,height:600},fake={isDestroyed:()=>false,isAlwaysOnTop:()=>pin,setAlwaysOnTop:v=>pin=v,isMinimized:()=>true,restore:()=>{throw Error('activating restore forbidden')},showInactive:()=>shows++,moveTop:()=>moves++,focus:()=>focus++};

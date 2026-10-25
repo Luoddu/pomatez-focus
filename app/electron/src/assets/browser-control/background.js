@@ -4,13 +4,16 @@ const TARGETS=["*://*.bilibili.com/*","*://*.xiaohongshu.com/*"];
 function target(url) { try { const h=new URL(url).hostname; return ["bilibili.com","xiaohongshu.com"].some(d=>h===d||h.endsWith("."+d)); } catch (_) { return false; } }
 function decide(state, old, now) {
   const ok=state?.v===1 && state.ready===true && state.supervise===true && now<=state.expiresAt && state.expiresAt<=now+7000 && ["mirror","pause","cooldown","quota"].includes(state.mode);
-  if(!ok) return {...old,until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
+  // Release the page lease immediately, but keep the original absolute deadline
+  // so a short off/disconnect cannot consume the reminder and erase its cooldown.
+  if(!ok) return {...old,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
   const dayChanged=old.day!==state.day, fresh=state.reminderKey && (dayChanged||old.key!==state.reminderKey), key=state.reminderKey||old.key;
-  let until=dayChanged?0:old.until||0;
+  let until=dayChanged||old.mode!==state.mode?0:old.until||0;
   if(fresh&&state.mode==="cooldown") until=now+state.cooldownMinutes*60000;
   if(state.mode!=="cooldown") until=0;
   if(state.mode==="quota"&&state.quotaSpent) { const d=new Date(now); d.setHours(24,0,0,0); until=d.getTime(); }
-  return {day:state.day,key,until,control:{pause:state.mode!=="mirror"&&!!fresh,blockedUntil:until,expiresAt:state.expiresAt,reason:state.mode==="quota"&&state.quotaSpent?"今日额度已用完":until>now?"冷静一下，再决定是否继续":""}};
+  const resumed=state.mode==="cooldown"&&until>now&&old.control?.blockedUntil!==until;
+  return {day:state.day,key,mode:state.mode,until,control:{pause:state.mode!=="mirror"&&(!!fresh||resumed),blockedUntil:until,expiresAt:state.expiresAt,reason:state.mode==="quota"&&state.quotaSpent?"今日额度已用完":until>now?"冷静一下，再决定是否继续":""}};
 }
 if(typeof module!=="undefined") module.exports={target,decide};
 else {
@@ -32,7 +35,7 @@ else {
     if(decision.control.pause && expected && typeof state.reminderKey==="string") expected.postMessage({type:"receipt",key:state.reminderKey,pausedCount:Math.min(100,count)});
   }
   function enqueue(state,expected,turn=epoch) { serial=serial.then(()=>apply(state,expected,turn)).catch(()=>{if(owns(expected,turn))stop();}); }
-  function release() { epoch++;port=null;current={...current,until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
+  function release() { epoch++;port=null;current={...current,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
   function stop() { const p=port;release();if(p)p.disconnect(); }
   function connect() {
     if(port)return Promise.resolve();if(connecting)return connecting;
