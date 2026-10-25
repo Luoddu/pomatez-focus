@@ -10,7 +10,7 @@ test('real service-worker concurrent activation/connect is single-flight; discon
  vm.runInNewContext(fs.readFileSync(path.join(root,'app/electron/src/assets/browser-control/background.js'),'utf8'),{chrome,URL,Date,Promise,setInterval:()=>{const id=++sequence;timers.add(id);return id;},clearInterval:id=>timers.delete(id),setTimeout:()=>++sequence,clearTimeout:()=>{}});
  const flush=()=>new Promise(r=>setImmediate(r));await flush();callbacks.activated();callbacks.updated(1,{status:'complete'},{url:'https://www.bilibili.com/synthetic'});callbacks.installed();assert.equal(waiters.length,1);
  waiters.splice(0).forEach(r=>r([{id:1,url:'https://www.bilibili.com/synthetic',active:true}]));await flush();assert.equal(nativeCalls,1);assert.equal(timers.size,1);
- callbacks.disconnect1();assert.equal(timers.size,0);await flush();callbacks.activated();waiters.splice(0).forEach(r=>r([{id:1,url:'https://www.bilibili.com/synthetic',active:true}]));await flush();assert.equal(nativeCalls,2);assert.equal(timers.size,1);
+ callbacks.disconnect1();assert.equal(timers.size,0);await flush();callbacks.activated();await flush();waiters.splice(0).forEach(r=>r([{id:1,url:'https://www.bilibili.com/synthetic',active:true}]));await flush();assert.equal(nativeCalls,2);assert.equal(timers.size,1);
  callbacks.message1({v:1,ready:true});await flush();assert.equal(nativeCalls,2);
 });
 function state(now){const d=new Date(now),day=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;return {status:'recording',settings:{supervise:true,quotaMinutes:60},live:{checkedAt:now,expiresAt:now+7000,site:'bilibili'},usage:{day,totalSeconds:300},reminder:{key:'test/5'}};}
@@ -77,6 +77,27 @@ test('real worker reconnect and session restart restore remaining cooldown witho
  now=end+1;restarted.callbacks.message3({...base,expiresAt:now+7000});await flush();assert.ok(restarted.messages.at(-1).blockedUntil<=end);assert.equal(restarted.messages.at(-1).pause,false);
  restarted.callbacks.message3({...base,reminderKey:'next/key',expiresAt:now+7000});await flush();assert.equal(restarted.messages.at(-1).blockedUntil,now+300000);
  restarted.callbacks.disconnect3();await flush();assert.equal(timers.size,0);
+});
+test('delayed session restore gates concurrent activation/install/startup before native connection and first decision',async()=>{
+ const vm=require('node:vm'),callbacks={},messages=[],writes=[];let resolveGet,nativeCalls=0,timers=0;
+ const now=Date.now(),saved={control:{day:'2026-10-25',key:'saved/key',mode:'cooldown',until:now+60000,control:{pause:false,blockedUntil:0,expiresAt:0,reason:''}}};
+ const event=name=>({addListener:f=>callbacks[name]=f}),tab={id:1,url:'https://www.bilibili.com/synthetic',active:true};
+ const chrome={runtime:{lastError:null,onMessage:event('request'),onStartup:event('startup'),onInstalled:event('installed'),connectNative:()=>{nativeCalls++;return {onMessage:event('message'),onDisconnect:event('disconnect'),postMessage:()=>{},disconnect:()=>{}}}},tabs:{query:async()=>[tab],sendMessage:async(_id,v)=>{messages.push(v);return {pausedCount:0}},onUpdated:event('updated'),onActivated:event('activated'),onRemoved:event('removed')},storage:{session:{get:()=>new Promise(r=>resolveGet=r),set:async v=>writes.push(structuredClone(v))}}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'app/electron/src/assets/browser-control/background.js'),'utf8'),{chrome,URL,Date:{now:()=>now},Promise,setInterval:()=>++timers,clearInterval:()=>--timers,setTimeout:()=>0,clearTimeout:()=>{}});
+ const flush=()=>new Promise(r=>setImmediate(r));callbacks.activated();callbacks.installed();callbacks.startup();await flush();assert.equal(nativeCalls,0);assert.equal(timers,0);assert.equal(writes.length,0);
+ let pending;callbacks.request({type:'getControl'},{tab},v=>pending=v);assert.equal(pending.expiresAt,0);
+ resolveGet(saved);await flush();assert.equal(nativeCalls,1);assert.equal(timers,1);
+ const state={v:1,ready:true,supervise:true,mode:'cooldown',cooldownMinutes:5,day:'2026-10-25',expiresAt:now+7000,reminderKey:'saved/key'};callbacks.message(state);await flush();assert.equal(messages.at(-1).blockedUntil,saved.control.until);assert.equal(writes.at(-1).control.until,saved.control.until);
+ callbacks.message({...state,reminderKey:'new/key'});await flush();assert.equal(messages.at(-1).blockedUntil,now+300000);assert.equal(nativeCalls,1);assert.equal(timers,1);
+ callbacks.disconnect();await flush();assert.equal(timers,0);
+});
+test('session restore failure remains fail-open without native connection, retries, timers, writes or repeated diagnostics',async()=>{
+ const vm=require('node:vm'),callbacks={};let calls=0,timers=0,writes=0,warnings=0;
+ const event=name=>({addListener:f=>callbacks[name]=f});
+ const chrome={runtime:{onMessage:event('request'),onStartup:event('startup'),onInstalled:event('installed'),connectNative:()=>calls++},tabs:{query:async()=>[{id:1,url:'https://www.bilibili.com/synthetic'}],onUpdated:event('updated'),onActivated:event('activated'),onRemoved:event('removed')},storage:{session:{get:async()=>{throw Error('synthetic storage rejection')},set:async()=>writes++}}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'app/electron/src/assets/browser-control/background.js'),'utf8'),{chrome,console:{warn:()=>warnings++},URL,Date,Promise,setInterval:()=>timers++,clearInterval:()=>{},setTimeout:()=>timers++,clearTimeout:()=>{}});
+ const flush=()=>new Promise(r=>setImmediate(r));await flush();callbacks.activated();callbacks.startup();callbacks.installed();await flush();assert.equal(calls,0);assert.equal(timers,0);assert.equal(writes,0);assert.equal(warnings,1);
+ let policy;callbacks.request({type:'getControl'},{tab:{url:'https://www.bilibili.com/synthetic'}},v=>policy=v);assert.equal(policy.blockedUntil,0);assert.equal(policy.expiresAt,0);
 });
 test('farm raise keeps bounds and focus untouched, restores original pin on leave and disabled policy',()=>{
  let pin=false,shows=0,moves=0,focus=0;const bounds={x:20,y:40,width:800,height:600},fake={isDestroyed:()=>false,isAlwaysOnTop:()=>pin,setAlwaysOnTop:v=>pin=v,isMinimized:()=>true,restore:()=>{throw Error('activating restore forbidden')},showInactive:()=>shows++,moveTop:()=>moves++,focus:()=>focus++};

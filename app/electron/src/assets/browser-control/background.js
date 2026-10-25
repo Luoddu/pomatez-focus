@@ -18,6 +18,12 @@ function decide(state, old, now) {
 if(typeof module!=="undefined") module.exports={target,decide};
 else {
   let port=null,timer=null,tries=0,retry=null,connecting=null,epoch=0,current={day:"",key:"",until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}},serial=Promise.resolve();
+  // All activation/install/startup paths share restoration before opening a
+  // native port; a late read must never replace newly processed control state.
+  const restored=chrome.storage.session.get("control").then(v=>{
+    if(v.control)current={...v.control,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
+    return true;
+  }).catch(()=>{console.warn("科学专注配套状态恢复失败，请重新加载扩展；当前不施加浏览限制。");return false;});
   async function tabs() { return chrome.tabs.query({url:TARGETS}); }
   const owns=(expected,turn)=>turn===epoch&&port===expected;
   async function apply(state,expected,turn) {
@@ -44,6 +50,7 @@ else {
     return connecting;
   }
   async function beginConnect(turn) {
+    if(!(await restored) || port || turn!==epoch) return;
     if(!(await tabs()).length || port || turn!==epoch) return;
     if(retry)clearTimeout(retry);retry=null;
     const p=port=chrome.runtime.connectNative(HOST);
@@ -60,5 +67,5 @@ else {
   chrome.tabs.onRemoved.addListener(()=>void tabs().then(list=>{if(!list.length)stop();}));
   chrome.runtime.onStartup.addListener(()=>void connect());
   chrome.runtime.onInstalled.addListener(()=>void connect());
-  chrome.storage.session.get("control").then(v=>{if(v.control)current={...v.control,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};return connect();});
+  void restored.then(ok=>{if(ok)void connect();});
 }
