@@ -18,4 +18,10 @@ Learning recorded LEARN-P0-POMO-067-01（独立已接受，本次源码原子检
 
 官方路径：Electron34.5.8 app.md固定hash/492–538 quit/relaunch（执行beforeunload、重复relaunch会多实例），electron-updater6.8.3实际官方npm包AppUpdater.d.ts:164/185公开setFeedURL/downloadUpdate与BaseUpdater quitAndInstall；固定文件hash/许可最小快照见p067-official。没有修改protected缓存、第三方包、依赖版本、常驻服务或网络暴露；本机包优先，GitHub仍按既有039真实旧更新器和五资产tag门禁。
 
-待完成：最终固定干净源码构建/独立review、同源NSIS包检查、经用户已批准首次本地App保存现场/关闭后备份/本地升级并验证104，再GitHub源码与五资产发布/103真实更新器0下载验收。旧103/tag/资产保留，用户原数据不迁移删除；失败保留旧包可回装。
+封版及包源已验证：冻结01dc684134f2a99304745d58e86c65fb94e431c6 / preview104 / dirty=false；最终build、7组分段桌面、原6组active任务回归通过。artifacts/release104-package-acceptance.json、release104-package-verify.txt：219个build文件逐字节匹配ASAR，原生提醒和更新资源存在；隐藏静音隔离成品启动通过，五资产size/SHA256与feed SHA512一致。setup 84,453,904字节，SHA256 5d80799ae5f00fc357eab1bf36c2e077dda5469c2c88173784ae3fc2a77c459b。review_scientific_rest独立源码PASS及最终包PASS均绑定该commit；未把包检查当作个人安装证明。
+
+交付前通道基线：artifacts/release104-before-update.txt/json，真实公开103原更新器检测103为current，errors=[]、downloads=0、autoDownload=false、autoInstallOnAppQuit=false。本机已安装103的build/source-version.json只读核对为b3de3395bc8c343bc194014dcce911356500e2bc / dirty=false。
+
+个人升级尚未执行：已取得用户明确批准保存现场后本地bootstrap一次；Windows截图通道连续FrameArrived/window capture timeout，随后按钮输入报coordinate input geometry is unavailable。只读可访问树发现仍有活动计时，未获得成功暂停或退出证据，因此未强杀、未复制热LevelDB、未运行安装器。已请用户手动暂停并从托盘“退出（保留专注）”；这一步需要可验证的关闭状态，而非重新请求安装授权。已准备closed-profile备份脚本，执行前仍须exact安装路径进程数为0、备份副本哈希校验及副本中paused/review验证。未经个人升级验收不先推送GitHub。
+
+Learning本检查点沿已记录LEARN-P0-POMO-067-01（01dc684同commit）；截图通道故障根因未明，仅保留操作阻断证据，不写未经验证通用教训。待完成个人保存/关闭/一致备份/本地NSIS升级并验证104，然后源码及五资产发布、真实103更新器0下载终验。旧103/tag/资产保留，用户原数据不迁移删除；失败保留旧包可回装。
