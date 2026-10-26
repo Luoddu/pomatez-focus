@@ -26,8 +26,9 @@ type Usage = {
     site: "bilibili" | "xiaohongshu";
   }[];
 };
+type FocusLock={enabled:boolean;plannedEnabled:boolean;goal:number;quotaMinutes:number;releaseMinutes:number;plannedReleaseMinutes:number;day:string;count:number|null;reached:boolean;lockedForChanges:boolean;releasing:boolean;until:number;blocked:boolean;quotaSpent:boolean;error:string};
 export type RestState = {
-  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean };
+  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean;focusLockCapable?:boolean;focusLock?:FocusLock };
   settings: {
     quotaMinutes: number;
     supervise: boolean;
@@ -52,6 +53,8 @@ export type RestState = {
     excessMinutes: number;
     kind: "focus" | "quota";
     watchedMinutes: number;
+    watchedSeconds?:number;
+    excessSeconds?:number;
     completedCount: number | null;
   } | null;
 };
@@ -134,6 +137,7 @@ export function useScientificRest(
 }
 const minutes = (seconds: number) =>
   `${Math.round(seconds / 6) / 10} 分钟`;
+const reminderElapsed=(seconds:number|undefined,minutes:number)=>seconds===undefined?`${minutes} 分钟`:seconds<60?`${seconds} 秒`:seconds%60?`${Math.floor(seconds/60)} 分 ${seconds%60} 秒`:`${seconds/60} 分钟`;
 const time = (value: number) =>
   new Date(value).toLocaleTimeString("zh-CN", {
     hour: "2-digit",
@@ -155,9 +159,12 @@ export default function ScientificRest({
   const [draft, setDraft] = useState("60");
   const [draftGoal, setDraftGoal] = useState("12");
   const [draftReminder, setDraftReminder] = useState("5");
+  const [reminderUnit,setReminderUnit]=useState<"minutes"|"seconds">("minutes");
+  const [draftRelease,setDraftRelease]=useState("15");
   const [busy, setBusy] = useState(false);
   const [setupNote,setSetupNote]=useState("");
   const policy=state.browserControl?.policy || {mode:"pause" as const,cooldownMinutes:2,autoRaise:true};
+  const lock=state.browserControl?.focusLock;
   const requestId = useRef(0);
   useEffect(
     () => () => {
@@ -180,8 +187,8 @@ export default function ScientificRest({
   // Read the clock on every render, including new detector snapshots between ticks.
   const displayNow = Date.now();
   const usage = displayUsage(state, displayNow);
-  const statusDetail = monitorDetail(state, displayNow)+"\n浏览器控制："+(state.browserControl?.connected?"配套扩展已连接":"未连接，暂停尚未确认");
-  const ring=usage?quotaDisplay(usage.totalSeconds,state.settings.quotaMinutes):null;
+  const statusDetail = monitorDetail(state, displayNow)+"\n浏览器控制："+(state.browserControl?.connected?"配套扩展已连接":"未连接，暂停尚未确认")+(lock?.enabled&&!state.browserControl?.focusLockCapable?"\n每日锁尚未确认：请更新并重新加载配套扩展":"");
+  const ring=usage?quotaDisplay(usage.totalSeconds,lock?.enabled?lock.quotaMinutes:state.settings.quotaMinutes):null;
   const ratio=ring?.ratio||0,over=ring?.over||false;
   const watching=state.status==="recording" && !!state.live?.site && displayNow>=state.live.checkedAt && displayNow<=state.live.expiresAt;
   const chart = range === "week" ? week : usage;
@@ -237,6 +244,9 @@ export default function ScientificRest({
     } finally {
       if (requestId.current === id) setLoading(false);
     }
+  }
+  async function lockAction(action:"focusLockConfigure"|"focusLockRelease"|"focusLockResume",value?:any){
+    setBusy(true);setError("");try{await api()[action](value);}catch(e:any){setError(e.message||"每日锁设置未保存");}finally{setBusy(false);}
   }
   const [refreshing, setRefreshing] = useState(false);
   async function refreshStatus() {
@@ -357,10 +367,10 @@ export default function ScientificRest({
                 开启督促
                 <input
                   type="checkbox"
-                  checked={state.settings.supervise}
-                  disabled={busy}
+                  checked={lock?.enabled?!lock.releasing:state.settings.supervise}
+                  disabled={busy||!!lock?.lockedForChanges}
                   onChange={(e) =>
-                    void configure(
+                    lock?.enabled?void lockAction(e.target.checked?"focusLockResume":"focusLockRelease"):void configure(
                       state.settings.quotaMinutes,
                       e.target.checked
                     )
@@ -382,9 +392,8 @@ export default function ScientificRest({
                   onClick={() => {
                     setDraft(String(state.settings.quotaMinutes));
                     setDraftGoal(String(state.settings.pomodoroGoal));
-                    setDraftReminder(
-                      String(state.settings.reminderMinutes)
-                    );
+                    const fractional=!Number.isInteger(state.settings.reminderMinutes);setReminderUnit(fractional?"seconds":"minutes");
+                    setDraftReminder(String(fractional?Math.round(state.settings.reminderMinutes*60):state.settings.reminderMinutes));setDraftRelease(String(lock?.plannedReleaseMinutes||15));
                     setError("");
                     setView("settings");
                   }}
@@ -392,6 +401,12 @@ export default function ScientificRest({
                   设置策略
                 </button>
               </div>
+              {lock?.enabled&&<div className="daily-focus-summary" role="status">
+                <span>每日锁 · 今日 {lock.count===null?"待确认":lock.count}/{lock.goal}</span>
+                <small>{!state.browserControl?.focusLockCapable?"更新配套后生效":lock.quotaSpent?"今日额度已用完":lock.releasing?`放行至 ${time(lock.until)}`:lock.reached?"已达标，可临时放行":"未达标，督促已锁定"}</small>
+                {lock.reached&&!lock.releasing&&!lock.quotaSpent&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockRelease")}>临时放行 {lock.releaseMinutes} 分钟</button>}
+                {lock.releasing&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockResume")}>恢复锁定</button>}
+              </div>}
               <div className="rest-sites">
                 <div>
                   <i className="rest-dot bili" />
@@ -435,6 +450,7 @@ export default function ScientificRest({
                 max={60}
                 step={1}
                 value={draftGoal}
+                disabled={!!lock?.lockedForChanges}
                 onChange={(e) => setDraftGoal(e.target.value)}
               />{" "}
               个
@@ -443,22 +459,30 @@ export default function ScientificRest({
               每看多久提醒{" "}
               <input
                 type="number"
-                aria-label="提醒间隔（分钟）"
-                min={1}
-                max={60}
-                step={1}
+                aria-label="提醒间隔"
+                min={reminderUnit==="seconds"?5:5/60}
+                max={reminderUnit==="seconds"?3600:60}
+                step={reminderUnit==="seconds"?1:1/60}
                 value={draftReminder}
                 onChange={(e) => setDraftReminder(e.target.value)}
               />{" "}
-              分钟
+              <select aria-label="提醒间隔单位" value={reminderUnit} onChange={e=>{const next=e.target.value as "minutes"|"seconds";if(next!==reminderUnit)setDraftReminder(String(next==="seconds"?Math.round(Number(draftReminder)*60):Number(draftReminder)/60));setReminderUnit(next);}}><option value="minutes">分钟</option><option value="seconds">秒</option></select>
             </label>
-            <p>未达目标时督促，超额继续提醒；目标设0则仅按额度提醒。</p>
+            <p>提醒最短5秒，约每5秒检查。目标设0仅按额度提醒。</p>
+            <div className="daily-focus-settings">
+              <label>每日专注锁 <input aria-label="启用每日专注锁" type="checkbox" checked={!!lock?.plannedEnabled} disabled={busy||!!lock?.lockedForChanges} onChange={e=>void lockAction("focusLockConfigure",{enabled:e.target.checked,releaseMinutes:Number(draftRelease)})}/></label>
+              <label>临时放行 <input aria-label="每日锁临时放行分钟" type="number" min={1} max={60} step={1} value={draftRelease} disabled={!!lock?.lockedForChanges} onChange={e=>setDraftRelease(e.target.value)}/> 分钟</label>
+              <small>{lock?.enabled?`今日承诺 ${lock.count===null?"待确认":lock.count}/${lock.goal}。未达标不能修改；达标后的设置改动次日生效。`:"先保存每日目标，再开启；达标后才能手动临时放行，次日重新锁定。"}</small>
+              {!state.browserControl?.focusLockCapable&&<small>每日锁需新版配套连接：更新／重新加载扩展后，打开B站或小红书页面再开启。</small>}
+              {lock?.error&&<small role="alert">{lock.error}</small>}
+              <button className="btn-text" disabled={busy||!!lock?.lockedForChanges} onClick={()=>void lockAction("focusLockConfigure",{enabled:!!lock?.plannedEnabled,releaseMinutes:Number(draftRelease)})}>保存每日锁设置</button>
+            </div>
             <div className="browser-policy">
-              <label>干预挡位 <select aria-label="浏览器干预挡位" value={policy.mode} onChange={async e=>{setError("");try{await api().browserConfigure({...policy,mode:e.target.value});}catch(err:any){setError(err.message);}}}>
+              <label>干预挡位 <select aria-label="浏览器干预挡位" disabled={busy||!!lock?.lockedForChanges} value={policy.mode} onChange={async e=>{setError("");try{await api().browserConfigure({...policy,mode:e.target.value});}catch(err:any){setError(err.message);}}}>
                 <option value="mirror">时间镜子</option><option value="pause">暂停挡</option><option value="cooldown">冷静挡</option><option value="quota">额度锁定挡</option>
               </select></label>
-              <label>冷静时间 <input aria-label="冷静时间（分钟）" type="number" min={1} max={30} value={policy.cooldownMinutes} onChange={async e=>{try{await api().browserConfigure({...policy,cooldownMinutes:Number(e.target.value)});}catch(err:any){setError(err.message);}}} /> 分钟</label>
-              <label><input type="checkbox" checked={policy.autoRaise} onChange={async e=>{try{await api().browserConfigure({...policy,autoRaise:e.target.checked});}catch(err:any){setError(err.message);}}} />浏览时农场原屏幕置顶</label>
+              <label>冷静时间 <input aria-label="冷静时间（分钟）" disabled={busy||!!lock?.lockedForChanges} type="number" min={1} max={30} value={policy.cooldownMinutes} onChange={async e=>{try{await api().browserConfigure({...policy,cooldownMinutes:Number(e.target.value)});}catch(err:any){setError(err.message);}}} /> 分钟</label>
+              <label><input type="checkbox" disabled={busy||!!lock?.lockedForChanges} checked={policy.autoRaise} onChange={async e=>{try{await api().browserConfigure({...policy,autoRaise:e.target.checked});}catch(err:any){setError(err.message);}}} />浏览时农场原屏幕置顶</label>
               <small>干预设置即时保存；镜子挡不暂停，冷静挡等待后可续，额度挡用完后至次日限制。</small>
               <p role="status">{state.browserControl?.error || (state.browserControl?.connected ? `配套扩展已连接${state.browserControl.pauseKey?` · 最近确认暂停 ${state.browserControl.pausedCount} 个播放器`:""}` : "配套扩展未连接 · 视频暂停尚未确认")}</p>
               <button className="btn-small" disabled={busy} onClick={async()=>{setBusy(true);setError("");try{const result=await api().browserSetup();setSetupNote(`已打开配套文件夹。Edge扩展 → 开发人员模式 → 加载解压缩的扩展，选择该文件夹。扩展ID：${result.extensionId}`);}catch(err:any){setError(err.message);}finally{setBusy(false);}}}>安装／更新浏览器配套</button>
@@ -471,9 +495,9 @@ export default function ScientificRest({
                 if (
                   await configure(
                     Number(draft),
-                    state.settings.supervise,
+                    lock?.enabled?true:state.settings.supervise,
                     draftGoal.trim() ? Number(draftGoal) : NaN,
-                    Number(draftReminder)
+                    Number(draftReminder)/(reminderUnit==="seconds"?60:1)
                   )
                 )
                   setView("quota");
@@ -700,13 +724,13 @@ export function ScientificRestReminder({
         <p id="rest-reminder-line">
           {error ||
             (reminder.kind === "focus"
-              ? `已看 ${reminder.watchedMinutes} 分钟，${state.progress?.effectiveCount !== undefined && state.progress.effectiveCount !== state.progress.completedCount ? "有效番茄" : "番茄"} ${
+              ? `已看 ${reminderElapsed(reminder.watchedSeconds,reminder.watchedMinutes)}，${state.progress?.effectiveCount !== undefined && state.progress.effectiveCount !== state.progress.completedCount ? "有效番茄" : "番茄"} ${
                   state.progress?.effectiveCount ?? state.progress?.completedCount ??
                   reminder.completedCount
                 }/${
                   state.settings.pomodoroGoal
                 }：去睡觉，或回到科研主线。`
-              : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。`)}
+              : `已超额 ${reminderElapsed(reminder.excessSeconds,reminder.excessMinutes)}：累了去睡觉，或者回到科研主线。`)}
         </p>
         <div>
           <button

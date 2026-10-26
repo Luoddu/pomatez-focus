@@ -122,6 +122,16 @@ test('partial first install leaves no registry/foreign target; restored copy can
  assert.ok(c.install(process.execPath,reg).extensionId);assert.equal(writes,1);
 });
 function host(dir,origin){const folder=path.join(dir,'browser-control');fs.mkdirSync(folder,{recursive:true});fs.copyFileSync(path.join(build,'focus/nativeBrowserHost.js'),path.join(folder,'nativeBrowserHost.js'));const config=path.join(folder,'host-config.json');fs.writeFileSync(config,JSON.stringify({owner:'pomatez-browser-control-v1',directory:dir,origin:'chrome-extension://'+'a'.repeat(32)+'/'}));const child=spawn(process.execPath,[path.join(folder,'nativeBrowserHost.js'),config,origin],{windowsHide:true,stdio:['pipe','pipe','pipe']});return child;}
+test('native host negotiates daily-lock capability, validates new projection and keeps old clients identifiable',{timeout:10000},async()=>{
+ const dir=temp(),now=Date.now(),c=new BrowserControl(dir,build),s=state(now);s.settings={...s.settings,pomodoroGoal:12,reminderMinutes:5};s.progress={day:s.usage.day,completedCount:11,effectiveCount:11};c.focusLock.configure({enabled:true,releaseMinutes:15},s);c.publish(s);
+ const child=host(dir,'chrome-extension://'+'a'.repeat(32)+'/'),exit=new Promise(r=>child.on('exit',r));
+ const ask=v=>new Promise(resolve=>{child.stdout.once('data',b=>resolve(JSON.parse(b.subarray(4,4+b.readUInt32LE(0)))));const b=Buffer.from(JSON.stringify(v)),h=Buffer.alloc(4);h.writeUInt32LE(b.length);child.stdin.write(Buffer.concat([h,b]));});
+ try{let answer=await ask({type:'status'});assert.equal(answer.focusLock.blocked,true);assert.equal(c.snapshot().focusLockCapable,false);
+ answer=await ask({type:'status',features:['daily-focus-lock-v1']});assert.equal(answer.focusLock.count,11);assert.equal(c.snapshot().focusLockCapable,true);
+ const file=path.join(dir,'browser-control-projection.json'),projection=JSON.parse(fs.readFileSync(file));projection.focusLock.count='12';fs.writeFileSync(file,JSON.stringify(projection));assert.equal((await ask({type:'status',features:['daily-focus-lock-v1']})).ready,false);
+ s.progress.completedCount=12;s.progress.effectiveCount=12;c.focusLock.release(s);c.publish(s);answer=await ask({type:'status',features:['daily-focus-lock-v1']});assert.equal(answer.ready,true);assert.equal(answer.focusLock.blocked,false);
+ }finally{child.stdin.end();assert.equal(await exit,0);}
+});
 test('real native binary framing accepts bounded normal status, strips private fields and refuses wrong origin/oversize',async()=>{
  const dir=temp(),now=Date.now(),c=new BrowserControl(dir,build,()=>now);c.publish(state(now));const file=path.join(dir,'browser-control-projection.json');const raw=JSON.parse(fs.readFileSync(file));raw.privateUrl='never-return';fs.writeFileSync(file,JSON.stringify(raw));
  const child=host(dir,'chrome-extension://'+'a'.repeat(32)+'/'),exit=new Promise(r=>child.on('exit',r)),reply=new Promise(r=>child.stdout.once('data',r));const body=Buffer.from(JSON.stringify({type:'status'})),h=Buffer.alloc(4);h.writeUInt32LE(body.length);child.stdin.write(h.subarray(0,2));child.stdin.write(Buffer.concat([h.subarray(2),body]));

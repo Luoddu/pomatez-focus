@@ -3,6 +3,10 @@ const bundle=esbuild.buildSync({stdin:{contents:'export * from "./app/renderer/s
 const m=new Module(__filename+'.bundle',module);m._compile(bundle,__filename+'.bundle');
 const {PreferenceSync,PREFERENCE_DEFAULTS,PREFERENCE_KEYS,preferenceHeads,validPreferenceValue,localPreferences}=m.exports;
 const clone=v=>structuredClone(v),equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+test('second-based rest preference round-trips across devices without extra fields',async()=>{
+ const cloud=[],a=device(cloud);a.values.rest.reminderMinutes=.25;await a.sync.synchronize(true);const b=device(cloud);await b.sync.synchronize();assert.ok(b.status.conflicts.some(c=>c.key==='rest'));
+ await b.sync.synchronize(false,{key:'rest',entryId:preferenceHeads(cloud,'rest')[0].id});assert.equal(b.values.rest.reminderMinutes,.25);assert.deepEqual(Object.keys(b.values.rest).sort(),['pomodoroGoal','quotaMinutes','reminderMinutes','supervise']);
+});
 class Memory {constructor(){this.map=new Map();}getItem(k){return this.map.get(k)??null;}setItem(k,v){this.map.set(k,String(v));}}
 function device(cloud,values=clone(PREFERENCE_DEFAULTS),storage=new Memory(),scope='base-A'){
  const d={values,storage,status:null,offline:false,lose:false,failApply:false,live:true,writes:[],reads:0};

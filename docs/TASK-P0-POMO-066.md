@@ -4,7 +4,7 @@
 
 冻结目标：科学专注设置内手动开启每日锁（默认未开启），复用现有已保存记录/有效番茄计数，当日目标默认12。开启后冻结当天目标；未达标App内关闭督促/降低目标/切宽松模式及偏好导入均拒绝。达标后仍须手动临时放行，默认15分钟、可设1–60，到期恢复；每日网站额度继续有效，次日按已保存策略重锁，重启保留当天安排。不设密码、不防卸载；退出App/监测失联/租约过期仍解除页面限制。达标后设置改动用于次日，临时放行单独入口，普通计时/任务/数据不改。提醒支持5–3600整秒、秒/分钟单位可选；保持5秒采集，允许几秒延迟，不增加轮询/逐秒进程。
 
-实现边界：新增本机DailyFocusLock窄状态仅保存启用策略、临时放行时长、当日冻结目标与放行截止，不保存另一份番茄计数/网址/账户。沿原BrowserControl→原生host→MV3→content投影追加窄每日锁字段和能力回执，原协议帧/权限不变；旧配套明确标记需更新，不误称已拦截。UI与主进程设置入口共同校验，日进度由原restProgress供给，未知/新日不借用昨日达标。临时放行不绕当日额度；失联沿既有fail-open。秒数内部沿reminderMinutes数值字段表达整秒/60，旧整分钟兼容，无新增云字段/表/真相源；校验与账本/偏好显示配对更新。
+实现边界：新增本机DailyFocusLock窄状态仅保存启用策略、临时放行时长、当日冻结目标／网站额度／放行时长与放行截止，不保存另一份番茄计数/网址/账户。沿原BrowserControl→原生host→MV3→content投影追加窄每日锁字段和能力回执，原协议帧/权限不变；旧配套明确标记需更新，不误称已拦截。UI与主进程设置入口共同校验，日进度由原restProgress供给，未知/新日不借用昨日达标。临时放行不绕当日额度；失联沿既有fail-open。秒数内部沿reminderMinutes数值字段表达整秒/60，旧整分钟兼容，无新增云字段/表/真相源；校验与账本/偏好显示配对更新。
 
 允许文件：app/electron/src/focus/dailyFocusLock.ts（新增）、browserControl.ts、activitywatch.ts、nativeBrowserHost.ts、restReminderWindow.ts；app/electron/src/main.ts、preload.ts；app/electron/src/assets/browser-control/background.js、content.js、manifest.json；app/electron/src/focus/preferences.ts；app/renderer/src/focus/components/ScientificRest.tsx、preferences.ts、preferenceDiff.ts、focus.css；新增tests/daily-focus-lock.test.cjs、tests/daily-focus-lock-desktop.cjs、scripts/test-daily-focus-lock.cjs；现有tests/browser-control.test.cjs、activitywatch.test.cjs、preferences-api.test.cjs、preference-sync.test.cjs、preference-diff.test.cjs仅对应回归；本卡、docs/ACCEPTANCE-P0-POMO-066.md、docs/BROWSER-CONTROL.md、CHANGELOG.md，版本helper的app/electron/package.json和SettingsPanel.tsx。ignored仅合成profile、纯VM/消息/成品回执、官方证据、包/发行helper、上一公开102安装器提取ASAR。根治理/路线图/锁/根Learning、用户profile/注册/飞书/任务历史/真实Edge不写；本模块Learning仅在独立确认候选后同最终收口checkpoint单写已接受条目。
 
@@ -15,3 +15,5 @@
 资源/预算：本clone build/dist和随机合成profile独占，无数据库/schema/端口/系统服务/其他电脑操作。单轮3小时有界实施/验证/发行，只复用既有review_scientific_rest做只读独立源码/包/公开终验，不新增Agent/后台任务/自动化。未知同因两次停相应尝试，系统/恢复故障先原始复现分类，已知可在卡内修正；超界只停依赖步骤。首次写入/冻结/提交/推送比对status/diff/worktree/实时主线，冲突按红黄绿。
 
 交付：完整测试/实际静默链路/独立复核后，干净固定源码NSIS-only；先draft五资产hash→同HEAD annotated tag→公开prerelease不设Latest；真实上一公开102更新器发现新版、0下载0安装。用户自行App检查安装、更新配套/Edge重新加载，不自动安装或重启个人App。回滚显式revert功能提交，旧102资产不变；新本地承诺文件在回滚后无读者，不迁移/删除用户记录。Learning预检引用065/039，新增候选按证据由模块owner单写最终同commit，不写根Learning。
+
+源码检查点：445/445逻辑、生产构建及5组真实静音桌面通过；独立早期P2已按当日执行三值冻结修正，详见ACCEPTANCE-P0-POMO-066.md。并发复核主线仍1bfe437，单worktree无重叠写者；版本helper实时预留103。尚待冻结独立复核与包／公开旧102更新器终验，未DONE。Learning沿065/039，本轮暂无独立确认新候选。

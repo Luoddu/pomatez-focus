@@ -4766,3 +4766,9 @@ button.stats-range-label:hover {
 .preference-difference dl > div { min-width:0; }
 .preference-difference dt { color:var(--muted); font-size:12px; }
 .preference-difference dd { margin:3px 0 0; font-size:13px; overflow-wrap:anywhere; }
+.daily-focus-summary { display:flex; flex-wrap:wrap; gap:2px 8px; align-items:center; font-size:12px; color:#4e5ac9; }
+.daily-focus-summary small { color:var(--muted); }
+.daily-focus-summary .btn-text { font-size:12px; padding:0; }
+.daily-focus-settings { display:grid; gap:8px; padding:10px 0; border-block:1px solid #eef0f5; }
+.daily-focus-settings small { color:var(--muted); font-size:12px; }
+.rest-settings select[aria-label="提醒间隔单位"] { width:auto; min-width:65px; }

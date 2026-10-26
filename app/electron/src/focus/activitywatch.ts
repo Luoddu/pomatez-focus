@@ -41,6 +41,8 @@ export type RestState = {
     excessMinutes: number;
     kind: "focus" | "quota";
     watchedMinutes: number;
+    watchedSeconds?: number;
+    excessSeconds?: number;
     completedCount: number | null;
   } | null;
 };
@@ -70,6 +72,11 @@ export function dayBounds(now: number, days = 1) {
   start.setDate(start.getDate() - (days - 1));
   return { start: start.getTime(), end: now };
 }
+export function validReminderMinutes(value:any):number {
+  const seconds=Math.round(value*60);
+  if(typeof value!=="number"||!Number.isFinite(value)||seconds<5||seconds>3600||Math.abs(value*60-seconds)>1e-7)throw Error("提醒间隔须为5–3600秒的整数秒");
+  return seconds/60;
+}
 export function validSettings(value: any): RestSettings {
   if (
     !value ||
@@ -82,20 +89,13 @@ export function validSettings(value: any): RestSettings {
     throw Error("额度须为 5–480 分钟，按 5 分钟调整");
   const pomodoroGoal =
     value.pomodoroGoal === undefined ? 12 : value.pomodoroGoal;
-  const reminderMinutes =
-    value.reminderMinutes === undefined ? 5 : value.reminderMinutes;
+  const reminderMinutes = validReminderMinutes(value.reminderMinutes === undefined ? 5 : value.reminderMinutes);
   if (
     !Number.isInteger(pomodoroGoal) ||
     pomodoroGoal < 0 ||
     pomodoroGoal > 60
   )
     throw Error("番茄目标须为 0–60 个整数，0 表示仅按额度提醒");
-  if (
-    !Number.isInteger(reminderMinutes) ||
-    reminderMinutes < 1 ||
-    reminderMinutes > 60
-  )
-    throw Error("提醒间隔须为 1–60 分钟的整数");
   return {
     quotaMinutes: value.quotaMinutes,
     supervise: value.supervise,
@@ -436,14 +436,7 @@ export class ActivityWatchRest {
           stored.ledger.quota % 5 === 0
         ) {
           const old = stored.ledger;
-          const oldInterval =
-            old.interval === undefined ? 5 : old.interval;
-          if (
-            !Number.isInteger(oldInterval) ||
-            oldInterval < 1 ||
-            oldInterval > 60
-          )
-            throw Error("提醒间隔账本无效");
+          const oldInterval =validReminderMinutes(old.interval === undefined ? 5 : old.interval);
           const legacy =
             old.focusStep === undefined &&
             old.quotaCrossed === undefined;
@@ -960,6 +953,8 @@ export class ActivityWatchRest {
             ),
             kind: quotaCrossed ? "quota" : "focus",
             watchedMinutes: Math.floor(u.totalSeconds / 60),
+            watchedSeconds:Math.floor(u.totalSeconds),
+            excessSeconds:Math.max(0,Math.ceil(u.totalSeconds-quota*60)),
             completedCount: count,
           };
           this.emit();

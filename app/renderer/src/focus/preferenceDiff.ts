@@ -21,6 +21,7 @@ export function preferenceDifferences(key: PreferenceKey,values: any[]) {
         if(typeof value==="boolean")return value ? "开启" : "关闭";
         if(key==="weights")return `${value} 倍（${Math.round(value*100)}%）`;
         if(name==="mode")return modes[value] || "未知挡位";
+        if(name==="reminderMinutes"&&!Number.isInteger(value))return `${Math.round(value*60)} 秒`;
         if(key==="weekGoals" || key==="researchGoals" || name==="pomodoroGoal")return `${value} 个有效番茄`;
         return `${value} 分钟`;
       })}));

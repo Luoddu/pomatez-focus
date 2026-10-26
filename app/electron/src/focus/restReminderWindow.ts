@@ -4,6 +4,7 @@ import type { RestState } from "./activitywatch";
 
 export type RestAction = "sleep" | "focus" | "gym";
 type Presentation = { key: string; line: string; gymAvailable: boolean };
+const elapsed=(seconds:number|undefined,minutes:number)=>seconds===undefined?`${minutes} 分钟`:seconds<60?`${seconds} 秒`:seconds%60?`${Math.floor(seconds/60)} 分 ${seconds%60} 秒`:`${seconds/60} 分钟`;
 
 // One short-lived window; never changes the farm's pin or timer ownership.
 export class RestReminderWindow {
@@ -29,8 +30,8 @@ export class RestReminderWindow {
     const previousKey=this.current?.key;
     this.takeFocus=state.browserControl?.policy?.mode!=="mirror";
     this.current = { key: reminder.key, gymAvailable: state.progress?.day === state.usage?.day && state.progress?.gymAvailable === true, line: reminder.kind === "focus"
-      ? `已看 ${reminder.watchedMinutes} 分钟，${state.progress?.effectiveCount !== undefined && state.progress.effectiveCount !== state.progress.completedCount ? "有效番茄" : "番茄"} ${state.progress?.effectiveCount ?? state.progress?.completedCount ?? reminder.completedCount}/${state.settings.pomodoroGoal}：去睡觉，或回到科研主线。`
-      : `已超额 ${reminder.excessMinutes} 分钟：累了去睡觉，或者回到科研主线。` };
+      ? `已看 ${elapsed(reminder.watchedSeconds,reminder.watchedMinutes)}，${state.progress?.effectiveCount !== undefined && state.progress.effectiveCount !== state.progress.completedCount ? "有效番茄" : "番茄"} ${state.progress?.effectiveCount ?? state.progress?.completedCount ?? reminder.completedCount}/${state.settings.pomodoroGoal}：去睡觉，或回到科研主线。`
+      : `已超额 ${elapsed(reminder.excessSeconds,reminder.excessMinutes)}：累了去睡觉，或者回到科研主线。` };
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send("rest-reminder:state", this.snapshot());
       if(!this.headless && previousKey!==reminder.key) { if(this.takeFocus) { this.window.show(); this.window.focus(); } else { this.window.showInactive(); this.window.moveTop(); } }

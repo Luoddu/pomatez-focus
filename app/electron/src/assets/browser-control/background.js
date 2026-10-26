@@ -7,6 +7,11 @@ function decide(state, old, now) {
   // Release the page lease immediately, but keep the original absolute deadline
   // so a short off/disconnect cannot consume the reminder and erase its cooldown.
   if(!ok) return {...old,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
+  if(state.focusLock){
+    const f=state.focusLock,reason=f.quotaSpent?"今日额度已用完":"每日专注锁";
+    const message=f.count===null?"正在确认今日番茄进度，请回到农场。":f.count<f.goal?`今日 ${f.count}/${f.goal} 个有效番茄 · 回到农场，继续主线。`:"今日目标已完成 · 请回到农场，手动临时放行。";
+    return {day:state.day,key:state.reminderKey||old.key,mode:state.mode,until:0,control:{pause:f.blocked&&(old.control?.reason!==reason||old.control?.expiresAt<=now),blockedUntil:f.blocked?state.expiresAt:0,expiresAt:state.expiresAt,reason:f.blocked?reason:"",message:f.blocked?message:""}};
+  }
   const dayChanged=old.day!==state.day, fresh=state.reminderKey && (dayChanged||old.key!==state.reminderKey), key=state.reminderKey||old.key;
   let until=dayChanged||old.mode!==state.mode?0:old.until||0;
   if(fresh&&state.mode==="cooldown") until=now+state.cooldownMinutes*60000;
@@ -56,7 +61,7 @@ else {
     const p=port=chrome.runtime.connectNative(HOST);
     p.onMessage.addListener(state=>{if(port!==p)return;tries=0;enqueue(state,p);});
     p.onDisconnect.addListener(()=>{void chrome.runtime.lastError;if(port!==p)return;release();if(++tries<=3)retry=setTimeout(()=>void connect(),tries*10000);});
-    p.postMessage({type:"status"}); timer=setInterval(()=>{if(port)port.postMessage({type:"status"});},5000);
+    p.postMessage({type:"status",features:["daily-focus-lock-v1"]}); timer=setInterval(()=>{if(port)port.postMessage({type:"status",features:["daily-focus-lock-v1"]});},5000);
   }
   chrome.runtime.onMessage.addListener((v,sender,reply)=>{
     if(v?.type==="getControl"&&target(sender.tab?.url)) { reply(current.control);return; }

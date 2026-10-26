@@ -67,10 +67,10 @@ export const browserControl = new BrowserControl(app.getPath("userData"), __dirn
 export const farmPresence = new FarmPresence(() => win, headless);
 const publishRest = (state: ReturnType<ActivityWatchRest["snapshot"]>) => {
   const browser = browserControl.publish(state);
-  farmPresence.update(state,browser.policy);
+  farmPresence.update(browser.focusLock.enabled?{...state,settings:{...state.settings,supervise:browser.focusLock.blocked}}:state,browser.policy);
   const next={...state,browserControl:browser};
   if(win && !win.isDestroyed()) win.webContents.send("focus:rest-state",next);
-  if(!quitting && farmReady) restPopup.update(next);
+  if(!quitting && farmReady) restPopup.update(browser.focusLock.enabled?{...next,settings:{...next.settings,supervise:false}}:next);
   return next;
 };
 export const restPopup = new RestReminderWindow(__dirname, headless,
@@ -219,16 +219,23 @@ else {
         const canonical=(v:any)=>JSON.stringify(v,Object.keys(v||{}).sort());
         if(value.key === "rest"){
           if(canonical(restMonitor.snapshot().settings)!==canonical(value.expected))throw Error("本机休息规则已变化");
-          return restMonitor.configure(validSettings(value.value));
+          const next=validSettings(value.value);browserControl.focusLock.guardSettings(next,restMonitor.snapshot());return restMonitor.configure(next);
         }
         if(value.key === "browser"){
           if(canonical(browserControl.policy)!==canonical(value.expected))throw Error("本机干预规则已变化");
-          const reply=browserControl.configure(validBrowserPolicy(value.value));publishRest(restMonitor.snapshot());return reply;
+          const reply=browserControl.configure(validBrowserPolicy(value.value),restMonitor.snapshot());publishRest(restMonitor.snapshot());return reply;
         }
         throw Error("不支持的设备偏好");
       });
-      handler("restState", () => ({...restMonitor.snapshot(),browserControl:browserControl.snapshot()}));
-      handler("browserConfigure", value => { browserControl.configure(value); return publishRest(restMonitor.snapshot()); });
+      handler("restState", () => publishRest(restMonitor.snapshot()));
+      handler("browserConfigure", value => { browserControl.configure(value,restMonitor.snapshot()); return publishRest(restMonitor.snapshot()); });
+      handler("focusLockConfigure", value => {
+        const current=browserControl.snapshot();
+        if(value?.enabled&&!current.focusLock.enabled&&!current.focusLockCapable)throw Error("请先更新并连接浏览器配套，再开启每日专注锁");
+        browserControl.focusLock.configure(value,restMonitor.snapshot());return publishRest(restMonitor.snapshot());
+      });
+      handler("focusLockRelease", () => {browserControl.focusLock.release(restMonitor.snapshot());return publishRest(restMonitor.snapshot());});
+      handler("focusLockResume", () => {browserControl.focusLock.resume(restMonitor.snapshot());return publishRest(restMonitor.snapshot());});
       handler("browserSetup", async () => {
         if(headless) throw Error("静默测试不得安装真实浏览器配套");
         const result=browserControl.install(process.execPath);
@@ -243,7 +250,7 @@ else {
         if (failure && state.status !== "recording") throw failure;
         return {...state,browserControl:browserControl.snapshot()};
       });
-      handler("restSettings", (value) => restMonitor.configure(value));
+      handler("restSettings", (value) => {const next=validSettings(value);browserControl.focusLock.guardSettings(next,restMonitor.snapshot());return restMonitor.configure(next);});
       handler("restProgress", (value) => restMonitor.reportProgress(value));
       handler("restStatistics", (value) => restMonitor.statistics(value));
       handler("restAcknowledge", (value) => restMonitor.acknowledge(value));

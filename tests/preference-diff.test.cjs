@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),esbuild=require('esbuild'),Module=require('node:module'),path=require('node:path');
 const bundle=esbuild.buildSync({entryPoints:[path.resolve(__dirname,'../app/renderer/src/focus/preferenceDiff.ts')],bundle:true,platform:'node',format:'cjs',write:false}).outputFiles[0].text,m=new Module(__filename+'.bundle',module);m._compile(bundle,__filename+'.bundle');const {preferenceDifferences:diff}=m.exports;
 test('equal weights including reordered keys have no visible differences',()=>assert.deepEqual(diff('weights',[{research:1,misc:.6},{misc:.6,research:1}]),[]));
+test('fractional-minute reminder preferences show readable whole seconds',()=>{assert.deepEqual(diff('rest',[{reminderMinutes:.25},{reminderMinutes:.5}])[0].values,['15 秒','30 秒']);});
 test('only actual changed fields use Chinese categories and ratios',()=>assert.deepEqual(diff('weights',[{research:1,misc:.6},{research:1,misc:.8}]),[{field:'misc',label:'其他杂事',values:['0.6 倍（60%）','0.8 倍（80%）']}]));
 test('timers and rules show Chinese units, toggles and browser modes',()=>{
  assert.deepEqual(diff('timer',[{focusMinutes:25,restMinutes:5},{focusMinutes:30,restMinutes:5}])[0],{field:'focusMinutes',label:'默认番茄时长',values:['25 分钟','30 分钟']});

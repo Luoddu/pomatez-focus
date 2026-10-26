@@ -17,6 +17,13 @@ const {
 } = require("../app/electron/build/focus/activitywatch");
 const dir = () =>
   fs.mkdtempSync(path.join(os.tmpdir(), "pomo-aw-test-"));
+test('whole-second reminder interval preserves old minutes, exact15s thresholds and same-day restart deduplication',async()=>{
+ for(const seconds of [5,7,15,30,90,3600])assert.equal(validSettings({quotaMinutes:60,supervise:true,reminderMinutes:seconds/60}).reminderMinutes,seconds/60);
+ for(const seconds of [0,4,5.5,3601,NaN])assert.throws(()=>validSettings({quotaMinutes:60,supervise:true,reminderMinutes:seconds/60}));
+ const f=fixture(),directory=dir();let alerts=0;const make=()=>new ActivityWatchRest(directory,()=>{},()=>alerts++,f.request,f.now);let m=make();m.configure({quotaMinutes:60,supervise:true,pomodoroGoal:12,reminderMinutes:.25});m.reportProgress({day:dayKey(f.now()),completedCount:0});
+ f.seconds(14.99);assert.equal((await m.refresh()).reminder,null);f.seconds(15);const first=await m.refresh();assert.equal(first.reminder.watchedSeconds,15);assert.equal(alerts,1);m.acknowledge(first.reminder.key);
+ m=make();assert.equal(m.snapshot().settings.reminderMinutes,.25);m.reportProgress({day:dayKey(f.now()),completedCount:0});assert.equal((await m.refresh()).reminder,null);f.seconds(30);assert.equal((await m.refresh()).reminder.watchedSeconds,30);assert.equal(alerts,2);
+});
 const at = (h = 12, m = 0) => new Date(2026, 9, 7, h, m).getTime();
 test("gym projection uses a bounded current-day boolean; invalid input retains previous value and ordinary progress still works", () => {
   const m=new ActivityWatchRest(dir(),()=>{},()=>{},async()=>{},()=>at());
@@ -364,7 +371,7 @@ test("zero goal disables early prompts; changing interval rebases and invalid in
     { pomodoroGoal: "8" },
     { reminderMinutes: 0 },
     { reminderMinutes: 61 },
-    { reminderMinutes: 2.5 },
+    { reminderMinutes: 1/120 },
     { reminderMinutes: null },
   ])
     assert.throws(() => m.configure({ ...zero, ...bad }));

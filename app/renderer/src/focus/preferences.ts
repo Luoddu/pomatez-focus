@@ -45,7 +45,8 @@ export function validPreferenceValue(key: PreferenceKey, value: any): any {
     valid = integer(value.focusMinutes,1,180) && integer(value.restMinutes,1,60);
   } else if (key === "rest") {
     exact(value, ["quotaMinutes", "supervise", "pomodoroGoal", "reminderMinutes"]);
-    valid = integer(value.quotaMinutes,5,480) && value.quotaMinutes % 5 === 0 && typeof value.supervise === "boolean" && integer(value.pomodoroGoal,0,60) && integer(value.reminderMinutes,1,60);
+    const m=value.reminderMinutes,s=Math.round(m*60);
+    valid = integer(value.quotaMinutes,5,480) && value.quotaMinutes % 5 === 0 && typeof value.supervise === "boolean" && integer(value.pomodoroGoal,0,60) && typeof m==="number" && Number.isFinite(m) && s>=5 && s<=3600 && Math.abs(m*60-s)<1e-7;
   } else if (key === "browser") {
     exact(value,["mode", "cooldownMinutes", "autoRaise"]);
     valid = ["mirror","pause","cooldown","quota"].includes(value.mode) && integer(value.cooldownMinutes,1,30) && typeof value.autoRaise === "boolean";

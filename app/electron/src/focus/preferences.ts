@@ -107,7 +107,7 @@ export function validatePreferenceValue<K extends PreferenceKey>(key: K, value: 
     const quotaMinutes = integer(obj.quotaMinutes, 5, 480);
     if (quotaMinutes % 5) fail("科学休息额度须按5分钟调整");
     result = { quotaMinutes, supervise: boolean(obj.supervise),
-      pomodoroGoal: integer(obj.pomodoroGoal, 0, 60), reminderMinutes: integer(obj.reminderMinutes, 1, 60) };
+      pomodoroGoal: integer(obj.pomodoroGoal, 0, 60), reminderMinutes: (()=>{const m=obj.reminderMinutes as number,s=Math.round(m*60);if(typeof m!=="number"||!Number.isFinite(m)||s<5||s>3600||Math.abs(m*60-s)>1e-7)fail("提醒间隔须为5–3600整秒");return s/60;})() };
   } else {
     const obj = fields(value, ["mode", "cooldownMinutes", "autoRaise"]);
     // Exact browserControl.ts validBrowserPolicy bounds.

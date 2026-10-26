@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import { nativeRegistry } from './nativeRegistry';
 import type { RestState } from "./activitywatch";
+import { DailyFocusLock } from "./dailyFocusLock";
 
 export type BrowserPolicy = { mode: "mirror" | "pause" | "cooldown" | "quota"; cooldownMinutes: number; autoRaise: boolean };
 export const HOST = "io.github.luoddu.pomatez_focus";
@@ -17,29 +18,35 @@ function json(file: string) { if (fs.statSync(file).size > 8192) throw Error("�
 export class BrowserControl {
   policy = { ...defaultBrowserPolicy };
   private error = "";
+  readonly focusLock:DailyFocusLock;
+  private state:RestState|null=null;
   constructor(readonly directory: string, readonly build: string, private now = Date.now) {
+    this.focusLock=new DailyFocusLock(directory,now);
     const file=path.join(directory,"browser-control-settings.json");
     if (fs.existsSync(file)) try { this.policy=validBrowserPolicy(json(file)); } catch (_) { this.policy={...defaultBrowserPolicy,autoRaise:false,mode:"mirror"}; this.error="干预策略损坏，保留原文件，请重新保存"; }
   }
-  configure(v: any) {
+  configure(v: any,state:RestState|null=this.state) {
+    if(this.focusLock.snapshot(state).lockedForChanges)throw Error("今日目标尚未完成，干预挡位已锁定");
     const next=validBrowserPolicy(v); atomic(path.join(this.directory,"browser-control-settings.json"),next);
     this.policy=next; this.error=""; return this.snapshot();
   }
   snapshot() {
-    let connected=false, pausedCount=0, pauseKey="", checkedAt: number|null=null;
+    let connected=false, pausedCount=0, pauseKey="", checkedAt: number|null=null,focusLockCapable=false;
     try { const v=json(path.join(this.directory,"browser-control-receipt.json")); const age=this.now()-v.checkedAt;
-      if(v.owner===OWNER && v.connected===true && age>=0 && age<=12000) { connected=true; checkedAt=v.checkedAt; if (Number.isInteger(v.pausedCount)&&v.pausedCount>=0&&v.pausedCount<=100) pausedCount=v.pausedCount; if(typeof v.pauseKey==="string"&&v.pauseKey.length<=100) pauseKey=v.pauseKey; }
+      if(v.owner===OWNER && v.connected===true && age>=0 && age<=12000) { connected=true; checkedAt=v.checkedAt;focusLockCapable=v.focusLockCapable===true; if (Number.isInteger(v.pausedCount)&&v.pausedCount>=0&&v.pausedCount<=100) pausedCount=v.pausedCount; if(typeof v.pauseKey==="string"&&v.pauseKey.length<=100) pauseKey=v.pauseKey; }
     } catch (_) {}
-    return { policy:{...this.policy}, connected, pausedCount, pauseKey, checkedAt, error:this.error,
+    return { policy:{...this.policy}, connected, pausedCount, pauseKey, checkedAt, error:this.error,focusLockCapable,focusLock:this.focusLock.snapshot(this.state),
       installed:fs.existsSync(path.join(this.directory,"browser-control","host-config.json")) };
   }
   publish(state: RestState) {
+    this.state=state;const lock=this.focusLock.snapshot(state);
     const now=this.now(), live=state.live;
     const ready=state.status==="recording" && !!live && now>=live.checkedAt && now<=live.expiresAt && live.expiresAt<=live.checkedAt+7000 && state.usage?.day===localDay(now);
     try { atomic(path.join(this.directory,"browser-control-projection.json"),{
-      owner:OWNER,v:1,ready,expiresAt:ready?live!.expiresAt:0,day:localDay(now),supervise:state.settings.supervise,
+      owner:OWNER,v:1,ready,expiresAt:ready?live!.expiresAt:0,day:localDay(now),supervise:state.settings.supervise||lock.enabled,
       mode:this.policy.mode,cooldownMinutes:this.policy.cooldownMinutes,reminderKey:ready?(state.reminder?.key||""):"",
       quotaSpent:ready && !!state.usage && state.usage.totalSeconds>=state.settings.quotaMinutes*60,
+      ...(lock.enabled?{focusLock:{blocked:lock.blocked,goal:lock.goal,count:lock.count,until:lock.until,quotaSpent:lock.quotaSpent}}:{}),
     }); } catch (_) { this.error="浏览器控制状态未写入，暂停尚未确认"; }
     return this.snapshot();
   }

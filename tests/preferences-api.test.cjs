@@ -19,6 +19,10 @@ memoryModule._compile(compiled, filename);
 const { PrefsRepository, PREFERENCES_TABLE, PREFERENCE_FIELDS, PREFERENCE_LIMITS,
   PREFERENCE_KEYS, WEIGHT_KEYS, validatePreferenceEntry, validatePreferenceValue, preferenceHeads } = memoryModule.exports;
 const clone = value => JSON.parse(JSON.stringify(value));
+test('rest preference keeps v1 shape and minute units while accepting exact whole-second intervals',()=>{
+ for(const seconds of [5,7,15,30,90,3600]){const value={quotaMinutes:60,supervise:true,pomodoroGoal:12,reminderMinutes:seconds/60};assert.deepEqual(validatePreferenceValue('rest',value),value);}
+ for(const seconds of [0,4,5.5,3601])assert.throws(()=>validatePreferenceValue('rest',{quotaMinutes:60,supervise:true,pomodoroGoal:12,reminderMinutes:seconds/60}));
+});
 const defaults = {
   weights: Object.fromEntries(WEIGHT_KEYS.map(key => [key, 1])),
   weekGoals: { "2026-10-12": 15 }, researchGoals: { "2026-10-12": 29 },
