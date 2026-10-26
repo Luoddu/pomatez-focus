@@ -4,6 +4,17 @@
 
 仅保存本独立仓库已验证、可用于后续农场任务的工程教训；任务状态只看模块执行卡。本文件不写入、不替代澄行根Learning及根路线图。
 
+## LEARN-P0-POMO-067-01 - 实际安装器测试隔离不能只依赖父环境
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-067
+- Evidence: docs/ACCEPTANCE-P0-POMO-067.md; tests/local-update-installed.cjs
+- Applies-To: 本模块通过真实NSIS安装器或其他已验证外部launcher启动、重启专用合成App的隔离测试
+- Lesson: 固定app-builder-lib25.1.8的StartApp走StdUtils.ExecShellAsUser，只传--updated；本机两版boot均记录incomingProfileMatches=false。仅在启动installer父进程设置POMATEZ_PROFILE/POMATEZ_HEADLESS不能证明重启仍隔离。专用fixture在require生产main前固定自己的随机profile和静音后，真实NSIS1→本地updater→NSIS2的records、暂停计时与一致备份均保留，测试产品正常卸载；独立复核已回读官方模板hash与两版boot/重启证据。
+- Required-Check: 专用测试入口先固定并验证隔离profile/静音，再加载生产模块；记录实际启动链的隔离凭据和新旧版状态一致性。跨installer/launcher的测试不能只验证leaf或父进程环境；产品用户目录仍沿原配置，不借测试迁移。
+- Supersedes: none
+- Invalid-When: 换installer/launcher或启动方式时须重新实链验证；不泛化所有launcher都丢环境，也不授权修改生产profile或安全设置。
+
 ## LEARN-P0-POMO-065-01 - 持久恢复完成前不能进入首个控制决策
 
 - Status: VALIDATED

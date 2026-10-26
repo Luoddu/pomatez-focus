@@ -4772,3 +4772,4 @@ button.stats-range-label:hover {
 .daily-focus-settings { display:grid; gap:8px; padding:10px 0; border-block:1px solid #eef0f5; }
 .daily-focus-settings small { color:var(--muted); font-size:12px; }
 .rest-settings select[aria-label="提醒间隔单位"] { width:auto; min-width:65px; }
+.btn-cut{border:1px solid #b8a6df;background:#f3edf9;color:#75539d;border-radius:28px;padding:12px 23px;font:inherit;font-weight:600;cursor:pointer}.btn-cut:disabled{opacity:.45;cursor:default}.chip.partial-tomato{border-style:dashed;background:linear-gradient(135deg,rgba(166,144,201,.18),rgba(166,144,201,.04));box-shadow:inset 0 -3px 0 rgba(132,103,178,.22)}.partial-note{font-size:13px;color:#8b72a9}

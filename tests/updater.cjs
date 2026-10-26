@@ -6,6 +6,7 @@ app.whenReady().then(async()=>{try{
   async checkForUpdates(){this.checks=(this.checks||0)+1;this.emit('update-available',{version:'0.1.0-preview.21'})}
   async downloadUpdate(){this.downloads=(this.downloads||0)+1;this.emit('download-progress',{percent:50,transferred:5,total:10});if(this.fail)throw Error('hash mismatch');return ['verified.exe']}
   quitAndInstall(...args){this.installs=(this.installs||0)+1;assert.deepEqual(args,[true,true])}
+  setFeedURL(v){this.feed=v}
  }
  const mock=new Mock(),states=[];let ready=0,active=true;
  const u=new FocusUpdater(s=>states.push(s),async()=>{ready++;if(active)u.defer();else u.install()},mock,'0.1.0-preview.20');
@@ -17,6 +18,9 @@ app.whenReady().then(async()=>{try{
  await v.check();await v.download();assert.equal(v.status().phase,'error');assert.equal(bad.installs,undefined);
  const fresh=new Mock();fresh.checkForUpdates=async()=>fresh.emit('update-not-available');const w=new FocusUpdater(()=>{},async()=>{},fresh,'0.1.0-preview.20');
  await w.check();assert.equal(w.status().phase,'current');await w.download();assert.equal(fresh.downloads,undefined);
+ const localMock=new Mock();localMock.fail=true;const local=new FocusUpdater(()=>{},async()=>local.defer(),localMock,'0.1.0-preview.20');
+ await assert.rejects(local.prepareLocal('http://127.0.0.1:12345/'+'a'.repeat(48)+'/','0.1.0-preview.21'));assert.equal(local.status().local,true);assert.equal(localMock.installs,undefined);
+ localMock.fail=false;await local.check();assert.equal(local.status().local,false);await local.download();assert.equal(local.status().local,false);assert.equal(local.status().phase,'downloaded');assert.equal(localMock.installs,undefined);assert.match(local.status().message,/先结束/);
  const {NsisUpdater}=require('electron-updater'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),{randomUUID}=require('node:crypto');
  const dir=path.join(__dirname,'../artifacts/test-profiles',randomUUID());fs.mkdirSync(dir,{recursive:true});
  app.setPath('userData',dir);

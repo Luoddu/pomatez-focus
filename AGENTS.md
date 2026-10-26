@@ -13,6 +13,8 @@
 
 验证命令与换机步骤见 `docs/DEVELOPMENT.md`；本轮整合证据见 `docs/ACCEPTANCE-integration.md`。
 
+用户2026-10-26补充本机交付偏好：先准备并使用已验证的本地NSIS安装包，再上传同源GitHub更新，避免本机重新下载。104起用`scripts/stage-local-update.cjs`原子准备当前用户本地包，用户在设置点“重启以加载更新”；不热覆盖ASAR，不自动点击重启。首次旧103无入口时，用户已单独同意P0-POMO-067在保存现场后用本地包升级一次；此首次授权不泛化为以后可自动关闭App。远端五资产、独立复核、真实旧更新器、不可变tag和源码同步门禁保持，详见`docs/LOCAL-UPDATE.md`。
+
 ## Mac 个人版独立发布
 
 用户要求 Mac 按月汇总。Mac 使用 `v0.1.0-mac.N` prerelease 和 `scripts/package-mac-personal.cjs`，详见 `docs/MAC-PERSONAL.md`。以上第5条 Windows 版本递增与打包流程不用于 Mac；其他干净源码、实时远端、授权、数据审查规则照常。Mac 不修改 Windows preview 计数/更新文件，不设 Latest，不替换旧资产，不建立定时发布。

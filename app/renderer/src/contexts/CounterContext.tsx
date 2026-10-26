@@ -12,6 +12,7 @@ import {
   FocusTask,
   advanceSession,
   confirmSession,
+  cutSession,
   restoreSession,
   reassignActiveSession,
   returnFromReview,
@@ -44,6 +45,7 @@ type CounterProps = {
   resume: () => void;
   finish: () => void;
   confirm: (seconds: number, completed: number, mood?: number) => void;
+  cut: (seconds:number,mood?:number)=>void;
   discard: () => void;
   returnToTiming: () => void;
   markSynced: (
@@ -160,7 +162,7 @@ const CounterProvider: React.FC = ({ children }) => {
     }
     const active = advanceSession(current.active, delta);
     if (
-      active.elapsedSeconds >= active.plannedSeconds &&
+      timeParts(active).remaining === 0 &&
       !notified.current
     ) {
       notified.current = true;
@@ -352,6 +354,13 @@ const CounterProvider: React.FC = ({ children }) => {
       setNotice("专注记录已保存。");
       setError("");
     });
+  const cut=(seconds:number,mood?:number)=>action(()=>{
+    const next=dataRef.current;
+    if(!next.active)throw Error("当前没有待确认记录");
+    const record=cutSession(next.active,seconds,mood);
+    publish({active:null,records:upsertRecord(next.records,record)});
+    setNotice("本段已保存，番茄尚未完成；下次选择同一个番茄继续。");setError("");
+  });
   // receipt.completedCount 是原表行“本次达标”标记（0/1），不回写覆盖
   // 本地记录里用户确认的番茄数；只补记 syncedPlanId
   const markSynced = (
@@ -499,6 +508,7 @@ const CounterProvider: React.FC = ({ children }) => {
         resume,
         finish,
         confirm,
+        cut,
         discard,
         returnToTiming,
         markSynced,

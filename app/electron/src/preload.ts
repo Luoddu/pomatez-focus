@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld("focusApi", {
     return () => ipcRenderer.removeListener("focus:rest-state", listener);
   },
   updateStatus: () => invoke("updateStatus"),
+  restartApp: () => invoke("restartApp"),
   checkUpdate: () => invoke("checkUpdate"),
   downloadUpdate: () => invoke("downloadUpdate"),
   installUpdate: () => invoke("installUpdate"),

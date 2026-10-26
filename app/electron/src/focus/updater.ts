@@ -10,12 +10,14 @@ export type UpdateState = {
   total?: number;
   message?: string;
   manual?: boolean;
+  local?: boolean;
 };
 // Official NSIS lifecycle; no credentials, alternate feed URLs, or shell update scripts.
 export class FocusUpdater {
   private updater: any;
   private busy = false;
   private state: UpdateState;
+  private localInput=false;
   constructor(private publish: (s: UpdateState) => void, private ready: () => Promise<void>, updater?: any, version = app.getVersion(), platform = process.platform, private openRelease = () => shell.openExternal("https://github.com/Luoddu/pomatez-focus/releases?q=mac&expanded=true")) {
     this.state = {phase: "idle", currentVersion: version, percent: 0};
     if (platform === "darwin") {
@@ -45,6 +47,7 @@ export class FocusUpdater {
       return this.status();
     }
     if (this.busy || ["downloaded", "installing"].includes(this.state.phase)) return this.status();
+    if(!this.localInput)this.set({local:false});
     this.busy = true; this.set({phase: "checking", message: undefined});
     try {
       const result = await this.updater.checkForUpdates();
@@ -62,12 +65,28 @@ export class FocusUpdater {
       const files = await this.updater.downloadUpdate();
       if (!files?.length) throw Error("No verified installer");
       this.set({phase: "downloaded", percent: 100, message: "下载完成，准备安装"});
-      await this.ready();
+      if(!this.localInput)await this.ready();
     } catch { this.set({phase: "error", message: "下载或校验失败，未安装更新；请重新检查更新。"}); }
     finally { this.busy = false; }
     return this.status();
   }
   defer() { this.set({message: "更新已下载；请先结束或放弃当前专注，再点击安装并重启。"}); }
+  async prepareLocal(url:string,version:string){
+    const parsed=new URL(url);
+    if(parsed.protocol!=="http:"||parsed.hostname!=="127.0.0.1"||!parsed.port||!/^\/[a-f0-9]{48}\/$/.test(parsed.pathname)||parsed.username||parsed.password||parsed.search||parsed.hash)throw Error("本地更新地址无效");
+    if(this.busy||this.state.phase==="installing")throw Error("更新操作正在进行");
+    if(this.state.local&&this.state.phase==="downloaded"&&this.state.version===version)return this.status();
+    this.localInput=true;this.set({phase:"idle",local:true,version,percent:0,message:"正在校验本机准备的更新…"});
+    try{
+      this.updater.setFeedURL({provider:"generic",url,channel:"preview"});
+      await this.check();if(this.state.phase!=="available"||this.state.version!==version)throw Error("本地更新版本未确认");
+      await this.download();if(this.status().phase!=="downloaded")throw Error("本地更新校验未完成");
+    }finally{
+      this.localInput=false;
+      this.updater.setFeedURL({provider:"github",owner:"Luoddu",repo:"pomatez-focus",channel:"preview"});
+    }
+    return this.status();
+  }
   install() {
     if (this.state.manual) return;
     if (this.state.phase !== "downloaded") return;

@@ -2,6 +2,7 @@ import React from "react";
 import { FocusSession, Mood, timeParts } from "../session";
 import { MoodPicker, parseTitle } from "./shared";
 import { loadTimerPreferences } from "../preferences";
+import { partialProgress } from "../partialTomato";
 
 export default function ReviewPanel({
   active,
@@ -18,6 +19,7 @@ export default function ReviewPanel({
   onSaveNext,
   onDiscard,
   onReturn,
+  onCut,
 }: {
   active: FocusSession;
   accepted: string;
@@ -33,11 +35,14 @@ export default function ReviewPanel({
   onSaveNext: () => void;
   onDiscard: () => void;
   onReturn: () => void;
+  onCut:()=>void;
 }) {
   const parts = timeParts(active);
   const parsed = parseTitle(active.task.title);
   const plannedMinutes = active.plannedSeconds / 60;
   const planMode = active.syncTarget === "plan";
+  const remainder=partialProgress(active.task,active.plannedSeconds).remaining;
+  const canCut=Number(accepted)>0&&Math.round(Number(accepted)*60)<remainder;
   // 快选上限：实际分钟/番茄时长向上取整再 +1 封顶（53 分钟/25 分钟 → 可选 0–3）
   const maxCount = Math.min(
     100,
@@ -140,6 +145,7 @@ export default function ReviewPanel({
           </span>
         </div>
         <div className="review-actions">
+          <button className="btn-cut" disabled={!canCut} title="保存本段时长，不计完成；之后回到同一个番茄继续剩余时间" onClick={onCut}>切断本次</button>
           <button className="btn-primary" onClick={onSave}>
             记录番茄
           </button>

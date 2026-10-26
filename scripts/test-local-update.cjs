@@ -1,0 +1,1 @@
+const {spawnSync}=require('node:child_process'),path=require('node:path');const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;const r=spawnSync(require('electron'),[path.resolve(__dirname,'../tests/local-update-desktop.cjs'),'--mute-audio'],{env,windowsHide:true,stdio:'inherit',timeout:65000});if(r.error)throw r.error;process.exit(r.status??1);

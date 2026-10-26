@@ -13,6 +13,7 @@ import path from "path";
 import fs from "fs";
 import { FocusService } from "./focus/service";
 import { FocusUpdater } from "./focus/updater";
+import { LocalUpdate } from "./focus/localUpdate";
 import { ActivityWatchRest, validSettings } from "./focus/activitywatch";
 import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
@@ -309,16 +310,40 @@ else {
       const updater = new FocusUpdater(
         (state) => {
           if (win && !win.isDestroyed())
-            win.webContents.send("focus:update-state", state);
+            win.webContents.send("focus:update-state", {...state,localUpdate:localUpdates.snapshot()});
         },
         async () => {
           await installUpdate();
         }
       );
-      handler("updateStatus", () => updater.status());
-      handler("checkUpdate", () => updater.check());
-      handler("downloadUpdate", () => updater.download());
-      handler("installUpdate", installUpdate);
+      const localUpdates=new LocalUpdate(app.getPath("userData"),app.getVersion());
+      let restarting=false;
+      handler("restartApp",async()=>{
+        if(restarting)return {restarting:true};
+        restarting=true;let served:Awaited<ReturnType<LocalUpdate["serve"]>>|undefined,localPrepared=false;
+        const freeze=async()=>win!.webContents.executeJavaScript(`(()=>{const s=JSON.parse(localStorage.getItem('pomatez-focus-v1')||'{"active":null,"records":[]}');if(!Array.isArray(s.records)||s.active&&!['paused','review'].includes(s.active.status))throw Error('请先暂停并保存当前计时');document.documentElement.inert=true;return s;})()`);
+        try{
+          await freeze();
+          if(localUpdates.snapshot().error)throw Error(localUpdates.snapshot().error);
+          if(localUpdates.snapshot().available){
+            if(process.platform!=="win32")throw Error("本地安装更新仅支持Windows");
+            served=await localUpdates.serve();await updater.prepareLocal(served.url,served.version);localPrepared=true;await served.close();served=undefined;
+          }
+          const snapshot=await freeze(),backups=path.join(app.getPath("userData"),"backups");
+          fs.mkdirSync(backups,{recursive:true});fs.writeFileSync(path.join(backups,`before-restart-${Date.now()}.json`),JSON.stringify(snapshot),{flag:"wx",mode:0o600});
+          if(localPrepared&&updater.status().local&&updater.status().phase==="downloaded")updater.install();
+          else{app.relaunch();app.quit();}
+          return {restarting:true};
+        }catch(error){
+          if(served)await served.close();restarting=false;
+          if(win&&!win.isDestroyed())await win.webContents.executeJavaScript("document.documentElement.inert=false");
+          throw error;
+        }
+      });
+      handler("updateStatus", () => ({...updater.status(),localUpdate:localUpdates.snapshot()}));
+      handler("checkUpdate", async() => {await updater.check();return {...updater.status(),localUpdate:localUpdates.snapshot()};});
+      handler("downloadUpdate", async() => {await updater.download();return {...updater.status(),localUpdate:localUpdates.snapshot()};});
+      handler("installUpdate", async() => {await installUpdate();return {...updater.status(),localUpdate:localUpdates.snapshot()};});
       handler("windowState", () => ({
         compact: compactMode,
         pinned: win!.isAlwaysOnTop(),

@@ -14,4 +14,6 @@
 
 资源/预算：本clone build/dist与合成随机profile独占，固定本机当前用户local-update及首次App安装的控制权仅本卡，端口仅显式安装期间127.0.0.1随机短期监听，结束关闭；无DB/schema/生产共享服务。一次前台4小时有界交付；依项目规则复用既有review_scientific_rest作只读独立复核，不新增子Agent、后台自动化或真实外部消息。写前/检查点/提交/发布复核status、基线到主线diff和worktree；未知同因两次停对应步骤，底层故障先T0，已知官方修正可在预算内继续。包/本机安装/公开分别有门禁，无验收不标DONE。
 
-回滚：显式revert本次源码，旧103/tag/assets保留；用户数据原结构和记录未迁移，已有0完成段仍可原版手动累计；本地staging副本非真相源，不删用户原始文件。首次升级保留已安装版本/一致快照备份，失败不发布；必要时使用保留旧安装包回装，不修改数据。Learning每检查点判定，新增候选由模块owner只在独立确证后最终同commit写模块Learning，根Learning不写。
+回滚：显式revert本次源码，旧103/tag/assets保留；用户数据原结构和记录未迁移，已有0完成段仍可原版手动累计；本地staging副本非真相源，不删用户原始文件。首次升级保留已安装版本/一致快照备份，失败不发布；必要时使用保留旧安装包回装，不修改数据。Learning每检查点判定，新增候选由模块owner只在独立确证后本次原子检查点同commit写模块Learning，根Learning不写。
+
+源码检查点：453/453、7组静音分段实链、重启备份/单飞及原updater负例、完整UUID NSIS本地安装重启均通过；早期三P2闭环及固定官方模板hash/候选Learning详见ACCEPTANCE-P0-POMO-067.md。首次真实UI只读定位到当前用户农场，尚未安装/修改个人App；用户已同意交付时本地bootstrap。版本helper实时预留104。Learning候选已独立接受，当前源码原子检查点同commit记录，最终收口引用。

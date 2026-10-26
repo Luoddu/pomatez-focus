@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FocusSession, FocusTask } from "../session";
+import { partialProgress } from "../partialTomato";
 import { tomatoTone } from "../week";
 import { Ring, clock, groupTasks, parseTitle, quadrantMeta } from "./shared";
 
@@ -26,6 +27,7 @@ export default function FocusTimer({
 }) {
   const parsed = parseTitle(active.task.title);
   const quadrant = quadrantMeta(active.task.quadrant);
+  const carried=partialProgress(active.task,active.plannedSeconds).credit;
   const plannedMinutes = Math.round(active.plannedSeconds / 60);
   // 「结束」二次确认防误触：第一次进入确认态，3 秒不点自动还原；再点才真结束
   const [confirming, setConfirming] = useState(false);
@@ -165,13 +167,14 @@ export default function FocusTimer({
           size={300}
           stroke={16}
           tone={ringTone}
-          progress={active.elapsedSeconds / active.plannedSeconds}
+          progress={(carried+active.elapsedSeconds) / active.plannedSeconds}
           className={active.status === "paused" ? "is-paused" : ""}
         >
           <div className="ring-time" data-testid="time">
             {shownTime}
           </div>
           <div className="ring-note">{note}</div>
+          {carried>0&&<div className="ring-elapsed partial-note">接续 · 之前已投入 {clock(carried)}</div>}
           {/* 攒满一个番茄后才亮出「已专注」，此前的每一分钟保持安静 */}
           {active.elapsedSeconds >= active.plannedSeconds && (
             <div className="ring-elapsed">

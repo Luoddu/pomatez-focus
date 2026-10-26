@@ -11,6 +11,7 @@ import { chipWindow } from "../chipWindow";
 import FarmField from "./FarmField";
 import TaskTitle from "./TaskTitle";
 import { effectiveTaskProgress, formatEffective, TomatoWeights } from "../weights";
+import { withTaskCredit, partialProgress } from "../partialTomato";
 
 // 已收格子的视觉上限：计划数很大时只画前 12 格，文字仍显示真实 x/y
 const HARVEST_CELLS_MAX = 12;
@@ -154,18 +155,21 @@ const GroupList = ({
                           +{hiddenBefore}
                         </span>
                       )}
-                      {rows.slice(win.start, win.end).map((task) => (
+                      {rows.slice(win.start, win.end).map((task) => {
+                        const partial=partialProgress(withTaskCredit(task,records));return (
                         <button
                           key={task.id}
                           className={`chip tone-${
                             task.quadrant || "unu"
                           } ${task.id === selected ? "selected" : ""} ${
                             task.kind === "pending" ? "pending" : ""
+                          } ${partial.credit>0?"partial-tomato":""
                           }`}
                           title={
-                            canComplete(task)
+                            (canComplete(task)
                               ? `${task.title}（右键可标记完成）`
-                              : task.title
+                              : task.title)
+                          + (partial.credit>0?` · 未完成：已投入 ${clock(partial.credit)}，剩余 ${clock(partial.remaining)}`:"")
                           }
                           disabled={task.kind === "pending"}
                           onClick={() => onSelect(task.id)}
@@ -182,7 +186,7 @@ const GroupList = ({
                         >
                           {parseTitle(task.title).pomodoro}
                         </button>
-                      ))}
+                      );})}
                       {hiddenAfter > 0 && (
                         <span
                           className="chips-more"
@@ -321,6 +325,8 @@ export default function QuadrantBoard({
   journalConnected,
   boardScope = null,
   onMove,
+  resumeFree,
+  onResumeFree,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -358,6 +364,8 @@ export default function QuadrantBoard({
   journalConnected: boolean;
   boardScope?: string | null;
   onMove?: Move;
+  resumeFree?: FocusTask[];
+  onResumeFree?:(task:FocusTask)=>void;
 }) {
   const [adding, setAdding] = useState<FocusQuadrant | null>(null);
   const dragRef = useRef<BoardDrag | null>(null);
@@ -473,6 +481,7 @@ export default function QuadrantBoard({
             分钟
           </span>
           <div className="action-side-row">
+            {resumeFree?.map(task=><button key={task.id} className="btn-text resume-free" disabled={busy||blocked} title="继续之前切断的同一个自由番茄" onClick={()=>onResumeFree?.(task)}>接续自由番茄 · 剩余 {clock(partialProgress(task).remaining)}</button>)}
             {canBreak && restSeconds <= 0 && (
               <button className="btn-text" onClick={onBreak}>
                 休息 {breakMinutes} 分钟

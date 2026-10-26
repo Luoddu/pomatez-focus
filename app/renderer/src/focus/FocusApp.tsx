@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { withTaskCredit, partialProgress, resumableFreeTasks } from "./partialTomato";
 import { CounterContext } from "contexts/CounterContext";
 import { DEFAULT_WEIGHTS, loadWeights, saveWeights, effectiveCount, effectiveWeekCount, effectiveToneRecords, TomatoWeights } from "./weights";
 import { loadTimerPreferences, saveTimerPreferences, PREFERENCES_CHANGED } from "./preferences";
@@ -659,7 +660,7 @@ export default function FocusApp() {
       setCompleted(
         Math.min(
           100,
-          Math.max(0, Math.floor(base / active.plannedSeconds))
+          Math.max(0, Math.floor((base + partialProgress(active.task,active.plannedSeconds).credit + 1e-7) / (active.task.goalSeconds || active.plannedSeconds)))
         )
       );
       setCompletedTouched(false);
@@ -674,7 +675,7 @@ export default function FocusApp() {
     setAccepted(value);
     if (active && !completedTouched) {
       const auto = Math.floor(
-        Number(value) / (active.plannedSeconds / 60)
+        (Number(value)*60 + partialProgress(active.task,active.plannedSeconds).credit + 1e-7) / (active.task.goalSeconds || active.plannedSeconds)
       );
       setCompleted(
         Number.isFinite(auto) ? Math.min(100, Math.max(0, auto)) : 0
@@ -1541,23 +1542,7 @@ export default function FocusApp() {
     ...(sourceKey ? { sourceKey } : {}),
   });
   // 开始一个任务：把未同步的同一 planId 记录折算进 creditedSeconds 后再起计时
-  const withPendingCredit = (task: FocusTask): FocusTask => {
-    const unsyncedSeconds = task.planId
-      ? pending
-          .filter(
-            (r) =>
-              r.syncTarget === "plan" &&
-              r.task.sourceKey === task.sourceKey &&
-              r.task.planId === task.planId &&
-              !task.appliedSessionIds?.includes(r.id)
-          )
-          .reduce((n, r) => n + (r.acceptedSeconds || 0), 0)
-      : 0;
-    return {
-      ...task,
-      creditedSeconds: (task.creditedSeconds || 0) + unsyncedSeconds,
-    };
-  };
+  const withPendingCredit = (task: FocusTask): FocusTask => withTaskCredit(task,timer.getSnapshot().records);
   const restScope = sourceKey || "local";
   const [actualRestLog, setActualRestLog] = useState<RestLog | null>(null);
   useEffect(() => {
@@ -1632,7 +1617,7 @@ export default function FocusApp() {
   const beginTask = (task: FocusTask) => {
     const previousId = timer.getSnapshot().active?.id;
     try {
-      withRestEnd(() => timer.begin(withPendingCredit(task), minutes), () => {
+      withRestEnd(() => timer.begin(withPendingCredit(task), (withPendingCredit(task).goalSeconds || minutes*60)/60), () => {
         const current = timer.getSnapshot().active;
         return !!current && current.status === "active" && current.id !== previousId;
       });
@@ -1901,6 +1886,7 @@ export default function FocusApp() {
               onDiscard={() => {
                 timer.discard();
               }}
+              onCut={() => timer.cut(Math.round(Number(accepted)*60),reviewMood ?? undefined)}
               onReturn={timer.returnToTiming}
             />
           ) : view === "timing" && active ? (
@@ -1921,6 +1907,8 @@ export default function FocusApp() {
             />
           ) : (
             <QuadrantBoard
+              resumeFree={resumableFreeTasks(timer.records,sourceKey||"local")}
+              onResumeFree={task=>beginTask({...task,creditedSeconds:0,appliedSessionIds:[]})}
               tasks={boardTasks}
               boardScope={boardScope}
               onMove={loadingTasks || timer.blocked ? undefined : moveBoard}

@@ -139,17 +139,25 @@ export function advanceSession(
 }
 
 export function timeParts(session: FocusSession) {
+  const credit=session.task.creditedSeconds || 0,goal=session.task.goalSeconds || session.plannedSeconds;
+  const remainingGoal = credit>0&&credit<goal?goal-credit:session.plannedSeconds;
   return {
     remaining: Math.max(
       0,
-      session.plannedSeconds - session.elapsedSeconds
+      remainingGoal - session.elapsedSeconds
     ),
-    base: Math.min(session.plannedSeconds, session.elapsedSeconds),
+    base: Math.min(remainingGoal, session.elapsedSeconds),
     overtime: Math.max(
       0,
-      session.elapsedSeconds - session.plannedSeconds
+      session.elapsedSeconds - remainingGoal
     ),
   };
+}
+
+export function cutSession(session:FocusSession,seconds:number,mood?:number):FocusSession {
+  const parts=timeParts(session),remainingGoal=parts.base+parts.remaining;
+  if(seconds<=0 || seconds>=remainingGoal)throw Error("切断仅保存尚未完成的一段，请记录有效的部分时长");
+  return confirmSession(session,seconds,0,mood);
 }
 
 export function confirmSession(
