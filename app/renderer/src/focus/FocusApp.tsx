@@ -1798,6 +1798,7 @@ export default function FocusApp() {
     onToggleCompact: () => windowMode(true, true),
   };
   const capture = <FocusCapture title={captureTitle} onTitle={setCaptureTitle}
+    allowEntry={view==="timing" && !!active}
     items={outbox.filter(isCapturedTask).map(e=>e.payload as QuickTask)}
     canCapture={connectionReady && connected && !!sourceKey && !timer.blocked && !editQueue.storageError}
     canOrganize={!active || active.status==="review"}
