@@ -24,4 +24,4 @@ Learning recorded LEARN-P0-POMO-067-01（独立已接受，本次源码原子检
 
 个人升级未执行：Windows截图通道两次超时，按钮输入报coordinate input geometry is unavailable，未获得暂停/退出证据，未强杀、未复制热LevelDB、未运行安装器。用户随后明确“我晚点自己升级”，本轮不再代关/备份/安装；保留本地最终包后继续GitHub发布。未执行的临时备份helper被独立指出枚举错误未fail closed，不纳入交付、不作为个人备份成功证明，也不用于后续安装。
 
-Learning沿已记录LEARN-P0-POMO-067-01（01dc684同commit）；截图通道故障根因未明，不写未经验证通用教训。按用户新指令，剩余发布由068合并收口，个人安装由用户自行决定。旧103/tag/资产保留，用户原数据不迁移删除。
+Learning沿已记录LEARN-P0-POMO-067-01（01dc684同commit）；截图通道故障根因未明，不写未经验证通用教训。已随068的105合并公开收口：固定9ca4e5fb77c0fa21f7ddc3bf4d38b2285ce1c03a，独立源码/224文件包源/公开终验PASS，真实103发现105、0下载。最终原始证据见ACCEPTANCE-P0-POMO-068；个人安装由用户自行决定，未代关或安装。旧103/tag/资产保留，用户原数据不迁移删除。状态DONE。
