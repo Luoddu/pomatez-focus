@@ -1,6 +1,41 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const captureModule={exports:{}};
+new Function('exports','require','module',require('typescript').transpileModule(require('node:fs').readFileSync('app/renderer/src/focus/editQueue.ts','utf8'),{compilerOptions:{module:1,target:7}}).outputText)(captureModule.exports,require,captureModule);
+const {EditQueue:CaptureQueue,isCapturedTask}=captureModule.exports;
+const captureStore=()=>{let raw=null,fail=false;return {getItem:()=>raw,setItem:(_k,v)=>{if(fail)throw Error('disk full');raw=v},fail:(v)=>{fail=v}}};
+const captured=(id='capture-1')=>({id,sourceKey:'synthetic',kind:'task',state:'pending',payload:{id,sourceKey:'synthetic',title:'Remember this',count:1,quadrant:'unu',day:123,capture:true}});
+test('captured task persists but does not drain or block unrelated ready tasks',async()=>{
+  const store=captureStore(),q=new CaptureQueue(store);q.add(captured());q.add({...captured('ready'),payload:{...captured('ready').payload,capture:undefined}});
+  const sent=[];await q.drain('synthetic',async e=>sent.push(e.id));
+  assert.deepEqual(sent,['ready']);assert.equal(q.entries.length,1);assert.ok(isCapturedTask(new CaptureQueue(store).entries[0]));
+});
+test('explicit classification releases the original id once with chosen project and slots',async()=>{
+  const q=new CaptureQueue(captureStore());q.add(captured());const before=structuredClone(q.entries[0].payload);
+  q.releaseCapture(before,'  Later work  ','inu',3,{id:'project-7',projectType:'research'});
+  const after=q.entries[0].payload;assert.equal(after.id,before.id);assert.equal(after.day,new Date().setHours(0,0,0,0));assert.equal(after.title,'Later work');assert.equal(after.projectId,'project-7');assert.equal(after.count,3);assert.equal(after.capture,undefined);
+  assert.throws(()=>q.releaseCapture(before,'stale','iu',1),/已改变/);
+  const sent=[];await q.drain('synthetic',async e=>sent.push(e.payload));assert.equal(sent.length,1);assert.equal(q.entries.length,0);
+});
+test('capture classification storage failure preserves draft and allows identical retry',()=>{
+  const store=captureStore(),q=new CaptureQueue(store);q.add(captured());const before=structuredClone(q.entries[0].payload);store.fail(true);
+  assert.throws(()=>q.releaseCapture(before,'Edited','iu',2),/保存/);assert.deepEqual(q.entries[0].payload,before);
+  store.fail(false);q.releaseCapture(before,'Edited','iu',2);assert.equal(new CaptureQueue(store).entries[0].payload.title,'Edited');
+});
+test('capture rejects stale content, invalid fields and wrong scope without changing stored draft',()=>{
+  const q=new CaptureQueue(captureStore());q.add(captured());const before=structuredClone(q.entries[0].payload);
+  for(const stale of [{...before,title:'older'},{...before,sourceKey:'other'}])assert.throws(()=>q.releaseCapture(stale,'Edit','iu',1),/已改变/);
+  for(const [title,quadrant,count] of [[' ','iu',1],['x'.repeat(201),'iu',1],['x','bad',1],['x','iu',0],['x','iu',1.5]])assert.throws(()=>q.releaseCapture(before,title,quadrant,count),/检查/);
+  assert.deepEqual(q.entries[0].payload,before);
+});
+test('cross-day release moves untouched capture to today but preserves used slot day and sequence',()=>{
+  const q=new CaptureQueue(captureStore());q.add(captured());const before=structuredClone(q.entries[0].payload);
+  const used={task:{quickTask:{id:before.id,sequence:2},sourceKey:before.sourceKey}};
+  assert.throws(()=>q.releaseCapture(before,'Used','iu',1,undefined,[used],456),/已经开始/);
+  q.releaseCapture(before,'Used','iu',2,undefined,[used],456);assert.equal(q.entries[0].payload.day,123);
+  const fresh=new CaptureQueue(captureStore());fresh.add(captured());fresh.releaseCapture(before,'Untouched','iu',1,undefined,[{task:{...used.task,sourceKey:'foreign'}}],456);assert.equal(fresh.entries[0].payload.day,456);assert.equal(fresh.entries[0].id,before.id);
+});
 const {
   Feishu,
   connectionKey,

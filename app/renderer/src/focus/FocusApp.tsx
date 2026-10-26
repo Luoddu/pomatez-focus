@@ -26,6 +26,7 @@ import {
   PendingEdit,
   QuickTask,
   RemovePlan,
+  isCapturedTask,
 } from "./editQueue";
 import { recolorSession } from "./classification.js";
 import { Journey, journeyDay, readJourney, reconcileJourney, gymRestTarget } from "./journey.js";
@@ -47,6 +48,7 @@ import {
 import QuadrantBoard from "./components/QuadrantBoard";
 import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup } from "./boardLayout";
 import FocusTimer from "./components/FocusTimer";
+import FocusCapture from "./components/FocusCapture";
 import ReviewPanel from "./components/ReviewPanel";
 import SettingsPanel, { FocusConfig } from "./components/SettingsPanel";
 import HistoryPanel from "./components/HistoryPanel";
@@ -339,6 +341,7 @@ export default function FocusApp() {
     return () => clearTimeout(t);
   }, [harvestProgress]);
   const [editQueue] = useState(() => new EditQueue(localStorage));
+  const [captureTitle,setCaptureTitle]=useState("");
   const [editRevision, setEditRevision] = useState(0);
   useEffect(
     () => editQueue.subscribe(() => setEditRevision((n) => n + 1)),
@@ -695,7 +698,7 @@ export default function FocusApp() {
       timer.blocked ||
       editQueue.running ||
       editQueue.entries.some(
-        (e) => e.sourceKey === sourceKey && e.state === "pending"
+        (e) => e.sourceKey === sourceKey && e.state === "pending" && !isCapturedTask(e)
       ) ||
       completionQueue.running
     )
@@ -866,7 +869,8 @@ export default function FocusApp() {
     title: string,
     quadrant: FocusQuadrant,
     count: number,
-    project?: FocusProject
+    project?: FocusProject,
+    capture?: true
   ) => {
     if (!connected || !sourceKey || !api())
       throw Error("请先在设置中连接飞书");
@@ -880,6 +884,7 @@ export default function FocusApp() {
       count,
       projectId: project?.id,
       projectType: project?.projectType,
+      ...(capture?{capture}:{}),
       day: new Date(
         now.getFullYear(),
         now.getMonth(),
@@ -977,7 +982,7 @@ export default function FocusApp() {
       !editReady.current ||
       syncing.current ||
       editQueue.running ||
-      !outbox.some((e) => e.state === "pending")
+      !outbox.some((e) => e.state === "pending" && !isCapturedTask(e))
     )
       return;
     editQueue
@@ -1289,7 +1294,7 @@ export default function FocusApp() {
     const check = () => {
       if (wake !== undefined) window.clearTimeout(wake);
       const now = Date.now();
-      const blocked = busy || loadingTasks || syncBusy || generating || silentGenerating || !!active || queued.length > 0 || editQueue.entries.some(e => e.sourceKey === sourceKey);
+      const blocked = busy || loadingTasks || syncBusy || generating || silentGenerating || !!active || queued.length > 0 || editQueue.entries.some(e => e.sourceKey === sourceKey && !isCapturedTask(e));
       const due = !dailyRefresh.error && refreshDue(now, dailyRefresh.stamp);
       if (due && !blocked && !genActive.current) generate(true);
       wake = window.setTimeout(check, due && blocked ? 60000 : nextRefreshDelay(now));
@@ -1792,6 +1797,18 @@ export default function FocusApp() {
     onToggleSettings: () => setSettingsOpen(!settingsOpen),
     onToggleCompact: () => windowMode(true, true),
   };
+  const capture = <FocusCapture title={captureTitle} onTitle={setCaptureTitle}
+    items={outbox.filter(isCapturedTask).map(e=>e.payload as QuickTask)}
+    canCapture={connectionReady && connected && !!sourceKey && !timer.blocked && !editQueue.storageError}
+    canOrganize={!active || active.status==="review"}
+    onCapture={title=>addQuickTask(title,"unu",1,undefined,true)}
+    loadProjects={loadProjects}
+    onOrganize={(before,title,quadrant,count,project)=>{
+      const current=timer.getSnapshot();
+      if(!sourceKey||before.sourceKey!==sourceKey||(current.active&&current.active.status!=="review"))throw Error("请结束当前专注后，再整理原表事项");
+      const references=[...(current.active?[current.active]:[]),...current.records];
+      editQueue.releaseCapture(before,title,quadrant,count,project,references);
+    }} />;
   return (
     <div className="focus-app">
       {restReminder}
@@ -1847,6 +1864,7 @@ export default function FocusApp() {
         <main className={`content view-${view}`}>
           {view === "review" && active ? (
             <ReviewPanel
+              capture={capture}
               active={active}
               accepted={accepted}
               completed={completed}
@@ -1891,6 +1909,7 @@ export default function FocusApp() {
             />
           ) : view === "timing" && active ? (
             <FocusTimer
+              capture={capture}
               active={activeDisplay!}
               tasks={boardTasks.filter(
                 (t) =>
@@ -1907,6 +1926,7 @@ export default function FocusApp() {
             />
           ) : (
             <QuadrantBoard
+              capture={capture}
               resumeFree={resumableFreeTasks(timer.records,sourceKey||"local")}
               onResumeFree={task=>beginTask({...task,creditedSeconds:0,appliedSessionIds:[]})}
               tasks={boardTasks}
@@ -2056,7 +2076,7 @@ export default function FocusApp() {
         <aside className="outbox-status" role="status">
           <span>
             {editQueue.storageError ||
-              `${outbox.length} 项待同步 · 可继续专注`}
+              `${outbox.filter(e=>!isCapturedTask(e)).length} 项待同步 · ${outbox.filter(isCapturedTask).length} 项待整理 · 可继续专注`}
           </span>
           {outbox.map((e) => (
             <span key={e.id}>
@@ -2065,7 +2085,7 @@ export default function FocusApp() {
                 : e.kind === "remove"
                 ? "减少番茄"
                 : "记录修改"}
-              ：{e.state === "failed" ? e.error : "等待同步"}
+              ：{isCapturedTask(e)?"待整理":e.state === "failed" ? e.error : "等待同步"}
             </span>
           ))}
           {outbox.some((e) => e.state === "failed") && (

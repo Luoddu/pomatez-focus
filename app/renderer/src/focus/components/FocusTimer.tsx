@@ -14,6 +14,7 @@ export default function FocusTimer({
   onPause,
   onResume,
   onFinish,
+  capture,
 }: {
   active: FocusSession;
   tasks: FocusTask[];
@@ -24,6 +25,7 @@ export default function FocusTimer({
   onPause: () => void;
   onResume: () => void;
   onFinish: () => void;
+  capture?: React.ReactNode;
 }) {
   const parsed = parseTitle(active.task.title);
   const quadrant = quadrantMeta(active.task.quadrant);
@@ -72,6 +74,7 @@ export default function FocusTimer({
     : "#4c6fff";
   return (
     <div className="left-col timing-left">
+      {capture}
       <div className="timing-center">
         <div className="card current-task">
           {quadrant && (

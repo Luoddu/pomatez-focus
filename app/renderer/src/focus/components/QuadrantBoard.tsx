@@ -327,6 +327,7 @@ export default function QuadrantBoard({
   onMove,
   resumeFree,
   onResumeFree,
+  capture,
 }: {
   tasks: FocusTask[];
   selected: string;
@@ -366,6 +367,7 @@ export default function QuadrantBoard({
   onMove?: Move;
   resumeFree?: FocusTask[];
   onResumeFree?:(task:FocusTask)=>void;
+  capture?: React.ReactNode;
 }) {
   const [adding, setAdding] = useState<FocusQuadrant | null>(null);
   const dragRef = useRef<BoardDrag | null>(null);
@@ -382,6 +384,7 @@ export default function QuadrantBoard({
   const rows = [QUADRANTS.slice(0, 2), QUADRANTS.slice(2, 4)];
   return (
     <div className="left-col">
+      {capture}
       <div className={`quadrants${dragging ? " is-dragging" : ""}`}>
         {rows.map((row) => {
           const rowLists = row.map((q) =>

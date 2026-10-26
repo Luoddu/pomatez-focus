@@ -1422,9 +1422,12 @@ input:focus-visible {
 /* ── 正在专注：左区垂直居中、整体水平居中 ── */
 .timing-left {
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  overflow-y: auto;
 }
 .timing-center {
+  flex: 1;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1432,6 +1435,20 @@ input:focus-visible {
   gap: 20px;
   width: 100%;
 }
+.focus-capture { width: 100%; flex: none; border: 1px solid var(--border); border-radius: 14px; background: var(--card); padding: 12px 16px; }
+.timing-left>.focus-capture { max-width: 640px; }
+.capture-input { display: flex; align-items: center; gap: 10px; }
+.capture-input input { min-width: 0; flex: 1; border: 0; background: transparent; font-size: 14px; padding: 6px 0; }
+.capture-input input::placeholder { color: var(--muted); }
+.capture-count { white-space: nowrap; font-size: 12px; color: var(--muted); }
+.capture-items { max-height: 180px; overflow-y: auto; margin-top: 8px; border-top: 1px solid var(--border); }
+.capture-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.capture-tomato { color: #9aa0a6; }
+.capture-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capture-items small { color: var(--muted); }
+.capture-editor { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; max-height: 340px; overflow-y: auto; }
+.capture-editor>label { font-size: 13px; color: var(--muted); }
+.capture-editor select { max-width: 100%; }
 .current-task {
   padding: 14px 20px;
   display: flex;

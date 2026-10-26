@@ -6,6 +6,7 @@ export default function QuickTaskEntry({
   onAdd,
   onClose,
   loadProjects,
+  initial,
 }: {
   quadrant: FocusQuadrant;
   onAdd: (
@@ -16,9 +17,10 @@ export default function QuickTaskEntry({
   ) => void;
   onClose: () => void;
   loadProjects?: () => Promise<FocusProject[]>;
+  initial?: { title: string; count: number };
 }) {
-  const [title, setTitle] = useState("");
-  const [count, setCount] = useState(1);
+  const [title, setTitle] = useState(initial?.title || "");
+  const [count, setCount] = useState(initial?.count || 1);
   const [error, setError] = useState("");
   const [projects, setProjects] = useState<FocusProject[]>([]);
   const [projectId, setProjectId] = useState("");
@@ -125,7 +127,7 @@ export default function QuickTaskEntry({
           />
         </label>
         <button className="btn-small" type="submit">
-          添加
+          {initial ? "确认整理" : "添加"}
         </button>
         <button className="btn-text" type="button" onClick={onClose}>
           取消

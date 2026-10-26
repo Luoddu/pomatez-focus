@@ -14,6 +14,8 @@ export type QuickTask = {
   day: number;
   projectId?: string;
   projectType?: ProjectType;
+  // Captured during focus; explicit classification releases this original intent.
+  capture?: true;
   // Additional slot for an existing task; stable across retries/restarts.
   append?: {
     taskId: string;
@@ -45,6 +47,7 @@ export type OutboxItem = {
   taskRows?: FocusTask[];
 };
 const KEY = "pomatez-quick-edit-outbox-v1";
+export const isCapturedTask = (e: OutboxItem) => e.kind === "task" && (e.payload as QuickTask).capture === true;
 export class EditQueue {
   entries: OutboxItem[] = [];
   running = false;
@@ -118,6 +121,17 @@ export class EditQueue {
       )
     );
   }
+  releaseCapture(before: QuickTask, title: string, quadrant: FocusQuadrant, count: number, project?: {id:string;projectType?:ProjectType}, sessions: FocusSession[] = [], today = new Date().setHours(0,0,0,0)) {
+    const item=this.entries.find(e=>e.id===before.id&&e.sourceKey===before.sourceKey&&isCapturedTask(e));
+    if(!item||item.taskRows||JSON.stringify(item.payload)!==JSON.stringify(before))throw Error("这条事项已改变，请重新打开整理");
+    if(!title.trim()||title.trim().length>200||!Number.isInteger(count)||count<1||count>50||!["iu","inu","uni","unu"].includes(quadrant))throw Error("请检查事项名称、象限和番茄数");
+    const used=sessions.filter(r=>r.task.quickTask?.id===before.id&&r.task.sourceKey===before.sourceKey);
+    if(count<Math.max(0,...used.map(r=>r.task.quickTask!.sequence)))throw Error("番茄数不能少于已经开始的番茄序号");
+    // Untouched captures become actionable today; previously used slots retain their accounting day.
+    const payload:QuickTask={...before,day:used.length?before.day:today,title:title.trim(),quadrant,count,projectId:project?.id,projectType:project?.projectType};
+    delete payload.capture;
+    this.save(this.entries.map(e=>e.id===item.id?{...e,payload,state:"pending",error:undefined}:e));
+  }
   resolveTask(
     id: string,
     rows: FocusTask[],
@@ -159,7 +173,7 @@ export class EditQueue {
     try {
       while (ready()) {
         const e = this.entries.find(
-          (e) => e.sourceKey === sourceKey && e.state === "pending"
+          (e) => e.sourceKey === sourceKey && e.state === "pending" && !isCapturedTask(e)
         );
         if (!e) break;
         try {

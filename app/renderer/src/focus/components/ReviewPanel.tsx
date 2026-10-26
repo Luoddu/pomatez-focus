@@ -20,6 +20,7 @@ export default function ReviewPanel({
   onDiscard,
   onReturn,
   onCut,
+  capture,
 }: {
   active: FocusSession;
   accepted: string;
@@ -36,6 +37,7 @@ export default function ReviewPanel({
   onDiscard: () => void;
   onReturn: () => void;
   onCut:()=>void;
+  capture?: React.ReactNode;
 }) {
   const parts = timeParts(active);
   const parsed = parseTitle(active.task.title);
@@ -55,6 +57,7 @@ export default function ReviewPanel({
     onCompleted(Math.min(100, Math.max(0, Math.round(value) || 0)));
   return (
     <div className="left-col review-left">
+      {capture}
       <div className="card review-card">
         <h2>本次专注已结束</h2>
         <div className="review-overview">

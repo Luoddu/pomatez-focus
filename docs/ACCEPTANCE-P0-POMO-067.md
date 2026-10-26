@@ -1,6 +1,6 @@
 # P0-POMO-067 分段番茄与本地更新验收
 
-源码检查点：453/453逻辑，真实分段桌面7组、重启备份/单飞、原更新器HTTP/SHA反例、完整隔离NSIS本地安装重启通过。固定源码独立封版、包源、个人App本地升级及公开旧103更新器终验尚待；不得据此先标DONE。授权/四源/文件与资源/回滚见TASK-P0-POMO-067.md。
+源码检查点已独立PASS：453/453逻辑，真实分段桌面7组、重启备份/单飞、原更新器HTTP/SHA反例、完整隔离NSIS本地安装重启通过；固定104干净源码和包源亦独立PASS。用户最新改为稍后自行安装，未公开104随068合并为105最终交付；最终公开证据见ACCEPTANCE-P0-POMO-068。授权/四源/文件与资源/回滚见TASK-P0-POMO-067.md。
 
 分段沿原record/plan分钟台账。cutSession调用原confirmSession记本段seconds/count0，不建挂起记录库；withTaskCredit使用source+sourceKey+planId或稳定本地/quick ID，只补原ledger未包含session IDs的分钟，包括已同步但任务回读尚未到达的片段。timeParts扣已有信用，elapsed/accepted只计本段；同任务计时重载原restore路径暂停，不把间隔算作投入。自由番茄接续从原records派生，保留原任务ID与syncedPlanId，不再生成新free行；完成后不显示接续入口。
 
@@ -22,6 +22,6 @@ Learning recorded LEARN-P0-POMO-067-01（独立已接受，本次源码原子检
 
 交付前通道基线：artifacts/release104-before-update.txt/json，真实公开103原更新器检测103为current，errors=[]、downloads=0、autoDownload=false、autoInstallOnAppQuit=false。本机已安装103的build/source-version.json只读核对为b3de3395bc8c343bc194014dcce911356500e2bc / dirty=false。
 
-个人升级尚未执行：已取得用户明确批准保存现场后本地bootstrap一次；Windows截图通道连续FrameArrived/window capture timeout，随后按钮输入报coordinate input geometry is unavailable。只读可访问树发现仍有活动计时，未获得成功暂停或退出证据，因此未强杀、未复制热LevelDB、未运行安装器。已请用户手动暂停并从托盘“退出（保留专注）”；这一步需要可验证的关闭状态，而非重新请求安装授权。已准备closed-profile备份脚本，执行前仍须exact安装路径进程数为0、备份副本哈希校验及副本中paused/review验证。未经个人升级验收不先推送GitHub。
+个人升级未执行：Windows截图通道两次超时，按钮输入报coordinate input geometry is unavailable，未获得暂停/退出证据，未强杀、未复制热LevelDB、未运行安装器。用户随后明确“我晚点自己升级”，本轮不再代关/备份/安装；保留本地最终包后继续GitHub发布。未执行的临时备份helper被独立指出枚举错误未fail closed，不纳入交付、不作为个人备份成功证明，也不用于后续安装。
 
-Learning本检查点沿已记录LEARN-P0-POMO-067-01（01dc684同commit）；截图通道故障根因未明，仅保留操作阻断证据，不写未经验证通用教训。待完成个人保存/关闭/一致备份/本地NSIS升级并验证104，然后源码及五资产发布、真实103更新器0下载终验。旧103/tag/资产保留，用户原数据不迁移删除；失败保留旧包可回装。
+Learning沿已记录LEARN-P0-POMO-067-01（01dc684同commit）；截图通道故障根因未明，不写未经验证通用教训。按用户新指令，剩余发布由068合并收口，个人安装由用户自行决定。旧103/tag/资产保留，用户原数据不迁移删除。
