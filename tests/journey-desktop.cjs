@@ -199,7 +199,7 @@ app.whenReady().then(async () => {
       await click("今天", ".journey-heading button");
       checks.push("explicit template apply, create/delete/default edits; invalid reference and storage failure preserve library without false apply");
       const d = new Date();
-      d.setHours(9, 0, 0, 0);
+      d.setHours(14, 7, 0, 0);
       const rec = (id, count, day) => ({
         id,
         task: {
@@ -236,6 +236,16 @@ app.whenReady().then(async () => {
         ),
         3
       );
+      const marker = () => js(`document.querySelector('.journey-stage .journey-time-corner').textContent.trim()`);
+      assert.equal(await marker(), "14:07");
+      assert.equal((await plan()).stages[0].time, 8);
+      assert.equal(await js(`document.querySelectorAll('.journey-stage')[1].querySelector('.journey-time-corner').textContent.trim()`), "12");
+      const corrected = await stored();
+      corrected.records.find(r=>r.id==='seed-today').startedAt += 600000;
+      await reload(`localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify(corrected))})`);
+      assert.equal(await marker(), "14:17");
+      assert.equal((await plan()).stages[0].time, 8);
+      checks.push("actual14:07 start replaces preset8 only in display; edit follows14:17, future12 and template8 preserved");
       assert.equal(
         await js(`document.querySelector('.stb-from').textContent`),
         "200"
@@ -320,6 +330,8 @@ app.whenReady().then(async () => {
       await click("开始这个番茄", ".journey-dialog button");
       await until(async () => !!(await stored()).active);
       const a = (await stored()).active;
+      const started = new Date(a.startedAt), startedLabel = `${String(started.getHours()).padStart(2,'0')}:${String(started.getMinutes()).padStart(2,'0')}`;
+      assert.equal(await js(`document.querySelector('.journey-tomato[data-active="true"]').closest('.journey-stage').querySelector('.journey-time-corner').textContent.trim()`), startedLabel);
       assert.equal(a.task.id, "plan-row1");
       assert.equal(
         await js(
@@ -447,6 +459,12 @@ app.whenReady().then(async () => {
       assert.equal((await stored()).active.task.planId,'midnight-plan1');
       await click("结束");await click("确认结束");await click("放弃本次");
       await until(async()=>(await stored()).active===null);
+      await until(async()=>(await plan()).stages.flatMap(s=>s.slots).every(p=>!p.binding));
+      const finalPlan = await plan(), earlierPlan = JSON.parse(fs.readFileSync(path.join(root,"artifacts/journey-restart-expected.json"),"utf8"));
+      // The midnight start/discard above legitimately advances the API revision.
+      // Check that it restores the same plan, then freeze that final revision for restart.
+      assert.deepEqual({ ...finalPlan, _revision: null }, { ...earlierPlan, _revision: null });
+      fs.writeFileSync(path.join(root,"artifacts/journey-restart-expected.json"),JSON.stringify(finalPlan));
       checks.push("same process day rollover rejects stale task snapshot, explicit refresh starts today's row");
     } else {
       const lib=await js(`JSON.parse(localStorage.getItem('pomatez-journey-templates-v1:synthetic'))`);

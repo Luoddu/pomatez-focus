@@ -303,6 +303,30 @@ export function completion(plan, records) {
     }
   return result;
 }
+// Display only: actual session boundaries never overwrite template hours or bindings.
+export function journeyActualTimes(plan, records, active = null) {
+  const done = completion(plan, records),
+    slots = plan.stages.flatMap((s) => s.slots),
+    starts = {};
+  const validActive = active &&
+    ["active", "paused", "review"].includes(active.status) &&
+    Number.isFinite(active.startedAt) && journeyDay(active.startedAt) === plan.day &&
+    (plan.scope === "local" ? active.task?.source === "local" :
+      active.task?.source === "feishu" && active.task.sourceKey === plan.scope);
+  const activeSlot = validActive && !Object.values(done).some((r) => r.id === active.id)
+    ? slots.find((p) => !done[p.id] && p.binding?.sessionId === active.id) ||
+      slots.find((p) => !done[p.id] && !p.binding)
+    : null;
+  for (const stage of plan.stages) {
+    const times = stage.slots.flatMap((p) => done[p.id] ? [done[p.id].startedAt] : []);
+    if (activeSlot && stage.slots.some((p) => p.id === activeSlot.id)) times.push(active.startedAt);
+    if (times.length) starts[stage.id] = Math.min(...times);
+  }
+  const last = slots[slots.length - 1], record = last && slots.every((p) => done[p.id]) && done[last.id];
+  const endedAt = record && Number.isFinite(record.endedAt) && record.endedAt >= record.startedAt
+    ? record.endedAt : null;
+  return { starts, endedAt };
+}
 export function reconcileJourney(plan, records, active) {
   const result = JSON.parse(JSON.stringify(plan)),
     used = new Set();

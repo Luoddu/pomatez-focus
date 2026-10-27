@@ -80,6 +80,11 @@ export function completion(
   plan: Journey,
   records: FocusSession[]
 ): Record<string, FocusSession>;
+export function journeyActualTimes(
+  plan: Journey,
+  records: FocusSession[],
+  active?: FocusSession | null
+): { starts: Record<string, number>; endedAt: number | null };
 export function reconcileJourney(
   plan: Journey,
   records: FocusSession[],

@@ -11,6 +11,7 @@ import {
   resolveTask,
   reconcileJourney,
   completion,
+  journeyActualTimes,
   moveSlot,
   resizeStages,
   journeyRoad,
@@ -47,6 +48,44 @@ test("default flexible itinerary 4/3/3/3/3 and local calendar tomorrow", () => {
     journeyDay(new Date(2026, 11, 31, 23).getTime(), 1),
     "2027-01-01"
   );
+});
+test("actual stage times replace display hours only; edits follow records and future references stay intact", () => {
+  const at = new Date(2026, 9, 8, 14, 7).getTime(),
+    r = record(5, { startedAt: at, endedAt: at + 7500000 }),
+    p = reconcileJourney(plan(), [r], null), before = JSON.stringify(p);
+  const times = journeyActualTimes(p, [r]);
+  assert.equal(times.starts[p.stages[0].id], at);
+  assert.equal(times.starts[p.stages[1].id], at); // same real session, no invented per-unit starts
+  assert.equal(times.starts[p.stages[2].id], undefined);
+  assert.equal(times.endedAt, null);
+  assert.equal(p.stages[0].time, 8);
+  assert.equal(p.stages[1].time, 12);
+  assert.equal(JSON.stringify(p), before);
+  const edited = { ...r, startedAt: at + 600000 };
+  assert.equal(journeyActualTimes(p, [edited]).starts[p.stages[0].id], edited.startedAt);
+  const all = record(16, { startedAt: at, endedAt: at + 7500000 }), full = reconcileJourney(plan(), [all], null);
+  assert.equal(journeyActualTimes(full, [all]).endedAt, all.endedAt);
+  assert.equal(journeyActualTimes(full, [{ ...all, endedAt: NaN }]).endedAt, null);
+  assert.equal(journeyActualTimes(full, [{ ...all, endedAt: at - 1 }]).endedAt, null);
+});
+test("native unbound active and reserved active project times without changing bindings; wrong day/source excluded", () => {
+  const p = plan(), before = JSON.stringify(p), at = new Date(2026, 9, 8, 14, 3).getTime();
+  for (const status of ["active", "paused", "review"]) {
+    const active = record(0, { status, startedAt: at });
+    assert.equal(journeyActualTimes(p, [], active).starts[p.stages[0].id], at);
+    assert.equal(Object.keys(completion(p, [])).length, 0);
+    assert.equal(JSON.stringify(p), before);
+  }
+  p.stages[2].slots[0].binding = { sessionId: "session-1", unit: 0 };
+  assert.equal(journeyActualTimes(p, [], record(0, { status: "active", startedAt: at })).starts[p.stages[2].id], at);
+  for (const bad of [
+    record(0, { status: "active", startedAt: at - 86400000 }),
+    record(0, { status: "active", startedAt: NaN }),
+    record(0, { status: "active", startedAt: at, task: { source: "feishu", sourceKey: "foreign" } }),
+  ]) assert.deepEqual(journeyActualTimes(p, [], bad), { starts: {}, endedAt: null });
+  const f = { ...p, scope: "table1" }, active = record(0, { status: "active", startedAt: at, task: { source: "feishu", sourceKey: "table1" } });
+  assert.equal(journeyActualTimes(f, [], active).starts[p.stages[2].id], at);
+  assert.deepEqual(journeyActualTimes(f, [], { ...active, task: { ...active.task, sourceKey: "foreign" } }), { starts: {}, endedAt: null });
 });
 test("drag preserves outline identity, task and total; supports intra-stage insertion", () => {
   let p = plan();
