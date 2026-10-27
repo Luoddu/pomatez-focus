@@ -205,7 +205,8 @@ test("0.29 repeated three/100 times sums exactly 0.87/29 across summary, day/mon
     assert.equal(annualHeatmap(projected, 2026).find(c => c.date === at(14, 0)).count, expected);
     assert.equal(topTasks(projected)[0].count, expected);
     render(HeatmapCalendar, { records: raw, weights: w });
-    assert.equal(document.querySelector(".hm-cell.today").textContent, formatEffective(expected));
+    assert.equal(document.querySelector(".hm-cell.today").textContent, String(Math.round(expected)));
+    assert.equal(Number(document.querySelector(".hm-cell.today").dataset.count), expected);
   }
 });
 
@@ -249,7 +250,9 @@ test("month calendar, fractional tiers and embedded today heat use effective cou
   near(sum([...document.querySelectorAll(".today-heatmap-cell")].map(node => Number(node.dataset.count))), 6);
   render(HeatmapCalendar, { records: [record(14, 1, "misc")], weights: { ...weights, misc: 0.29 } });
   const fraction = document.querySelector(".hm-cell.today");
-  assert.equal(fraction.textContent, "0.29"); assert.ok(fraction.classList.contains("hm-t1"));
+  assert.equal(fraction.textContent, "0"); assert.equal(fraction.dataset.count, "0.29"); assert.ok(fraction.classList.contains("hm-t1"));
+  const fractionalWeek = document.querySelector(".hm-week-total");
+  assert.equal(fractionalWeek.textContent, "0"); assert.equal(fractionalWeek.title, "本周有效 0.29 个番茄");
   assert.equal(document.querySelector('.today-heatmap-cell[data-slot="18"]').title, "09:00–09:30 · 0.29 个番茄");
 });
 

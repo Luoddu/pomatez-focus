@@ -230,7 +230,7 @@ export default function HeatmapCalendar({
                       }
                       onMouseLeave={() => setTip(null)}
                     >
-                      {!future && count > 0 ? formatEffective(count) : ""}
+                      {!future && count > 0 ? Math.round(count) : ""}
                     </span>
                   );
                 })}
@@ -254,7 +254,7 @@ export default function HeatmapCalendar({
                       className="hm-week-total"
                       title={`本周有效 ${formatEffective(total)} 个番茄`}
                     >
-                      {formatEffective(total)}
+                      {Math.round(total)}
                     </span>
                   )}
                   {met && (
