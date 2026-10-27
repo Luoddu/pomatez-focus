@@ -505,6 +505,8 @@ export default function TodayJourney({
                         !!p.binding &&
                         controls.active?.id === p.binding.sessionId;
                     const position = slots.findIndex(v => v.id === p.id) + 1;
+                    const terminal = i === plan.stages.length - 1 && j === s.slots.length - 1 &&
+                      (j !== 0 || s.time === null || actualTimes.endedAt !== null);
                     return (
                       <React.Fragment key={p.id}>
                       <button
@@ -566,21 +568,19 @@ export default function TodayJourney({
                         ) : (
                           <JourneyOutline size={22} />
                         )}
-                        {j === 0 && (actualTimes.starts[s.id] !== undefined || s.time !== null) ? (
+                        {terminal && (actualTimes.endedAt !== null || plan.endHour !== null) ? (
+                          <small className="journey-time-corner"
+                            data-time-kind={actualTimes.endedAt !== null ? "actual" : "reference"}
+                            title={`${actualTimes.endedAt !== null ? `实际专注结束 ${journeyClock(actualTimes.endedAt)}` : `预设结束参考 ${plan.endHour}点`}${actualTimes.starts[s.id] !== undefined ? ` · 本段专注开始 ${journeyClock(actualTimes.starts[s.id])}` : ""}`}>
+                            {actualTimes.endedAt !== null ? journeyClock(actualTimes.endedAt) : plan.endHour}
+                          </small>
+                        ) : j === 0 && (actualTimes.starts[s.id] !== undefined || s.time !== null) ? (
                           <small className="journey-time-corner"
                             data-time-kind={actualTimes.starts[s.id] !== undefined ? "actual" : "reference"}
                             title={actualTimes.starts[s.id] !== undefined
                               ? `实际专注开始 ${journeyClock(actualTimes.starts[s.id])}${s.time !== null ? ` · 模板参考 ${s.time}点` : ""}`
                               : `预设参考 ${s.time}点`}>
                             {actualTimes.starts[s.id] !== undefined ? journeyClock(actualTimes.starts[s.id]) : s.time}
-                          </small>
-                        ) : i === plan.stages.length - 1 &&
-                          j === s.slots.length - 1 &&
-                          (actualTimes.endedAt !== null || plan.endHour !== null) ? (
-                          <small className="journey-time-corner"
-                            data-time-kind={actualTimes.endedAt !== null ? "actual" : "reference"}
-                            title={actualTimes.endedAt !== null ? `实际专注结束 ${journeyClock(actualTimes.endedAt)}` : `预设结束参考 ${plan.endHour}点`}>
-                            {actualTimes.endedAt !== null ? journeyClock(actualTimes.endedAt) : plan.endHour}
                           </small>
                         ) : null}
                       </button>

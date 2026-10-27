@@ -115,7 +115,7 @@ app.whenReady().then(async () => {
       js(
         `(()=>{const e=document.querySelector('.journey-card');return JSON.parse(localStorage.getItem('pomatez-journey-v1:'+encodeURIComponent(e.dataset.scope)+':'+e.dataset.day))})()`
       );
-    const reload = async (source, broken = false) => {
+    const reload = async (source, broken = false, count = 16) => {
       if (source) {
         win.webContents.debugger.attach("1.3");
         await win.webContents.debugger.sendCommand("Page.enable");
@@ -139,7 +139,7 @@ app.whenReady().then(async () => {
       }
       if (!broken)
         await until(() =>
-          js(`document.querySelectorAll('.journey-tomato').length===16`)
+          js(`document.querySelectorAll('.journey-tomato').length===${count}`)
         );
     };
     const open = async (index) => {
@@ -153,7 +153,31 @@ app.whenReady().then(async () => {
     await until(() =>
       js(`document.querySelectorAll('.journey-tomato').length===16`)
     );
-    if (phase === "plan") {
+    if (phase === "times") {
+      const p = await plan(); p.stages.at(-1).slots = p.stages.at(-1).slots.slice(0,1);
+      const at = new Date(); at.setHours(14,7,0,0);
+      const endedAt = at.getTime()+4500000, key=`pomatez-journey-v1:synthetic:${p.day}`;
+      const rec={id:'time-session',task:tasks[0],startedAt:at.getTime(),endedAt,
+        plannedSeconds:4500,elapsedSeconds:4500,acceptedSeconds:4500,completedCount:14,status:'saved',sync:'local'};
+      const seedTime = snapshot => `localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(p))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify(snapshot))})`;
+      await reload(seedTime({active:null,records:[rec]}),false,14);
+      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').textContent.trim()`),'15:22');
+      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').dataset.timeKind`),'actual');
+      assert.equal(await js(`document.querySelector('.journey-stage:first-child .journey-time-corner').textContent.trim()`),'14:07');
+      const active={...rec,id:'unbound-time',status:'paused',completedCount:0};delete active.endedAt;
+      const saved={...rec,completedCount:13,startedAt:at.getTime()-7200000,endedAt:at.getTime()-3600000};
+      await reload(seedTime({active,records:[saved]}),false,14);
+      const snapshot=await stored(), actualPlan=await plan();
+      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').textContent.trim()`),'24');
+      assert.ok(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').title.includes('14:07')`));
+      assert.equal(actualPlan.stages.at(-1).slots[0].binding,null);
+      assert.deepEqual(snapshot.active,{...active,recovered:true,segmentOpen:false});
+      await js("document.querySelector('.journey-time-corner').focus()");
+      assert.deepEqual((await stored()).active,snapshot.active);
+      assert.deepEqual(await plan(),actualPlan);
+      assert.equal(actualPlan.endHour,24);
+      checks.push('single-slot final stage keeps terminal reference24 and shows actual end15:22 when full; hover includes active14:07 start; native active remains unbound and unchanged');
+    } else if (phase === "plan") {
       await click("设置", ".journey-heading button");
       await click("复制新建", ".journey-dialog button");
       await change('[aria-label="模板名称"]', "合成15");

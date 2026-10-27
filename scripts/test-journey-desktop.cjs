@@ -3,11 +3,11 @@ const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const root = path.resolve(__dirname, ".."),
   profile = path.join(root, "artifacts/test-profiles", randomUUID());
-for (const phase of ["plan", "resume"]) {
+for (const phase of ["plan", "resume", "times"]) {
   const env = {
     ...process.env,
     POMATEZ_HEADLESS: "1",
-    POMATEZ_PROFILE: profile,
+    POMATEZ_PROFILE: phase === "times" ? path.join(root, "artifacts/test-profiles", randomUUID()) : profile,
     JOURNEY_PHASE: phase,
   };
   delete env.ELECTRON_RUN_AS_NODE;

@@ -6,4 +6,6 @@ artifacts/p072-journey-unit.txt：原journey+templates及新增实际时间正�
 
 p072-build-working.txt成功；p072-journey-working.txt两个真实Electron隐藏静音进程全部检查PASS，实际14:07替换模板8，修改记录后显示14:17，未来12及模板8保持；旅程启动的active显示真实分钟，原拖动/列布局/模板编辑/休息/保留计时与更换任务/保存失败/跨日/冷启/坏数据保护仍通。真实外部写入0，不操作个人App。首轮resume比较失败仅_revision不同：原夹具在后续模拟跨日开始/放弃之前冻结预期，合法状态操作应产生新revision。保留p072-journey-before-final-revision.txt，夹具先对比最终与原计划全部字段（仅revision允许合法变化），再冻结最终revision，冷启继续完整raw相等验证；未修改产品存储逻辑。
 
-独立复核、固定干净源码/成品/本地准备/公开更新链待补。Learning-Review: none - 纯投影复用现有完成与日期/来源机制，memo采用已记录日期依赖原则；旧夹具快照时序局部适配，没有新的可跨任务工程事实。
+首轮独立review_journey_times审e8903df原始diff/证据并重跑20/20纯函数，核心来源/日期/只读/memo通过，但指出P2：最后阶段仅1槽且time=null时，实际开始分支遮住结束角标。原回执p072-independent-review-first.txt。修正为终点优先：原专用于终点的单槽保留结束参考，全部完成显示实际结束；悬浮保留本段实际开始。新真实times阶段确认14槽全部完成末角标15:22、首角标14:07；未绑定暂停会话时末角标仍24，title包含14:07，binding仍null、plan/active不被显示变动。首次该夹具把原restoreSession添加recovered=true/segmentOpen=false误判为投影改变，保留p072-journey-recovery-expectation.txt，按session.ts211–231原文修正预期并检查恢复后显示不再变动，三个进程均PASS。产品恢复逻辑未修改。
+
+109已打包的候选不公开、不本机stage、不替换已有字节；沿唯一版本helper递增110交付，复核修正后固定源码、干净成品/本地准备/公开108→110更新链待补。Learning-Review: none - 纯投影复用现有完成与日期/来源机制，memo采用已记录日期依赖原则；旧夹具快照时序、原恢复标记与单槽JSX边界均局部适配，没有新的可跨任务工程事实。
