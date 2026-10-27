@@ -127,6 +127,11 @@ test("missing stage reference uses surrounding slot anchors, early progress does
   assert.equal(empty.starts[p.stages[2].id],undefined);
   assert.equal(empty.end.at,at(24));
   assert.equal(empty.end.kind,'reference');
+  const unusual=plan(); unusual.stages.at(-1).time=21;
+  for (const endHour of [20,0]) {
+    unusual.endHour=endHour;
+    assert.deepEqual(journeyTimeline(unusual,[]).end,{at:at(endHour),kind:'reference'});
+  }
   const wrong=record(10,{startedAt:at(14),task:{source:'feishu',sourceKey:'foreign'}});
   assert.deepEqual(journeyTimeline(p,[wrong]),empty);
   assert.deepEqual(journeyTimeline(p,[],null,[{startedAt:at(14)-86400000,endedAt:at(15)-86400000}]),empty);

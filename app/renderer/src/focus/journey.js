@@ -382,7 +382,7 @@ export function journeyTimeline(plan, records, active = null, rests = []) {
     }
   }
   const end = actual.endedAt !== null ? { at: actual.endedAt, kind: "actual" } : plan.endHour !== null
-    ? { at: Math.max(atHour(plan.endHour) + delay, floor), kind: hasProgress ? "estimate" : "reference" } : null;
+    ? { at: hasProgress ? Math.max(atHour(plan.endHour) + delay, floor) : atHour(plan.endHour), kind: hasProgress ? "estimate" : "reference" } : null;
   return { starts, end };
 }
 export function journeyHour(day, at) {

@@ -6,4 +6,6 @@ artifacts/p073-journey-unit.txt共22/22 PASS：原journey/templates及新增截�
 
 p073-build-working.txt成功；p073-journey-working.txt原真实Electron plan/resume/times三进程PASS，隐藏静音、随机profile、外部业务写入0：只见小时14，hover14:07/修改后14:17，未来参考12推至18但模板8保持；单槽末端小时15、原生暂停未绑定时24及hover14:07、plan/active不因显示变动；截图相同五段实际14/16/19后显示22/24/次日2，hover“预计开始22:48”、模板仍10/14/16/19/21，明日8且原records不变；既有模板编辑/拖动/休息/计时/跨日/冷启/坏数据保护仍通。
 
-独立复核、最终同源干净包、本机准备及真实110→111公开更新链待补。Learning-Review: none - 自有只读预测复用原完成/日期来源和已验发行链，未形成新第三方机制或跨任务教训。
+首轮独立review_journey_times审23ab940并重跑22/22 PASS，发现无进度分支P2：合法非单调模板末段21、end20时，终点仍被reference更新的floor推为21，违背未开始原参考不变。原只读复现/回执p073-independent-review-first.txt。已仅在hasProgress时约束终点floor，无进度直接原endHour；现有纯函数新增end20/0不变断言，22/22仍PASS。尚未打包111，不生成中间发行或更换资产。
+
+修正复核、最终同源干净包、本机准备及真实110→111公开更新链待补。Learning-Review: none - 自有只读预测复用原完成/日期来源和已验发行链；局部无进度分支边界无新跨任务教训。
