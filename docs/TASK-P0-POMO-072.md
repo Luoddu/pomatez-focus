@@ -1,9 +1,10 @@
 # P0-POMO-072 旅程实际时间角标
 
-- IN_PROGRESS；模块实现/卡负责人root；唯一状态源本卡。基线f70f462be5658e937cc92885665955d3fa6bbf74，协调ref origin/codex/feishu-focus，任务分支task/p0-pomo-072-journey-times。开工status/worktree/fetch/check:sync同公开108、clean、单worktree，绿灯；关键检查点/提交前比对写集和资源。根共享治理/路线图/组件锁只读。
+- DONE；模块实现/卡负责人root；唯一状态源本卡。基线f70f462be5658e937cc92885665955d3fa6bbf74，协调ref origin/codex/feishu-focus，任务分支task/p0-pomo-072-journey-times。开工status/worktree/fetch/check:sync同公开108、clean、单worktree，绿灯；关键检查点/提交前比对写集和资源。根共享治理/路线图/组件锁只读。
 - 用户2026-10-27指出今日14点开始但旅程仍显示模板10点；已明确选择“只更新已开始部分；后面保留预设参考时间”。目标：阶段角标从同日同来源实际已确认/当前专注的startedAt投影，HH:mm显示真实分钟；未开始/明日保留原参考小时；终点完成后可读取最后已确认专注endedAt。原模板参考小时不重写、不顺延，实际记录/计时/旅程binding/API revision不改。
 - 允许写：journey.js及journey.d.ts仅增加纯显示投影；TodayJourney.tsx仅接入角标与title；tests/journey.test.mjs、tests/journey-desktop.cjs、原scripts/test-journey-desktop.cjs必要夹具适配；docs/DAILY-JOURNEY.md、本卡/ACCEPTANCE-P0-POMO-072.md、CHANGELOG、原版本helper两文件；ignored原始证据及沿原108发行helpers、本地NSIS。禁止新第三方依赖、旅程schema/写入/远端接口、权限/来源策略、个人profile/凭证/飞书业务写入、用户App控制或自动安装。本worktree build/dist与随机合成profile独占，无真实数据库/端口/服务控制权。
 - T1标准（实际记录到显示的语义需复核），一次前台60分钟。授权一个10分钟只读独立reviewer子任务：读取冻结diff/卡/原始测试及直接相关journey完成映射，检查正确性、来源/日期隔离、不修改状态与性能；不得改文件/访问个人profile/外部写入/再分派。无其他子Agent/后台/定时任务。静音隐藏测试，发布沿模块默认授权，先本机准备、用户自行重启。
 - 四源：①TodayJourney557–567只读s.time/endHour，completion已能按绑定映射实际记录；原生四象限启动的active未绑定旅程，显示可只读投影到首个空槽所属段，不改变binding；②仅项目自有纯JS和现有React useMemo，无第三方采用/升级/运行机制变更，不适用外部官方调研；③复用completion/eligible/journeyDay与原版本/同源发行helper，命中Learning日期缓存输入要求，memo依赖同一plan/day/records及active身份与开始时间，不增加逐秒存储/网络/进程；④原journey.test与真实journey-desktop已有同来源/跨日/计时/拖动/冷启动/模板/存储失败覆盖，在原夹具增加14点开始及修改后回显等正反例。
 - 验收：已确认记录和当前active/paused/review的实际开始时间显示HH:mm；未绑定原生专注也及时反映在首个空段，不提前填完成或新增binding。下一未开始段、明日仍原参考小时；异日/异源/无效时间不覆盖，但合法同源仍通。修改原记录startedAt后跟随更新；多番茄同一session复用真实startedAt不伪造逐个起点。仅最终槽确认且有有效endedAt才显示实际终点；未完成仍参考终点。模板/计划/records/active字节不因显示变化而写入；无新增秒级轮询。纯函数及真实静音DOM、独立复核、干净成品/五资产/真实108→新版更新器均通过后DONE。
 - 回滚：revert本任务源码并以新版本发布，不更改旧tag/资产；无数据迁移，模板与原会话格式兼容。范围外问题只记录；未知同因两次停止冲突步骤，副作用不盲重放。Learning判断只在验收记录一次，无证据不写通用教训。
+- 交付：固定源码/tag378a00816777862b102225023e5834914c668481 / preview110。首轮只读review发现单槽末段终点P2，修正为明确终点优先、悬浮保留实际开始，新增真实times阶段后同reviewer复核PASS；原始回执和未公开109候选保留。20/20纯函数、最终干净三进程静音旅程、240文件同源ASAR/成品、本机包清单与字节回读、公开五资产及实际108→110原更新器零下载安装均PASS。release425451891，旧108及Latest51不变，用户自行重启安装本地110。详见ACCEPTANCE-P0-POMO-072.md；最终仅两份文档收口，不重打包或改tag。
