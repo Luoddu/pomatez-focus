@@ -1314,9 +1314,19 @@ export default function FocusApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionReady, connected, sourceKey, dailyRefresh, busy, loadingTasks, syncBusy, generating, silentGenerating, active?.id, active?.status, queueRevision, editRevision, genMock]);
   // Both directions persist exact intent before asynchronous Feishu writes.
-  const adjust = (taskId: string, delta: 1 | -1) => {
+  const adjust = (taskId: string, delta: 1 | -1, historyTask?: FocusTask) => {
     if (!api() || !connected) {
       notify("请先在设置中连接飞书，再调整番茄数。", "error");
+      return;
+    }
+    if (historyTask && (
+      delta !== 1 || !sourceKey || historyTask.source !== "feishu" ||
+      historyTask.sourceKey !== sourceKey || historyTask.taskId !== taskId ||
+      !taskId || taskId.startsWith("quick-") || historyTask.quickTask ||
+      historyTask.kind === "free" || loadingTasks ||
+      taskScope.current !== `${sourceKey}|${taskDay()}`
+    )) {
+      notify("请先刷新今日任务，再为这项任务增加番茄。", "error");
       return;
     }
     // Read the durable queue now: successive clicks may share a render closure.
@@ -1327,15 +1337,15 @@ export default function FocusApp() {
     const group = groupTasks(currentBoard).find(
       (g) => g.key === taskId
     );
-    if (!group || !sourceKey) return;
+    if ((!group && !historyTask) || !sourceKey) return;
     if (delta === 1) {
       const info =
-        group.tasks.find((t) => t.plannedToday != null) ||
-        group.tasks[0];
+        group?.tasks.find((t) => t.plannedToday != null) ||
+        group?.tasks[0] || historyTask!;
       const sequence =
         Math.max(
-          info?.plannedToday || 0,
-          ...group.tasks.map((t) => parseTitle(t.title).pomodoro),
+          group ? info.plannedToday || 0 : 0,
+          ...(group?.tasks.map((t) => parseTitle(t.title).pomodoro) || []),
           ...editQueue.entries
             .filter(
               (e) =>
@@ -1359,7 +1369,7 @@ export default function FocusApp() {
       const payload: QuickTask = {
         id,
         sourceKey,
-        title: group.name,
+        title: group?.name || parseTitle(info.title).name,
         quadrant: info.quadrant,
         projectType: info.projectType,
         count: 1,
@@ -1367,11 +1377,11 @@ export default function FocusApp() {
         append: {
           taskId,
           sequence,
-          doneToday: info.doneToday || 0,
+          doneToday: group ? info.doneToday || 0 : 0,
           plannedToday:
-            Math.max(info.plannedToday || 0, group.tasks.length) + 1,
-          description: group.tasks.find((t) => t.description)
-            ?.description,
+            Math.max(group ? info.plannedToday || 0 : 0, group?.tasks.length || 0) + 1,
+          description: group?.tasks.find((t) => t.description)
+            ?.description || info.description,
         },
       };
       try {
@@ -1388,7 +1398,7 @@ export default function FocusApp() {
       }
       return;
     }
-    if (active?.task.taskId === taskId) return;
+    if (!group || active?.task.taskId === taskId) return;
     const victims = group.tasks.filter(
       (t) =>
         t.kind !== "done" &&
@@ -2044,6 +2054,10 @@ export default function FocusApp() {
             tasks={boardTasks}
             onAddManual={timer.addManual}
             onEdit={editRecord}
+            appendSource={sourceKey || ""}
+            onAppend={connected && connectionReady && !loadingTasks && !timer.blocked
+              ? (task) => adjust(task.taskId!, 1, task)
+              : undefined}
             onRecolor={recolorRecord}
             dayReviews={dayReviews}
             reviewState={reviewState}

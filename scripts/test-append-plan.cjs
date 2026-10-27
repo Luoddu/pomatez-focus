@@ -10,11 +10,12 @@ const env = {
   ),
 };
 delete env.ELECTRON_RUN_AS_NODE;
-for (const phase of ["seed", "restart"]) {
+for (const phase of ["seed", "restart", "history"]) {
+  const phaseEnv = phase === "history" ? { ...env, POMATEZ_PROFILE: path.join(__dirname, "../artifacts/test-profiles", randomUUID()) } : env;
   const r = spawnSync(
     require("electron"),
-    [path.join(__dirname, "../tests/append-plan-desktop.cjs"), phase],
-    { env, windowsHide: true, stdio: "inherit", timeout: 50000 }
+    [path.join(__dirname, "../tests/append-plan-desktop.cjs"), phase, "--mute-audio"],
+    { env: phaseEnv, windowsHide: true, stdio: "inherit", timeout: 50000 }
   );
   if (r.error) throw r.error;
   if (r.status !== 0) process.exit(r.status ?? 1);

@@ -2692,8 +2692,17 @@ input:focus-visible {
   transform: translateX(4px);
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
+.record-append {
+  margin-left: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
 .record:hover .record-edit,
 .record:focus-within .record-edit,
+.record:hover .record-append,
+.record:focus-within .record-append,
 .record-edit:disabled {
   opacity: 1;
   transform: none;
@@ -2702,7 +2711,8 @@ input:focus-visible {
   cursor: default;
 }
 @media (hover: none) {
-  .record-edit {
+  .record-edit,
+  .record-append {
     opacity: 1;
     transform: none;
   }

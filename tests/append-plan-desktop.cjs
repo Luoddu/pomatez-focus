@@ -6,7 +6,9 @@ const {
   FocusService,
 } = require("../app/electron/build/focus/service.js");
 process.env.POMATEZ_HEADLESS = "1";
+app.commandLine.appendSwitch("mute-audio");
 const seed = process.argv.includes("seed");
+const historyMode = process.argv.includes("history");
 let release,
   uploads = 0,
   requests = [],
@@ -25,6 +27,19 @@ const tasks = ["iu", "inu", "uni", "unu"].map((quadrant) => ({
   doneToday: quadrant === "iu" ? 3 : 0,
   ...(quadrant === "iu" ? { kind: "done" } : {}),
 }));
+if (historyMode) {
+  const now = Date.now(), today = new Date().setHours(0, 0, 0, 0);
+  shared = [
+    { ...tasks[0] },
+    { ...tasks[0], id: "old-plan", planId: "old-plan", taskId: "t-old", title: "Past task · 第 9 个番茄", plannedToday: 9, doneToday: 9, quadrant: "uni", projectType: "delivery" },
+    { ...tasks[0], id: "free", taskId: "free", title: "Free", kind: "free" },
+    { ...tasks[0], id: "quick", taskId: "quick-unbound", title: "Unbound", quickTask: { id: "unbound", sequence: 1 } },
+  ].map((task, i) => ({ id: `history-${i}`, task,
+    startedAt: i === 1 ? today - 3600000 : now - 1800000 - i * 60000,
+    endedAt: i === 1 ? today - 1800000 : now - 300000 - i * 60000,
+    plannedSeconds: 1500, elapsedSeconds: 1500, acceptedSeconds: 1500,
+    completedCount: 1, status: "saved", sync: "synced", cloudSynced: true }));
+}
 FocusService.prototype.status = () => ({
   configured: true,
   sourceKey: "synthetic",
@@ -113,7 +128,44 @@ app.whenReady().then(async () => {
       js(
         "JSON.parse(localStorage.getItem('pomatez-quick-edit-outbox-v1')||'[]')"
       );
-    if (seed) {
+    if (historyMode) {
+      await until(() => js("document.querySelectorAll('.task').length===4"));
+      await until(() => js("!!document.querySelector('[aria-label=\"手动同步\"]')&&!document.querySelector('[aria-label=\"手动同步\"]').disabled"));
+      await click("手动同步");
+      await until(async () => (await stored())?.records?.some(r => r.id === "history-1"));
+      await js("document.querySelectorAll('.day-glass').forEach(b=>b.click())");
+      await until(() => js("document.querySelectorAll('.record-append').length===2"));
+      assert.equal(await js("document.querySelector('.record-append').previousElementSibling.classList.contains('record-edit')"), true);
+      assert.equal(await js("getComputedStyle(document.querySelector('.record-append')).opacity"), "0");
+      // Hidden windows do not advance compositor transitions reliably. Inspect
+      // the final focus rule with transitions disabled only in this fixture.
+      await js("document.head.appendChild(Object.assign(document.createElement('style'),{textContent:'.record-append{transition:none!important}'}));document.querySelector('.record-append').focus()");
+      assert.equal(await js("document.activeElement===document.querySelector('.record-append')"), true);
+      assert.equal(await js("getComputedStyle(document.querySelector('.record-append')).opacity"), "1");
+      assert.equal(await js("getComputedStyle(document.querySelector('.record-append')).borderRadius"), "50%");
+      await js("document.querySelector('.quad-inu .chip').click()");
+      await click("开始专注"); await click("暂停");
+      const before = await stored();
+      await js("(()=>{const b=document.querySelector('.record-append[aria-label=\"增加番茄：Synthetic iu\"]');b.click();b.click()})()");
+      await js("(()=>{const b=document.querySelector('.record-append[aria-label=\"增加番茄：Past task\"]');b.click();b.click()})()");
+      const queued = await queue();
+      assert.equal(queued.length, 4);
+      assert.deepEqual(queued.filter(e=>e.payload.append.taskId==='t-iu').map(e=>e.payload.append.sequence), [4,5]);
+      const past = queued.filter(e=>e.payload.append.taskId==='t-old');
+      assert.deepEqual(past.map(e=>e.payload.append.sequence), [1,2]);
+      assert.ok(past.every(e=>e.payload.quadrant==='uni'&&e.payload.projectType==='delivery'&&e.payload.day===new Date().setHours(0,0,0,0)));
+      assert.deepEqual((await stored()).active, before.active);
+      assert.deepEqual((await stored()).records, before.records);
+      await click("修改记录 history-0");
+      assert.equal(await js("!!document.querySelector('#manual-task')"), true);
+      await click("取消");
+      release(); await until(async ()=>(await queue()).length===0);
+      assert.equal(uploads, 0);
+      assert.deepEqual((await stored()).active, before.active);
+      assert.deepEqual((await stored()).records, before.records);
+      assert.equal(requests.filter(q=>q.append.taskId==='t-old').length,2);
+      console.log("PASS history circle plus/focus beside edit, stable IDs, today sequences, past-day reset, free/unbound excluded, active/history unchanged, synthetic receipts");
+    } else if (seed) {
       await until(() =>
         js("document.querySelectorAll('.task').length===4")
       );
@@ -172,7 +224,7 @@ app.whenReady().then(async () => {
       );
       await click("补记");
       await js(
-        "(()=>{const s=document.querySelector('#manual-task');s.value=[...s.options].find(o=>o.textContent.includes('Synthetic iu')&&o.textContent.includes('第 4 个')).value;s.dispatchEvent(new Event('change',{bubbles:true}))})()"
+        "(()=>{const s=document.querySelector('#manual-task');s.value=[...s.options].find(o=>o.textContent.includes('Synthetic iu')).value;s.dispatchEvent(new Event('change',{bubbles:true}))})()"
       );
       await click("保存补记");
       await js(

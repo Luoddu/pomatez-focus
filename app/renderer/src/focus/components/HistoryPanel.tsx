@@ -155,6 +155,8 @@ export default function HistoryPanel({
   tasks,
   onAddManual,
   onEdit,
+  onAppend,
+  appendSource,
   onRecolor,
   dayReviews = {},
   reviewState = "loaded",
@@ -185,6 +187,8 @@ export default function HistoryPanel({
   tasks: FocusTask[];
   onAddManual: (record: FocusSession) => void;
   onEdit?: (before: FocusSession, after: FocusSession) => void;
+  onAppend?: (task: FocusTask) => void;
+  appendSource?: string;
   onRecolor?: (record: FocusSession, type?: ProjectType) => void;
   dayReviews?: Record<string, string>;
   reviewState?: "loading" | "loaded" | "error";
@@ -782,6 +786,21 @@ export default function HistoryPanel({
                                   {editingIds.includes(r.id)
                                     ? "修改待同步"
                                     : "修改"}
+                                </button>
+                              )}
+                              {onAppend && appendSource &&
+                                r.task.source === "feishu" &&
+                                r.task.sourceKey === appendSource &&
+                                r.task.taskId &&
+                                !r.task.taskId.startsWith("quick-") &&
+                                !r.task.quickTask && r.task.kind !== "free" && (
+                                <button
+                                  className="adjust-btn record-append"
+                                  aria-label={`增加番茄：${parseTitle(r.task.title).name}`}
+                                  title="为这项任务增加一个今日番茄"
+                                  onClick={() => onAppend(r.task)}
+                                >
+                                  ＋
                                 </button>
                               )}
                             </div>
