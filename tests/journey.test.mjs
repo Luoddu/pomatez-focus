@@ -12,6 +12,8 @@ import {
   reconcileJourney,
   completion,
   journeyActualTimes,
+  journeyTimeline,
+  journeyHour,
   moveSlot,
   resizeStages,
   journeyRoad,
@@ -86,6 +88,48 @@ test("native unbound active and reserved active project times without changing b
   const f = { ...p, scope: "table1" }, active = record(0, { status: "active", startedAt: at, task: { source: "feishu", sourceKey: "table1" } });
   assert.equal(journeyActualTimes(f, [], active).starts[p.stages[2].id], at);
   assert.deepEqual(journeyActualTimes(f, [], { ...active, task: { ...active.task, sourceKey: "foreign" } }), { starts: {}, endedAt: null });
+});
+test("future markers follow latest actual stage delay, preserve gaps and show hours across midnight", () => {
+  const at = (h, m=0) => new Date(2026,9,8,h,m).getTime(), p = plan();
+  p.stages.forEach((s,i)=>s.time=[10,14,16,19,21][i]); p.endHour=23;
+  const records=[record(4,{id:'morning',startedAt:at(14,10),endedAt:at(15,50)}),
+    record(3,{id:'noon',startedAt:at(16,17),endedAt:at(17,47)}),
+    record(3,{id:'evening',startedAt:at(19,48),endedAt:at(20,48)})];
+  const q=reconcileJourney(p,records,null), before=JSON.stringify({q,records}), times=journeyTimeline(q,records);
+  assert.deepEqual(q.stages.map(s=>journeyHour(day,times.starts[s.id].at)),['14','16','19','22','24']);
+  assert.equal(times.starts[q.stages[3].id].at,at(22,48));
+  assert.equal(times.starts[q.stages[4].id].at,at(24,48));
+  assert.equal(journeyHour(day,times.end.at),'次日2');
+  assert.equal(times.starts[q.stages[3].id].kind,'estimate');
+  assert.equal(times.starts[q.stages[2].id].kind,'actual');
+  assert.deepEqual(journeyTimeline(q,records),times);
+  assert.equal(JSON.stringify({q,records}),before);
+  const extended=records.map(r=>r.id==='evening'?{...r,endedAt:at(23,30)}:r), later=journeyTimeline(q,extended);
+  assert.equal(later.starts[q.stages[3].id].at,at(23,30));
+  assert.equal(later.starts[q.stages[4].id].at,at(25,30));
+  const rested=journeyTimeline(q,records,null,[{startedAt:at(23),endedAt:at(24,15)}]);
+  assert.equal(rested.starts[q.stages[3].id].at,at(24,15));
+  assert.equal(rested.starts[q.stages[4].id].at,at(26,15));
+  assert.equal(journeyHour(day,at(25)),'次日1');
+});
+test("missing stage reference uses surrounding slot anchors, early progress does not advance future presets", () => {
+  const at=(h,m=0)=>new Date(2026,9,8,h,m).getTime(), p=plan();
+  const records=[record(4,{id:'a',startedAt:at(12),endedAt:at(14)}),
+    record(3,{id:'b',startedAt:at(16),endedAt:at(18)}),
+    record(3,{id:'c',startedAt:at(19,48),endedAt:at(21)})];
+  const q=reconcileJourney(p,records,null), times=journeyTimeline(q,records);
+  assert.equal(times.starts[q.stages[3].id].at,at(23,48)); // unnamed third stage baseline16 between12/20
+  assert.equal(q.stages[2].time,null);
+  const early=records.map(r=>r.id==='c'?{...r,startedAt:at(15),endedAt:at(16)}:r);
+  assert.ok(journeyTimeline(q,early).starts[q.stages[3].id].at>=at(20));
+  const empty=journeyTimeline(p,[]);
+  assert.equal(empty.starts[p.stages[1].id].at,at(12));
+  assert.equal(empty.starts[p.stages[2].id],undefined);
+  assert.equal(empty.end.at,at(24));
+  assert.equal(empty.end.kind,'reference');
+  const wrong=record(10,{startedAt:at(14),task:{source:'feishu',sourceKey:'foreign'}});
+  assert.deepEqual(journeyTimeline(p,[wrong]),empty);
+  assert.deepEqual(journeyTimeline(p,[],null,[{startedAt:at(14)-86400000,endedAt:at(15)-86400000}]),empty);
 });
 test("drag preserves outline identity, task and total; supports intra-stage insertion", () => {
   let p = plan();

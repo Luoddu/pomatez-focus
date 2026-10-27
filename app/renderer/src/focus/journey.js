@@ -303,16 +303,17 @@ export function completion(plan, records) {
     }
   return result;
 }
+const activeInJourney = (plan, active) => active &&
+  ["active", "paused", "review"].includes(active.status) &&
+  Number.isFinite(active.startedAt) && journeyDay(active.startedAt) === plan.day &&
+  (plan.scope === "local" ? active.task?.source === "local" :
+    active.task?.source === "feishu" && active.task.sourceKey === plan.scope);
 // Display only: actual session boundaries never overwrite template hours or bindings.
 export function journeyActualTimes(plan, records, active = null) {
   const done = completion(plan, records),
     slots = plan.stages.flatMap((s) => s.slots),
     starts = {};
-  const validActive = active &&
-    ["active", "paused", "review"].includes(active.status) &&
-    Number.isFinite(active.startedAt) && journeyDay(active.startedAt) === plan.day &&
-    (plan.scope === "local" ? active.task?.source === "local" :
-      active.task?.source === "feishu" && active.task.sourceKey === plan.scope);
+  const validActive = activeInJourney(plan, active);
   const activeSlot = validActive && !Object.values(done).some((r) => r.id === active.id)
     ? slots.find((p) => !done[p.id] && p.binding?.sessionId === active.id) ||
       slots.find((p) => !done[p.id] && !p.binding)
@@ -326,6 +327,69 @@ export function journeyActualTimes(plan, records, active = null) {
   const endedAt = record && Number.isFinite(record.endedAt) && record.endedAt >= record.startedAt
     ? record.endedAt : null;
   return { starts, endedAt };
+}
+export function journeyTimeline(plan, records, active = null, rests = []) {
+  const actual = journeyActualTimes(plan, records, active), done = completion(plan, records);
+  const [y, m, d] = plan.day.split("-").map(Number),
+    atHour = (h) => new Date(y, m - 1, d, h).getTime(),
+    positions = [], anchors = [];
+  let position = 0;
+  plan.stages.forEach((stage) => {
+    positions.push(position);
+    if (stage.time !== null) anchors.push({ position, at: atHour(stage.time) });
+    position += stage.slots.length;
+  });
+  if (plan.endHour !== null) anchors.push({ position, at: atHour(plan.endHour) });
+  const baseline = (index) => {
+    const stage = plan.stages[index], pos = positions[index];
+    if (stage.time !== null) return atHour(stage.time);
+    const left = anchors.filter((a) => a.position <= pos).at(-1),
+      right = anchors.find((a) => a.position > pos);
+    return left && right && right.at >= left.at
+      ? left.at + (right.at - left.at) * (pos - left.position) / (right.position - left.position) : null;
+  };
+  let delay = 0, latest = -Infinity, floor = -Infinity;
+  plan.stages.forEach((stage, index) => {
+    const start = actual.starts[stage.id], base = baseline(index);
+    if (start !== undefined && start >= latest) {
+      latest = start;
+      delay = base === null ? 0 : Math.max(0, start - base);
+    }
+  });
+  for (const r of Object.values(done)) {
+    floor = Math.max(floor, r.startedAt);
+    if (Number.isFinite(r.endedAt) && r.endedAt >= r.startedAt) floor = Math.max(floor, r.endedAt);
+  }
+  if (activeInJourney(plan, active)) {
+    floor = Math.max(floor, active.startedAt);
+    if (Number.isFinite(active.plannedSeconds) && active.plannedSeconds > 0)
+      floor = Math.max(floor, active.startedAt + active.plannedSeconds * 1000);
+  }
+  for (const rest of rests) {
+    if (!Number.isFinite(rest.startedAt) || journeyDay(rest.startedAt) !== plan.day) continue;
+    floor = Math.max(floor, Number.isFinite(rest.endedAt) && rest.endedAt >= rest.startedAt ? rest.endedAt : rest.startedAt);
+  }
+  const hasProgress = Number.isFinite(floor), starts = {};
+  for (const stage of plan.stages) {
+    if (actual.starts[stage.id] !== undefined) {
+      starts[stage.id] = { at: actual.starts[stage.id], kind: "actual" };
+    } else if (stage.time !== null) {
+      const base = atHour(stage.time);
+      if (hasProgress) delay = Math.max(delay, floor - base);
+      const at = base + delay;
+      starts[stage.id] = { at, kind: hasProgress ? "estimate" : "reference" };
+      floor = Math.max(floor, at);
+    }
+  }
+  const end = actual.endedAt !== null ? { at: actual.endedAt, kind: "actual" } : plan.endHour !== null
+    ? { at: Math.max(atHour(plan.endHour) + delay, floor), kind: hasProgress ? "estimate" : "reference" } : null;
+  return { starts, end };
+}
+export function journeyHour(day, at) {
+  const date = new Date(at), [y, m, d] = day.split("-").map(Number),
+    days = Math.round((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(y, m - 1, d)) / 86400000),
+    hour = date.getHours();
+  return days === 0 ? String(hour) : days === 1 ? hour === 0 ? "24" : `次日${hour}` : `${days}日后${hour}`;
 }
 export function reconcileJourney(plan, records, active) {
   const result = JSON.parse(JSON.stringify(plan)),

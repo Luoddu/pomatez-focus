@@ -5,7 +5,9 @@ import {
   Journey,
   JourneySlot,
   completion,
-  journeyActualTimes,
+  journeyTimeline,
+  journeyHour,
+  JourneyTime,
   journeyDay,
   locked,
   moveSlot,
@@ -38,6 +40,8 @@ const journeyClock = (at: number) => {
   const d = new Date(at);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
+const journeyDetail = (day: string, at: number) => journeyDay(at) === day
+  ? journeyClock(at) : `${journeyHour(day, at)}点（${journeyClock(at)}）`;
 type RestEntry = {kind:ActualRestKind; start:string; end:string; suggestedStart:number|null; suggestedEnd:number};
 const sameTimeInput = (value: string, at: number) =>
   (value.length === 16 ? `${value}:00` : value) === localTimeInput(at);
@@ -169,12 +173,13 @@ export default function TodayJourney({
     () => (plan ? completion(plan, records) : {}),
     [plan, records]
   );
-  const actualTimes = useMemo<{ starts: Record<string, number>; endedAt: number | null }>(
-    () => plan ? journeyActualTimes(plan, records, controls.active) : { starts: {}, endedAt: null },
+  const timeline = useMemo<{ starts: Record<string, JourneyTime>; end: JourneyTime | null }>(
+    () => plan ? journeyTimeline(plan, records, controls.active,
+      controls.restLog?.scope === scope ? controls.restLog.events : []) : { starts: {}, end: null },
     // Start times change on record edits or session changes, never on elapsed-second ticks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, records, controls.active?.id, controls.active?.startedAt, controls.active?.status,
-      controls.active?.task.source, controls.active?.task.sourceKey]
+    [plan, records, controls.restLog, scope, controls.active?.id, controls.active?.startedAt, controls.active?.status,
+      controls.active?.plannedSeconds, controls.active?.task.source, controls.active?.task.sourceKey]
   );
   const slots = plan?.stages.flatMap((s) => s.slots) || [],
     selected = slots.find((s) => s.id === edit);
@@ -505,8 +510,9 @@ export default function TodayJourney({
                         !!p.binding &&
                         controls.active?.id === p.binding.sessionId;
                     const position = slots.findIndex(v => v.id === p.id) + 1;
+                    const stageTime = timeline.starts[s.id];
                     const terminal = i === plan.stages.length - 1 && j === s.slots.length - 1 &&
-                      (j !== 0 || s.time === null || actualTimes.endedAt !== null);
+                      (j !== 0 || s.time === null || timeline.end?.kind === "actual");
                     return (
                       <React.Fragment key={p.id}>
                       <button
@@ -568,19 +574,17 @@ export default function TodayJourney({
                         ) : (
                           <JourneyOutline size={22} />
                         )}
-                        {terminal && (actualTimes.endedAt !== null || plan.endHour !== null) ? (
+                        {terminal && timeline.end ? (
                           <small className="journey-time-corner"
-                            data-time-kind={actualTimes.endedAt !== null ? "actual" : "reference"}
-                            title={`${actualTimes.endedAt !== null ? `实际专注结束 ${journeyClock(actualTimes.endedAt)}` : `预设结束参考 ${plan.endHour}点`}${actualTimes.starts[s.id] !== undefined ? ` · 本段专注开始 ${journeyClock(actualTimes.starts[s.id])}` : ""}`}>
-                            {actualTimes.endedAt !== null ? journeyClock(actualTimes.endedAt) : plan.endHour}
+                            data-time-kind={timeline.end.kind}
+                            title={`${timeline.end.kind === "actual" ? "实际专注结束" : timeline.end.kind === "estimate" ? "预计结束" : "预设结束参考"} ${journeyDetail(plan.day, timeline.end.at)}${stageTime?.kind === "actual" ? ` · 本段专注开始 ${journeyDetail(plan.day, stageTime.at)}` : ""}`}>
+                            {journeyHour(plan.day, timeline.end.at)}
                           </small>
-                        ) : j === 0 && (actualTimes.starts[s.id] !== undefined || s.time !== null) ? (
+                        ) : j === 0 && stageTime ? (
                           <small className="journey-time-corner"
-                            data-time-kind={actualTimes.starts[s.id] !== undefined ? "actual" : "reference"}
-                            title={actualTimes.starts[s.id] !== undefined
-                              ? `实际专注开始 ${journeyClock(actualTimes.starts[s.id])}${s.time !== null ? ` · 模板参考 ${s.time}点` : ""}`
-                              : `预设参考 ${s.time}点`}>
-                            {actualTimes.starts[s.id] !== undefined ? journeyClock(actualTimes.starts[s.id]) : s.time}
+                            data-time-kind={stageTime.kind}
+                            title={`${stageTime.kind === "actual" ? "实际专注开始" : stageTime.kind === "estimate" ? "预计开始" : "预设参考"} ${journeyDetail(plan.day, stageTime.at)}${s.time !== null ? ` · 模板参考 ${s.time}点` : ""}`}>
+                            {journeyHour(plan.day, stageTime.at)}
                           </small>
                         ) : null}
                       </button>
