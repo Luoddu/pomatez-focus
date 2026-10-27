@@ -1,0 +1,9 @@
+# P0-POMO-073 旅程小时与后续顺延
+
+- IN_PROGRESS；隔离模块实现/卡负责人root，状态仅本卡。用户2026-10-27新选择覆盖072的“未来保留原小时”：角标只显示大致小时，未来参考随实际进度后推，避免19:48后又显示预设19的歧义。基线8eeb83ede596871d2c79d789a883c665c3977b63，ref origin/codex/feishu-focus，任务分支task/p0-pomo-073-journey-forward；status/worktree/fetch/check:sync同公开110且clean、单worktree，绿灯。根路线图/治理/组件锁不写。
+- 范围：新增纯显示timeline投影，实际会话时间仍由原completion/actualTimes提供；以最近已开始阶段相对模板的非负延迟顺延后续参考点，当前阶段原参考缺失时仅在前后已知模板锚点间按槽位置推算内部基准，不向用户伪称实际起点。未来点不得早于已记录实际结束，参考间隔随顺延保留；没有实际进度时原参考不变。角标取小时，悬浮精确时间并区分实际/预计/模板；跨午夜标次日，24点仍可显示24。单槽终点优先规则沿072。无自动启动/卡点/模板或records/active/binding/revision写回。
+- 允许写：journey.js/d.ts纯投影和类型；TodayJourney.tsx仅显示/memo接入；原tests/journey.test.mjs、tests/journey-desktop.cjs、scripts/test-journey-desktop.cjs按需验证；DAILY-JOURNEY.md、CHANGELOG、本卡/ACCEPTANCE-P0-POMO-073.md、原版本helper两文件；ignored原始证据/原110发行helper/本地NSIS。禁止schema/远端API/第三方依赖/个人profile/凭证/真实飞书业务写入/用户App控制安装/根共享写入。本worktree build/dist和随机合成profile独占，无真实数据库/端口/服务控制。
+- T1标准，一次前台60分钟；授权一位独立只读reviewer（可复用原review_journey_times）10分钟：读取冻结diff/卡/相关纯投影/原始正反证据，检查延迟/缺失锚点/跨日/计时历史隔离/性能，返回PASS或精确问题，不写文件、不读个人profile、不外部写入或分派。无其他子Agent/后台。测试隐藏静音；默认发布沿模块AGENTS，先本机准备、用户自行重启。
+- 四源：①现110实际角标HH:mm和未来固定s.time混用导致用户截图19:48→19；②自有JS+现React memo，无第三方采用/升级或关键运行机制变更，不适用外部官方调研；③复用journeyActualTimes/completion/journeyDay与原build/version/stage/release工具，Learning日期memo与不可变发行沿用；④原journey/templates20项与三进程journey-desktop（含单槽终点/原生active）直接适配，新增延迟/记录延长/缺失基准/跨午夜正反测试。
+- 验收：14:10/16:17/19:48显示14/16/19，后续19/21应按最近实际阶段延迟后推且不早于实际结束；下一阶段实际开始后重算，提前开始不将未来拉到原模板之前；无actual/明日仍原参考，异日异源不影响且同源可用；跨午夜次日显示、单槽终点正常、原模板/会话/绑定与revision字节不因投影变动。依赖不含逐秒elapsed，无新轮询进程/网络/逐秒存储。纯函数和真实DOM/原旅程三进程、独立复核、干净同源成品/五资产/真实110→新版更新器通过后DONE。
+- 回滚显式revert源码并新版本发布，无数据迁移，旧tag和资产不替换。提交/关键检查点前复核写集与资源；范围外只记录，同根因未知两次停冲突步骤、外部副作用不盲重放。Learning在验收单次判断，无新机制不重复记录。
