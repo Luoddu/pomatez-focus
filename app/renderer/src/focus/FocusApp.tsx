@@ -745,7 +745,6 @@ export default function FocusApp() {
     syncing.current = true;
     initialHistorySource.current = sourceKey;
     const classify = classifyRequested.current.has(sourceKey);
-    const manual = manualSyncRequested.current.delete(sourceKey);
     setSyncBusy(true);
     setHarvestProgress({
       percent: 3,
@@ -870,7 +869,7 @@ export default function FocusApp() {
         failures.push(
           `还有 ${remote.missing} 条旧专注缺少完整明细，请在原电脑运行新版并同步。`
         );
-      if (manual) notify(
+      if (manualSyncRequested.current.delete(sourceKey)) notify(
         failures.length
           ? `已同步可处理的成果，仍有待处理项：${failures[0]}`
           : classified
@@ -899,7 +898,7 @@ export default function FocusApp() {
         text: "暂未完成同步 · 本机成果保留",
         state: "error",
       });
-      if (manual) notify(`记录已保存在本机，待同步：${e.message}`, "error");
+      if (manualSyncRequested.current.delete(sourceKey)) notify(`记录已保存在本机，待同步：${e.message}`, "error");
     } finally {
       syncing.current = false;
       setSyncBusy(false);

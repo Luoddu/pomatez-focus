@@ -10,4 +10,8 @@ p075-unit-full.txt 30/30 PASS（editQueue/quietSync/session/manual），包含fa
 
 UI同进程先开始真实active，再补过去一条：id/task/status保持、elapsed继续；暂停后重叠输入被拒且表单保留，调为更早区间后保存成功，paused active深相等。手动同步两条成功并给结果，active仍深相等。右键历史改色→合成同网络错误→颜色修改行按钮可见→放弃，备份entry一致、原record/current active均深相等，recolor仅调用一次、其他队列不动。个人App未读取/操作、0真实云写；截图不是个人业务数据。
 
-待冻结独立复核、最终干净构建/本机包/公开更新链；未据局部测试宣称DONE。Learning-Review none：本轮为既有恢复保护、计时状态和显示语义局部调整，没有已验证的新跨任务教训候选。
+首轮review_history_append独立只读复核9a9f197：标题badge、active补记和color保护无阻断，独立纯测试20/20；发现P2手动通知意图在sync开始过早delete，若中断延期则最终结果无通知。现仅在真正完成/报告失败的notify处消费source请求，interrupted保留。p075-desktop-review-fix.txt五进程全PASS：原record用例改为明确手动开始→held sync中新增编辑→延后完成，MutationObserver确认最终恰一次手动结果通知；原source隔离继续通过。
+
+新增ui-resume同profile冷启动：两条补记记录深相等，当前暂停计时的id/task/elapsed/segments保持，已放弃color不复活。首轮夹具错误等待active页面下本来不渲染的四象限，定位后改为等待恢复active，非产品修补。旧companion进度选择器/手动触发已随新UI更新并node --check通过；其完整历史日记链本轮未重跑，不冒称通过；同一同步路径已由上述五进程直接验证。
+
+待修正冻结版独立复核、最终干净构建/本机包/公开更新链；未据局部测试宣称DONE。Learning-Review none：本轮为既有恢复保护、计时状态和显示语义局部调整，没有已验证的新跨任务教训候选。

@@ -32,8 +32,11 @@ app.whenReady().then(async()=>{try{
  const queue=()=>js("JSON.parse(localStorage.getItem('pomatez-quick-edit-outbox-v1')||'[]')");
  const stored=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
  const add=async name=>{await click('在重要不紧急新增任务');await set('[aria-label="新增任务名称"]',name);await set('[aria-label="新增任务番茄数"]',2);await click('添加');await until(async()=>(await queue()).some(e=>e.payload.title===name))};
- await until(()=>js("!!document.querySelector('.quad-iu [data-task-group=t1]')"));
- if(phase==='ui'){
+ if(phase!=='ui-resume')await until(()=>js("!!document.querySelector('.quad-iu [data-task-group=t1]')"));
+ if(phase==='ui-resume'){
+  const expected=await js("JSON.parse(localStorage.getItem('__p075-expected'))");await until(async()=>(await stored()).active?.status==='paused');
+  const restored=await stored();assert.equal(restored.active.id,expected.active.id);assert.equal(restored.active.elapsedSeconds,expected.active.elapsedSeconds);assert.deepEqual(restored.active.task,expected.active.task);assert.deepEqual(restored.active.segments,expected.active.segments);assert.deepEqual(restored.records,expected.records);assert.equal((await queue()).length,0);checks.push('cold process keeps both backfilled records and paused current focus identity/time/segments; discarded color does not return');
+ }else if(phase==='ui'){
   await until(()=>!!releaseHistory);await until(()=>js("!!document.querySelector('.records-section .side-title .sync-progress.busy')"));
   const widths=await js("[document.querySelector('.left-col').getBoundingClientRect().width,document.querySelector('.right-col').getBoundingClientRect().width]");
   for(const width of [1440,480]){
@@ -60,19 +63,25 @@ app.whenReady().then(async()=>{try{
   const original=(await stored()).records[0];await js("document.querySelector('.record').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:400,clientY:300}))");await until(()=>js("!!document.querySelector('[role=menuitemradio]')"));await js("document.querySelector('[role=menuitemradio]').click()");await click('手动同步');await until(async()=>(await queue())[0]?.state==='failed');const failedColor=(await queue())[0];assert.equal(failedColor.kind,'color');
   await until(()=>js(`!!document.querySelector('[aria-label="放弃未同步修改 ${failedColor.id}"]:not(:disabled)')`));await click('放弃未同步修改 '+failedColor.id);await until(async()=>(await queue()).length===0);assert.deepEqual((await stored()).records[0],original);assert.deepEqual((await stored()).active,paused);
   assert.deepEqual(await js(`JSON.parse(localStorage.getItem('pomatez-discarded-edit-v1:${failedColor.id}')).entry`),failedColor);assert.equal(recolors,1);checks.push('failed color clearly named with visible discard action; recovery copy verified and saved record/current timer untouched');
+  await js("localStorage.setItem('__p075-expected',JSON.stringify(JSON.parse(localStorage.getItem('pomatez-focus-v1'))))");
  }else if(phase==='record'){
   await until(()=>historyReads.includes(source));assert.equal(saved.length,0);
   holdSync=true;
   await click('补记');await js("{const e=document.querySelector('#manual-task');e.value=[...e.options].find(o=>o.value!=='free').value;e.dispatchEvent(new Event('change',{bubbles:true}))}");await click('保存补记');
+  await js("window.__manualNotices=0;{const seen=new WeakSet();new MutationObserver(()=>{for(const el of document.querySelectorAll('.toast span')){if(el.textContent.includes('专注成果已同步')&&!seen.has(el)){seen.add(el);window.__manualNotices++}}}).observe(document.body,{childList:true,subtree:true,characterData:true})};void 0");
+  await click('手动同步');
   await advance(300000);await until(()=>!!releaseSync);const record=(await stored()).records[0];
   await click('修改记录 '+record.id);await set('[aria-label="补记番茄数"]',0);await click('保存修改');
   holdSync=false;releaseSync();await until(async()=>(await stored()).records[0].sync==='synced');await wait(100);assert.equal(saved.length,0);assert.equal(corrects,0);
   await advance(599000);assert.equal(saved.length,0);await advance(600000);await until(async()=>(await queue()).length===0&&corrects===1);assert.equal(syncCalls,1);assert.equal(saved.length,1);assert.equal((await stored()).records[0].completedCount,0);
+  await until(()=>js("window.__manualNotices===1"));
   checks.push('held sync receipt persists; intervening edit defers archive and correction, then resumes each once without retiring pending intent');
+  checks.push('manual request survives interrupted write and emits exactly one result notice after deferred completion');
+  const classificationsBefore=classifies.filter(s=>s==='synthetic-quiet').length;
   hold=true;await add('Synthetic source guard');await click('手动同步');await until(()=>!!releaseCreate);
   const switchSource=async next=>{source=next;await click('设置');await js("document.querySelector('form.field-grid').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))");await until(()=>js("!document.querySelector('.settings-save').disabled"));await click('设置');await until(()=>js("!document.querySelector('.gen-btn').disabled"))};
   await switchSource('synthetic-other');await wait(150);assert.equal(classifies.includes('synthetic-other'),false);
-  await switchSource('synthetic-quiet');hold=false;releaseCreate();await until(async()=>(await queue()).length===0);await until(()=>classifies.includes('synthetic-quiet'));assert.equal(classifies.filter(s=>s==='synthetic-quiet').length,1);
+  await switchSource('synthetic-quiet');hold=false;releaseCreate();await until(async()=>(await queue()).length===0);await until(()=>classifies.filter(s=>s==='synthetic-quiet').length===classificationsBefore+1);
   checks.push('deferred manual classification belongs to source A; switch B never consumes it, return A completes once');
   const original=(await stored()).records[0];failCorrect=true;
   await click('修改记录 '+original.id);await set('[aria-label="补记番茄数"]',1);await click('保存修改');await click('手动同步');
