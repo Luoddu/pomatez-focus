@@ -1,6 +1,6 @@
 # P0-POMO-076 浏览器专注锁一致性
 
-- IN_PROGRESS；模块root实现/卡负责人，唯一状态本卡。基线085faafbd966b9908082ba66f72b9f6606117ce5，fetch/check:sync实时同origin/codex/feishu-focus，preview114，clean单worktree绿灯。task/p0-pomo-076-consistent-lock；根治理/路线图/组件锁不写。
+- DONE（代码与发行，个人Edge配套需用户加载）；模块root实现/卡负责人，唯一状态本卡。基线085faafbd966b9908082ba66f72b9f6606117ce5，开工fetch/check:sync实时同origin/codex/feishu-focus，preview114，clean单worktree绿灯。task/p0-pomo-076-consistent-lock；根治理/路线图/组件锁不写。
 - 用户2026-10-28截图：B站首页一会正常、一会9/12每日专注锁，要求定位修复。默认静音隔离测试、先本机包后默认源码/Windows preview推送，不操作个人App安装/重启、Edge注册/profile或真实浏览页面；不改目标、当日放行、计数/额度和退出fail-open约定。
 - 写前T0：p076-t0-repro.txt由114编译BrowserControl与原worker decide复现：AW发布0秒、扩展4秒读取(7秒到期)、农场5秒健康新发布、页面7秒先放行、扩展9秒再读取后重锁，9/12全程未变，空档2秒。源码链为ActivityWatch tick await refresh后再等5秒/live有效7秒→BrowserControl直接复制live.expiresAt→原生host照传→worker复制到页面→content到期删罩。独立两段轮询共用7秒导致健康相位空档；真实截图具体时间相位未观测，不冒充个人现场取证。另content pagehide清罩/计时器却无pageshow重读，overlay被DOM移除后只保留离线引用。按完整链分类后修复，不先局部试补。
 - 有界方案：监测采样仍7秒；控制租约从发布完成时算，新能力协商后20秒，覆盖最多7秒内有效查询+5秒调度+5秒native错位及余量。协议保持v1帧，追加leaseVersion=2与control-lease-v2能力回执；只有新host+新worker实际回执才发20秒，旧配套继续7秒并提示需更新，不因App先升级而让旧host拒绝20秒。host/worker按协商版本严格上限，禁止无限续过期投影；到本地午夜截断。ready=false、关闭、断连仍解除，真正无新消息最多20秒后释放。没有新timer/进程、没有加快5秒轮询/逐秒I/O。content复用原1秒计时器恢复断开DOM节点，pageshow重新取有效control，document_start根未就绪不报错。
@@ -9,3 +9,6 @@
 - 四源：①上述原文与精确T0复现，固定114 baseline/build/source。②NativeMessaging沿Electron34.5.8/既有stdio4字节公开接口，未升级或改变第三方API；Chrome官方https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging L49/L70-L74/L173等及HTML Standard页面生命周期https://html.spec.whatwg.org/multipage/document-lifecycle.html公开原文核对，均当前资料、非固定版能力升级证明，仅佐证原生连接与pagehide/pageshow既有机制；变更租约是自有协议，固定版机制以本机全链为准，不新建平行桥/服务。③命中LEARN-P0-POMO-065-01 worker一次恢复门禁/epoch/串行、039不可变发行与067安装隔离，复用既有host/manifest/nativeRegistry adapter/原日目标和计数；不变权限或第二统计源。④原browser-control及daily-focus-lock纯/静音CMD→host→content真实video链，新增相位连续时序、旧配套兼容、过期/foreign/畸形/关闭/午夜负例、pageshow/DOM恢复及唯一timer正反。
 - 完成正反：持续有效策略9/12在AW5秒/host5秒所有相位与有界查询延迟下连续遮罩且拒播；真正ready=false/断连/旧消息过期不延长锁，临时放行正常播、结束恢复、额度/目标业务不变。新能力才发20秒，新App旧host/worker仍接受7秒，不误称稳定能力；旧App/新配套可读v1；非法version/上限/源拒绝。午夜不沿用昨日宽限，缓存返回/节点被移除能恢复遮罩，超时后可播，timer不重复/无新轮询。先纯测试，再完整App策略→实际生成CMD/Node host帧→真实worker源码→真实静音HTML video多轮验证，不以synthetic leaf代替完整链。
 - 回滚：源码revert发新版本，不替换旧tag/资产；旧配套可继续走7秒兼容，manifest key/权限与本机承诺格式不改。关键检查点/提交前查status/diff/worktree资源；未知同根因两次停止并扩大分类、身份/外部副作用不盲重放。Learning候选须独立证据确认，最终同验收具体判断；不把当前风险/猜测写Learning。
+
+- 交付：固定运行源码/tag27a1f5e90eb3f4ce786d23372ba1ed20c1a86981，preview115，独立review_scientific_rest PASS；22策略测试/实际静音全链6组最终通过。NSIS85,712,377字节/SHA256 6761c022b9dadc0065d31db48bf66f0d1b9ddeecd241835db02b85cbcb8db1a3；成品273文件逐字节同源、先本机stage/reread，再公开426473469五资产与annotated tag；实际114原updater发现115、errors=[]、下载安装0，旧114/Latest51不变。个人App/Edge/注册未改，用户须重启加载App、更新配套、Edge重载与刷新网站后生效。
+- Learning收口补充允许root单写本模块Learning.md（不写根仓Learning）：独立复核确认候选跨任务适用且证据足够，最终同原子验收提交记录LEARN-P0-POMO-076-01。仅记录多级采样/交付时钟应分别验证的有界规则，不把20秒外推为通用默认值；证据指向本卡验收与已提交测试，原candidate检查点27a1f5e在此处置完成。
