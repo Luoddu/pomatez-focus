@@ -1,6 +1,6 @@
 # P0-POMO-074 每日准备、午夜收短、自由拖动与安静同步
 
-- IN_PROGRESS；模块实现/卡负责人root，状态仅本卡。基线28709c8d76eaa29303df0c3335d710434bdaaf36，ref origin/codex/feishu-focus，任务分支task/p0-pomo-074-daily-workflow；status/worktree/fetch/check:sync同公开111、clean、单worktree，绿灯。根路线图/治理/组件锁不写。
+- DONE（实现与交付）；模块实现/卡负责人root，状态仅本卡。基线28709c8d76eaa29303df0c3335d710434bdaaf36，ref origin/codex/feishu-focus，任务分支task/p0-pomo-074-daily-workflow；开工status/worktree/fetch/check:sync同公开111、clean、单worktree，绿灯。根路线图/治理/组件锁不写。个人旧版积压未代删，用户加载新版后可点单条放弃入口。
 - 用户2026-10-28：8:30仍显示昨日剩余番茄；旅程限制24点、晚开始收掉来不及完成的番茄；抓任务标题简便跨象限移动并带整组番茄；完成/新建等集中操作最后一次后安静5分钟再合并同步（已明确选最后一次，不是首笔窗口）。默认本机包优先及公开推送沿模块AGENTS，用户自行重启，个人App不操作。
 - 范围/实现默认：①跨日到点先只读刷新今日任务，旧日缓存不继续冒充今日；自动生成仅在安全可用时沿原幂等生成；失败原因/等待原因留在原按钮说明，已失败旧意图不永久挡新日；最多一次间隔5分钟的补试，未知写入结果仍沿原读回幂等生成，不额外创建任务源。今天具体8:30历史根因仍unknown，手动8:42已覆盖当前标记，不伪称已证实。②午夜收短为当日可逆显示投影，以原番茄/休息时长和实际/参考时间估计可完成槽，保留完成/当前计时，收掉末尾来不及的未开始轮廓；不删除原任务/云行/历史/模板，日后模板仍全量，开始按钮不得启动隐藏槽，午夜后不得新开昨日旅程。③复用整组boardLayout拖放，允许未同步新任务整组本地拖动，创建回执稳定ID重绑后保留安排；不新建云象限写入API。④所有本地意图立即持久，独立source级5分钟安静窗口只管发送时机，网络回执不重置窗口；新操作重置，手动同步/重试立即，重启恢复原截止，失败不高频循环；在途请求不撤销，下一条发送前重新检查新操作。偏好同步非本任务修改。
 - 允许写：FocusApp.tsx；dailyRefresh.ts；新quietSync.ts及其纯/桌面合成测试与runner；boardLayout.ts、QuadrantBoard.tsx、TaskTitle.tsx/focus.css必要拖动体验；journey.js/d.ts、TodayJourney.tsx/HistoryPanel.tsx必要午夜投影/时长入口；原daily-refresh/auto-refresh、board-layout/board-drag、journey/templates/API及必要原合成夹具；DEVELOPMENT.md、DAILY-JOURNEY.md、CHANGELOG、本卡/ACCEPTANCE-P0-POMO-074.md、原version helper两文件、ignored原始证据/沿111发行helper/本地NSIS。禁止飞书schema/身份/Secret/权限、实际业务API测试、根共享写入、个人profile/真实配置写入、控制/安装用户App、新第三方依赖或系统服务。本worktree build/dist与随机静音profile独占，无真实数据库/端口/服务控制。
@@ -12,3 +12,5 @@
 - 复核补卡：d037275只读审查发现复合sync/archive/correct/recolor下一次独立写未重检。允许写集明确增入原editQueue.ts及tests/edit-queue.test.mjs；send返回false表示安全延期并保留pending，不当失败、不退休意图，已有void成功协议兼容。源隔离的延期分类请求使用source Set。新增held sync后新操作→archive0→截止后一次恢复的桌面证据与队列正反测试，冻结后再次独立复核；其余授权/资源/预算/发布门禁不变。
 
 - 同轮用户新增：长期1项待同步可放弃，随后截图明确是失败的“记录修改：无法连接飞书，记录已保留本机”。桌面只读工具两次capture超时、UIA无Web内容，未操作个人App/重试云写/删除数据。补充范围为原EditQueue中仅failed edit的本地放弃入口：按当前source+intent ID核对，运行中/非edit/异源拒绝；先逐字节核对原意图恢复副本再移出outbox，原timer/cloud记录不删，不自动丢弃。FocusApp原失败行按钮由用户升级后点击；本轮不自动重启旧App。新增纯正反与真实合成record失败→放弃→原记录不变测试、独立复核。112已冻结打包并草稿五资产核对但尚无公共tag，不复用112字节；保留未公开草稿并最终交付合并113，用户仅需一次本机重启，公开前版仍111。版本helper原两文件与后续发行/本机stage沿原授权，其余范围/预算不变。
+
+- 交付：固定运行源码/tag55e3d7d83bb30f698ceec7970ed4f136ad0b8238，preview113，52/52纯测试及最终隐藏静音合成链通过；两reviewer复核，review_history_append复核最终清理入口PASS。NSIS85,524,715字节/SHA256 6be812bedaf1cacde76e1d292891d50c6005086628ff54ee73df640332232720；先本机stage并回读alreadyPrepared=true，再发布426174097，五资产与annotated tag核验通过，真实111原updater发现113且下载/安装0、errors=[]。旧111/Latest51不变，112草稿无公共tag、未公开。证据与剩余用户操作见ACCEPTANCE-P0-POMO-074.md。Learning-Review none：复用既有身份/队列/只读投影/不可变发行链，本功能边界未形成新跨任务教训。

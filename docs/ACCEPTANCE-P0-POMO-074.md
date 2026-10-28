@@ -1,6 +1,6 @@
 # P0-POMO-074 每日工作流验收
 
-REVIEW准备；合同/四源/正反验收/授权/回滚见TASK-P0-POMO-074.md。历史08:30原因unknown：用户确认昨日任务残留，现有日志不能复原具体阻塞。修复已定位的路径，不把代码推断当历史事实。基线28709c8，单独task/p0-pomo-074-daily-workflow、单worktree，范围外改动0。
+DONE（实现与发行，个人积压清理由用户加载新版后点击）；合同/四源/正反验收/授权/回滚见TASK-P0-POMO-074.md。历史08:30原因unknown：用户确认昨日任务残留，现有日志不能复原具体阻塞。修复已定位的路径，不把代码推断当历史事实。基线28709c8，单独task/p0-pomo-074-daily-workflow、单worktree，范围外改动0。
 
 dailyRefresh沿原生成幂等读回，跨日先读今日、保留旧未同步事实；pending/active/写入等待，旧failed不永久挡新日。自动失败一次5分钟补试，最多2次，手动仍可重试；成功只在完整回读后盖戳。纯测试覆盖日期回拨、旧格式、来源隔离及坏metadata。
 
@@ -22,6 +22,14 @@ review_history_append二次只读复核8ebec1b PASS，两项P2关闭；独立纯
 
 p074-discard-unit.txt 5/5；p074-unit113-full.txt 52/52；p074-build113-working.txt成功；p074-quiet113-working.txt原write/resume/record三进程全部通过，新增record末段复现相同网络报错，点击放弃后outbox为空，恢复副本entry逐字节一致、原saved record深相等且云history仍一条，未调用多余correct。纯负例：异源/非edit/运行中拒绝，备份未确认保留原outbox；成功后冷读仅原其他意图。该副本仅本机、不入Git、不自动回放。
 
-待113清理入口冻结复核、同源干净包/本机stage及公开五资产/真实111更新器验收；未据源码存在宣称DONE。
+review_history_append最终只读复核55e3d7d83bb30f698ceec7970ed4f136ad0b8238 PASS，无新增阻断，独立原队列5/5；其余同步/刷新差异不变。最终固定源码/tag同55e3d7d / preview113 / dirty=false。p074-build113-final-clean.txt成功；p074-quiet113-final.txt原write/resume/record（含清理）、p074-refresh113-final.txt原plan/resume、p074-journey113-final.txt原plan/resume/times通过，均隐藏静音、随机profile、0真实业务写入，原board-review-fix write/restore结论保留。
+
+p074-package113.txt、release113-package-acceptance.json/package-verify.txt：262个build文件与成品ASAR逐字节相同，原生资源存在，成品随机profile静音隐藏启动退出0。NSIS85,524,715字节，SHA256 6be812bedaf1cacde76e1d292891d50c6005086628ff54ee73df640332232720；五资产/feed SHA512匹配。先原stage helper准备本机113，再完整回读alreadyPrepared=true（release113-local-stage.json/local-reread.json），不从远端下载、不自动关闭/安装/重启个人App。
+
+release113-draft-verify.txt/public-verify.txt与remote-draft/public.json：草稿426174097五资产大小/摘要全部通过且无公共tag，推固定annotated113 tag后立即公开、非Latest；草稿/公开asset IDs相同、旧111资产及发布时间不变、Latest仍51。地址https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.113 。原push:focus非强推同步固定源码，最后仅更新本卡/验收文档，不重打包或改tag。
+
+release113-prior-verification.json核对原111安装包SHA256 4c06598470581900a16e2f9b76d086dfd43e5a5404d6dc11959863c6241d3fd6等于公开摘要；release113-before-update.json验证112无公共tag草稿未进入原111更新链。release113-live-update.json/txt用原111 ASAR、source3ccef813及原updater SHA256 9476f779e9e8650fa1eec0718155fe8a04a4618bbb8ed06bd8673cae5de0a819，发现available113，文件/85,524,715字节/SHA512匹配本机feed，errors=[]、downloads=0、autoDownload=false、autoInstallOnAppQuit=false。
+
+用户下一步：设置中点击“重启以加载更新”，回到失败的“记录修改”行点击“放弃这次修改”。此入口才会清理那条个人本地意图并保存恢复副本；本次交付尚未代点或声称已清。回滚按执行卡发新版本，不替换既有tag/字节，不删个人记录。112未公开草稿保留、不创建公共112 tag、不重新上传它。
 
 Learning-Review: none - 本轮复用原队列/日期/source guards和既有只读预测、不可变发行链；新边界属于本功能局部业务，没有新的已验证跨任务教训候选。
