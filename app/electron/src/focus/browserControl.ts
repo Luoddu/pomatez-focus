@@ -31,24 +31,28 @@ export class BrowserControl {
     this.policy=next; this.error=""; return this.snapshot();
   }
   snapshot() {
-    let connected=false, pausedCount=0, pauseKey="", checkedAt: number|null=null,focusLockCapable=false;
+    let connected=false, pausedCount=0, pauseKey="", checkedAt: number|null=null,focusLockCapable=false,leaseCapable=false;
     try { const v=json(path.join(this.directory,"browser-control-receipt.json")); const age=this.now()-v.checkedAt;
-      if(v.owner===OWNER && v.connected===true && age>=0 && age<=12000) { connected=true; checkedAt=v.checkedAt;focusLockCapable=v.focusLockCapable===true; if (Number.isInteger(v.pausedCount)&&v.pausedCount>=0&&v.pausedCount<=100) pausedCount=v.pausedCount; if(typeof v.pauseKey==="string"&&v.pauseKey.length<=100) pauseKey=v.pauseKey; }
+      if(v.owner===OWNER && v.connected===true && age>=0 && age<=12000) { connected=true; checkedAt=v.checkedAt;focusLockCapable=v.focusLockCapable===true;leaseCapable=v.leaseCapable===true; if (Number.isInteger(v.pausedCount)&&v.pausedCount>=0&&v.pausedCount<=100) pausedCount=v.pausedCount; if(typeof v.pauseKey==="string"&&v.pauseKey.length<=100) pauseKey=v.pauseKey; }
     } catch (_) {}
-    return { policy:{...this.policy}, connected, pausedCount, pauseKey, checkedAt, error:this.error,focusLockCapable,focusLock:this.focusLock.snapshot(this.state),
+    return { policy:{...this.policy}, connected, pausedCount, pauseKey, checkedAt, error:this.error,focusLockCapable,leaseCapable,focusLock:this.focusLock.snapshot(this.state),
       installed:fs.existsSync(path.join(this.directory,"browser-control","host-config.json")) };
   }
   publish(state: RestState) {
-    this.state=state;const lock=this.focusLock.snapshot(state);
+    this.state=state;const browser=this.snapshot(),lock=browser.focusLock;
     const now=this.now(), live=state.live;
     const ready=state.status==="recording" && !!live && now>=live.checkedAt && now<=live.expiresAt && live.expiresAt<=live.checkedAt+7000 && state.usage?.day===localDay(now);
+    // AW sample freshness and browser delivery are separate clocks. Two 5s
+    // stages need their own bounded lease, negotiated before old hosts see it.
+    const leaseVersion=browser.leaseCapable?2:1,leaseMs=leaseVersion===2?20000:7000;
+    const midnight=new Date(now);midnight.setHours(24,0,0,0);
     try { atomic(path.join(this.directory,"browser-control-projection.json"),{
-      owner:OWNER,v:1,ready,expiresAt:ready?live!.expiresAt:0,day:localDay(now),supervise:state.settings.supervise||lock.enabled,
+      owner:OWNER,v:1,ready,leaseVersion,expiresAt:ready?Math.min(now+leaseMs,midnight.getTime()):0,day:localDay(now),supervise:state.settings.supervise||lock.enabled,
       mode:this.policy.mode,cooldownMinutes:this.policy.cooldownMinutes,reminderKey:ready?(state.reminder?.key||""):"",
       quotaSpent:ready && !!state.usage && state.usage.totalSeconds>=state.settings.quotaMinutes*60,
       ...(lock.enabled?{focusLock:{blocked:lock.blocked,goal:lock.goal,count:lock.count,until:lock.until,quotaSpent:lock.quotaSpent}}:{}),
     }); } catch (_) { this.error="浏览器控制状态未写入，暂停尚未确认"; }
-    return this.snapshot();
+    return {...browser,error:this.error};
   }
   close() { try { atomic(path.join(this.directory,"browser-control-projection.json"),{owner:OWNER,v:1,ready:false,expiresAt:0}); } catch (_) {} }
   // Only an explicit trusted farm action installs the per-user host. Tests

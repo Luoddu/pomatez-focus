@@ -3,7 +3,8 @@ const HOST="io.github.luoddu.pomatez_focus";
 const TARGETS=["*://*.bilibili.com/*","*://*.xiaohongshu.com/*"];
 function target(url) { try { const h=new URL(url).hostname; return ["bilibili.com","xiaohongshu.com"].some(d=>h===d||h.endsWith("."+d)); } catch (_) { return false; } }
 function decide(state, old, now) {
-  const ok=state?.v===1 && state.ready===true && state.supervise===true && now<=state.expiresAt && state.expiresAt<=now+7000 && ["mirror","pause","cooldown","quota"].includes(state.mode);
+  const leaseVersion=state?.leaseVersion??1,leaseMs=leaseVersion===2?20000:7000;
+  const ok=[1,2].includes(leaseVersion) && state?.v===1 && state.ready===true && state.supervise===true && Number.isSafeInteger(state.expiresAt) && now<=state.expiresAt && state.expiresAt<=now+leaseMs && ["mirror","pause","cooldown","quota"].includes(state.mode);
   // Release the page lease immediately, but keep the original absolute deadline
   // so a short off/disconnect cannot consume the reminder and erase its cooldown.
   if(!ok) return {...old,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
@@ -61,7 +62,7 @@ else {
     const p=port=chrome.runtime.connectNative(HOST);
     p.onMessage.addListener(state=>{if(port!==p)return;tries=0;enqueue(state,p);});
     p.onDisconnect.addListener(()=>{void chrome.runtime.lastError;if(port!==p)return;release();if(++tries<=3)retry=setTimeout(()=>void connect(),tries*10000);});
-    p.postMessage({type:"status",features:["daily-focus-lock-v1"]}); timer=setInterval(()=>{if(port)port.postMessage({type:"status",features:["daily-focus-lock-v1"]});},5000);
+    p.postMessage({type:"status",features:["daily-focus-lock-v1","control-lease-v2"]}); timer=setInterval(()=>{if(port)port.postMessage({type:"status",features:["daily-focus-lock-v1","control-lease-v2"]});},5000);
   }
   chrome.runtime.onMessage.addListener((v,sender,reply)=>{
     if(v?.type==="getControl"&&target(sender.tab?.url)) { reply(current.control);return; }

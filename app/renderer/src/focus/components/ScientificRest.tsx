@@ -28,7 +28,7 @@ type Usage = {
 };
 type FocusLock={enabled:boolean;plannedEnabled:boolean;goal:number;quotaMinutes:number;releaseMinutes:number;plannedReleaseMinutes:number;day:string;count:number|null;reached:boolean;lockedForChanges:boolean;releasing:boolean;until:number;blocked:boolean;quotaSpent:boolean;error:string};
 export type RestState = {
-  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean;focusLockCapable?:boolean;focusLock?:FocusLock };
+  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean;focusLockCapable?:boolean;leaseCapable?:boolean;focusLock?:FocusLock };
   settings: {
     quotaMinutes: number;
     supervise: boolean;
@@ -187,7 +187,7 @@ export default function ScientificRest({
   // Read the clock on every render, including new detector snapshots between ticks.
   const displayNow = Date.now();
   const usage = displayUsage(state, displayNow);
-  const statusDetail = monitorDetail(state, displayNow)+"\n浏览器控制："+(state.browserControl?.connected?"配套扩展已连接":"未连接，暂停尚未确认")+(lock?.enabled&&!state.browserControl?.focusLockCapable?"\n每日锁尚未确认：请更新并重新加载配套扩展":"");
+  const statusDetail = monitorDetail(state, displayNow)+"\n浏览器控制："+(state.browserControl?.connected?"配套扩展已连接":"未连接，暂停尚未确认")+(lock?.enabled&&!state.browserControl?.focusLockCapable?"\n每日锁尚未确认：请更新并重新加载配套扩展":lock?.enabled&&!state.browserControl?.leaseCapable?"\n专注锁稳定修复待配套更新：更新浏览器配套，在Edge重新加载并刷新网站":"");
   const ring=usage?quotaDisplay(usage.totalSeconds,lock?.enabled?lock.quotaMinutes:state.settings.quotaMinutes):null;
   const ratio=ring?.ratio||0,over=ring?.over||false;
   const watching=state.status==="recording" && !!state.live?.site && displayNow>=state.live.checkedAt && displayNow<=state.live.expiresAt;
@@ -485,7 +485,8 @@ export default function ScientificRest({
               <label><input type="checkbox" disabled={busy||!!lock?.lockedForChanges} checked={policy.autoRaise} onChange={async e=>{try{await api().browserConfigure({...policy,autoRaise:e.target.checked});}catch(err:any){setError(err.message);}}} />浏览时农场原屏幕置顶</label>
               <small>干预设置即时保存；镜子挡不暂停，冷静挡等待后可续，额度挡用完后至次日限制。</small>
               <p role="status">{state.browserControl?.error || (state.browserControl?.connected ? `配套扩展已连接${state.browserControl.pauseKey?` · 最近确认暂停 ${state.browserControl.pausedCount} 个播放器`:""}` : "配套扩展未连接 · 视频暂停尚未确认")}</p>
-              <button className="btn-small" disabled={busy} onClick={async()=>{setBusy(true);setError("");try{const result=await api().browserSetup();setSetupNote(`已打开配套文件夹。Edge扩展 → 开发人员模式 → 加载解压缩的扩展，选择该文件夹。扩展ID：${result.extensionId}`);}catch(err:any){setError(err.message);}finally{setBusy(false);}}}>安装／更新浏览器配套</button>
+              {state.browserControl?.connected && <small>{state.browserControl.leaseCapable?"稳定连接已确认":"请更新浏览器配套，在Edge重新加载扩展，并刷新B站／小红书页面，完成稳定锁定修复。"}</small>}
+              <button className="btn-small" disabled={busy} onClick={async()=>{setBusy(true);setError("");try{const result=await api().browserSetup();setSetupNote(state.browserControl?.installed?"已更新配套文件。在Edge扩展页找到番茄农场，点击重新加载，再刷新B站／小红书页面。":`已打开配套文件夹。Edge扩展 → 开发人员模式 → 加载解压缩的扩展，选择该文件夹。扩展ID：${result.extensionId}`);}catch(err:any){setError(err.message);}finally{setBusy(false);}}}>安装／更新浏览器配套</button>
               {setupNote && <small>{setupNote}</small>}
             </div>
             <button
