@@ -1,6 +1,6 @@
 # P0-POMO-075 静默标题同步与失败修改入口
 
-- IN_PROGRESS；root为模块实现/卡负责人，状态仅本卡。基线35874cbb6d9c8d045d339e2fe0b4df6a9f0c8039，实时fetch/check:sync确认origin/codex/feishu-focus同基线，preview113，clean单worktree绿灯；分支task/p0-pomo-075-quiet-sync-ui（原提交helper强制task命名，首次codex默认分支被拒后按既有门禁改名，不绕hook）。根仓/共享路线图/组件锁不写。
+- DONE（实现与发行）；root为模块实现/卡负责人，状态仅本卡。基线35874cbb6d9c8d045d339e2fe0b4df6a9f0c8039，开工实时fetch/check:sync确认origin/codex/feishu-focus同基线，preview113，clean单worktree绿灯；分支task/p0-pomo-075-quiet-sync-ui（原提交helper强制task命名，首次codex默认分支被拒后按既有门禁改名，不绕hook）。根仓/共享路线图/组件锁不写。
 - 用户2026-10-28：重启后仍未看到放弃修改按钮；同步左下浮层过大且打断思考，移到专注积累标题右侧、小字静默进度，完成自动消失，去动画、参考原刷新小标签。此前明确保留原番茄记录，默认本机包优先/源码与preview推送，不自动重启个人App；按既有授权执行。
 - 目标：补齐失败color与edit共用记录修改提示但仅edit可放弃的静态缺口，颜色修改明确命名，原source/failed/notrunning/先备份回读/保留原记录保护沿用；不删除task/remove/completion意图。用户具体积压kind未读个人profile，截图仅确认新版记录修改提示+缺按钮，不把推断当私有数据实证。同步组件仅标题内紧凑无动画进度，busy显示百分比/悬浮阶段、done即隐藏、error小字待同步并沿原手动同步可恢复；不再有左下浮层、果筐动画、成功toast。自动同步错误保留标题与原队列明细且静默，明确手动同步仍可通知结果。同步时机/云API/恢复/番茄数据逻辑不改。
 - 允许写：app/renderer/src/focus/FocusApp.tsx、editQueue.ts、components/HistoryPanel.tsx、components/HarvestSync.tsx、focus.css；tests/edit-queue.test.mjs、quiet-sync-desktop.cjs、companion-desktop.cjs必要旧断言；必要新同步UI合成夹具/runner；本卡/ACCEPTANCE-P0-POMO-075.md、DEVELOPMENT.md、CHANGELOG.md、原version helper两文件；ignored构建/截图/发行证据。禁止真实profile读取/写入、业务API测试、凭证/网络/系统服务/根共享/新依赖、自动安装或关闭用户App。仅build/dist/随机合成profile独占，无真实数据库/端口。
@@ -10,3 +10,5 @@
 - 回滚：源码revert并发新版本，不替换113/114tag或资产；旧副本key/队列格式兼容、无数据迁移，保留原记录。关键检查点/提交前复核status/diff/worktree；未知同根因两次停相应层扩大分类，外部副作用不盲重放。Learning同验收一次具体判断，未形成新跨任务教训写none。
 
 - 用户同轮追加：补记过去的番茄不必结束当前专注。T0原CounterContext.addManual第一行无条件拒绝active为精确触发；允许写集增入contexts/CounterContext.tsx、components/ManualEntry.tsx及必要同类测试。移除无条件限制，默认补记截止预填当前专注开始时间；当前active的id/task/status/segments/计时不能重置。过去不重叠时正常保存并走原5分钟队列；重叠当前专注的区间明确拒绝且保留输入/计时，不扩大到改原历史重叠规则。用真实合成UI验证active持续、paused深相等、边界相接允许、重叠拒绝、成功补记后重启恢复，独立review覆盖此差异。无个人计时操作，其他预算/资源/发布门禁不变。
+
+- 交付固定源码/tag7598fdce26a921f9309f1cfaeac7cf039776ca3b，preview114；30纯测试、隐藏静音五进程和最终独立复核PASS。NSIS85,734,241字节/SHA256 a09b7e75957f3b49b9eb7f9f20901f075931277868e5318f7629ec7e70b81e01，269个成品文件逐字节匹配；先stage/reread本机包，再公开426306772五资产/annotated tag，旧113与Latest51不变，真实113原updater发现114且errors=[]/下载安装0。个人App未关闭或重启，旧积压未代清，用户加载新版后可点击改色失败行入口。证据/局限见ACCEPTANCE-P0-POMO-075.md。Learning-Review none：既有数据/队列/显示语义局部调整，无新已验证跨任务教训候选。
