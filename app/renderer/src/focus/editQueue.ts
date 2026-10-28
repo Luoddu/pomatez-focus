@@ -121,6 +121,27 @@ export class EditQueue {
       )
     );
   }
+  discardFailedEdit(sourceKey: string, id: string) {
+    if (this.running || this.storageError) throw Error("正在同步或存储未就绪，请稍后再放弃修改");
+    const item = this.entries.find(e => e.id === id && e.sourceKey === sourceKey);
+    if (!item || item.kind !== "edit" || item.state !== "failed")
+      throw Error("只能放弃当前来源中已失败的记录修改");
+    const key = `pomatez-discarded-edit-v1:${item.id}`;
+    const existing = this.store.getItem(key);
+    if (existing !== null) {
+      if (JSON.stringify(JSON.parse(existing).entry) !== JSON.stringify(item))
+        throw Error("已有不同恢复副本，保留待同步修改");
+    } else {
+      const backup = JSON.stringify({version:1,discardedAt:Date.now(),entry:item});
+      this.store.setItem(key,backup);
+      if (this.store.getItem(key) !== backup) throw Error("恢复副本未保存，保留待同步修改");
+    }
+    const next = this.entries.filter(e => e.id !== item.id), raw = JSON.stringify(next);
+    this.store.setItem(KEY,raw);
+    if (this.store.getItem(KEY) !== raw) throw Error("放弃修改尚未确认，请保留本机数据后重试");
+    this.entries = next;
+    this.listeners.forEach(fn => fn());
+  }
   releaseCapture(before: QuickTask, title: string, quadrant: FocusQuadrant, count: number, project?: {id:string;projectType?:ProjectType}, sessions: FocusSession[] = [], today = new Date().setHours(0,0,0,0)) {
     const item=this.entries.find(e=>e.id===before.id&&e.sourceKey===before.sourceKey&&isCapturedTask(e));
     if(!item||item.taskRows||JSON.stringify(item.payload)!==JSON.stringify(before))throw Error("这条事项已改变，请重新打开整理");

@@ -4,7 +4,7 @@ if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error(
 const phase=process.env.POMO_QUIET_PHASE,root=path.resolve(__dirname,'..');let source='synthetic-quiet';
 const {FocusService}=require('../app/electron/build/focus/service');
 const tasks=[{id:'p1',planId:'p1',taskId:'t1',title:'Synthetic existing · 第 1 个番茄',source:'feishu',sourceKey:source,quadrant:'iu'}];
-let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false,holdSync=false,releaseSync,syncCalls=0,corrects=0,classifies=[],historyReads=[];
+let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false,holdSync=false,releaseSync,syncCalls=0,corrects=0,failCorrect=false,classifies=[],historyReads=[];
 FocusService.prototype.status=()=>({configured:true,sourceKey:source});
 FocusService.prototype.projects=async()=>({sourceKey:source,projects:[]});
 FocusService.prototype.configure=async()=>({configured:true});
@@ -15,7 +15,7 @@ FocusService.prototype.createQuickTask=async q=>{creates.push(q.id);if(hold)awai
 FocusService.prototype.completeToday=async({planId})=>{completes.push(planId);tasks.find(t=>t.planId===planId).kind='done';return {completed:true}};
 FocusService.prototype.sync=async r=>{syncCalls++;if(holdSync)await new Promise(r=>releaseSync=r);return {synced:true,planId:r.task.planId}};
 FocusService.prototype.archiveHistory=async r=>{const v={...r,cloudSynced:true,sync:'synced'};saved.push(v);return v};
-FocusService.prototype.correctRecord=async({after})=>{corrects++;const record={...after,cloudSynced:true,sync:'synced'};saved=saved.filter(r=>r.id!==record.id).concat(record);return {record}};
+FocusService.prototype.correctRecord=async({after})=>{corrects++;if(failCorrect)throw Error('无法连接飞书，记录已保留在本机；请检查网络后重试');const record={...after,cloudSynced:true,sync:'synced'};saved=saved.filter(r=>r.id!==record.id).concat(record);return {record}};
 FocusService.prototype.classifyHistory=async()=>{classifies.push(source);return {classified:0}};
 require('../app/electron/build/main');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),55000);
@@ -46,6 +46,13 @@ app.whenReady().then(async()=>{try{
   await switchSource('synthetic-other');await wait(150);assert.equal(classifies.includes('synthetic-other'),false);
   await switchSource('synthetic-quiet');hold=false;releaseCreate();await until(async()=>(await queue()).length===0);await until(()=>classifies.includes('synthetic-quiet'));assert.equal(classifies.filter(s=>s==='synthetic-quiet').length,1);
   checks.push('deferred manual classification belongs to source A; switch B never consumes it, return A completes once');
+  const original=(await stored()).records[0];failCorrect=true;
+  await click('修改记录 '+original.id);await set('[aria-label="补记番茄数"]',1);await click('保存修改');await click('手动同步');
+  await until(async()=>(await queue())[0]?.state==='failed');const failedEdit=(await queue())[0];
+  await until(()=>js(`!!document.querySelector('[aria-label="放弃未同步修改 ${failedEdit.id}"]:not(:disabled)')`));
+  await click('放弃未同步修改 '+failedEdit.id);await until(async()=>(await queue()).length===0);
+  assert.deepEqual((await stored()).records[0],original);assert.deepEqual(await js(`JSON.parse(localStorage.getItem('pomatez-discarded-edit-v1:${failedEdit.id}')).entry`),failedEdit);
+  assert.equal(saved.length,1);assert.equal(corrects,2);checks.push('failed record modification can be discarded alone with verified local recovery copy; original saved record and cloud history unchanged');
  }else if(phase==='resume'){
   const pending=await queue();assert.equal(pending.length,1);assert.equal(creates.length,0);
   await advance(1859000);assert.equal(creates.length,0);await advance(1860000);try{await until(async()=>(await queue()).length===0)}catch(e){console.error('Resume diagnostic',JSON.stringify({creates,queue:await queue(),state:await js("({quiet:localStorage.getItem('pomatez-quiet-sync-v1'),text:document.body.textContent.slice(-1800)})")}));throw e}assert.deepEqual(creates,[pending[0].payload.id]);checks.push('cold process retains original quiet deadline and sends same durable intent once');

@@ -2192,8 +2192,19 @@ export default function FocusApp() {
                 ? (e.payload as QuickTask).title
                 : e.kind === "remove"
                 ? "减少番茄"
-                : "记录修改"}
+                : `记录修改「${parseTitle((e.payload as PendingEdit).before?.task?.title || "专注记录").name}」`}
               ：{isCapturedTask(e)?"待整理":e.state === "failed" ? e.error : "等待同步"}
+              {e.kind === "edit" && e.state === "failed" && (
+                <button className="btn-text" disabled={editQueue.running || syncing.current}
+                  title="停止重试这次失败修改；保留本机记录和恢复副本，不撤回已写入飞书的部分"
+                  aria-label={`放弃未同步修改 ${e.id}`}
+                  onClick={()=>{try {
+                    if (!sourceKey) throw Error("任务来源尚未就绪");
+                    editQueue.discardFailedEdit(sourceKey,e.id);
+                    notify("已停止重试这次修改；本机原记录和恢复副本已保留，已写入飞书的部分不撤回。");
+                  } catch (error:any) { notify(error.message || "无法放弃修改，原内容已保留","error"); }}}
+                >放弃这次修改</button>
+              )}
             </span>
           ))}
           {outbox.some((e) => e.state === "failed") && (

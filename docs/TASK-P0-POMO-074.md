@@ -10,3 +10,5 @@
 - 回滚：显式revert本任务源码并发新版本，不替换旧tag/资产；调度metadata可被旧版忽略，原outbox/session格式保留；无云数据删除/迁移。关键检查点和提交前核对实际写集/资源，冲突只停对应步骤。未知同根因两次停止；外部副作用不盲重放。Learning在验收一次具体判断，候选由root单写模块Learning，证据不足none。
 
 - 复核补卡：d037275只读审查发现复合sync/archive/correct/recolor下一次独立写未重检。允许写集明确增入原editQueue.ts及tests/edit-queue.test.mjs；send返回false表示安全延期并保留pending，不当失败、不退休意图，已有void成功协议兼容。源隔离的延期分类请求使用source Set。新增held sync后新操作→archive0→截止后一次恢复的桌面证据与队列正反测试，冻结后再次独立复核；其余授权/资源/预算/发布门禁不变。
+
+- 同轮用户新增：长期1项待同步可放弃，随后截图明确是失败的“记录修改：无法连接飞书，记录已保留本机”。桌面只读工具两次capture超时、UIA无Web内容，未操作个人App/重试云写/删除数据。补充范围为原EditQueue中仅failed edit的本地放弃入口：按当前source+intent ID核对，运行中/非edit/异源拒绝；先逐字节核对原意图恢复副本再移出outbox，原timer/cloud记录不删，不自动丢弃。FocusApp原失败行按钮由用户升级后点击；本轮不自动重启旧App。新增纯正反与真实合成record失败→放弃→原记录不变测试、独立复核。112已冻结打包并草稿五资产核对但尚无公共tag，不复用112字节；保留未公开草稿并最终交付合并113，用户仅需一次本机重启，公开前版仍111。版本helper原两文件与后续发行/本机stage沿原授权，其余范围/预算不变。

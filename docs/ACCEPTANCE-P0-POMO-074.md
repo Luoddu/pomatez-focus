@@ -16,6 +16,12 @@ boardLayout原拖动扩至quick任务，稳定ID回执前先原子保存重绑�
 
 新增p074-quiet-review-fix.txt record进程：真实sync挂起→用户编辑重置截止→释放sync，archive/correct均0；+299秒仍0；+300秒仅一次archive/correct，sync回执不重放。随后A新建队列挂起、A手动分类请求延期→切B无分类写→回A原请求完成一次。另正验无pending启动历史仍可读。p074-deferred-unit.txt原队列+false延期正反3/3。原write/resume仍通，最终同批纯测试50/50。
 
-待修正冻结版独立复核、同源干净包/本机stage及公开五资产/真实111更新器验收；未据源码存在宣称DONE。
+review_history_append二次只读复核8ebec1b PASS，两项P2关闭；独立纯函数6/6，无新增阻断。其余午夜结论不变。该固定源码112干净构建、成品258文件逐字节匹配、静音隐藏启动0、五资产feed一致并本机stage/reread alreadyPrepared=true。112安装包85,421,188字节，SHA256 9aedf20f282c52d1260ec76926daed1764b2d8a297281336ccd11dbc151141ea；草稿426169864远端五资产大小/摘要核对通过、无公共112 tag、旧111不变。未安装、重启或操作个人App。
+
+此时用户新增截图指出长期“1项待同步/记录修改/无法连接飞书”。按补卡提供仅failed edit的显式放弃入口，显示任务名；先保存逐字节核对本机恢复副本，再清除该ID意图，原记录不改，其他意图不动。不把停止重试冒充云端回滚，已写入部分不撤回。个人App截图工具连续两次超时、UIA无Web文本，未盲点/自动清理/触发真实云重试。清理需用户加载新版后点击具体条目的按钮，尚未清个人积压。112成品不可变，保留未公开草稿、合并最终113；不要求用户安装中间版。
+
+p074-discard-unit.txt 5/5；p074-unit113-full.txt 52/52；p074-build113-working.txt成功；p074-quiet113-working.txt原write/resume/record三进程全部通过，新增record末段复现相同网络报错，点击放弃后outbox为空，恢复副本entry逐字节一致、原saved record深相等且云history仍一条，未调用多余correct。纯负例：异源/非edit/运行中拒绝，备份未确认保留原outbox；成功后冷读仅原其他意图。该副本仅本机、不入Git、不自动回放。
+
+待113清理入口冻结复核、同源干净包/本机stage及公开五资产/真实111更新器验收；未据源码存在宣称DONE。
 
 Learning-Review: none - 本轮复用原队列/日期/source guards和既有只读预测、不可变发行链；新边界属于本功能局部业务，没有新的已验证跨任务教训候选。

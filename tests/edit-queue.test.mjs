@@ -73,3 +73,24 @@ test("postponed sender keeps pending intent; resumed normal sender retires once"
   await q.drain('base',async()=>{calls++});
   assert.equal(calls,2);assert.equal(q.entries.length,0);
 });
+
+test("discard only one failed edit after verified local backup; records and other intents remain", () => {
+  const data=new Map(),s={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)},q=new EditQueue(s);
+  const record={id:'record',task:{id:'p1'},acceptedSeconds:1500},before=JSON.stringify(record);
+  const item={id:'bad-edit',sourceKey:'base',kind:'edit',state:'failed',error:'offline',payload:{id:'bad-edit',sourceKey:'base',before:record,after:{...record,acceptedSeconds:1800}}};
+  q.add(item);q.add({id:'other',sourceKey:'base',kind:'task',state:'pending',payload:{id:'other',sourceKey:'base',title:'Synthetic',count:1,day:0}});
+  assert.throws(()=>q.discardFailedEdit('other-source','bad-edit'));
+  assert.throws(()=>q.discardFailedEdit('base','other'));
+  q.running=true;assert.throws(()=>q.discardFailedEdit('base','bad-edit'));q.running=false;
+  q.discardFailedEdit('base','bad-edit');
+  assert.deepEqual(q.entries.map(e=>e.id),['other']);assert.equal(JSON.stringify(record),before);
+  assert.deepEqual(JSON.parse(s.getItem('pomatez-discarded-edit-v1:bad-edit')).entry,item);
+  assert.deepEqual(new EditQueue(s).entries.map(e=>e.id),['other']);
+});
+
+test("unverified discard backup leaves failed edit pending and does not touch outbox", () => {
+  const data=new Map(),s={getItem:k=>data.get(k)??null,setItem:(k,v)=>{if(!k.startsWith('pomatez-discarded'))data.set(k,v)}},q=new EditQueue(s);
+  q.add({id:'bad-edit',sourceKey:'base',kind:'edit',state:'failed',payload:{before:{id:'record'},after:{id:'record'}}});
+  const raw=s.getItem('pomatez-quick-edit-outbox-v1');assert.throws(()=>q.discardFailedEdit('base','bad-edit'),/恢复副本/);
+  assert.equal(q.entries.length,1);assert.equal(s.getItem('pomatez-quick-edit-outbox-v1'),raw);
+});
