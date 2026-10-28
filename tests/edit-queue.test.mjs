@@ -62,3 +62,14 @@ test("corrupt storage and failed persistence never acknowledge new edits", () =>
   assert.throws(() => full.add({ id: "x" }), /空间/);
   assert.equal(full.entries.length, 0);
 });
+
+test("postponed sender keeps pending intent; resumed normal sender retires once", async () => {
+  const s=store(),q=new EditQueue(s);
+  q.add({id:'deferred',sourceKey:'base',kind:'task',state:'pending',payload:{id:'deferred',sourceKey:'base',title:'Synthetic',count:1,day:0}});
+  let calls=0;
+  await q.drain('base',async()=>{calls++;return false});
+  assert.equal(calls,1);assert.equal(q.entries[0].state,'pending');
+  assert.equal(new EditQueue(s).entries[0].id,'deferred');
+  await q.drain('base',async()=>{calls++});
+  assert.equal(calls,2);assert.equal(q.entries.length,0);
+});

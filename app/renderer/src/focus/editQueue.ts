@@ -165,7 +165,7 @@ export class EditQueue {
   }
   async drain(
     sourceKey: string,
-    send: (e: OutboxItem) => Promise<void>,
+    send: (e: OutboxItem) => Promise<void | false>,
     ready = () => true
   ) {
     if (this.running || this.storageError) return;
@@ -177,7 +177,7 @@ export class EditQueue {
         );
         if (!e) break;
         try {
-          await send(e);
+          if (await send(e) === false) break; // postponed, still pending with the same identity
           this.save(this.entries.filter((x) => x.id !== e.id));
         } catch (error: any) {
           this.save(

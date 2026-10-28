@@ -12,6 +12,10 @@ boardLayout原拖动扩至quick任务，稳定ID回执前先原子保存重绑�
 
 完整纯测试49/49 PASS。旧board夹具首次跨象限失败后只补等待仍失败，已停止同层试补并追完整调用链：quietRevision使没有待发送记录的拖动也触发全量云回读，loadingTasks短暂撤掉onMove，第二次连续拖动被挡。修复无pending时只在来源启动读取一次，保留手动读取；原board write/restore全链7组通过。新task/complete/history队列批处理及cold resume同样通过。失败记录在本进程按原revision/内容记住，聚焦不重复写；手动明确重试清除标记。手动旧历史分类意图跨等待保留。
 
-待独立冻结源码复核、同源干净包/本机stage及公开五资产/真实111更新器验收；未据源码存在宣称DONE。
+首轮独立review_journey_times复核d037275午夜相关写集PASS、重跑23/23，记录分钟重算依赖已有React更新，启动有精确时间二次校验。review_history_append同一冻结版发现P2两项：sync/archive/edit复合链未逐次写重检，及延期分类boolean串来源。补卡允许原EditQueue新增兼容false延期返回（保留pending而非退休/failed），原void成功不变；每个复合写边界重新检查，已收到sync回执持久保留，分类Set按source申请/消费。初次来源合成用例回A发现等待分类无触发，已补原source请求的调度条件；纯只读启动不受无stamp的安静门阻挡，初始读标记仅在实际启动后设置。
+
+新增p074-quiet-review-fix.txt record进程：真实sync挂起→用户编辑重置截止→释放sync，archive/correct均0；+299秒仍0；+300秒仅一次archive/correct，sync回执不重放。随后A新建队列挂起、A手动分类请求延期→切B无分类写→回A原请求完成一次。另正验无pending启动历史仍可读。p074-deferred-unit.txt原队列+false延期正反3/3。原write/resume仍通，最终同批纯测试50/50。
+
+待修正冻结版独立复核、同源干净包/本机stage及公开五资产/真实111更新器验收；未据源码存在宣称DONE。
 
 Learning-Review: none - 本轮复用原队列/日期/source guards和既有只读预测、不可变发行链；新边界属于本功能局部业务，没有新的已验证跨任务教训候选。

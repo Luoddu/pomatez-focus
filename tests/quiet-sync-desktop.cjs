@@ -1,19 +1,22 @@
 // Real hidden/muted main + preload + production renderer; synthetic service only.
 const {app,BrowserWindow}=require('electron'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('isolated silent profile required');
-const phase=process.env.POMO_QUIET_PHASE,source='synthetic-quiet',root=path.resolve(__dirname,'..');
+const phase=process.env.POMO_QUIET_PHASE,root=path.resolve(__dirname,'..');let source='synthetic-quiet';
 const {FocusService}=require('../app/electron/build/focus/service');
 const tasks=[{id:'p1',planId:'p1',taskId:'t1',title:'Synthetic existing · 第 1 个番茄',source:'feishu',sourceKey:source,quadrant:'iu'}];
-let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false;
+let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false,holdSync=false,releaseSync,syncCalls=0,corrects=0,classifies=[],historyReads=[];
 FocusService.prototype.status=()=>({configured:true,sourceKey:source});
 FocusService.prototype.projects=async()=>({sourceKey:source,projects:[]});
-FocusService.prototype.today=async()=>{if(initial)await new Promise(r=>readers.push(r));return structuredClone(tasks)};
-FocusService.prototype.history=async()=>({sourceKey:source,records:saved,missing:0});
+FocusService.prototype.configure=async()=>({configured:true});
+FocusService.prototype.today=async()=>{if(initial)await new Promise(r=>readers.push(r));return tasks.map(t=>({...t,sourceKey:source}))};
+FocusService.prototype.history=async()=>{historyReads.push(source);return {sourceKey:source,records:saved.filter(r=>r.task.sourceKey===source),missing:0}};
 FocusService.prototype.generateToday=async()=>{throw Error('unexpected generation before 08:30')};
 FocusService.prototype.createQuickTask=async q=>{creates.push(q.id);if(hold)await new Promise(r=>releaseCreate=r);if(fail)throw Error('Synthetic offline');const rows=Array.from({length:q.count},(_,i)=>({id:`q-${q.id}-${i+1}`,planId:`q-${q.id}-${i+1}`,taskId:`t-${q.id}`,title:`${q.title} · 第 ${i+1} 个番茄`,source:'feishu',sourceKey:source,quadrant:q.quadrant}));tasks.push(...rows);return {created:true,taskId:`t-${q.id}`,tasks:rows}};
 FocusService.prototype.completeToday=async({planId})=>{completes.push(planId);tasks.find(t=>t.planId===planId).kind='done';return {completed:true}};
-FocusService.prototype.sync=async r=>({synced:true,planId:r.task.planId});
+FocusService.prototype.sync=async r=>{syncCalls++;if(holdSync)await new Promise(r=>releaseSync=r);return {synced:true,planId:r.task.planId}};
 FocusService.prototype.archiveHistory=async r=>{const v={...r,cloudSynced:true,sync:'synced'};saved.push(v);return v};
+FocusService.prototype.correctRecord=async({after})=>{corrects++;const record={...after,cloudSynced:true,sync:'synced'};saved=saved.filter(r=>r.id!==record.id).concat(record);return {record}};
+FocusService.prototype.classifyHistory=async()=>{classifies.push(source);return {classified:0}};
 require('../app/electron/build/main');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),55000);
 app.whenReady().then(async()=>{try{
@@ -29,7 +32,21 @@ app.whenReady().then(async()=>{try{
  const stored=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
  const add=async name=>{await click('在重要不紧急新增任务');await set('[aria-label="新增任务名称"]',name);await set('[aria-label="新增任务番茄数"]',2);await click('添加');await until(async()=>(await queue()).some(e=>e.payload.title===name))};
  await until(()=>js("!!document.querySelector('.quad-iu [data-task-group=t1]')"));
- if(phase==='resume'){
+ if(phase==='record'){
+  await until(()=>historyReads.includes(source));assert.equal(saved.length,0);
+  holdSync=true;
+  await click('补记');await js("{const e=document.querySelector('#manual-task');e.value=[...e.options].find(o=>o.value!=='free').value;e.dispatchEvent(new Event('change',{bubbles:true}))}");await click('保存补记');
+  await advance(300000);await until(()=>!!releaseSync);const record=(await stored()).records[0];
+  await click('修改记录 '+record.id);await set('[aria-label="补记番茄数"]',0);await click('保存修改');
+  holdSync=false;releaseSync();await until(async()=>(await stored()).records[0].sync==='synced');await wait(100);assert.equal(saved.length,0);assert.equal(corrects,0);
+  await advance(599000);assert.equal(saved.length,0);await advance(600000);await until(async()=>(await queue()).length===0&&corrects===1);assert.equal(syncCalls,1);assert.equal(saved.length,1);assert.equal((await stored()).records[0].completedCount,0);
+  checks.push('held sync receipt persists; intervening edit defers archive and correction, then resumes each once without retiring pending intent');
+  hold=true;await add('Synthetic source guard');await click('手动同步');await until(()=>!!releaseCreate);
+  const switchSource=async next=>{source=next;await click('设置');await js("document.querySelector('form.field-grid').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))");await until(()=>js("!document.querySelector('.settings-save').disabled"));await click('设置');await until(()=>js("!document.querySelector('.gen-btn').disabled"))};
+  await switchSource('synthetic-other');await wait(150);assert.equal(classifies.includes('synthetic-other'),false);
+  await switchSource('synthetic-quiet');hold=false;releaseCreate();await until(async()=>(await queue()).length===0);await until(()=>classifies.includes('synthetic-quiet'));assert.equal(classifies.filter(s=>s==='synthetic-quiet').length,1);
+  checks.push('deferred manual classification belongs to source A; switch B never consumes it, return A completes once');
+ }else if(phase==='resume'){
   const pending=await queue();assert.equal(pending.length,1);assert.equal(creates.length,0);
   await advance(1859000);assert.equal(creates.length,0);await advance(1860000);try{await until(async()=>(await queue()).length===0)}catch(e){console.error('Resume diagnostic',JSON.stringify({creates,queue:await queue(),state:await js("({quiet:localStorage.getItem('pomatez-quiet-sync-v1'),text:document.body.textContent.slice(-1800)})")}));throw e}assert.deepEqual(creates,[pending[0].payload.id]);checks.push('cold process retains original quiet deadline and sends same durable intent once');
  }else{

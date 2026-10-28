@@ -334,7 +334,7 @@ export default function FocusApp() {
   const refreshSequence = useRef(0);
   const syncing = useRef(false);
   const failedRecordWrites = useRef(new Set<string>());
-  const classifyRequested = useRef(false);
+  const classifyRequested = useRef(new Set<string>());
   const initialHistorySource = useRef<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [harvestProgress, setHarvestProgress] =
@@ -747,8 +747,8 @@ export default function FocusApp() {
     if (timer.getSnapshot().records.some(r => !r.cloudSynced && !r.task.quickTask &&
       (r.task.source === "local" || r.task.sourceKey === sourceKey)) && !syncAllowed()) return;
     syncing.current = true;
-    const classify = classifyRequested.current;
-    classifyRequested.current = false;
+    initialHistorySource.current = sourceKey;
+    const classify = classifyRequested.current.has(sourceKey);
     setSyncBusy(true);
     setHarvestProgress({
       percent: 3,
@@ -767,6 +767,7 @@ export default function FocusApp() {
       const failures: string[] = [];
       const attempted = new Set<string>();
       let complete = 0;
+      let interrupted = false;
       const progress = (text: string, phase: number) => {
         const total = Math.max(
           1,
@@ -782,7 +783,7 @@ export default function FocusApp() {
         for (let record of [...timer.getSnapshot().records]
           .filter(eligible)
           .reverse()) {
-          if (!syncAllowed()) break;
+          if (!syncAllowed()) { interrupted = true; break; }
           if (attempted.has(record.id)) continue;
           attempted.add(record.id);
           try {
@@ -805,6 +806,7 @@ export default function FocusApp() {
                   : {}),
               };
             }
+            if (!syncAllowed()) { interrupted = true; break; }
             progress("正在共享专注明细", 0.55);
             const archived = await api().archiveHistory(record);
             timer.mergeCloud([archived], sourceKey);
@@ -833,8 +835,13 @@ export default function FocusApp() {
           .getSnapshot()
           .records.some((r) => eligible(r) && !attempted.has(r.id))
       );
+      if (interrupted || (classify && !syncAllowed())) {
+        setHarvestProgress({percent:100,text:"改动已保存 · 安静5分钟后继续同步",state:"done"});
+        return;
+      }
       let classified = 0;
       if (classify && api().classifyHistory) {
+        classifyRequested.current.delete(sourceKey);
         try {
           const result = await api().classifyHistory();
           classified = result.classified;
@@ -911,15 +918,14 @@ export default function FocusApp() {
     .join(",");
   // A pending-set change permits one attempt; a failed attempt waits for explicit retry.
   useEffect(() => {
-    if (connected && sourceKey && (pendingIds || initialHistorySource.current !== sourceKey)) {
-      initialHistorySource.current = sourceKey;
+    if (connected && sourceKey && (pendingIds || classifyRequested.current.has(sourceKey) || initialHistorySource.current !== sourceKey)) {
       sync();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingIds, connected, sourceKey, editRevision, quietRevision]);
   const requestSync = async (classify = false) => {
     if (!sourceKey) return;
-    if (classify) classifyRequested.current = true;
+    if (classify) classifyRequested.current.add(sourceKey);
     failedRecordWrites.current.clear();
     quietSync.observe(collectMutations());
     quietSync.flush(sourceKey);
@@ -1054,6 +1060,7 @@ export default function FocusApp() {
           const currentStatus = await api().status();
           if (currentStatus.sourceKey !== item.sourceKey)
             throw Error("飞书连接已变化，待同步内容仍保留在原表队列");
+          if (!syncAllowed()) return false;
           if (item.kind === "task") {
             const q = item.payload as QuickTask;
             const rows: FocusTask[] =
@@ -1129,6 +1136,7 @@ export default function FocusApp() {
                   .getSnapshot()
                   .records.find((r) => r.id === edit.before.id)!;
               }
+              if (!syncAllowed()) return false;
               const archived = await api().archiveHistory(latest);
               timer.mergeCloud([archived], sourceKey);
               latest = archived;
@@ -1146,6 +1154,7 @@ export default function FocusApp() {
                   ? latest!.completionOwnedPlanIds
                   : undefined),
             };
+            if (!syncAllowed()) return false;
             if (item.kind === "color") {
               const colorBefore = {
                 ...latest,
