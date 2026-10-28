@@ -1,0 +1,60 @@
+// Real hidden/muted main + preload + production renderer; synthetic service only.
+const {app,BrowserWindow}=require('electron'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('isolated silent profile required');
+const phase=process.env.POMO_QUIET_PHASE,source='synthetic-quiet',root=path.resolve(__dirname,'..');
+const {FocusService}=require('../app/electron/build/focus/service');
+const tasks=[{id:'p1',planId:'p1',taskId:'t1',title:'Synthetic existing · 第 1 个番茄',source:'feishu',sourceKey:source,quadrant:'iu'}];
+let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false;
+FocusService.prototype.status=()=>({configured:true,sourceKey:source});
+FocusService.prototype.projects=async()=>({sourceKey:source,projects:[]});
+FocusService.prototype.today=async()=>{if(initial)await new Promise(r=>readers.push(r));return structuredClone(tasks)};
+FocusService.prototype.history=async()=>({sourceKey:source,records:saved,missing:0});
+FocusService.prototype.generateToday=async()=>{throw Error('unexpected generation before 08:30')};
+FocusService.prototype.createQuickTask=async q=>{creates.push(q.id);if(hold)await new Promise(r=>releaseCreate=r);if(fail)throw Error('Synthetic offline');const rows=Array.from({length:q.count},(_,i)=>({id:`q-${q.id}-${i+1}`,planId:`q-${q.id}-${i+1}`,taskId:`t-${q.id}`,title:`${q.title} · 第 ${i+1} 个番茄`,source:'feishu',sourceKey:source,quadrant:q.quadrant}));tasks.push(...rows);return {created:true,taskId:`t-${q.id}`,tasks:rows}};
+FocusService.prototype.completeToday=async({planId})=>{completes.push(planId);tasks.find(t=>t.planId===planId).kind='done';return {completed:true}};
+FocusService.prototype.sync=async r=>({synced:true,planId:r.task.planId});
+FocusService.prototype.archiveHistory=async r=>{const v={...r,cloudSynced:true,sync:'synced'};saved.push(v);return v};
+require('../app/electron/build/main');
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),55000);
+app.whenReady().then(async()=>{try{
+ let win;const until=async f=>{for(let i=0;i<200;i++){if(await f())return;await wait(25)}throw Error('Timeout '+f)};
+ await until(()=>{win=BrowserWindow.getAllWindows()[0];return win&&!win.webContents.isLoadingMainFrame()&&readers.length});
+ const js=s=>win.webContents.executeJavaScript(s,true),base=new Date(2026,9,28,7).getTime(),checks=[];
+ await js(`window.__now=${base+(phase==='resume'?1680000:0)};{const Original=Date;window.Date=class extends Original{constructor(...a){super(...(a.length?a:[window.__now]))}static now(){return window.__now}}};void 0`);
+ initial=false;readers.splice(0).forEach(r=>r());
+ const advance=async ms=>{await js(`window.__now=${base+ms};window.dispatchEvent(new Event('focus'))`);await wait(100)};
+ const click=label=>js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===${JSON.stringify(label)}||b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)throw Error('Missing '+${JSON.stringify(label)});b.click()})()`);
+ const set=(s,v)=>js(`(()=>{const e=document.querySelector(${JSON.stringify(s)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(String(v))});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+ const queue=()=>js("JSON.parse(localStorage.getItem('pomatez-quick-edit-outbox-v1')||'[]')");
+ const stored=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
+ const add=async name=>{await click('在重要不紧急新增任务');await set('[aria-label="新增任务名称"]',name);await set('[aria-label="新增任务番茄数"]',2);await click('添加');await until(async()=>(await queue()).some(e=>e.payload.title===name))};
+ await until(()=>js("!!document.querySelector('.quad-iu [data-task-group=t1]')"));
+ if(phase==='resume'){
+  const pending=await queue();assert.equal(pending.length,1);assert.equal(creates.length,0);
+  await advance(1859000);assert.equal(creates.length,0);await advance(1860000);try{await until(async()=>(await queue()).length===0)}catch(e){console.error('Resume diagnostic',JSON.stringify({creates,queue:await queue(),state:await js("({quiet:localStorage.getItem('pomatez-quiet-sync-v1'),text:document.body.textContent.slice(-1800)})")}));throw e}assert.deepEqual(creates,[pending[0].payload.id]);checks.push('cold process retains original quiet deadline and sends same durable intent once');
+ }else{
+  await add('Synthetic first');assert.equal(creates.length,0);
+  await click('补记');await click('保存补记');await until(async()=>(await stored()).records.length===1);assert.equal(saved.length,0);
+  await advance(240000);
+  const quick=(await queue())[0].payload,key='quick-'+quick.id;
+  await js(`window.__dragData=new DataTransfer();document.querySelector('[data-task-group="${key}"] .task-title-button').dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:window.__dragData}))`);
+  await until(()=>js("document.querySelector('.quadrants').classList.contains('is-dragging')"));
+  await js("document.querySelector('.quad-iu').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__dragData}))");
+  await until(()=>js(`!!document.querySelector('.quad-iu [data-task-group="${key}"]')`));
+  await js("document.querySelector('[data-task-group=t1] .chip').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:200,clientY:200}))");
+  await click('标记完成（不计专注时间）');assert.equal(completes.length,0);
+  await advance(539000);assert.equal(creates.length,0);assert.equal(saved.length,0);
+  await advance(540000);await until(async()=>(await queue()).length===0&&saved.length===1&&completes.length===1);assert.deepEqual(completes,['p1']);
+  assert.equal(await js(`document.querySelectorAll('.quad-iu [data-task-group="t-${quick.id}"] .chip').length`),2);
+  assert.equal((await stored()).records.length,1);checks.push('last operation resets quiet deadline; no writes at 299s; serial task/history flush at 300s; quick drag survives stable ID receipt');
+  await add('Synthetic manual');await click('手动同步');await until(async()=>(await queue()).length===0);assert.equal(creates.length,2);checks.push('manual sync bypasses waiting without duplicating saved record');
+  hold=true;await add('Synthetic held');await advance(840000);await until(()=>!!releaseCreate);
+  await advance(900000);await add('Synthetic later');hold=false;releaseCreate();await until(async()=>(await queue()).length===1);assert.equal(creates.length,3);
+  await advance(1199000);assert.equal(creates.length,3);await advance(1200000);await until(async()=>(await queue()).length===0);assert.equal(creates.length,4);checks.push('new operation during in-flight request stops next write until its own quiet deadline');
+  fail=true;await add('Synthetic retry');await advance(1500000);await until(async()=>(await queue())[0]?.state==='failed');await advance(1560000);assert.equal(creates.length,5);
+  fail=false;await click('重试待同步操作');await until(async()=>(await queue()).length===0);assert.equal(creates.length,6);checks.push('failed work retained without repeat loop; explicit retry immediately succeeds');
+  await add('Synthetic restart');assert.equal(creates.length,6);assert.equal((await stored()).records.length,1);checks.push('restart seed preserves pending task and saved history');
+ }
+ assert.equal(win.isVisible(),false);assert.equal(win.webContents.isAudioMuted(),true);
+ fs.writeFileSync(path.join(root,`artifacts/p074-quiet-${phase}.json`),JSON.stringify({checks,creates,saved:saved.length,completes,silent:true,realWrites:0},null,2));console.log(JSON.stringify({phase,checks}));clearTimeout(deadline);app.exit(0);
+}catch(e){console.error(e.stack);clearTimeout(deadline);app.exit(1)}});

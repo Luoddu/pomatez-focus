@@ -46,7 +46,7 @@ import {
   taskDay,
 } from "./taskSnapshot";
 import QuadrantBoard from "./components/QuadrantBoard";
-import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup } from "./boardLayout";
+import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup, rebindBoardGroup } from "./boardLayout";
 import FocusTimer from "./components/FocusTimer";
 import FocusCapture from "./components/FocusCapture";
 import ReviewPanel from "./components/ReviewPanel";
@@ -67,13 +67,14 @@ import {
   tomatoRecordTone,
 } from "./week";
 import { CompletionQueue } from "./completionQueue";
+import { QuietSync, LocalMutation } from "./quietSync";
 import { playTimeUp } from "./sound";
 import {
   shouldGenerateSilently,
   silentGenerateNotice,
 } from "./silentgen";
 import "./focus.css";
-import { readRefresh, writeRefresh, refreshDue, refreshAttempt, nextRefreshDelay, refreshLabel, RefreshStamp } from "./dailyRefresh";
+import { readRefresh, writeRefresh, refreshDue, refreshAttempt, refreshFailed, nextRefreshDelay, refreshLabel, refreshBoundary, RefreshStamp } from "./dailyRefresh";
 import { ActualRestKind, RestLog, readRestLog, writeRestLog, openRest, closeRest, startRest, completedBeforeRest, restBackfillWindow, backfillRest } from "./restLog";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
@@ -332,6 +333,9 @@ export default function FocusApp() {
   const queueFailed = queued.filter((e) => e.state === "failed");
   const refreshSequence = useRef(0);
   const syncing = useRef(false);
+  const failedRecordWrites = useRef(new Set<string>());
+  const classifyRequested = useRef(false);
+  const initialHistorySource = useRef<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [harvestProgress, setHarvestProgress] =
     useState<HarvestProgress | null>(null);
@@ -350,6 +354,41 @@ export default function FocusApp() {
   const outbox = editQueue.entries.filter(
     (e) => e.sourceKey === sourceKey
   );
+  const [quietSync] = useState(() => new QuietSync(localStorage));
+  const [quietRevision, setQuietRevision] = useState(0);
+  useEffect(() => quietSync.subscribe(() => setQuietRevision(n => n + 1)), [quietSync]);
+  const collectMutations = (): LocalMutation[] => [
+    ...timer.getSnapshot().records.filter(r => !r.cloudSynced).map(r => {
+      const source = r.task.source === "feishu" ? r.task.sourceKey || "local" : sourceKey || "local";
+      return { key: `record:${r.id}`, source, value: JSON.stringify([
+        r.startedAt,r.endedAt,r.acceptedSeconds,r.completedCount,r.revision,r.colorRevision]) };
+    }),
+    ...editQueue.entries.map(e => ({ key: `edit:${e.sourceKey}:${e.id}`, source: e.sourceKey,
+      value: `${e.kind}:${isCapturedTask(e)}` })),
+    ...completionQueue.entries.filter(e => e.state !== "done").map(e => ({
+      key: `complete:${e.sourceKey}:${e.planId}`, source: e.sourceKey, value: e.planId })),
+  ];
+  // Receipt/progress changes remove work but never restart the user's quiet window.
+  useEffect(() => { if (connectionReady) quietSync.observe(collectMutations()); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [timer.records, editRevision, queueRevision, sourceKey, connectionReady]);
+  const syncAllowed = () => {
+    quietSync.observe(collectMutations()); // also check fresh intents between in-flight writes
+    return !!sourceKey && quietSync.allowed(sourceKey);
+  };
+  useEffect(() => {
+    if (!sourceKey || !connected) return;
+    const delay = quietSync.remaining(sourceKey);
+    if (delay === null || delay <= 0) return;
+    const wake = setTimeout(() => setQuietRevision(n => n + 1), Math.min(delay,2147483647));
+    return () => clearTimeout(wake);
+  }, [sourceKey, connected, quietRevision, quietSync]);
+  useEffect(() => {
+    const wake = () => setQuietRevision(n => n + 1);
+    window.addEventListener("focus",wake);
+    const unsubscribe = api()?.onSuspend?.(wake);
+    return () => { window.removeEventListener("focus",wake); unsubscribe?.(); };
+  }, []);
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
   const [boardRevision, setBoardRevision] = useState(0);
@@ -375,6 +414,7 @@ export default function FocusApp() {
       const latest = readBoardLayout(localStorage, boardScope);
       const next = moveBoardGroup(boardTasksRef.current, latest, boardScope, key, quadrant, target, after);
       saveBoardLayout(localStorage, next);
+      quietSync.touch(boardScope);
       setBoardRevision(n => n + 1);
     } catch (e: any) { notify(e.message || "看板安排未能保存", "error"); }
   };
@@ -479,6 +519,7 @@ export default function FocusApp() {
     text?: string;
   } | null>(null);
   const genActive = useRef(false);
+  const dayReadTried = useRef("");
   const [dailyRefresh, setDailyRefresh] = useState<{ source: string | null; stamp: RefreshStamp | null; error?: boolean }>({ source: null, stamp: null });
   useEffect(() => {
     if (!sourceKey) { setDailyRefresh({ source: null, stamp: null }); return; }
@@ -689,7 +730,7 @@ export default function FocusApp() {
     setCompletedTouched(true);
     setCompleted(value);
   };
-  const sync = async (classify = false) => {
+  const sync = async () => {
     if (
       !connected ||
       !sourceKey ||
@@ -703,7 +744,11 @@ export default function FocusApp() {
       completionQueue.running
     )
       return;
+    if (timer.getSnapshot().records.some(r => !r.cloudSynced && !r.task.quickTask &&
+      (r.task.source === "local" || r.task.sourceKey === sourceKey)) && !syncAllowed()) return;
     syncing.current = true;
+    const classify = classifyRequested.current;
+    classifyRequested.current = false;
     setSyncBusy(true);
     setHarvestProgress({
       percent: 3,
@@ -711,9 +756,11 @@ export default function FocusApp() {
       state: "busy",
     });
     try {
+      const attemptKey = (r: FocusSession) => JSON.stringify([sourceKey,r.id,r.revision,r.colorRevision,r.startedAt,r.endedAt,r.acceptedSeconds,r.completedCount]);
       const eligible = (r: FocusSession) =>
         !r.task.quickTask &&
         !r.cloudSynced &&
+        !failedRecordWrites.current.has(attemptKey(r)) &&
         (r.task.source === "local" || r.task.sourceKey === sourceKey);
       if (timer.getSnapshot().records.some(eligible))
         await api().backupHistory(timer.getSnapshot());
@@ -735,6 +782,7 @@ export default function FocusApp() {
         for (let record of [...timer.getSnapshot().records]
           .filter(eligible)
           .reverse()) {
+          if (!syncAllowed()) break;
           if (attempted.has(record.id)) continue;
           attempted.add(record.id);
           try {
@@ -776,10 +824,11 @@ export default function FocusApp() {
                 }`
               );
           } catch (e: any) {
+            failedRecordWrites.current.add(attemptKey(record));
             failures.push(e.message || "一条专注记录未能同步");
           }
         }
-      } while (
+      } while (syncAllowed() &&
         timer
           .getSnapshot()
           .records.some((r) => eligible(r) && !attempted.has(r.id))
@@ -862,9 +911,22 @@ export default function FocusApp() {
     .join(",");
   // A pending-set change permits one attempt; a failed attempt waits for explicit retry.
   useEffect(() => {
-    if (connected && sourceKey) sync();
+    if (connected && sourceKey && (pendingIds || initialHistorySource.current !== sourceKey)) {
+      initialHistorySource.current = sourceKey;
+      sync();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingIds, connected, sourceKey, editRevision]);
+  }, [pendingIds, connected, sourceKey, editRevision, quietRevision]);
+  const requestSync = async (classify = false) => {
+    if (!sourceKey) return;
+    if (classify) classifyRequested.current = true;
+    failedRecordWrites.current.clear();
+    quietSync.observe(collectMutations());
+    quietSync.flush(sourceKey);
+    if (editQueue.entries.some(e => e.sourceKey === sourceKey && e.state === "failed")) editQueue.retry(sourceKey);
+    if (completionQueue.entries.some(e => e.sourceKey === sourceKey && e.state === "failed")) completionQueue.retry(sourceKey);
+    await sync();
+  };
   const addQuickTask = (
     title: string,
     quadrant: FocusQuadrant,
@@ -928,7 +990,7 @@ export default function FocusApp() {
       payload: { id, sourceKey, before, after },
       state: "pending",
     });
-    notify("修改已保存在本机，将在当前同步结束后更新飞书。");
+    notify("修改已保存在本机，最后一次操作后安静5分钟再同步。");
   };
   const recolorRecord = (before: FocusSession, type?: ProjectType) => {
     if (!api() && demoSeed.some((r) => r.id === before.id)) {
@@ -974,7 +1036,7 @@ export default function FocusApp() {
     !generating &&
     !silentGenerating &&
     !completionQueue.running &&
-    !timer.blocked;
+    !timer.blocked && !!sourceKey && quietSync.allowed(sourceKey);
   useEffect(() => {
     if (
       !sourceKey ||
@@ -997,6 +1059,9 @@ export default function FocusApp() {
             const rows: FocusTask[] =
               item.taskRows || (await api().createQuickTask(q)).tasks;
             validateQuickReceipt(q, rows);
+            const layout = rebindBoardGroup(readBoardLayout(localStorage, item.sourceKey),
+              `quick-${q.id}`, rows[0].taskId!);
+            if (layout) { saveBoardLayout(localStorage, layout); setBoardRevision(n => n + 1); }
             editQueue.resolveTask(item.id, rows, (task) =>
               bindQuickTask(task, q, rows)
             );
@@ -1119,7 +1184,7 @@ export default function FocusApp() {
             await refresh();
           }
         },
-        () => editReady.current && !syncing.current
+        () => editReady.current && !syncing.current && syncAllowed()
       )
       .catch((e: any) => notify(e.message, "error"));
     // Queue listeners cause the next readiness check after a completed operation.
@@ -1133,6 +1198,7 @@ export default function FocusApp() {
     generating,
     silentGenerating,
     queueRevision,
+    quietRevision,
   ]);
   const windowMode = async (small: boolean, pin: boolean) => {
     try {
@@ -1228,7 +1294,7 @@ export default function FocusApp() {
       const loadedSource = await refresh();
       if (loadedSource !== attemptSource || reviewSource.current !== attemptSource || taskDay() !== attemptDay)
         throw Error("日期或任务来源已变化，请重新刷新");
-      const completed = { ...stamp, completedAt: Date.now() };
+      const completed = { ...stamp, completedAt: Date.now(), failedAt:0, retryAt:0 };
       writeRefresh(localStorage, completed);
       setDailyRefresh({ source: attemptSource, stamp: completed });
       return result;
@@ -1243,6 +1309,12 @@ export default function FocusApp() {
           const notice = silentGenerateNotice(r);
           if (notice && !automatic) notify(notice);
         } catch (e: any) {
+          if (automatic && taskDay()===attemptDay && reviewSource.current===attemptSource) {
+            try {
+              const failed=refreshFailed(stamp,Date.now());writeRefresh(localStorage,failed);
+              setDailyRefresh({source:attemptSource,stamp:failed});
+            } catch { setDailyRefresh({source:attemptSource,stamp,error:true}); }
+          }
           setGenStage({ stage: "error" });
           notify(
             e.message || "后台更新今日番茄失败，请稍后重试",
@@ -1294,10 +1366,16 @@ export default function FocusApp() {
     const check = () => {
       if (wake !== undefined) window.clearTimeout(wake);
       const now = Date.now();
-      const blocked = busy || loadingTasks || syncBusy || generating || silentGenerating || !!active || queued.length > 0 || editQueue.entries.some(e => e.sourceKey === sourceKey && !isCapturedTask(e));
+      const writing = busy || loadingTasks || syncBusy || generating || silentGenerating || editQueue.running || completionQueue.running;
+      const blocked = writing || !!active || queued.some(e=>e.state==="pending") || editQueue.entries.some(e => e.sourceKey === sourceKey && e.state==="pending" && !isCapturedTask(e));
       const due = !dailyRefresh.error && refreshDue(now, dailyRefresh.stamp);
-      if (due && !blocked && !genActive.current) generate(true);
-      wake = window.setTimeout(check, due && blocked ? 60000 : nextRefreshDelay(now));
+      const scope=`${sourceKey}|${taskDay(now)}`;
+      if (due && !writing && taskScope.current!==scope && dayReadTried.current!==scope) {
+        dayReadTried.current=scope;
+        tasksRef.current=[];setTasks([]);setSelected("");
+        refresh().catch(()=>notify("今日任务暂未载入，自动生成会补试；昨日记录已保留。","error"));
+      } else if (due && !blocked && !genActive.current) generate(true);
+      wake = window.setTimeout(check, due && blocked ? 60000 : nextRefreshDelay(now,dailyRefresh.stamp));
     };
     const visible = () => { if (document.visibilityState === "visible") check(); };
     window.addEventListener("focus", check);
@@ -1445,7 +1523,7 @@ export default function FocusApp() {
   // the existing serialized Feishu write/readback and history synchronization.
   const queueReady = useRef(false);
   queueReady.current =
-    connected && !!sourceKey && !generating && !syncBusy && !busy;
+    connected && !!sourceKey && !generating && !syncBusy && !busy && quietSync.allowed(sourceKey);
   useEffect(() => {
     if (
       !sourceKey ||
@@ -1468,7 +1546,7 @@ export default function FocusApp() {
           await api().completeToday({ planId });
         },
         () =>
-          queueReady.current && !editQueue.running && !syncing.current
+          queueReady.current && !editQueue.running && !syncing.current && syncAllowed()
       )
       .then(() => {
         // One refresh per drained batch, never one full refresh per click.
@@ -1489,6 +1567,7 @@ export default function FocusApp() {
     generating,
     syncBusy,
     busy,
+    quietRevision,
   ]);
   const completeChip = (task: FocusTask) => {
     if (!api() || !connected || !sourceKey) {
@@ -1823,6 +1902,8 @@ export default function FocusApp() {
   return (
     <div className="focus-app">
       {restReminder}
+      {quietSync.error && <aside role="alert" className="outbox-status">{quietSync.error}
+        <button className="btn-text" onClick={()=>requestSync()}>手动同步</button></aside>}
       {weightState.error && <div role="alert" className="outbox-status weight-config-error">{weightState.error}；当前使用原始数量，请在设置中保存比例。</div>}
       {preferenceSync.status.conflicts.length>0 && !settingsOpen && <div className="outbox-status" role="alert">全局偏好有不同版本，请选择统一设置。<button className="btn-small outline" onClick={()=>setSettingsOpen(true)}>处理设置冲突</button></div>}
       {settingsOpen ? (
@@ -1859,7 +1940,7 @@ export default function FocusApp() {
               notify("原表专注字段已就绪，保存时会回写对应番茄。");
             })
           }
-          onRetrySync={() => run(sync)}
+          onRetrySync={() => run(() => requestSync())}
           onLocalTitle={setLocalTitle}
           onAddLocal={addLocal}
           {...windowControls}
@@ -1991,6 +2072,8 @@ export default function FocusApp() {
             weights={weights}
             journey={{
               scope: sourceKey || "local",
+              focusSeconds: Math.max(1,Number(minutes)*60),
+              breakSeconds: timerPreferences.restMinutes*60,
               ready: timer.ready && !timer.blocked && connectionReady,
               active: timer.active,
               restLog: actualRestLog?.scope === restScope ? actualRestLog : null,
@@ -2048,8 +2131,7 @@ export default function FocusApp() {
             canSync={connected && !!api()}
             syncBusy={syncBusy}
             onSync={() => {
-              if (sourceKey) editQueue.retry(sourceKey);
-              sync(true);
+              requestSync(true);
             }}
             tasks={boardTasks}
             onAddManual={timer.addManual}
@@ -2063,7 +2145,10 @@ export default function FocusApp() {
             reviewState={reviewState}
             editingIds={editingIds}
             onGenerate={() => generate()}
-            refreshedLabel={dailyRefresh.source === sourceKey ? refreshLabel(dailyRefresh.stamp) : ""}
+            refreshedLabel={dailyRefresh.source === sourceKey ? refreshLabel(dailyRefresh.stamp) ||
+              (dailyRefresh.stamp?.failedAt && dailyRefresh.stamp.failedAt>=refreshBoundary(Date.now())
+                ? dailyRefresh.stamp.retryAt ? "自动刷新待补试" : "自动刷新未完成"
+                : Date.now()>=refreshBoundary(Date.now()) && active ? "待专注结束后刷新" : "") : ""}
             generating={generating || silentGenerating}
             genStageText={genStageText}
             genPercent={genPercent}
@@ -2083,15 +2168,14 @@ export default function FocusApp() {
         progress={harvestProgress}
         pending={historyPending.length}
         onRetry={() => {
-          if (sourceKey) editQueue.retry(sourceKey);
-          sync();
+          requestSync();
         }}
       />
       {(outbox.length > 0 || editQueue.storageError) && (
         <aside className="outbox-status" role="status">
           <span>
             {editQueue.storageError ||
-              `${outbox.filter(e=>!isCapturedTask(e)).length} 项待同步 · ${outbox.filter(isCapturedTask).length} 项待整理 · 可继续专注`}
+              `${outbox.filter(e=>!isCapturedTask(e)).length} 项待同步 · ${outbox.filter(isCapturedTask).length} 项待整理 · 安静5分钟后统一同步`}
           </span>
           {outbox.map((e) => (
             <span key={e.id}>
@@ -2107,7 +2191,7 @@ export default function FocusApp() {
             <button
               className="btn-text"
               onClick={() => {
-                if (sourceKey) editQueue.retry(sourceKey);
+                requestSync();
               }}
             >
               重试待同步操作
@@ -2134,7 +2218,7 @@ export default function FocusApp() {
               <button
                 onClick={() => {
                   try {
-                    if (sourceKey) completionQueue.retry(sourceKey);
+                    requestSync();
                   } catch (e: any) {
                     notify(e.message, "error");
                   }

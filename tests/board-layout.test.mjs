@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {BOARD_LAYOUT_KEY,readBoardLayout,saveBoardLayout,projectBoardLayout,moveBoardGroup} from '../app/renderer/src/focus/boardLayout.ts';
+import {BOARD_LAYOUT_KEY,readBoardLayout,saveBoardLayout,projectBoardLayout,moveBoardGroup,rebindBoardGroup} from '../app/renderer/src/focus/boardLayout.ts';
 const row=(key,quad='iu',extra={})=>({id:key+'-1',taskId:key,planId:key+'-1',source:'feishu',sourceKey:'A',title:key,quadrant:quad,...extra});
 const rows=[row('a','iu'),row('b','iu',{projectType:'research'}),row('b','iu',{id:'b-2',planId:'b-2',creditedSeconds:70,appliedSessionIds:['r']}),row('c','inu'),row('d','iu',{kind:'done',doneToday:1})];
 const store=()=>{const m=new Map();return {m,getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)}};
@@ -24,7 +24,11 @@ test('durable preference survives fresh rows and restart; new tasks remain and d
 });
 test('invalid/foreign/stale/temporary moves fail while valid task still moves',()=>{
  for(const args of [['A','missing','iu'],['B','a','iu'],['A','a','bad'],['A','a','iu','gone'],['A','a','iu','c']])assert.throws(()=>moveBoardGroup(rows,null,...args));
- assert.throws(()=>moveBoardGroup([row('q','iu',{quickTask:{id:'q',sequence:1}})],null,'A','q','inu'));
+ const queued=[row('quick-q','iu',{quickTask:{id:'q',sequence:1}})];
+ const arranged=moveBoardGroup(queued,null,'A','quick-q','inu');
+ assert.equal(projectBoardLayout(queued,arranged)[0].quadrant,'inu');
+ const rebound=rebindBoardGroup(arranged,'quick-q','real');
+ assert.equal(projectBoardLayout([row('real')],rebound)[0].quadrant,'inu');
  assert.throws(()=>moveBoardGroup([row('q','iu',{kind:'pending'})],null,'A','q','inu'));
  assert.equal(projectBoardLayout(rows,moveBoardGroup(rows,null,'A','a','inu')).find(t=>t.taskId==='a').quadrant,'inu');
 });

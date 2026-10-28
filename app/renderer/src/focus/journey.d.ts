@@ -89,6 +89,9 @@ export type JourneyTime = { at: number; kind: "actual" | "estimate" | "reference
 export function journeyTimeline(plan: Journey, records: FocusSession[], active?: FocusSession | null,
   rests?: { startedAt: number; endedAt: number | null }[]): { starts: Record<string, JourneyTime>; end: JourneyTime | null };
 export function journeyHour(day: string, at: number): string;
+export function fitJourneyDay(plan: Journey, records: FocusSession[], active?: FocusSession | null,
+  rests?: { startedAt:number; endedAt:number|null }[], focusSeconds?:number, breakSeconds?:number, now?:number):
+  {plan:Journey;timeline:{starts:Record<string,JourneyTime>;end:JourneyTime|null};hidden:string[];cutoff:number};
 export function reconcileJourney(
   plan: Journey,
   records: FocusSession[],

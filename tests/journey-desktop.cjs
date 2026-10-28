@@ -89,6 +89,9 @@ app.whenReady().then(async () => {
         }
         throw Error("timeout " + f);
       };
+    const earlyOffset = new Date().setHours(8,0,0,0)-Date.now();
+    const earlyClock = `{const Original=Date,offset=${earlyOffset};window.Date=class extends Original{constructor(...args){super(...(args.length?args:[Original.now()+offset]))}static now(){return Original.now()+offset}}};`;
+    await js(earlyClock+"window.dispatchEvent(new Event('focus'))");
     const click = (text, selector = "button") =>
       js(
         `(()=>{const b=[...document.querySelectorAll(${JSON.stringify(
@@ -116,6 +119,7 @@ app.whenReady().then(async () => {
         `(()=>{const e=document.querySelector('.journey-card');return JSON.parse(localStorage.getItem('pomatez-journey-v1:'+encodeURIComponent(e.dataset.scope)+':'+e.dataset.day))})()`
       );
     const reload = async (source, broken = false, count = 16) => {
+      source=earlyClock+(source||"");
       if (source) {
         win.webContents.debugger.attach("1.3");
         await win.webContents.debugger.sendCommand("Page.enable");
@@ -182,16 +186,18 @@ app.whenReady().then(async () => {
       const records=[{...rec,id:'am',completedCount:4,startedAt:time(14,10),endedAt:time(15,50)},
         {...rec,id:'pm',completedCount:3,startedAt:time(16,17),endedAt:time(17,47)},
         {...rec,id:'eve',completedCount:3,startedAt:time(19,48),endedAt:time(20,48)}];
-      await reload(`localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(q))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records}))})`);
+      await reload(`localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(q))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records}))})`,false,12);
       const labels=await js(`[...document.querySelectorAll('.journey-stage .journey-time-corner')].map(e=>e.textContent.trim())`);
-      assert.deepEqual(labels,['14','16','19','22','24','次日2']);
+      assert.deepEqual(labels,['14','16','19','22','24']);
+      assert.equal(await js(`Number(document.querySelector('.journey-card').dataset.trimmed)`),4);
+      assert.equal((await plan()).stages.flatMap(s=>s.slots).length,16);
       assert.ok(await js(`document.querySelectorAll('.journey-stage')[3].querySelector('.journey-time-corner').title.includes('预计开始 22:48')`));
       assert.deepEqual((await plan()).stages.map(s=>s.time),[10,14,16,19,21]);
       const beforeNextDay=await stored();
       await click('明天','.journey-heading button');
       assert.equal(await js(`document.querySelector('.journey-stage .journey-time-corner').textContent.trim()`),'8');
       assert.deepEqual((await stored()).records,beforeNextDay.records);
-      checks.push('actual14/16/19 followed by forward22/24/next-day2, precise forecast hover, template unchanged and tomorrow remains8');
+      checks.push('actual14/16/19 and future22 capped24; four unfinishable outlines hidden, raw16/template/history retained; tomorrow remains8');
     } else if (phase === "plan") {
       await click("设置", ".journey-heading button");
       await click("复制新建", ".journey-dialog button");
@@ -238,7 +244,7 @@ app.whenReady().then(async () => {
       await click("今天", ".journey-heading button");
       checks.push("explicit template apply, create/delete/default edits; invalid reference and storage failure preserve library without false apply");
       const d = new Date();
-      d.setHours(14, 7, 0, 0);
+      d.setHours(8, 7, 0, 0);
       const rec = (id, count, day) => ({
         id,
         task: {
@@ -276,16 +282,16 @@ app.whenReady().then(async () => {
         3
       );
       const marker = () => js(`document.querySelector('.journey-stage .journey-time-corner').textContent.trim()`);
-      assert.equal(await marker(), "14");
+      assert.equal(await marker(), "8");
       assert.equal((await plan()).stages[0].time, 8);
-      assert.equal(await js(`document.querySelectorAll('.journey-stage')[1].querySelector('.journey-time-corner').textContent.trim()`), "18");
+      assert.equal(await js(`document.querySelectorAll('.journey-stage')[1].querySelector('.journey-time-corner').textContent.trim()`), "12");
       const corrected = await stored();
       corrected.records.find(r=>r.id==='seed-today').startedAt += 600000;
       await reload(`localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify(corrected))})`);
-      assert.equal(await marker(), "14");
-      assert.ok(await js(`document.querySelector('.journey-stage .journey-time-corner').title.includes('14:17')`));
+      assert.equal(await marker(), "8");
+      assert.ok(await js(`document.querySelector('.journey-stage .journey-time-corner').title.includes('08:17')`));
       assert.equal((await plan()).stages[0].time, 8);
-      checks.push("actual hour14 with precise14:07/edited14:17 hover, future12 moves to18, original template8 preserved");
+      checks.push("actual hour8 with precise08:07/edited08:17 hover, early-day budget and original template8 preserved");
       assert.equal(
         await js(`document.querySelector('.stb-from').textContent`),
         "200"

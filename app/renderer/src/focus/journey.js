@@ -391,6 +391,39 @@ export function journeyHour(day, at) {
     hour = date.getHours();
   return days === 0 ? String(hour) : days === 1 ? hour === 0 ? "24" : `次日${hour}` : `${days}日后${hour}`;
 }
+// Reversible day view: never erase a task, saved credit, preset or active session.
+export function fitJourneyDay(plan, records, active = null, rests = [], focusSeconds = 1500, breakSeconds = 300, now = Date.now()) {
+  const done = completion(plan, records), timeline = journeyTimeline(plan, records, active, rests),
+    [y,m,d] = plan.day.split("-").map(Number), cutoff = new Date(y,m-1,d+1).getTime(),
+    startOfDay = new Date(y,m-1,d).getTime(), flat = plan.stages.flatMap(s=>s.slots);
+  const running = activeInJourney(plan,active) ? flat.find(p=>p.binding?.sessionId===active.id) ||
+    flat.find(p=>!done[p.id]&&!p.binding) : null;
+  const focus = Number.isFinite(focusSeconds) && focusSeconds > 0 ? focusSeconds : 1500,
+    pause = Number.isFinite(breakSeconds) && breakSeconds >= 0 ? breakSeconds : 300;
+  let cursor = journeyDay(now) === plan.day ? Math.max(startOfDay,now) : startOfDay;
+  for (const r of Object.values(done)) if (Number.isFinite(r.endedAt)) cursor=Math.max(cursor,r.endedAt);
+  for (const rest of rests) if (Number.isFinite(rest.startedAt) && journeyDay(rest.startedAt)===plan.day)
+    cursor=Math.max(cursor,Number.isFinite(rest.endedAt)?rest.endedAt:rest.startedAt);
+  const hidden = [];
+  const stages = plan.stages.map(stage=>{
+    const point=timeline.starts[stage.id];
+    if (point && point.kind !== "actual") cursor=Math.max(cursor,point.at);
+    const slots=stage.slots.filter(p=>{
+      if (done[p.id]) return true;
+      if (p.id===running?.id) {
+        cursor=Math.max(cursor,active.startedAt + (active.plannedSeconds || focus)*1000);
+        return true;
+      }
+      const end=cursor+focus*1000;
+      if (end>cutoff) { hidden.push(p.id); return false; }
+      cursor=end+pause*1000;
+      return true;
+    });
+    return {...stage,slots};
+  });
+  if (timeline.end && timeline.end.kind !== "actual") timeline.end={...timeline.end,at:Math.min(cutoff,timeline.end.at)};
+  return { plan:{...plan,stages}, timeline, hidden, cutoff };
+}
 export function reconcileJourney(plan, records, active) {
   const result = JSON.parse(JSON.stringify(plan)),
     used = new Set();

@@ -24,8 +24,8 @@ app.whenReady().then(async()=>{try{
   await start(key);await until(()=>js("document.querySelector('.quadrants').classList.contains('is-dragging')"));
   const selector=target?'[data-task-group="'+target+'"]':'.quad-'+q;
   await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect(),y=r.top+r.height*${after?0.8:0.2};e.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:y}))})()`);
-  if(target)assert.equal(await js(`document.querySelector(${JSON.stringify(selector)}).classList.contains(${JSON.stringify(after?'drop-after':'drop-before')})`),true);
-  else assert.equal(await js(`document.querySelector(${JSON.stringify(selector)}).classList.contains('drag-over')`),true);
+  if(target)await until(()=>js(`document.querySelector(${JSON.stringify(selector)}).classList.contains(${JSON.stringify(after?'drop-after':'drop-before')})`));
+  else await until(()=>js(`document.querySelector(${JSON.stringify(selector)}).classList.contains('drag-over')`));
   await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();e.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:globalThis.__dragData,clientY:r.top+r.height*${after?0.8:0.2}}))})()`);
  };
  if(phase==='restore'){

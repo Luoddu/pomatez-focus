@@ -1,7 +1,8 @@
 // Scheduling metadata only. The existing Feishu generator owns actual plan rows.
 export const DAILY_REFRESH_KEY = "pomatez-daily-refresh-v1";
 type Store = Pick<Storage, "getItem" | "setItem">;
-export type RefreshStamp = { source: string; attemptedAt: number; completedAt: number };
+export type RefreshStamp = { source: string; attemptedAt: number; completedAt: number;
+  attempts?: number; failedAt?: number; retryAt?: number };
 const day = (at: number) => new Date(at).toDateString();
 export function refreshBoundary(now: number, tomorrow = false) {
   const date = new Date(now);
@@ -21,7 +22,12 @@ function readAll(storage: Store): RefreshStamp[] {
         ![entry.attemptedAt, entry.completedAt].every(at => Number.isSafeInteger(at) && at >= 0 && at <= 8640000000000000))
       throw Error("每日刷新状态损坏，请保留数据并重试");
     sources.add(entry.source);
-    return { source: entry.source, attemptedAt: entry.attemptedAt, completedAt: entry.completedAt };
+    if ((entry.attempts !== undefined && (!Number.isInteger(entry.attempts) || entry.attempts<1 || entry.attempts>2)) ||
+      [entry.failedAt,entry.retryAt].some(at=>at!==undefined&&(!Number.isSafeInteger(at)||at<0)))
+      throw Error("每日刷新状态损坏，请保留数据并重试");
+    return { source: entry.source, attemptedAt: entry.attemptedAt, completedAt: entry.completedAt,
+      ...(entry.attempts===undefined?{}:{attempts:entry.attempts}),
+      ...(entry.failedAt===undefined?{}:{failedAt:entry.failedAt}),...(entry.retryAt===undefined?{}:{retryAt:entry.retryAt}) };
   });
 }
 export function readRefresh(storage: Store, source: string) {
@@ -39,16 +45,24 @@ export function writeRefresh(storage: Store, stamp: RefreshStamp) {
 }
 export function refreshDue(now: number, stamp: RefreshStamp | null) {
   const boundary = refreshBoundary(now);
-  return now >= boundary && !(stamp && [stamp.attemptedAt, stamp.completedAt].some(at => day(at) === day(now) && at >= boundary));
+  if (now<boundary || (stamp && day(stamp.completedAt)===day(now) && stamp.completedAt>=boundary)) return false;
+  if (stamp && day(stamp.attemptedAt)===day(now) && stamp.attemptedAt>=boundary)
+    return !!stamp.retryAt && now>=stamp.retryAt && (stamp.attempts||1)<2;
+  return true;
 }
 export function refreshAttempt(source: string, previous: RefreshStamp | null, now: number): RefreshStamp {
   // A manual run after wall-clock rollback may change its display time, but must
   // not erase the same-day evidence that the scheduled boundary was crossed.
   const sameDay = (at: number) => day(at) === day(now) ? at : 0;
-  return { source, attemptedAt: Math.max(now, sameDay(previous?.attemptedAt || 0), sameDay(previous?.completedAt || 0)), completedAt: previous?.completedAt || 0 };
+  return { source, attemptedAt: Math.max(now, sameDay(previous?.attemptedAt || 0), sameDay(previous?.completedAt || 0)),
+    completedAt: previous?.completedAt || 0, attempts: Math.min(2,sameDay(previous?.attemptedAt||0)?(previous?.attempts||1)+1:1) };
 }
-export function nextRefreshDelay(now: number) {
-  return Math.max(1, refreshBoundary(now, now >= refreshBoundary(now)) - now);
+export function refreshFailed(stamp:RefreshStamp, now:number):RefreshStamp {
+  return {...stamp,failedAt:now,retryAt:(stamp.attempts||1)<2?now+5*60000:0};
+}
+export function nextRefreshDelay(now: number, stamp?:RefreshStamp|null) {
+  const retry = stamp?.retryAt && day(stamp.attemptedAt)===day(now) && stamp.retryAt>now ? stamp.retryAt : Infinity;
+  return Math.max(1, Math.min(retry,refreshBoundary(now, now >= refreshBoundary(now))) - now);
 }
 export function refreshLabel(stamp: RefreshStamp | null, now = Date.now()) {
   if (!stamp?.completedAt || day(stamp.completedAt) !== day(now) || stamp.completedAt > now) return "";

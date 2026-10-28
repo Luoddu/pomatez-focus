@@ -68,7 +68,7 @@ export function moveBoardGroup(rows: FocusTask[], layout: BoardLayout | null,
   if (!quadrants.includes(quadrant) || (layout && layout.scope !== scope)) throw Error("任务来源或象限已变化");
   const projected = projectBoardLayout(rows, layout);
   const group = projected.filter(t => boardGroupKey(t) === key);
-  if (!group.length || group.some(t => !belongs(t, scope) || t.quickTask || t.kind === "pending" || t.kind === "free"))
+  if (!group.length || group.some(t => !belongs(t, scope) || (t.kind === "pending" && !t.quickTask) || t.kind === "free"))
     throw Error("任务不存在或尚未同步，请刷新后再拖动");
   if (target === key) return layout || { version: 1, scope, order: [], quadrants: [] };
   if (target && !projected.some(t => boardGroupKey(t) === target && belongs(t, scope) && (t.quadrant || "unu") === quadrant))
@@ -87,4 +87,11 @@ export function moveBoardGroup(rows: FocusTask[], layout: BoardLayout | null,
   const present = new Set(order);
   const absent = (layout?.order || []).filter(k => !present.has(k));
   return validate({ version: 1, scope, order: [...order, ...absent], quadrants: changes }, scope);
+}
+export function rebindBoardGroup(layout: BoardLayout | null, before: string, after: string): BoardLayout | null {
+  if (!layout || before === after || (!layout.order.includes(before) && !layout.quadrants.some(q => q.key === before))) return null;
+  const moved = layout.quadrants.find(q => q.key === before);
+  return validate({ ...layout, order: Array.from(new Set(layout.order.map(k => k === before ? after : k))),
+    quadrants: [...layout.quadrants.filter(q => q.key !== before && (!moved || q.key !== after)),
+      ...(moved ? [{ ...moved, key: after }] : [])] }, layout.scope);
 }

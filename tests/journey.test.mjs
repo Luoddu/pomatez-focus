@@ -14,6 +14,7 @@ import {
   journeyActualTimes,
   journeyTimeline,
   journeyHour,
+  fitJourneyDay,
   moveSlot,
   resizeStages,
   journeyRoad,
@@ -50,6 +51,20 @@ test("default flexible itinerary 4/3/3/3/3 and local calendar tomorrow", () => {
     journeyDay(new Date(2026, 11, 31, 23).getTime(), 1),
     "2027-01-01"
   );
+});
+test('late day journey hides only unstarted outlines that cannot finish by midnight; source plan remains intact',()=>{
+ const at=(h,m=0)=>new Date(2026,9,8,h,m).getTime(),p=plan(),before=JSON.stringify(p);
+ const late=fitJourneyDay(p,[],null,[],1500,300,at(23,30));
+ assert.equal(late.plan.stages.flatMap(s=>s.slots).length,1);assert.equal(late.hidden.length,15);
+ assert.ok(late.timeline.end.at<=at(24));assert.equal(JSON.stringify(p),before);
+ const tomorrow={...p,day:journeyDay(at(12),1)};
+ assert.equal(fitJourneyDay(tomorrow,[],null,[],1500,300,at(23,30)).hidden.length,0);
+ const r=record(5,{startedAt:at(22),endedAt:at(23,40)}),active=record(0,{id:'running',status:'paused',startedAt:at(23,50),plannedSeconds:1500}),
+   q=reconcileJourney(p,[r],null),protectedView=fitJourneyDay(q,[r],active,[],1500,300,at(23,55));
+ assert.equal(Object.keys(completion(protectedView.plan,[r])).length,5);
+ assert.equal(protectedView.plan.stages.flatMap(s=>s.slots).length,6);
+ assert.equal(protectedView.hidden.length,10);
+ assert.equal(fitJourneyDay(p,[],null,[],1500,300,at(24)).plan.stages.flatMap(s=>s.slots).length,16); // another day's view uses its own date
 });
 test("actual stage times replace display hours only; edits follow records and future references stay intact", () => {
   const at = new Date(2026, 9, 8, 14, 7).getTime(),

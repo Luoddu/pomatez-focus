@@ -5,7 +5,7 @@ import {
   Journey,
   JourneySlot,
   completion,
-  journeyTimeline,
+  fitJourneyDay,
   journeyHour,
   JourneyTime,
   journeyDay,
@@ -65,6 +65,8 @@ export type JourneyControls = {
   resume: () => void;
   onPlan?: (plan: Journey) => void;
   refreshToken?: number;
+  focusSeconds?: number;
+  breakSeconds?: number;
 };
 export default function TodayJourney({
   records,
@@ -173,15 +175,20 @@ export default function TodayJourney({
     () => (plan ? completion(plan, records) : {}),
     [plan, records]
   );
-  const timeline = useMemo<{ starts: Record<string, JourneyTime>; end: JourneyTime | null }>(
-    () => plan ? journeyTimeline(plan, records, controls.active,
-      controls.restLog?.scope === scope ? controls.restLog.events : []) : { starts: {}, end: null },
+  const nowMinute = Math.floor(Date.now()/60000);
+  const fitted = useMemo(
+    () => plan ? fitJourneyDay(plan, records, controls.active,
+      controls.restLog?.scope === scope ? controls.restLog.events : [],
+      controls.focusSeconds,controls.breakSeconds,Date.now()) : null,
     // Start times change on record edits or session changes, never on elapsed-second ticks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [plan, records, controls.restLog, scope, controls.active?.id, controls.active?.startedAt, controls.active?.status,
-      controls.active?.plannedSeconds, controls.active?.task.source, controls.active?.task.sourceKey]
+      controls.active?.plannedSeconds, controls.active?.task.source, controls.active?.task.sourceKey,
+      controls.focusSeconds,controls.breakSeconds,nowMinute]
   );
-  const slots = plan?.stages.flatMap((s) => s.slots) || [],
+  const timeline: {starts:Record<string,JourneyTime>;end:JourneyTime|null} = fitted?.timeline || {starts:{},end:null};
+  const shownPlan = fitted?.plan || plan;
+  const slots = shownPlan?.stages.flatMap((s) => s.slots) || [],
     selected = slots.find((s) => s.id === edit);
   const options = useMemo(() => {
     const values: FocusTask[] = [],
@@ -290,6 +297,10 @@ export default function TodayJourney({
     if (!today || journeyDay() !== plan?.day || !controls.ready)
       throw Error("只能开始当天旅程");
     if (controls.active) throw Error("请先结束并确认当前专注");
+    const available = fitJourneyDay(ref.current!,records,controls.active,
+      controls.restLog?.scope===scope?controls.restLog.events:[],controls.focusSeconds,controls.breakSeconds,Date.now());
+    if (!available.plan.stages.some(s=>s.slots.some(v=>v.id===p.id)))
+      throw Error("这个番茄已超出今日24点预算，请明天再安排");
     const target = p.task ? resolveTask(p.task, tasks, scope) : null;
     if (p.task && !target)
       throw Error(
@@ -399,10 +410,11 @@ export default function TodayJourney({
       data-long={slots.length > 16}
       data-day={day}
       data-scope={scope}
+      data-trimmed={fitted?.hidden.length || 0}
     >
       <div className="journey-heading">
         <strong
-          title={`${Object.keys(done).length}/${slots.length} 个番茄`}
+          title={`${Object.keys(done).length}/${slots.length} 个番茄 · 24点结束${fitted?.hidden.length ? ` · 已收起${fitted.hidden.length}个来不及完成的轮廓` : ""}`}
         >
           {today ? "今日旅程" : "明日旅程"}
         </strong>
@@ -487,7 +499,7 @@ export default function TodayJourney({
         <>
           <div className="journey-stages">
             {actualAt(0)}
-            {plan.stages.map((s, i) => (
+            {shownPlan!.stages.map((s, i) => (
               <div
                 className={`journey-stage${
                   plan.resting === s.id ? " is-resting" : ""
@@ -511,7 +523,7 @@ export default function TodayJourney({
                         controls.active?.id === p.binding.sessionId;
                     const position = slots.findIndex(v => v.id === p.id) + 1;
                     const stageTime = timeline.starts[s.id];
-                    const terminal = i === plan.stages.length - 1 && j === s.slots.length - 1 &&
+                    const terminal = p.id === slots[slots.length-1]?.id &&
                       (j !== 0 || s.time === null || timeline.end?.kind === "actual");
                     return (
                       <React.Fragment key={p.id}>

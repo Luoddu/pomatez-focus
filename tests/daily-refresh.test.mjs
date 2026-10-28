@@ -1,8 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DAILY_REFRESH_KEY, readRefresh, writeRefresh, refreshDue, refreshAttempt, nextRefreshDelay, refreshLabel } from "../app/renderer/src/focus/dailyRefresh.ts";
+import { DAILY_REFRESH_KEY, readRefresh, writeRefresh, refreshDue, refreshAttempt, refreshFailed, nextRefreshDelay, refreshLabel } from "../app/renderer/src/focus/dailyRefresh.ts";
 const clock=(d,h,m)=>new Date(2026,9,d,h,m).getTime();
 const memory=()=>{const values=new Map();return { getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v) };};
+test('failed automatic run has one delayed retry; success and second failure stop replay',()=>{
+ const first=refreshAttempt('A',null,clock(10,8,30)), failed=refreshFailed(first,clock(10,8,31));
+ assert.equal(refreshDue(clock(10,8,35),failed),false);assert.equal(refreshDue(clock(10,8,36),failed),true);
+ assert.equal(nextRefreshDelay(clock(10,8,35),failed),60000);
+ const second=refreshAttempt('A',failed,clock(10,8,36)), stopped=refreshFailed(second,clock(10,8,37));
+ assert.equal(refreshDue(clock(10,9,0),stopped),false);assert.equal(refreshDue(clock(11,8,30),stopped),true);
+});
 test("08:30 due, persisted attempt prevents same-day replay but early manual permits scheduled run",()=>{
   assert.equal(refreshDue(clock(10,8,29),null),false);
   assert.equal(refreshDue(clock(10,8,30),null),true);

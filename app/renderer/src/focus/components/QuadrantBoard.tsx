@@ -90,7 +90,7 @@ const GroupList = ({
           !group.tasks.some((t) => t.kind === "free");
         // 计时中的任务不允许减：该行可能已有未同步的专注分钟
         const timing = !!activeTaskId && activeTaskId === taskId;
-        const draggable = !!boardScope && !!onMove && !group.tasks.some(t => t.quickTask || t.kind === "pending" || t.kind === "free");
+        const draggable = !!boardScope && !!onMove && !group.tasks.some(t => (t.kind === "pending" && !t.quickTask) || t.kind === "free");
         return (
           <div
             className={`task${complete ? " complete" : ""}${
