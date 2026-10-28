@@ -55,7 +55,7 @@ import HistoryPanel from "./components/HistoryPanel";
 import { useScientificRest, ScientificRestReminder } from "./components/ScientificRest";
 import MiniView from "./components/MiniView";
 import StatsPanel from "./components/StatsPanel";
-import HarvestSync, { HarvestProgress } from "./components/HarvestSync";
+import { HarvestProgress } from "./components/HarvestSync";
 import {
   api,
   clock,
@@ -335,15 +335,11 @@ export default function FocusApp() {
   const syncing = useRef(false);
   const failedRecordWrites = useRef(new Set<string>());
   const classifyRequested = useRef(new Set<string>());
+  const manualSyncRequested = useRef(new Set<string>());
   const initialHistorySource = useRef<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [harvestProgress, setHarvestProgress] =
     useState<HarvestProgress | null>(null);
-  useEffect(() => {
-    if (harvestProgress?.state !== "done") return;
-    const t = setTimeout(() => setHarvestProgress(null), 3000);
-    return () => clearTimeout(t);
-  }, [harvestProgress]);
   const [editQueue] = useState(() => new EditQueue(localStorage));
   const [captureTitle,setCaptureTitle]=useState("");
   const [editRevision, setEditRevision] = useState(0);
@@ -749,6 +745,7 @@ export default function FocusApp() {
     syncing.current = true;
     initialHistorySource.current = sourceKey;
     const classify = classifyRequested.current.has(sourceKey);
+    const manual = manualSyncRequested.current.delete(sourceKey);
     setSyncBusy(true);
     setHarvestProgress({
       percent: 3,
@@ -873,7 +870,7 @@ export default function FocusApp() {
         failures.push(
           `还有 ${remote.missing} 条旧专注缺少完整明细，请在原电脑运行新版并同步。`
         );
-      notify(
+      if (manual) notify(
         failures.length
           ? `已同步可处理的成果，仍有待处理项：${failures[0]}`
           : classified
@@ -902,7 +899,7 @@ export default function FocusApp() {
         text: "暂未完成同步 · 本机成果保留",
         state: "error",
       });
-      notify(`记录已保存在本机，待同步：${e.message}`, "error");
+      if (manual) notify(`记录已保存在本机，待同步：${e.message}`, "error");
     } finally {
       syncing.current = false;
       setSyncBusy(false);
@@ -925,6 +922,7 @@ export default function FocusApp() {
   }, [pendingIds, connected, sourceKey, editRevision, quietRevision]);
   const requestSync = async (classify = false) => {
     if (!sourceKey) return;
+    manualSyncRequested.current.add(sourceKey);
     if (classify) classifyRequested.current.add(sourceKey);
     failedRecordWrites.current.clear();
     quietSync.observe(collectMutations());
@@ -2139,6 +2137,8 @@ export default function FocusApp() {
             pendingCount={historyPending.length}
             canSync={connected && !!api()}
             syncBusy={syncBusy}
+            syncProgress={harvestProgress}
+            activeStartedAt={active?.startedAt}
             onSync={() => {
               requestSync(true);
             }}
@@ -2173,13 +2173,6 @@ export default function FocusApp() {
           />
         </main>
       )}
-      <HarvestSync
-        progress={harvestProgress}
-        pending={historyPending.length}
-        onRetry={() => {
-          requestSync();
-        }}
-      />
       {(outbox.length > 0 || editQueue.storageError) && (
         <aside className="outbox-status" role="status">
           <span>
@@ -2192,9 +2185,9 @@ export default function FocusApp() {
                 ? (e.payload as QuickTask).title
                 : e.kind === "remove"
                 ? "减少番茄"
-                : `记录修改「${parseTitle((e.payload as PendingEdit).before?.task?.title || "专注记录").name}」`}
+                : `${e.kind === "color" ? "颜色修改" : "记录修改"}「${parseTitle((e.payload as PendingEdit).before?.task?.title || "专注记录").name}」`}
               ：{isCapturedTask(e)?"待整理":e.state === "failed" ? e.error : "等待同步"}
-              {e.kind === "edit" && e.state === "failed" && (
+              {(e.kind === "edit" || e.kind === "color") && e.state === "failed" && (
                 <button className="btn-text" disabled={editQueue.running || syncing.current}
                   title="停止重试这次失败修改；保留本机记录和恢复副本，不撤回已写入飞书的部分"
                   aria-label={`放弃未同步修改 ${e.id}`}

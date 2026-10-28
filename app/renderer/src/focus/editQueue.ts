@@ -124,7 +124,7 @@ export class EditQueue {
   discardFailedEdit(sourceKey: string, id: string) {
     if (this.running || this.storageError) throw Error("正在同步或存储未就绪，请稍后再放弃修改");
     const item = this.entries.find(e => e.id === id && e.sourceKey === sourceKey);
-    if (!item || item.kind !== "edit" || item.state !== "failed")
+    if (!item || (item.kind !== "edit" && item.kind !== "color") || item.state !== "failed")
       throw Error("只能放弃当前来源中已失败的记录修改");
     const key = `pomatez-discarded-edit-v1:${item.id}`;
     const existing = this.store.getItem(key);

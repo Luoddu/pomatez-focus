@@ -4,12 +4,12 @@ if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error(
 const phase=process.env.POMO_QUIET_PHASE,root=path.resolve(__dirname,'..');let source='synthetic-quiet';
 const {FocusService}=require('../app/electron/build/focus/service');
 const tasks=[{id:'p1',planId:'p1',taskId:'t1',title:'Synthetic existing · 第 1 个番茄',source:'feishu',sourceKey:source,quadrant:'iu'}];
-let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false,holdSync=false,releaseSync,syncCalls=0,corrects=0,failCorrect=false,classifies=[],historyReads=[];
+let creates=[],saved=[],completes=[],initial=true,readers=[],releaseCreate,hold=false,fail=false,holdSync=false,releaseSync,syncCalls=0,corrects=0,failCorrect=false,classifies=[],historyReads=[],holdHistory=phase==='ui',releaseHistory,recolors=0;
 FocusService.prototype.status=()=>({configured:true,sourceKey:source});
 FocusService.prototype.projects=async()=>({sourceKey:source,projects:[]});
 FocusService.prototype.configure=async()=>({configured:true});
 FocusService.prototype.today=async()=>{if(initial)await new Promise(r=>readers.push(r));return tasks.map(t=>({...t,sourceKey:source}))};
-FocusService.prototype.history=async()=>{historyReads.push(source);return {sourceKey:source,records:saved.filter(r=>r.task.sourceKey===source),missing:0}};
+FocusService.prototype.history=async()=>{historyReads.push(source);if(holdHistory)await new Promise(r=>releaseHistory=r);return {sourceKey:source,records:saved.filter(r=>r.task.sourceKey===source),missing:0}};
 FocusService.prototype.generateToday=async()=>{throw Error('unexpected generation before 08:30')};
 FocusService.prototype.createQuickTask=async q=>{creates.push(q.id);if(hold)await new Promise(r=>releaseCreate=r);if(fail)throw Error('Synthetic offline');const rows=Array.from({length:q.count},(_,i)=>({id:`q-${q.id}-${i+1}`,planId:`q-${q.id}-${i+1}`,taskId:`t-${q.id}`,title:`${q.title} · 第 ${i+1} 个番茄`,source:'feishu',sourceKey:source,quadrant:q.quadrant}));tasks.push(...rows);return {created:true,taskId:`t-${q.id}`,tasks:rows}};
 FocusService.prototype.completeToday=async({planId})=>{completes.push(planId);tasks.find(t=>t.planId===planId).kind='done';return {completed:true}};
@@ -17,6 +17,7 @@ FocusService.prototype.sync=async r=>{syncCalls++;if(holdSync)await new Promise(
 FocusService.prototype.archiveHistory=async r=>{const v={...r,cloudSynced:true,sync:'synced'};saved.push(v);return v};
 FocusService.prototype.correctRecord=async({after})=>{corrects++;if(failCorrect)throw Error('无法连接飞书，记录已保留在本机；请检查网络后重试');const record={...after,cloudSynced:true,sync:'synced'};saved=saved.filter(r=>r.id!==record.id).concat(record);return {record}};
 FocusService.prototype.classifyHistory=async()=>{classifies.push(source);return {classified:0}};
+FocusService.prototype.recolorRecord=async()=>{recolors++;throw Error('无法连接飞书，记录已保留在本机；请检查网络后重试')};
 require('../app/electron/build/main');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit(2),55000);
 app.whenReady().then(async()=>{try{
@@ -32,7 +33,34 @@ app.whenReady().then(async()=>{try{
  const stored=()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");
  const add=async name=>{await click('在重要不紧急新增任务');await set('[aria-label="新增任务名称"]',name);await set('[aria-label="新增任务番茄数"]',2);await click('添加');await until(async()=>(await queue()).some(e=>e.payload.title===name))};
  await until(()=>js("!!document.querySelector('.quad-iu [data-task-group=t1]')"));
- if(phase==='record'){
+ if(phase==='ui'){
+  await until(()=>!!releaseHistory);await until(()=>js("!!document.querySelector('.records-section .side-title .sync-progress.busy')"));
+  const widths=await js("[document.querySelector('.left-col').getBoundingClientRect().width,document.querySelector('.right-col').getBoundingClientRect().width]");
+  for(const width of [1440,480]){
+   win.setContentSize(width,900);await wait(100);
+   const box=await js("(()=>{const e=document.querySelector('.sync-progress'),r=e.getBoundingClientRect(),h=e.closest('.side-title').getBoundingClientRect(),s=getComputedStyle(e);return {width:r.width,height:r.height,inHeader:r.left>=h.left&&r.right<=h.right+1&&r.top>=h.top&&r.bottom<=h.bottom+1,position:s.position,animation:s.animationName,transition:s.transitionDuration,overflow:document.documentElement.scrollWidth>innerWidth+1}})()");
+   assert.ok(box.width<115&&box.height<30&&box.inHeader&&!box.overflow,JSON.stringify({width,box}));assert.equal(box.position,'relative');assert.equal(box.animation,'none');assert.equal(box.transition,'0s');
+  }
+  assert.equal(await js("document.querySelectorAll('.harvest-sync,.harvest-basket,.harvest-fruit').length"),0);
+  win.setContentSize(1440,900);await wait(100);await js("document.querySelector('.records-section .side-title').scrollIntoView({block:'center'})");await win.capturePage(undefined,{stayHidden:true,stayAwake:true});win.webContents.invalidate();await wait(100);fs.writeFileSync(path.join(root,'artifacts/p075-inline-preview.png'),(await win.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
+  holdHistory=false;releaseHistory();await until(()=>js("!document.querySelector('.sync-progress')&&!document.querySelector('.gen-btn').disabled"));
+  assert.equal(await js("!!document.querySelector('.toast')"),false);checks.push('busy progress stays inside history title, narrow width fits, no fixed basket/animation; auto completion immediately disappears without toast');
+  const choose=()=>js("{const e=document.querySelector('#manual-task');e.value=[...e.options].find(o=>o.value!=='free').value;e.dispatchEvent(new Event('change',{bubbles:true}))}");
+  await js("document.querySelector('.btn-begin').click()");await until(async()=>(await stored()).active?.status==='active');const active=(await stored()).active;
+  await click('补记');await choose();const end=await js("new Date(document.querySelector('#manual-end').value).getTime()");assert.ok(Math.abs(end-active.startedAt)<1000);
+  await click('保存补记');await until(async()=>(await stored()).records.length===1);const continuing=(await stored()).active;
+  assert.equal(continuing.id,active.id);assert.equal(continuing.status,'active');assert.deepEqual(continuing.task,active.task);assert.ok(continuing.elapsedSeconds>=active.elapsedSeconds);
+  await click('暂停');await until(async()=>(await stored()).active.status==='paused');const paused=(await stored()).active;
+  await click('补记');await choose();
+  const local=at=>{const d=new Date(at);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,19)};
+  await set('#manual-end',local(active.startedAt+60000));await click('保存补记');assert.equal(await js("!!document.querySelector('.manual-form')"),true);assert.equal((await stored()).records.length,1);assert.deepEqual((await stored()).active,paused);
+  await set('#manual-when',local(active.startedAt-55*60000));await set('#manual-end',local(active.startedAt-30*60000));await click('保存补记');await until(async()=>(await stored()).records.length===2);assert.deepEqual((await stored()).active,paused);
+  await click('手动同步');await until(async()=>saved.length===2&&(await stored()).records.every(r=>r.cloudSynced));await until(()=>js("!document.querySelector('.sync-progress')"));assert.deepEqual((await stored()).active,paused);
+  assert.ok(await js("document.querySelector('.toast')?.textContent.includes('专注成果已同步')"));checks.push('past manual entry works during active focus, default ends at active start; paused timer unchanged, overlap rejected with form retained; explicit sync still reports result');
+  const original=(await stored()).records[0];await js("document.querySelector('.record').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:400,clientY:300}))");await until(()=>js("!!document.querySelector('[role=menuitemradio]')"));await js("document.querySelector('[role=menuitemradio]').click()");await click('手动同步');await until(async()=>(await queue())[0]?.state==='failed');const failedColor=(await queue())[0];assert.equal(failedColor.kind,'color');
+  await until(()=>js(`!!document.querySelector('[aria-label="放弃未同步修改 ${failedColor.id}"]:not(:disabled)')`));await click('放弃未同步修改 '+failedColor.id);await until(async()=>(await queue()).length===0);assert.deepEqual((await stored()).records[0],original);assert.deepEqual((await stored()).active,paused);
+  assert.deepEqual(await js(`JSON.parse(localStorage.getItem('pomatez-discarded-edit-v1:${failedColor.id}')).entry`),failedColor);assert.equal(recolors,1);checks.push('failed color clearly named with visible discard action; recovery copy verified and saved record/current timer untouched');
+ }else if(phase==='record'){
   await until(()=>historyReads.includes(source));assert.equal(saved.length,0);
   holdSync=true;
   await click('补记');await js("{const e=document.querySelector('#manual-task');e.value=[...e.options].find(o=>o.value!=='free').value;e.dispatchEvent(new Event('change',{bubbles:true}))}");await click('保存补记');

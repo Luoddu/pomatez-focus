@@ -94,3 +94,13 @@ test("unverified discard backup leaves failed edit pending and does not touch ou
   const raw=s.getItem('pomatez-quick-edit-outbox-v1');assert.throws(()=>q.discardFailedEdit('base','bad-edit'),/恢复副本/);
   assert.equal(q.entries.length,1);assert.equal(s.getItem('pomatez-quick-edit-outbox-v1'),raw);
 });
+
+test("failed color intent shares safe discard but pending color remains protected", () => {
+  const data=new Map(),s={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)},q=new EditQueue(s);
+  const record={id:'record',task:{id:'p1'},acceptedSeconds:1500,colorOverride:'research'},raw=JSON.stringify(record);
+  const item={id:'color-edit',sourceKey:'base',kind:'color',state:'pending',payload:{before:record,after:{...record,colorOverride:'study'}}};
+  q.add(item);assert.throws(()=>q.discardFailedEdit('base','color-edit'));
+  q.entries[0].state='failed';q.discardFailedEdit('base','color-edit');
+  assert.equal(q.entries.length,0);assert.equal(JSON.stringify(record),raw);
+  assert.deepEqual(JSON.parse(s.getItem('pomatez-discarded-edit-v1:color-edit')).entry,item);
+});

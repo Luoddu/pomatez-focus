@@ -22,22 +22,24 @@ export default function ManualEntry({
   onSave,
   onCancel,
   initial,
+  activeStartedAt,
 }: {
   tasks: FocusTask[];
   onSave: (record: FocusSession) => void;
   onCancel: () => void;
   initial?: FocusSession;
+  activeStartedAt?: number;
 }) {
   const formRef = useRef<HTMLDivElement>(null);
   const [taskId, setTaskId] = useState(initial?.task.id || "free");
   const [when, setWhen] = useState(() =>
-    localInputValue(initial?.startedAt ?? Date.now() - 25 * 60000)
+    localInputValue(initial?.startedAt ?? (activeStartedAt ?? Date.now()) - 25 * 60000)
   );
   const [minutes, setMinutes] = useState(
     (initial?.acceptedSeconds ?? 1500) / 60
   );
   const [endWhen, setEndWhen] = useState(() =>
-    localInputValue(initial?.endedAt ?? Date.now())
+    localInputValue(initial?.endedAt ?? activeStartedAt ?? Date.now())
   );
   const [customName, setCustomName] = useState("");
   const [count, setCount] = useState(initial?.completedCount ?? 1);
@@ -117,6 +119,8 @@ export default function ManualEntry({
   };
   const save = () => {
     const { startedAt, endedAt } = current;
+    if (activeStartedAt !== undefined && startedAt < Date.now() && endedAt > activeStartedAt)
+      return setError("补记时段与当前专注重叠，请选择当前专注开始之前的时段");
     if (!when || !Number.isFinite(startedAt))
       return setError("请选择开始时间");
     if (startedAt > Date.now()) return setError("开始时间不能在未来");

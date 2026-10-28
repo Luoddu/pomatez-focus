@@ -424,8 +424,10 @@ const CounterProvider: React.FC = ({ children }) => {
     });
   const addManual = (record: FocusSession) =>
     action(() => {
-      if (dataRef.current.active)
-        throw new Error("请先结束并确认当前专注再补记");
+      const current = dataRef.current.active;
+      if (current && record.startedAt < (current.endedAt ?? Date.now()) &&
+          (record.endedAt ?? record.startedAt) > current.startedAt)
+        throw new Error("补记时段与当前专注重叠，请选择当前专注开始之前的时段");
       if (!record?.id || !record.task?.id || record.status !== "saved")
         throw new Error("补记记录格式不正确");
       if (

@@ -6,6 +6,10 @@
 
 113的失败“记录修改”行显示任务名与“放弃这次修改”。用户点击仅停止本机该失败edit意图重试：先保存并逐字节回读`pomatez-discarded-edit-v1:<intent-id>`恢复副本，再移出原outbox；原timer记录不改，其他意图不动。异源、非edit、未失败或队列运行中拒绝；备份失败不移除。副本不自动回放，需恢复时核对原before/after与云端当前revision后再决定；停止重试不是云端回滚，已写入的部分不撤回。112成品已生成但无公共tag，保留未公开草稿；用户只需安装合并113。
 
+114补齐failed color同等入口，并明确标为“颜色修改”。仍只允许failed edit/color，source、运行中和恢复副本回读门禁不变。HarvestProgress在HistoryPanel的专注积累标题中显示无动画的小标签，busy显示百分比/悬浮阶段，done立即卸载，error紧凑显示“同步未完成”；没有固定浮层/果筐/成功动画。自动同步不发完成或失败toast，具体错误仍在原队列明细及小标签，明确手动请求仍可显示结果，5分钟调度不变。
+
+当前专注不再阻止补记。新补记默认开始=当前专注开始前25分钟、结束=当前专注开始，用户可调整过去时间；ManualEntry与CounterContext均拒绝与当前专注区间重叠。仅upsert补记记录，保留active身份、任务、状态、segments和原计时循环，不结束、暂停或重置当前番茄。
+
 公开主线是 `origin/codex/feishu-focus`。开始工作前：
 
 ```sh

@@ -4325,109 +4325,41 @@ button.stats-range-label:hover {
   line-height: 1.7;
   margin: 6px 0;
 }
-.harvest-sync {
-  position: fixed;
-  left: 20px;
-  bottom: 48px;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: min(420px, calc(100vw - 40px));
-  padding: 12px 16px;
-  border: 1px solid #e6dfd2;
-  border-radius: 14px;
-  box-shadow: 0 4px 22px #483b2212;
-  background: #fffef9;
-  color: #76654e;
-  font-size: 12px;
-  pointer-events: none;
-}
-.harvest-sync.error {
-  background: #fff7f0;
-}
-.harvest-sync button {
-  pointer-events: auto;
-  white-space: nowrap;
-}
-.harvest-sync-body {
-  flex: 1;
-  min-width: 0;
-}
-.harvest-sync-track {
-  height: 4px;
-  border-radius: 4px;
-  background: #f0eadf;
-  overflow: hidden;
-  margin-top: 7px;
-}
-.harvest-sync-track i {
-  display: block;
-  height: 100%;
-  background: #d4a441;
-  border-radius: 4px;
-  transition: width 0.4s ease;
-}
-.harvest-basket {
+/* Quiet inline sync status: no floating surface or animated decoration. */
+.sync-progress {
   position: relative;
-  display: inline-block;
-  font-size: 25px;
-  width: 48px;
-  text-align: center;
-  padding-top: 8px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 4px 7px;
+  margin-right: 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 400;
+  white-space: nowrap;
+  animation: none;
+  transition: none;
 }
-.harvest-fruit {
+.sync-progress i {
   position: absolute;
-  top: -9px;
-  left: 18px;
-  font-style: normal;
-  font-size: 16px;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: #cbd3e4;
+  animation: none;
+  transition: none;
 }
-.harvest-sync.done .harvest-fruit {
-  animation: collect-tomato 0.8s ease-out forwards;
-}
-.harvest-sync.done .harvest-basket {
-  animation: basket-settle 0.9s ease;
-}
-@keyframes collect-tomato {
-  0% {
-    transform: translate(22px, -14px) rotate(-15deg);
-    opacity: 1;
-  }
-  70% {
-    transform: translate(0, 19px) rotate(12deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(0, 22px) scale(0.6);
-    opacity: 0;
-  }
-}
-@keyframes basket-settle {
-  70% {
-    transform: rotate(0);
-  }
-  85% {
-    transform: rotate(7deg);
-  }
-  100% {
-    transform: rotate(0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .harvest-sync *,
-  .harvest-sync.done .harvest-fruit,
-  .harvest-sync.done .harvest-basket {
-    animation: none;
-    transition: none;
-  }
-}
+.sync-progress.error { color: #8e8173; }
+.records-section .side-title-actions { flex-wrap: wrap; justify-content: flex-end; row-gap: 3px; }
 @media (max-width: 620px) {
   .routine-panel {
     padding: 14px;
-  }
-  .harvest-sync {
-    bottom: 12px;
   }
   .scarecrow-speech {
     font-size: 12px;

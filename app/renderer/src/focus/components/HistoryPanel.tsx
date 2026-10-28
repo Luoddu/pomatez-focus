@@ -1,4 +1,5 @@
 import ResearchGoal from "./ResearchGoal";
+import HarvestSync, { HarvestProgress } from "./HarvestSync";
 import TodayJourney, { JourneyControls } from "./TodayJourney";
 import ScientificRest, { RestState } from "./ScientificRest";
 import { companionGreeting } from "../wellbeing.js";
@@ -151,6 +152,8 @@ export default function HistoryPanel({
   pendingCount,
   canSync,
   syncBusy,
+  syncProgress = null,
+  activeStartedAt,
   onSync,
   tasks,
   onAddManual,
@@ -183,6 +186,8 @@ export default function HistoryPanel({
   pendingCount: number;
   canSync: boolean;
   syncBusy: boolean;
+  syncProgress?: HarvestProgress | null;
+  activeStartedAt?: number;
   onSync: () => void;
   tasks: FocusTask[];
   onAddManual: (record: FocusSession) => void;
@@ -523,6 +528,7 @@ export default function HistoryPanel({
         <div className="side-title">
           专注积累
           <span className="side-title-actions">
+            <HarvestSync progress={syncProgress} />
             <button
               className="btn-text"
               onClick={() => setEntryOpen((open) => !open)}
@@ -542,9 +548,7 @@ export default function HistoryPanel({
               disabled={!canSync || syncBusy}
               onClick={onSync}
             >
-              {syncBusy
-                ? "同步中…"
-                : `手动同步${pendingCount ? ` (${pendingCount})` : ""}`}
+              {`手动同步${pendingCount ? ` (${pendingCount})` : ""}`}
             </button>
             {/* 「导出」按用户要求隐藏不渲染；导出实现（FocusApp.exportRecords）
                 保留，恢复时还原下方按钮即可
@@ -558,6 +562,7 @@ export default function HistoryPanel({
           <ManualEntryDialog title="补记专注" onClose={()=>setEntryOpen(false)}>
           <ManualEntry
             tasks={tasks}
+            activeStartedAt={activeStartedAt}
             onSave={(record) => {
               onAddManual(record);
               setEntryOpen(false);

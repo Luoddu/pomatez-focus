@@ -355,6 +355,7 @@ app.whenReady().then(async () => {
       "supplement category six dots match history; selected dot and keyboard selection"
     );
     await click("保存补记");
+    await click("手动同步");
     await until(() => !!releaseSync);
     const saved = (await stored()).records.find((r) => !r.cloudSynced);
     assert.equal(saved.colorOverride, "research");
@@ -363,7 +364,7 @@ app.whenReady().then(async () => {
     assert.equal(saved.acceptedSeconds, 1500);
     assert.ok(
       await js(
-        "Number(document.querySelector('.harvest-sync [role=progressbar]').getAttribute('aria-valuenow'))<100"
+        "Number(document.querySelector('.records-section .sync-progress[role=progressbar]').getAttribute('aria-valuenow'))<100"
       )
     );
     await js("document.querySelector('.quad-iu .chip').click()");
@@ -372,14 +373,14 @@ app.whenReady().then(async () => {
       async () => (await stored()).active?.task.planId === task.planId
     );
     assert.equal(
-      await js("!!document.querySelector('.harvest-sync.busy')"),
+      await js("!!document.querySelector('.records-section .sync-progress.busy')"),
       true
     );
     releaseSync();
     releaseSync = null;
     syncMode = "instant";
     await until(
-      "document.querySelector('.harvest-sync.done [role=progressbar]')?.getAttribute('aria-valuenow')==='100'"
+      "!document.querySelector('.sync-progress')"
     );
     assert.equal(archiveCount, 1);
     assert.equal(
@@ -391,14 +392,15 @@ app.whenReady().then(async () => {
     checks.push(
       "supplement category local/cloud unchanged accounting, true receipt progress, focus remains usable"
     );
-    // A failed focus write never gives a done animation and retains the original row.
+    // A failed write leaves a quiet header status and retains the original row.
     syncMode = "fail";
     await click("补记");
     await set("#manual-task", task.id, "change");
     await click("保存补记");
-    await until("!!document.querySelector('.harvest-sync.error')");
+    await click("手动同步");
+    await until("!!document.querySelector('.records-section .sync-progress.error')");
     assert.equal(
-      await js("!!document.querySelector('.harvest-sync.done')"),
+      await js("!!document.querySelector('.sync-progress.done')"),
       false
     );
     assert.equal(
@@ -407,7 +409,7 @@ app.whenReady().then(async () => {
     );
     syncMode = "instant";
     await js(
-      "document.querySelector('.harvest-sync.error button').click()"
+      "document.querySelector('[aria-label=\"手动同步\"]').click()"
     );
     await until(async () =>
       (await stored()).records.every((r) => r.cloudSynced)
