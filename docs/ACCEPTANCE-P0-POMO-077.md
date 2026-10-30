@@ -14,8 +14,18 @@ SyncFailures沿用原revision防重放key并保存该次错误；按source和当
 
 ## 限制与当前个人状态
 
-个人09:23–09:55记录的首次云端拒绝原因尚unknown；旧版没有持久化该异常，现场读取未得到原文，现有一致性备份日期早于该记录。没有读个人LevelDB、解密凭证、调用真实业务API或删记录，不冒称已同步成功。用户随后要求解除黄色监听外框，已reset桌面读取会话；之后不再读取或控制个人App。新版先提供可见原错误及安全重试，用户自主加载后才可取得具体原因并继续针对性修复。
+个人09:23–09:55记录的首次云端拒绝原因仍unknown；旧版没有持久化该异常，现场读取未得到原文，现有一致性备份日期早于该记录。没有读个人LevelDB、解密凭证、调用真实业务API或删记录。用户随后要求解除黄色监听外框，已reset桌面读取会话；之后不再读取或控制个人App。
+
+2026-10-30，本地116包准备并明确请用户自主加载后，用户回报：“已重启，重新同步后，同步完成”。据此记录个人积压已恢复（用户验证），不冒称Agent再次读取过个人云端或已追溯首次失败根因。未自动关闭、暂停、安装或重启个人App；实际更新/重试由用户完成。
 
 Learning-Review: none；本轮是既有失败revision保护的诊断信息和UI修补，个人失败根因尚未查明，不能把假设记录为可复用教训。
 
-独立复核、冻结版本与本地/公开发行证据待补；本任务个人积压恢复尚未完成。
+## 冻结与交付
+
+review_history_append在冻结3eee793cfffb1be6ab8f684523f0969b5d0f3512独立只读复核PASS、纯测试3/3；确认失败source/revision、原ID、原计时和静默详情保护，无阻断或新Learning。其局限为诊断进程内保存，以及异源迟到进度有源码和纯测试旁证、未在新增桌面夹具动态重演；未冒充覆盖。p077-build-final.txt干净来源同上述SHA/preview116；p077-recovery-final.txt及p077-failures-final.txt在该构建通过。
+
+release116-package-acceptance.json：278成品文件逐字节匹配、原生资源齐备、成品随机profile隐藏静音smoke exit0；NSIS85,847,989字节/SHA256 2b29cda34d31fcd04a41816641f12a4bab7f3188200e66a5df0d181d4809ab2e，feed大小与SHA512一致。release116-local-stage.json先准备、local-reread.json再读alreadyPrepared=true，随后才公开。
+
+release116-draft-verify.txt/public-verify.txt：Release428719328五资产uploaded、大小/摘要一致，固定annotated tag指向3eee793，草稿/公开asset IDs不变，旧115未改，Latest仍51。地址https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.116 。p077-source-push.txt为非强制公开源码同步，最终仅本卡/验收文档补用户验证和交付，不重打包或修改tag。
+
+release116-before-update.json/live-update.json来自实际115 ASAR提取的原updater，在隔离profile中先确认115 current，再确认116 available；previousSource27a1f5e、errors=[]、downloads=0、autoDownload=false、autoInstallOnAppQuit=false，setup/feed一致。辅助脚本沿旧模板最后一行纯打印仍写public114，结构化previousVersion及提取源已核为115，不据旧打印冒认版本。
