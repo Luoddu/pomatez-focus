@@ -4356,6 +4356,21 @@ button.stats-range-label:hover {
   transition: none;
 }
 .sync-progress.error { color: #8e8173; }
+.sync-details { position: relative; font-size: 12px; font-weight: normal; }
+.sync-details summary { cursor: pointer; list-style: none; }
+.sync-details summary::-webkit-details-marker { display: none; }
+.sync-details[open] { z-index: 20; }
+.sync-error-details {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  width: min(340px, 82vw); box-sizing: border-box; padding: 12px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card, #fff); color: var(--text); line-height: 1.6;
+  box-shadow: 0 5px 18px #25304a14; overflow-wrap: anywhere;
+  max-height: 45vh; overflow-y: auto;
+}
+.sync-error-details ul { padding-left: 18px; margin: 7px 0; }
+.sync-error-details li + li { margin-top: 7px; }
+.sync-error-details small { color: var(--muted); }
 .records-section .side-title-actions { flex-wrap: wrap; justify-content: flex-end; row-gap: 3px; }
 @media (max-width: 620px) {
   .routine-panel {

@@ -68,6 +68,7 @@ import {
 } from "./week";
 import { CompletionQueue } from "./completionQueue";
 import { QuietSync, LocalMutation } from "./quietSync";
+import { SyncFailures } from "./syncFailures";
 import { playTimeUp } from "./sound";
 import {
   shouldGenerateSilently,
@@ -333,13 +334,14 @@ export default function FocusApp() {
   const queueFailed = queued.filter((e) => e.state === "failed");
   const refreshSequence = useRef(0);
   const syncing = useRef(false);
-  const failedRecordWrites = useRef(new Set<string>());
+  const failedRecordWrites = useRef(new SyncFailures());
   const classifyRequested = useRef(new Set<string>());
   const manualSyncRequested = useRef(new Set<string>());
   const initialHistorySource = useRef<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
-  const [harvestProgress, setHarvestProgress] =
-    useState<HarvestProgress | null>(null);
+  const [harvestProgress, writeHarvestProgress] =
+    useState<(HarvestProgress & {source:string|null}) | null>(null);
+  const setHarvestProgress = (progress:HarvestProgress) => writeHarvestProgress({...progress,source:sourceKey});
   const [editQueue] = useState(() => new EditQueue(localStorage));
   const [captureTitle,setCaptureTitle]=useState("");
   const [editRevision, setEditRevision] = useState(0);
@@ -751,16 +753,17 @@ export default function FocusApp() {
       text: "正在核对本机成果",
       state: "busy",
     });
+    const failures: string[] = [];
+    const remainingFailures = () => [...failedRecordWrites.current.messages(sourceKey,timer.getSnapshot().records),...failures];
+    let phase = "核对本机备份";
     try {
-      const attemptKey = (r: FocusSession) => JSON.stringify([sourceKey,r.id,r.revision,r.colorRevision,r.startedAt,r.endedAt,r.acceptedSeconds,r.completedCount]);
       const eligible = (r: FocusSession) =>
         !r.task.quickTask &&
         !r.cloudSynced &&
-        !failedRecordWrites.current.has(attemptKey(r)) &&
+        !failedRecordWrites.current.has(sourceKey,r) &&
         (r.task.source === "local" || r.task.sourceKey === sourceKey);
       if (timer.getSnapshot().records.some(eligible))
         await api().backupHistory(timer.getSnapshot());
-      const failures: string[] = [];
       const attempted = new Set<string>();
       let complete = 0;
       let interrupted = false;
@@ -782,6 +785,7 @@ export default function FocusApp() {
           if (!syncAllowed()) { interrupted = true; break; }
           if (attempted.has(record.id)) continue;
           attempted.add(record.id);
+          let recordPhase = record.sync === "pending" ? "写回番茄记录" : "共享专注明细";
           try {
             let receipt: any;
             if (record.sync === "pending") {
@@ -803,6 +807,7 @@ export default function FocusApp() {
               };
             }
             if (!syncAllowed()) { interrupted = true; break; }
+            recordPhase = "共享专注明细";
             progress("正在共享专注明细", 0.55);
             const archived = await api().archiveHistory(record);
             timer.mergeCloud([archived], sourceKey);
@@ -822,8 +827,9 @@ export default function FocusApp() {
                 }`
               );
           } catch (e: any) {
-            failedRecordWrites.current.add(attemptKey(record));
-            failures.push(e.message || "一条专注记录未能同步");
+            const time = (value:number) => new Date(value).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false});
+            failedRecordWrites.current.add(sourceKey,record,
+              `${time(record.startedAt)}–${time(record.endedAt!)}「${parseTitle(record.task.title).name}」${recordPhase}失败：${e.message || "未返回错误原因"}`);
           }
         }
       } while (syncAllowed() &&
@@ -832,11 +838,14 @@ export default function FocusApp() {
           .records.some((r) => eligible(r) && !attempted.has(r.id))
       );
       if (interrupted || (classify && !syncAllowed())) {
-        setHarvestProgress({percent:100,text:"改动已保存 · 安静5分钟后继续同步",state:"done"});
+        const errors = remainingFailures();
+        setHarvestProgress({percent:100,text:"改动已保存 · 安静5分钟后继续同步",state:errors.length?"error":"done",errors});
         return;
       }
       let classified = 0;
       if (classify && api().classifyHistory) {
+        phase = "核对旧记录分类";
+        setHarvestProgress({percent:83,text:"正在核对旧记录分类",state:"busy"});
         classifyRequested.current.delete(sourceKey);
         try {
           const result = await api().classifyHistory();
@@ -854,35 +863,40 @@ export default function FocusApp() {
         text: "正在回读飞书成果",
         state: "busy",
       });
+      phase = "回读飞书成果";
       const remote = await api().history();
       if (remote.sourceKey !== sourceKey)
         throw Error("飞书连接已变化，请重新同步");
       timer.mergeCloud(remote.records, sourceKey);
+      phase = "回读每日复盘";
       await refreshReviews();
       setHarvestProgress({
         percent: 93,
         text: "成果已回读 · 正在刷新看板",
         state: "busy",
       });
+      phase = "刷新四象限任务";
       await refresh();
       if (remote.missing)
         failures.push(
           `还有 ${remote.missing} 条旧专注缺少完整明细，请在原电脑运行新版并同步。`
         );
+      const errors = remainingFailures();
       if (manualSyncRequested.current.delete(sourceKey)) notify(
-        failures.length
-          ? `已同步可处理的成果，仍有待处理项：${failures[0]}`
+        errors.length
+          ? `已同步可处理的成果，仍有待处理项：${errors[0]}`
           : classified
           ? `已同步，并为 ${classified} 条旧记录补上项目颜色。`
           : "专注成果已同步，其他电脑同步后即可查看。",
-        failures.length ? "error" : "info"
+        errors.length ? "error" : "info"
       );
       setHarvestProgress(
-        failures.length
+        errors.length
           ? {
               percent: 93,
               text: "部分成果待处理 · 本机记录保留",
               state: "error",
+              errors,
             }
           : {
               percent: 100,
@@ -893,10 +907,12 @@ export default function FocusApp() {
             }
       );
     } catch (e: any) {
+      const errors = [...remainingFailures(),`${phase}失败：${e.message || "未返回错误原因"}`];
       setHarvestProgress({
         percent: 0,
         text: "暂未完成同步 · 本机成果保留",
         state: "error",
+        errors,
       });
       if (manualSyncRequested.current.delete(sourceKey)) notify(`记录已保存在本机，待同步：${e.message}`, "error");
     } finally {
@@ -923,7 +939,7 @@ export default function FocusApp() {
     if (!sourceKey) return;
     manualSyncRequested.current.add(sourceKey);
     if (classify) classifyRequested.current.add(sourceKey);
-    failedRecordWrites.current.clear();
+    failedRecordWrites.current.retry(sourceKey);
     quietSync.observe(collectMutations());
     quietSync.flush(sourceKey);
     if (editQueue.entries.some(e => e.sourceKey === sourceKey && e.state === "failed")) editQueue.retry(sourceKey);
@@ -2136,7 +2152,7 @@ export default function FocusApp() {
             pendingCount={historyPending.length}
             canSync={connected && !!api()}
             syncBusy={syncBusy}
-            syncProgress={harvestProgress}
+            syncProgress={harvestProgress?.source === sourceKey ? harvestProgress : null}
             activeStartedAt={active?.startedAt}
             onSync={() => {
               requestSync(true);

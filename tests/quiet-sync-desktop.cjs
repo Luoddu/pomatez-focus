@@ -23,7 +23,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms)),deadline=setTimeout(()=>app.exit
 app.whenReady().then(async()=>{try{
  let win;const until=async f=>{for(let i=0;i<200;i++){if(await f())return;await wait(25)}throw Error('Timeout '+f)};
  await until(()=>{win=BrowserWindow.getAllWindows()[0];return win&&!win.webContents.isLoadingMainFrame()&&readers.length});
- const js=s=>win.webContents.executeJavaScript(s,true),base=new Date(2026,9,28,7).getTime(),checks=[];
+ const js=s=>win.webContents.executeJavaScript(s,true),base=new Date().setHours(7,0,0,0),checks=[];
  await js(`window.__now=${base+(phase==='resume'?1680000:0)};{const Original=Date;window.Date=class extends Original{constructor(...a){super(...(a.length?a:[window.__now]))}static now(){return window.__now}}};void 0`);
  initial=false;readers.splice(0).forEach(r=>r());
  const advance=async ms=>{await js(`window.__now=${base+ms};window.dispatchEvent(new Event('focus'))`);await wait(100)};
