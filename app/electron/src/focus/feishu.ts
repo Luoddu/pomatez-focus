@@ -496,17 +496,81 @@ export class Feishu {
       .filter((p) => p.name);
     return { link: links[0], projects };
   }
-  async projects() {
+  private async projectTaskTable() {
     const schema = await this.planSchema();
     const linkedTable = schema.fields.find(
       (f) => f.field_name === this.config.taskField
     )?.property?.table_id;
     if (!linkedTable) throw Error("原番茄表缺少任务关联");
-    const catalog = await this.projectCatalog(linkedTable);
+    return id(linkedTable);
+  }
+  async projects() {
+    const catalog = await this.projectCatalog(await this.projectTaskTable());
+    if (!catalog.link) throw Error("任务表缺少可用的“所属项目”关联字段");
     return {
       sourceKey: connectionKey(this.config),
       projects: catalog.projects,
     };
+  }
+  private async taskProjectContext(input: {sourceKey: string; taskId: string}) {
+    const sourceKey = connectionKey(this.config);
+    if (input?.sourceKey !== sourceKey) throw Error("飞书连接已变化，请重新打开任务");
+    const taskId = id(input.taskId);
+    const taskTable = await this.projectTaskTable();
+    const catalog = await this.projectCatalog(taskTable);
+    if (!catalog.link) throw Error("任务表缺少可用的“所属项目”关联字段");
+    const projectTable = id(catalog.link.property.table_id);
+    const route = `${this.root()}/tables/${taskTable}/records/${taskId}`;
+    const read = async () => {
+      const result = await this.call("GET", route);
+      const record = result.data?.record;
+      if (record?.record_id !== taskId || !record.fields) throw Error("飞书任务不存在或无法读取");
+      const value = record.fields[catalog.link.field_name];
+      if (value == null) return [];
+      const links = Array.isArray(value) ? value : [value];
+      for (const link of links) {
+        if (typeof link === "string") {
+          id(link);
+        } else {
+          if (!link || (link.table_id && link.table_id !== projectTable))
+            throw Error("无法识别任务当前的项目关联");
+          const refs = Array.isArray(link.record_ids) ? link.record_ids : [link.record_id];
+          refs.forEach(id);
+        }
+      }
+      return linkedRecordIds(value, projectTable).sort();
+    };
+    return {sourceKey, taskTable, projectTable, catalog, route, read};
+  }
+  async taskProjects(input: {sourceKey: string; taskId: string}) {
+    const {sourceKey, taskTable, projectTable, catalog, read} = await this.taskProjectContext(input);
+    return {sourceKey, taskTable, projectTable, projects: catalog.projects, currentIds: await read()};
+  }
+  async updateTaskProject(input: {
+    sourceKey: string; taskId: string; taskTable: string; projectTable: string;
+    currentIds: string[]; projectId: string | null;
+  }, canWrite = () => true) {
+    if (!Array.isArray(input?.currentIds) || input.currentIds.length > 500)
+      throw Error("当前项目关联无效，请重新读取");
+    const before = JSON.stringify(input.currentIds.map(id).sort());
+    const desired = input.projectId === null ? [] : [id(input.projectId)];
+    const {sourceKey, taskTable, projectTable, catalog, route, read} = await this.taskProjectContext(input);
+    if (input.taskTable !== taskTable || input.projectTable !== projectTable)
+      throw Error("任务表或项目表已变化，请重新读取");
+    const project = catalog.projects.find(p => p.id === input.projectId);
+    if (desired.length && !project) throw Error("所选项目已不存在，请重新读取");
+    const expected = JSON.stringify(desired);
+    const actual = JSON.stringify(await read());
+    if (actual !== expected) {
+      if (actual !== before) throw Error("项目归属已在飞书变更，请重新读取");
+      if (!canWrite()) throw Error("飞书连接已变化，请重新打开任务");
+      await this.call("PUT", route, {
+        fields: {[catalog.link.field_name]: desired.length ? desired : null},
+      });
+      if (JSON.stringify(await read()) !== expected)
+        throw Error("飞书项目回读不一致，请重新读取");
+    }
+    return {sourceKey, taskId: input.taskId, projectType: project?.projectType};
   }
   async dailyReviews() {
     const key = connectionKey(this.config);
@@ -1292,6 +1356,7 @@ export class Feishu {
         planId: r.record_id,
         taskId,
         title: `${input.title.trim()} · 第 ${i + 1} 个番茄`,
+        projectEditable: true,
         source: "feishu",
         sourceKey: input.sourceKey,
         quadrant: input.quadrant,
@@ -1409,6 +1474,7 @@ export class Feishu {
           id: row.record_id,
           planId: row.record_id,
           taskId: a.taskId,
+          projectEditable: true,
           title: `${input.title} · 第 ${a.sequence} 个番茄`,
           description: a.description,
           source: "feishu",
@@ -1613,6 +1679,7 @@ export class Feishu {
         id: r.record_id,
         planId: r.record_id,
         taskId: refs[0] || "",
+        projectEditable: refs.length === 1 && linkedById.has(refs[0]) && !free,
         title: free
           ? FREE_TITLE
           : `${title} · 第 ${plain(r.fields["番茄"]) || "?"} 个番茄`,
@@ -1647,6 +1714,7 @@ export class Feishu {
         id: `done-${key}`,
         planId: "",
         taskId: key,
+        projectEditable: refs.length === 1 && linkedById.has(refs[0]),
         title: taskTitle(refs, sample.fields[this.config.taskField]),
         ...(taskDescription(refs)
           ? { description: taskDescription(refs) }

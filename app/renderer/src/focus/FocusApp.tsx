@@ -980,15 +980,39 @@ export default function FocusApp() {
       state: "pending",
     });
   };
+  const projectCache = useRef<{source: string; expires: number; request: Promise<FocusProject[]>} | null>(null);
   const loadProjects = useCallback(async (): Promise<
     FocusProject[]
   > => {
-    if (!sourceKey || !api()) return [];
-    const result = await api().projects();
-    if (result.sourceKey !== sourceKey)
-      throw Error("飞书连接已变化，请重新打开新增任务");
-    return result.projects;
+    if (!sourceKey || !api()) throw Error("请先连接飞书以选择项目");
+    const cached = projectCache.current;
+    if (cached?.source === sourceKey && Date.now() < cached.expires) return cached.request;
+    const request: Promise<FocusProject[]> = api().projects().then((result: {sourceKey: string; projects: FocusProject[]}) => {
+      if (result.sourceKey !== sourceKey) throw Error("飞书连接已变化，请重新打开表单");
+      if (projectCache.current?.request === request) projectCache.current.expires = Date.now() + 60000;
+      return result.projects;
+    }).catch((error: unknown) => {
+      if (projectCache.current?.request === request) projectCache.current = null;
+      throw error;
+    });
+    projectCache.current = {source: sourceKey, request, expires: Infinity};
+    return request;
   }, [sourceKey]);
+  useEffect(() => {
+    if (sourceKey) void loadProjects().catch(() => {});
+  }, [sourceKey, loadProjects]);
+  const applyTaskProject = (receipt: {sourceKey: string; taskId: string; projectType?: ProjectType}) => {
+    if (taskScope.current !== `${receipt.sourceKey}|${taskDay()}`) return;
+    ++refreshSequence.current;
+    setLoadingTasks(false);
+    const fresh = tasksRef.current.map(task => task.projectEditable && task.sourceKey === receipt.sourceKey && task.taskId === receipt.taskId
+      ? {...task, projectType: receipt.projectType}
+      : task);
+    tasksRef.current = fresh;
+    writeTaskSnapshot(localStorage, receipt.sourceKey, fresh);
+    setTasks(fresh);
+    notify("所属项目已更新");
+  };
   const editRecord = (before: FocusSession, after: FocusSession) => {
     if (!connected || !sourceKey || !api()) {
       if (before.task.source !== "local" || before.cloudSynced)
@@ -2083,6 +2107,7 @@ export default function FocusApp() {
               completing={""}
               onAddTask={addQuickTask}
               loadProjects={loadProjects}
+              onTaskProjectSaved={connected && sourceKey ? applyTaskProject : undefined}
               records={shownRecords}
               weights={weights}
               journalSource={sourceKey || ""}

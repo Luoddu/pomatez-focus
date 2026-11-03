@@ -32,6 +32,8 @@ export default function QuickTaskEntry({
     if (!loadProjects) return;
     setLoading(true);
     setProjectError("");
+    setProjects([]);
+    setProjectId("");
     loadProjects()
       .then((rows) => {
         if (!cancelled) setProjects(rows);
@@ -53,6 +55,7 @@ export default function QuickTaskEntry({
       className="quick-task-form"
       onSubmit={(e) => {
         e.preventDefault();
+        if (initial && loading) return;
         try {
           if (!title.trim() || title.trim().length > 200)
             throw Error("请输入 1–200 字的任务名称");
@@ -86,9 +89,10 @@ export default function QuickTaskEntry({
         <select
           aria-label="新增任务所属项目"
           value={projectId}
+          disabled={loading || !!projectError || !projects.length}
           onChange={(e) => setProjectId(e.target.value)}
         >
-          <option value="">暂不归属（浅灰）</option>
+          <option value="">{loading ? "正在读取项目…" : projectError ? "项目读取失败" : "暂不归属（浅灰）"}</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -100,7 +104,10 @@ export default function QuickTaskEntry({
         </select>
       </label>
       {loading && (
-        <small role="status">正在读取飞书项目，仍可先添加任务</small>
+        <small role="status">正在读取飞书项目，确认后可选择所属项目。</small>
+      )}
+      {!loading && !projectError && loadProjects && !projects.length && (
+        <small role="status">飞书项目表暂无可选项目。</small>
       )}
       {projectError && (
         <small role="status">
@@ -126,7 +133,7 @@ export default function QuickTaskEntry({
             onChange={(e) => setCount(Number(e.target.value))}
           />
         </label>
-        <button className="btn-small" type="submit">
+        <button className="btn-small" type="submit" disabled={!!initial && loading}>
           {initial ? "确认整理" : "添加"}
         </button>
         <button className="btn-text" type="button" onClick={onClose}>

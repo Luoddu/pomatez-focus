@@ -19,6 +19,7 @@ export type FocusTask = {
   source: "local" | "feishu";
   planId?: string;
   taskId?: string;
+  projectEditable?: boolean;
   sourceKey?: string;
   quickTask?: { id: string; sequence: number };
   // free=自由番茄；done=今日已全部完成的占位行；pending=± 乐观更新的临时行

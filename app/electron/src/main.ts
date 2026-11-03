@@ -196,6 +196,8 @@ else {
       handler("adjustToday", (value) => service.adjustToday(value));
       handler("removePlan", (value) => service.removePlan(value));
       handler("projects", () => service.projects());
+      handler("taskProjects", (value) => service.taskProjects(value));
+      handler("updateTaskProject", (value) => service.updateTaskProject(value));
       handler("createQuickTask", (value) =>
         service.createQuickTask(value)
       );

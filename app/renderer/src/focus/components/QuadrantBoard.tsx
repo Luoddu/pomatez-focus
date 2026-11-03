@@ -10,6 +10,7 @@ import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import { chipWindow } from "../chipWindow";
 import FarmField from "./FarmField";
 import TaskTitle from "./TaskTitle";
+import TaskProjectEditor, { TaskProjectReceipt } from "./TaskProjectEditor";
 import { effectiveTaskProgress, formatEffective, TomatoWeights } from "../weights";
 import { withTaskCredit, partialProgress } from "../partialTomato";
 
@@ -25,6 +26,7 @@ const GroupList = ({
   onAdjust,
   activeTaskId,
   onComplete,
+  onEditProject,
   completing,
   dragRef,
   boardScope,
@@ -40,6 +42,7 @@ const GroupList = ({
   onAdjust?: (taskId: string, delta: 1 | -1) => void;
   activeTaskId: string;
   onComplete?: (task: FocusTask) => void;
+  onEditProject?: (task: FocusTask) => void;
   completing: string;
   dragRef: React.MutableRefObject<BoardDrag | null>;
   boardScope: string | null;
@@ -51,9 +54,10 @@ const GroupList = ({
 }) => {
   const [hover, setHover] = useState("");
   const [landing, setLanding] = useState<{key: string; after: boolean} | null>(null);
-  // 右键 chip 的上下文菜单：单选项「标记完成」，点别处或右键别处关闭
+  // 任务行与番茄格共用右键菜单，完成操作仅出现在可完成的番茄格。
   const [menu, setMenu] = useState<{
     task: FocusTask;
+    allowComplete: boolean;
     x: number;
     y: number;
   } | null>(null);
@@ -63,6 +67,9 @@ const GroupList = ({
     !task.quickTask &&
     task.kind !== "free" &&
     task.kind !== "pending";
+  const canEditProject = (task: FocusTask) =>
+    !!onEditProject && task.source === "feishu" && task.projectEditable === true && !!task.taskId &&
+    task.sourceKey === boardScope && !task.quickTask && task.kind !== "free";
   return (
     <div className="task-list">
       {groupTasks(tasks).map((group) => {
@@ -98,6 +105,12 @@ const GroupList = ({
             }${landing?.key === group.key ? landing.after ? " drop-after" : " drop-before" : ""}`}
             key={group.key}
             data-task-group={group.key}
+            onContextMenu={(e) => {
+              const task = group.tasks.find(canEditProject);
+              if (!task) return;
+              e.preventDefault();
+              setMenu({task, allowComplete: false, x: e.clientX, y: e.clientY});
+            }}
             onDragOver={(e) => {
               if (!onMove || !dragRef.current || dragRef.current.scope !== boardScope || dragRef.current.key === group.key) return;
               e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect = "move";
@@ -174,11 +187,12 @@ const GroupList = ({
                           disabled={task.kind === "pending"}
                           onClick={() => onSelect(task.id)}
                           onContextMenu={(e) => {
-                            if (!canComplete(task)) return;
+                            if (!canComplete(task) && !canEditProject(task)) return;
                             e.preventDefault();
                             e.stopPropagation();
                             setMenu({
                               task,
+                              allowComplete: canComplete(task),
                               x: e.clientX,
                               y: e.clientY,
                             });
@@ -268,11 +282,11 @@ const GroupList = ({
             className="ctx-menu"
             role="menu"
             style={{
-              left: Math.min(menu.x, window.innerWidth - 140),
-              top: Math.min(menu.y, window.innerHeight - 60),
+              left: Math.max(0, Math.min(menu.x, window.innerWidth - 190)),
+              top: Math.max(0, Math.min(menu.y, window.innerHeight - 90)),
             }}
           >
-            <button
+            {menu.allowComplete && <button
               className="ctx-item"
               role="menuitem"
               disabled={completing === menu.task.id}
@@ -285,7 +299,13 @@ const GroupList = ({
               {completing === menu.task.id
                 ? "正在完成…"
                 : "标记完成（不计专注时间）"}
-            </button>
+            </button>}
+            {canEditProject(menu.task) && (
+              <button className="ctx-item" role="menuitem" onClick={() => {
+                onEditProject!(menu.task);
+                setMenu(null);
+              }}>修改所属项目</button>
+            )}
           </div>
         </div>
       )}
@@ -319,6 +339,7 @@ export default function QuadrantBoard({
   completing,
   onAddTask,
   loadProjects,
+  onTaskProjectSaved,
   records,
   weights,
   journalSource,
@@ -359,6 +380,7 @@ export default function QuadrantBoard({
     project?: FocusProject
   ) => void;
   loadProjects?: () => Promise<FocusProject[]>;
+  onTaskProjectSaved?: (receipt: TaskProjectReceipt) => void;
   records: FocusSession[];
   weights?: TomatoWeights;
   journalSource: string;
@@ -370,6 +392,7 @@ export default function QuadrantBoard({
   capture?: React.ReactNode;
 }) {
   const [adding, setAdding] = useState<FocusQuadrant | null>(null);
+  const [projectTask, setProjectTask] = useState<FocusTask | null>(null);
   const dragRef = useRef<BoardDrag | null>(null);
   const [dragging, setDragging] = useState("");
   const [overQuadrant, setOverQuadrant] = useState<FocusQuadrant | null>(null);
@@ -384,6 +407,9 @@ export default function QuadrantBoard({
   const rows = [QUADRANTS.slice(0, 2), QUADRANTS.slice(2, 4)];
   return (
     <div className="left-col">
+      {projectTask && projectTask.sourceKey === boardScope && onTaskProjectSaved && (
+        <TaskProjectEditor task={projectTask} onClose={() => setProjectTask(null)} onSaved={onTaskProjectSaved} />
+      )}
       {capture}
       <div className={`quadrants${dragging ? " is-dragging" : ""}`}>
         {rows.map((row) => {
@@ -443,6 +469,7 @@ export default function QuadrantBoard({
                       onAdjust={onAdjust}
                       activeTaskId={activeTaskId}
                       onComplete={onComplete}
+                      onEditProject={onTaskProjectSaved ? setProjectTask : undefined}
                       completing={completing}
                       dragRef={dragRef}
                       boardScope={boardScope}

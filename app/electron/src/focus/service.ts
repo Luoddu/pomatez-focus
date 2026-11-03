@@ -124,6 +124,19 @@ export class FocusService {
   projects() {
     return this.connected().projects();
   }
+  taskProjects(value: Parameters<Feishu["taskProjects"]>[0]) {
+    return this.connected().taskProjects(value);
+  }
+  async updateTaskProject(value: Parameters<Feishu["updateTaskProject"]>[0]) {
+    if (this.planWriting) throw Error("飞书正在同步，请稍后保存项目");
+    this.planWriting = true;
+    try {
+      const client = this.connected();
+      return await client.updateTaskProject(value, () => this.client === client);
+    } finally {
+      this.planWriting = false;
+    }
+  }
   async removePlan(value: any) {
     if (this.planWriting)
       throw Error("飞书正在同步，减少操作已保留，可稍后重试");

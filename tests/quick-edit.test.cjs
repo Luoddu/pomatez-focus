@@ -213,6 +213,48 @@ test("project affiliation uses existing link and server category, rejects unknow
   );
   assert.equal(h.state.tasks.length, 1);
 });
+test("existing task project is read, updated in isolation, and verified across a lost receipt", async () => {
+  const { client, state, key } = harness();
+  state.fields.tasks.push({field_name: "所属项目", type: 21, property: {table_id: "projects"}});
+  state.fields.projects = [
+    {field_name: "名称", type: 1, is_primary: true},
+    {field_name: "项目类型", type: 3},
+  ];
+  state.projects = [
+    {record_id: "original", fields: {名称: "Original", 项目类型: "科研"}},
+    {record_id: "new", fields: {名称: "New", 项目类型: "项目交付"}},
+  ];
+  state.tasks = [{record_id: "task1", fields: {
+    任务名称: "Existing", 计划日: 123,
+    所属项目: [{table_id: "projects", record_ids: ["original"]}],
+  }}];
+  state.plans = [{record_id: "plan1", fields: {任务: ["task1"], 已完成: true}}];
+  const beforePlans = structuredClone(state.plans);
+  const scope = {sourceKey: key, taskId: "task1"};
+  const choices = await client.taskProjects(scope);
+  assert.deepEqual(choices.currentIds, ["original"]);
+  const input = {...scope, taskTable: choices.taskTable, projectTable: choices.projectTable,
+    currentIds: choices.currentIds, projectId: "new"};
+  await assert.rejects(client.updateTaskProject({...input, sourceKey: "other"}), /连接/);
+  await assert.rejects(client.updateTaskProject({...input, projectTable: "other"}), /项目表/);
+  await assert.rejects(client.updateTaskProject({...input, projectId: "missing"}), /已不存在/);
+  await assert.rejects(client.updateTaskProject({...input, currentIds: []}), /已在飞书变更/);
+  await assert.rejects(client.updateTaskProject(input, () => false), /连接/);
+  assert.equal(state.writes.length, 0);
+  state.lose = "PUT:tasks";
+  await assert.rejects(client.updateTaskProject(input), /response lost/);
+  const receipt = await client.updateTaskProject(input);
+  assert.deepEqual(receipt, {...scope, projectType: "delivery"});
+  assert.equal(state.writes.length, 1);
+  assert.match(state.writes[0].route, /tables\/tasks\/records\/task1$/);
+  assert.deepEqual(state.writes[0].body, {fields: {所属项目: ["new"]}});
+  await client.updateTaskProject({...input, currentIds: ["new"], projectId: null});
+  assert.deepEqual((await client.taskProjects(scope)).currentIds, []);
+  assert.deepEqual(state.writes[1].body, {fields: {所属项目: null}});
+  assert.deepEqual(state.plans, beforePlans);
+  assert.equal(state.tasks[0].fields.任务名称, "Existing");
+  assert.equal(state.tasks[0].fields.计划日, 123);
+});
 test("queued removals keep exact identity across response loss and day change, guard used/moved/wrong-Base rows", async () => {
   const h = harness(),
     day = new Date().setHours(0, 0, 0, 0) - 86400000;
