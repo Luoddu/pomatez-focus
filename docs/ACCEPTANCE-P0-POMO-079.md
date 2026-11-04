@@ -1,6 +1,6 @@
 # P0-POMO-079 验收
 
-状态：产品验证及独立复核通过，交付中。四源预检引用TASK-P0-POMO-079.md。
+状态：DONE；118本地更新已准备，公开发布与旧版更新发现均通过。四源预检引用TASK-P0-POMO-079.md。
 
 - `npm run test:focus:all`：485/485 PASS，证据artifacts/quick-rest-all-tests.txt。
 - 旅程/模板/API/休息/新默认时长定向46/46 PASS；新quick-rest 7组与原rest-log 10组独立复核17/17 PASS。
@@ -12,3 +12,12 @@
 - 回滚：基线e309e46/preview117；撤销本任务源码，不改真实记录；保留旧版本资产。运行目录/端口/用户数据不属于写集。
 
 - 通用桌面21项、进程冷重启、横竖屏14项PASS。旧category-review在等待云端分类处超时，与ACCEPTANCE-P0-POMO-078已通过116公开包复现的已知基线问题相同：旧测试只等待数秒，现行为五分钟安静同步。按当前quiet-sync五进程替代回归全部PASS（write/resume/record/ui/ui-resume），原范围外测试未改。证据artifacts/quick-rest-standard-desktop.txt、quick-rest-quiet-sync.txt。故不宣称旧test:desktop整条命令全部通过。
+
+
+## 最终交付
+
+固定源码633738bab3024d0df1c8f951947d1fc9e84f2f86，干净构建0.1.0-preview.118。独立最终复核PASS：75个构建文件与ASAR逐字节相同；NSIS提取ASAR与成品ASAR同SHA256 6599d4811a50d32bc96dde24bfcb5181e409d5998bcae52bd1db47860ee88b6a；成品ASAR复跑五组交互PASS。
+
+安装包75,511,516字节，SHA256 fd74fa1b886261b7cbe77ec5aebd28035cb17e2897ec3d9b4b5a6980e97a07d1。本机stage-local-update首次准备与重复同字节回读均PASS，没有安装或重启App。源码非force同步、433513569草稿五资产大小/服务端digest逐项匹配后才创建固定annotated tag并立即公开为非Latest prerelease。[118发布](https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.118)。真实117安装包的更新器发现118，errors=[]、downloads=0、autoDownload=false、autoInstallOnAppQuit=false；更新器仅在独立profile运行。主实现验证公开发布，reviewer仅复核本地产品和包一致性，范围不混淆。
+
+证据：artifacts/release118-local.json、release118-remote-verified.json、release118-update-check.txt、quick-rest-package-source.json、quick-rest-package.txt。最终Learning none，理由沿上文。后续仅本回执与任务状态提交，不改变118源码/tag/包。
