@@ -142,6 +142,31 @@ export function quickRest(log: RestLog, plan: Journey, kind: ActualRestKind, now
     presetKey:moving?.presetKey ?? nextPreset(valid,plan,kind), estimated:true};
   return validateRestLog({...valid,events:[...valid.events,event].sort((a,b)=>a.startedAt-b.startedAt)},log.scope);
 }
+// Cancel only the selected event. Compact its contiguous estimated tail, never focus.
+export function cancelRest(log: RestLog, id: string, now: number,
+  records: FocusSession[], active: FocusSession | null): RestLog {
+  const valid = validateRestLog(log,log.scope);
+  const selected = valid.events.find(e => e.id === id);
+  if (!timestamp(now) || !selected || journeyDay(selected.startedAt) !== journeyDay(now))
+    throw Error("休息记录或日期已变化，请刷新后重试");
+  const focus = [...records,...(active ? [active] : [])].filter(r => inScope(r,log.scope));
+  const removed = selected.endedAt === null ? 0 : selected.endedAt-selected.startedAt;
+  let edge = selected.endedAt;
+  const events = valid.events.filter(e => e.id !== id).map(e => {
+    if (e.startedAt < selected.startedAt) return e;
+    if (!removed || !e.estimated || e.endedAt === null || e.startedAt !== edge ||
+        e.afterCount !== selected.afterCount) { edge=null; return e; }
+    const shifted = {...e,startedAt:e.startedAt-removed,endedAt:e.endedAt-removed};
+    if (focus.some(r => (unknownFocus(r) && shifted.endedAt > r.startedAt) ||
+      intervals(r).some(s => shifted.startedAt < s.end && shifted.endedAt > s.start))) {
+      edge=null; return e;
+    }
+    edge=e.endedAt;
+    return shifted;
+  });
+  return validateRestLog({...valid,events},log.scope);
+}
+
 export function completedBeforeRest(records: FocusSession[], scope: string, now: number): number {
   return records.filter(r => r.status === "saved" && journeyDay(r.startedAt) === journeyDay(now) &&
     r.startedAt <= now && (!r.endedAt || r.endedAt <= now) &&

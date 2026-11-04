@@ -56,6 +56,7 @@ export type JourneyControls = {
   ready: boolean;
   active: FocusSession | null;
   restLog: RestLog | null;
+  cancelRestAction: (id: string) => void;
   quickRestAction: (kind: ActualRestKind, beforeSessionId?: string, moveId?: string) => void;
   restAction: (kind: ActualRestKind, finish: boolean) => void;
   restWindow: () => { startedAt: number | null; endedAt: number };
@@ -126,8 +127,10 @@ export default function TodayJourney({
     e.dataTransfer.setData("text/plain", `rest:${kind}`);
     e.dataTransfer.effectAllowed = id ? "move" : "copy";
   };
-  const quick = (kind: ActualRestKind) => attempt(() => {
-    controls.quickRestAction(kind);
+  const quick = (kind: ActualRestKind, toggle = false) => attempt(() => {
+    const recent=controls.restLog?.events.filter(e => e.kind===kind && journeyDay(e.startedAt)===day).slice(-1)[0];
+    if(toggle && recent) controls.cancelRestAction(recent.id);
+    else controls.quickRestAction(kind);
     setRestMenu(null);
   });
   const persist = (next: Journey) => {
@@ -250,7 +253,8 @@ export default function TodayJourney({
         aria-label={`${event.estimated ? "已安排" : event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
         draggable={today && event.endedAt !== null}
         onDragStart={e => dragRest(e,event.kind,event.id)} onDragEnd={() => { restDrag.current=null; setDraggingRest(false); }}
-        onClick={() => { if (today) setRestMenu(event.kind); }} disabled={!today}>
+        onContextMenu={e => { e.preventDefault(); if(today) setRestMenu(event.kind); }}
+        onClick={() => { if(today) attempt(() => controls.cancelRestAction(event.id)); }} disabled={!today}>
         <JourneyRestIcon kind={event.kind} lit />
       </button>
     </span>);
@@ -442,11 +446,11 @@ export default function TodayJourney({
               className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : recent ? " is-recorded" : ""}`}
               data-rest-kind={kind} data-rest-state={state}
               aria-label={ACTUAL_REST[kind].record}
-              title={recent ? `点击追加默认时长；拖到番茄前补记；右键精确记录 · ${recent.estimated ? "已安排" : state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `点击记录${ACTUAL_REST[kind].label}；拖到番茄前补记；右键精确记录`}
+              title={recent ? `再次点击取消并撤回占时；拖到番茄前补记；右键精确记录 · ${recent.estimated ? "已安排" : state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `点击记录${ACTUAL_REST[kind].label}；拖到番茄前补记；右键精确记录`}
               aria-pressed={!!recent} aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
               draggable onDragStart={e => dragRest(e,kind)} onDragEnd={() => { restDrag.current=null; setDraggingRest(false); }}
               onContextMenu={e => { e.preventDefault(); setRestMenu(kind); }}
-              onClick={() => quick(kind)}>
+              onClick={() => quick(kind, true)}>
               <JourneyRestIcon kind={kind} lit={!!recent} />
               {ongoing?.kind === kind && <small role="timer">{restClock(ongoing, restNow)}</small>}
             </button>})}
@@ -514,9 +518,6 @@ export default function TodayJourney({
       )}
       {plan && (
         <>
-          {today && actualRests.some(e => e.estimated) && <div className="journey-note" data-next-focus-time>
-            下个番茄预计 {journeyClock(Math.max(Date.now(), ...actualRests.map(e => e.endedAt ?? e.startedAt)))} · 生活时长按估算，可直接开始专注
-          </div>}
           <div className="journey-stages">
             {actualAt(0)}
             {shownPlan!.stages.map((s, i) => (

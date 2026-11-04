@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {newJourney,journeyDay,journeyTimeline} from "../app/renderer/src/focus/journey.js";
-import {quickRest,closeRest,readRestLog,writeRestLog,defaultRestMinutes} from "../app/renderer/src/focus/restLog.ts";
+import {quickRest,closeRest,readRestLog,writeRestLog,defaultRestMinutes,cancelRest} from "../app/renderer/src/focus/restLog.ts";
 const at=(h,m=0)=>new Date(2026,10,4,h,m).getTime();
 const plan=()=>newJourney("local",journeyDay(at(12)),()=>crypto.randomUUID());
 const blank=()=>({version:2,scope:"local",events:[]});
@@ -66,4 +66,29 @@ test("legacy/native ongoing rests close atomically and allow one-click switching
   assert.equal(ongoing.events[0].endedAt,null);
   const finished=quickRest(ongoing,p,'meal',at(14,30),records,null,'unused');
   assert.equal(finished.events.length,1);assert.equal(finished.events[0].endedAt,at(14,30));
+});
+
+test("cancel removes selected time and compacts only contiguous estimates; can select again",()=>{
+ const p=plan();let log=quickRest(blank(),p,'meal',at(14,25),records,null,'m');
+ log=quickRest(log,p,'nap',at(14,25),records,null,'n');
+ const raw=JSON.stringify(records),before=JSON.stringify(log);
+ const next=cancelRest(log,'m',at(14,25),records,null);
+ assert.equal(next.events.length,1);assert.equal(next.events[0].id,'n');
+ assert.equal(next.events[0].startedAt,at(14));assert.equal(next.events[0].endedAt,at(14,50));
+ assert.equal(JSON.stringify(log),before);assert.equal(JSON.stringify(records),raw);
+ const empty=cancelRest(next,'n',at(14,25),records,null);assert.equal(empty.events.length,0);
+ assert.equal(quickRest(empty,p,'meal',at(14,25),records,null,'m2').events[0].endedAt,at(14,30));
+});
+test("cancel never shifts across an anchor, real rest, focus interval or stale day",()=>{
+ const e=(id,kind,start,end,extra={})=>({id,kind,startedAt:start,endedAt:end,afterCount:1,presetKey:null,estimated:true,...extra});
+ const first=e('m','meal',at(11),at(11,30));
+ for(const last of [e('n','nap',at(11,30),at(12,20),{afterCount:2}),e('n','nap',at(11,30),at(12,20),{estimated:undefined}),e('n','nap',at(12),at(12,50))]) {
+  const log={...blank(),events:[first,last]};const next=cancelRest(log,'m',at(15),records,null);assert.equal(next.events[0].startedAt,last.startedAt);
+ }
+ const overlappingFocus=record('overlap',at(11),at(11,20));
+ const next=cancelRest({...blank(),events:[first,e('n','nap',at(11,30),at(12,20))]},'m',at(15),[overlappingFocus],null);
+ assert.equal(next.events[0].startedAt,at(11,30));
+ assert.throws(()=>cancelRest({...blank(),events:[first]},'missing',at(15),records,null),/变化/);
+ assert.throws(()=>cancelRest({...blank(),events:[first]},'m',at(15)+86400000,records,null),/日期/);
+ assert.equal(cancelRest({...blank(),events:[{...first,endedAt:null}]},'m',at(15),records,null).events.length,0);
 });
