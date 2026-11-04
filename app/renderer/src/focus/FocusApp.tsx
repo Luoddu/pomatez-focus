@@ -76,7 +76,7 @@ import {
 } from "./silentgen";
 import "./focus.css";
 import { readRefresh, writeRefresh, refreshDue, refreshAttempt, refreshFailed, nextRefreshDelay, refreshLabel, refreshBoundary, RefreshStamp } from "./dailyRefresh";
-import { ActualRestKind, RestLog, readRestLog, writeRestLog, openRest, closeRest, startRest, completedBeforeRest, restBackfillWindow, backfillRest } from "./restLog";
+import { ActualRestKind, RestLog, readRestLog, writeRestLog, openRest, closeRest, startRest, completedBeforeRest, restBackfillWindow, backfillRest, quickRest } from "./restLog";
 
 // 仅未连接飞书时使用的演示数据，方便离线演示与截图
 const demo: FocusTask[] = [
@@ -1696,7 +1696,7 @@ export default function FocusApp() {
   const withRestEnd = (action: () => void, verified: () => boolean) => {
     if (!connectionReady || !timer.ready || timer.blocked) throw Error("计时记录尚未就绪");
     const previous = readRestLog(localStorage, restScope);
-    const changed = !!openRest(previous);
+    const changed = !!openRest(previous) || previous.events.some(e => e.estimated && e.endedAt !== null && e.endedAt > Date.now());
     const next = changed ? writeRestLog(localStorage, closeRest(previous, Date.now())) : previous;
     try {
       action();
@@ -1737,6 +1737,14 @@ export default function FocusApp() {
       throw error;
     }
     setActualRestLog(persisted);
+  };
+  const quickRestAction = (kind: ActualRestKind, beforeSessionId?: string, moveId?: string) => {
+    if (!connectionReady || !timer.ready || timer.blocked) throw Error("旅程尚未就绪");
+    const snapshot = timer.getSnapshot(), previous = readRestLog(localStorage, restScope);
+    const now = Date.now(), plan = readJourney(localStorage, restScope, journeyDay(now));
+    const next = quickRest(previous, plan, kind, now, snapshot.records, snapshot.active,
+      crypto.randomUUID(), beforeSessionId, moveId);
+    setActualRestLog(writeRestLog(localStorage, next));
   };
   const restWindow = () => {
     if (!connectionReady || !timer.ready || timer.blocked) throw Error("旅程尚未就绪");
@@ -2125,6 +2133,7 @@ export default function FocusApp() {
               active: timer.active,
               restLog: actualRestLog?.scope === restScope ? actualRestLog : null,
               restAction,
+              quickRestAction,
               restWindow,
               saveRestBackfill,
               onPlan: reportJourney,

@@ -56,6 +56,7 @@ export type JourneyControls = {
   ready: boolean;
   active: FocusSession | null;
   restLog: RestLog | null;
+  quickRestAction: (kind: ActualRestKind, beforeSessionId?: string, moveId?: string) => void;
   restAction: (kind: ActualRestKind, finish: boolean) => void;
   restWindow: () => { startedAt: number | null; endedAt: number };
   saveRestBackfill: (kind: ActualRestKind, startedAt: number, endedAt: number) => void;
@@ -117,6 +118,18 @@ export default function TodayJourney({
   }, [restMenu]);
   const ref = useRef<Journey | null>(null);
   const drag = useRef<string | null>(null);
+  const [draggingRest, setDraggingRest] = useState(false);
+  const restDrag = useRef<{kind:ActualRestKind; id?:string} | null>(null);
+  const dragRest = (e: React.DragEvent, kind: ActualRestKind, id?: string) => {
+    restDrag.current = {kind,id};
+    setDraggingRest(true);
+    e.dataTransfer.setData("text/plain", `rest:${kind}`);
+    e.dataTransfer.effectAllowed = id ? "move" : "copy";
+  };
+  const quick = (kind: ActualRestKind) => attempt(() => {
+    controls.quickRestAction(kind);
+    setRestMenu(null);
+  });
   const persist = (next: Journey) => {
     const valid = writeJourney(localStorage, next);
     ref.current = valid;
@@ -224,7 +237,7 @@ export default function TodayJourney({
   const actualRests = controls.restLog?.events.filter(e => journeyDay(e.startedAt) === day) || [];
   const restDetails = (event: RestEvent) => {
     const when = (at: number) => new Date(at).toLocaleTimeString("zh-CN", {hour12:false});
-    return `${ACTUAL_REST[event.kind].label} · ${when(event.startedAt)}—${event.endedAt === null ? "进行中" : when(event.endedAt)} · ${restClock(event, restNow)} · 第${event.afterCount}个番茄后`;
+    return `${ACTUAL_REST[event.kind].label}${event.estimated ? "（估算）" : ""} · ${when(event.startedAt)}—${event.endedAt === null ? "进行中" : when(event.endedAt)} · ${restClock(event, restNow)} · 第${event.afterCount}个番茄后`;
   };
   const actualAt = (position: number) => actualRests
     .filter(e => Math.min(e.afterCount, slots.length) === position)
@@ -233,8 +246,10 @@ export default function TodayJourney({
         data-rest-event={event.id} data-after-count={event.afterCount}
         data-preset-key={event.presetKey || ""} data-rest-kind={event.kind}
         data-rest-state={event.endedAt === null ? "ongoing" : "completed"}
-        title={`${event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
-        aria-label={`${event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
+        title={`${event.estimated ? "已安排" : event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
+        aria-label={`${event.estimated ? "已安排" : event.endedAt === null ? "正在进行" : "已完成"} · ${restDetails(event)}`}
+        draggable={today && event.endedAt !== null}
+        onDragStart={e => dragRest(e,event.kind,event.id)} onDragEnd={() => { restDrag.current=null; setDraggingRest(false); }}
         onClick={() => { if (today) setRestMenu(event.kind); }} disabled={!today}>
         <JourneyRestIcon kind={event.kind} lit />
       </button>
@@ -424,13 +439,15 @@ export default function TodayJourney({
               const recent = ongoing?.kind === kind ? ongoing : actualRests.filter(event => event.kind === kind).slice(-1)[0];
               const state = recent ? recent.endedAt === null ? "ongoing" : "completed" : "planned";
               return <button key={kind}
-              className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : ""}`}
+              className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : recent ? " is-recorded" : ""}`}
               data-rest-kind={kind} data-rest-state={state}
               aria-label={ACTUAL_REST[kind].record}
-              title={recent ? `${state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `记录实际${ACTUAL_REST[kind].label}`}
-              aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
-              onClick={() => { setRestMenu(restMenu === kind ? null : kind); setError(""); }}>
-              <JourneyRestIcon kind={kind} />
+              title={recent ? `点击追加默认时长；拖到番茄前补记；右键精确记录 · ${recent.estimated ? "已安排" : state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `点击记录${ACTUAL_REST[kind].label}；拖到番茄前补记；右键精确记录`}
+              aria-pressed={!!recent} aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
+              draggable onDragStart={e => dragRest(e,kind)} onDragEnd={() => { restDrag.current=null; setDraggingRest(false); }}
+              onContextMenu={e => { e.preventDefault(); setRestMenu(kind); }}
+              onClick={() => quick(kind)}>
+              <JourneyRestIcon kind={kind} lit={!!recent} />
               {ongoing?.kind === kind && <small role="timer">{restClock(ongoing, restNow)}</small>}
             </button>})}
             {restMenu && <div className="journey-rest-menu" role="group" aria-label={`${ACTUAL_REST[restMenu].label}选项`}>
@@ -497,6 +514,9 @@ export default function TodayJourney({
       )}
       {plan && (
         <>
+          {today && actualRests.some(e => e.estimated) && <div className="journey-note" data-next-focus-time>
+            下个番茄预计 {journeyClock(Math.max(Date.now(), ...actualRests.map(e => e.endedAt ?? e.startedAt)))} · 生活时长按估算，可直接开始专注
+          </div>}
           <div className="journey-stages">
             {actualAt(0)}
             {shownPlan!.stages.map((s, i) => (
@@ -507,7 +527,7 @@ export default function TodayJourney({
                 key={s.id}
                 data-stage={s.id}
                 onDragOver={(e) => {
-                  if (drag.current) e.preventDefault();
+                  if (drag.current || restDrag.current) e.preventDefault();
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -527,6 +547,16 @@ export default function TodayJourney({
                       (j !== 0 || s.time === null || timeline.end?.kind === "actual");
                     return (
                       <React.Fragment key={p.id}>
+                      {today && actual && <span className={`journey-rest-drop${draggingRest ? " is-visible" : ""}`}
+                        data-rest-drop-before={actual.id} title="拖到这里补记前面的生活空档"
+                        onDragOver={e => { if(restDrag.current) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add("is-over"); } }}
+                        onDragLeave={e => e.currentTarget.classList.remove("is-over")}
+                        onDrop={e => {
+                          e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove("is-over");
+                          const source=restDrag.current;
+                          if(source) attempt(() => controls.quickRestAction(source.kind,actual.id,source.id));
+                          restDrag.current=null; setDraggingRest(false);
+                        }} />}
                       <button
                         key={p.id}
                         data-journey-slot={p.id}
@@ -564,12 +594,19 @@ export default function TodayJourney({
                         }}
                         onDragEnd={() => (drag.current = null)}
                         onDragOver={(e) => {
-                          if (drag.current) e.preventDefault();
+                          if (drag.current || restDrag.current) e.preventDefault();
                         }}
                         onDrop={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (drag.current)
+                          if (restDrag.current) {
+                            const source = restDrag.current;
+                            attempt(() => {
+                              if (!actual) throw Error("请拖到已完成番茄之前的空档");
+                              controls.quickRestAction(source.kind,actual.id,source.id);
+                            });
+                            restDrag.current=null; setDraggingRest(false);
+                          } else if (drag.current)
                             move(drag.current, s.id, p.id);
                           drag.current = null;
                         }}
@@ -631,9 +668,13 @@ export default function TodayJourney({
                         title={
                           resting
                             ? `${REST_LABELS[kind]}中 · 点击结束并继续`
-                            : `${REST_LABELS[kind]} · 点击进入，不强制卡点`
+                            : `${REST_LABELS[kind]} · 点击按默认时长记录，可拖到番茄前补记`
                         }
-                        onClick={() => kind === "meal" || kind === "nap" || kind === "gym" ? setRestMenu(kind) : toggleRest(s.id, n)}
+                        draggable={today && (kind === "meal" || kind === "nap" || kind === "gym")}
+                        onDragStart={e => { if (kind === "meal" || kind === "nap" || kind === "gym") dragRest(e,kind); }}
+                        onDragEnd={() => { restDrag.current=null; setDraggingRest(false); }}
+                        onContextMenu={e => { if (kind === "meal" || kind === "nap" || kind === "gym") { e.preventDefault(); setRestMenu(kind); } }}
+                        onClick={() => kind === "meal" || kind === "nap" || kind === "gym" ? quick(kind) : toggleRest(s.id, n)}
                       >
                         <JourneyRestIcon kind={kind} lit={resting || plan.passedActions.includes(key)} />
                       </button>

@@ -15,6 +15,7 @@ export type RestEvent = {
   endedAt: number | null;
   afterCount: number;
   presetKey: string | null;
+  estimated?: true;
 };
 export type RestLog = { version: 2; scope: string; events: RestEvent[] };
 const MAX_EVENTS = 2048;
@@ -41,7 +42,7 @@ export function validateRestLog(raw: any, scope: string): RestLog {
     ids.add(e.id);
     previousEnd = e.endedAt ?? e.startedAt;
     return { id:e.id, kind:e.kind, startedAt:e.startedAt, endedAt:e.endedAt,
-      afterCount:e.afterCount, presetKey:e.presetKey };
+      afterCount:e.afterCount, presetKey:e.presetKey, ...(e.estimated === true ? {estimated:true as const} : {}) };
   });
   return { version:2, scope, events };
 }
@@ -69,10 +70,77 @@ export function writeRestLog(storage: Storage, log: RestLog): RestLog {
 export const openRest = (log: RestLog | null): RestEvent | undefined =>
   log?.events.find(e => e.endedAt === null);
 export function closeRest(log: RestLog, now: number): RestLog {
-  const valid = validateRestLog(log, log.scope), current = openRest(valid);
+  const original = validateRestLog(log, log.scope);
+  if (!timestamp(now)) throw Error("系统时间无效");
+  const valid = {...original, events:original.events
+    .filter(e => !(e.estimated && e.startedAt >= now))
+    .map(e => e.estimated && e.endedAt !== null && e.endedAt > now ? {...e, endedAt:now} : e)};
+  const current = openRest(valid);
   if (!current) return valid;
   if (!timestamp(now) || now < current.startedAt) throw Error("系统时间早于休息开始，请校准时间后重试");
   return { ...valid, events:valid.events.map(e => e.id === current.id ? {...e, endedAt:now} : e) };
+}
+
+export const defaultRestMinutes = (kind: ActualRestKind, afterMeal = false): number =>
+  kind === "meal" ? 30 : kind === "gym" ? 60 : afterMeal ? 50 : 20;
+
+// Estimates share the existing rest log; focus timestamps are only read.
+export function quickRest(log: RestLog, plan: Journey, kind: ActualRestKind, now: number,
+  records: FocusSession[], active: FocusSession | null, id: string,
+  beforeSessionId?: string, moveId?: string): RestLog {
+  const original = validateRestLog(log, log.scope);
+  if (!timestamp(now) || plan.scope !== log.scope || plan.day !== journeyDay(now))
+    throw Error("旅程日期或来源已变化，请重试");
+  if (active?.status === "active" || active?.status === "review")
+    throw Error("请先暂停或确认当前番茄，再记录休息");
+  const moving = moveId ? original.events.find(e => e.id === moveId) : undefined;
+  if (moveId && (!moving || moving.kind !== kind || journeyDay(moving.startedAt) !== plan.day))
+    throw Error("休息记录已变化，请重新拖动");
+  if (moving?.endedAt === null) throw Error("请先结束当前休息再移动");
+  let valid = {...original, events:original.events.filter(e => e.id !== moveId)};
+  const ongoing = openRest(valid);
+  if (ongoing) {
+    if (beforeSessionId) throw Error("请先结束当前休息再补记历史空档");
+    valid = closeRest(valid,now);
+    if (ongoing.kind === kind) return valid;
+  }
+  const focus = [...records, ...(active ? [active] : [])].filter(r => inScope(r,log.scope));
+  const dayFocus = focus.filter(r => journeyDay(r.startedAt) === plan.day);
+  let start: number, limit: number;
+  const midnight = new Date(now); midnight.setHours(24,0,0,0);
+  if (beforeSessionId) {
+    const target = dayFocus.find(r => r.id === beforeSessionId && r.status === "saved");
+    if (!target || target.startedAt > now) throw Error("请拖到已完成番茄之前的空档");
+    limit = target.startedAt;
+    const previous = dayFocus.filter(r => r.id !== target.id && timestamp(r.endedAt) && r.endedAt! <= limit);
+    if (!previous.length) throw Error("这两个番茄之间没有可补记的空档");
+    start = Math.max(...previous.map(r => r.endedAt!));
+  } else {
+    limit = midnight.getTime();
+    const end = restBackfillWindow(valid,records,active,now).startedAt;
+    const tail = valid.events.filter(e => journeyDay(e.startedAt) === plan.day).slice(-1)[0];
+    start = tail && tail.endedAt !== null && tail.endedAt > now ? tail.endedAt
+      : end !== null && journeyDay(end) === plan.day && now-end >= 20*60000 ? end : now;
+    // Consecutive clicks append to the preceding estimate, including backfilled estimates.
+    if (tail?.estimated && tail.endedAt !== null && (!end || tail.endedAt >= end)) start=tail.endedAt;
+  }
+  // Pack at the first available interval; never overwrite another rest.
+  for (const e of valid.events) {
+    if (e.endedAt! <= start) continue;
+    if (e.startedAt <= start) start=e.endedAt!;
+    else { limit=Math.min(limit,e.startedAt); break; }
+  }
+  const preceding = valid.events.find(e => e.endedAt === start);
+  const endedAt = Math.min(limit,start+defaultRestMinutes(kind,preceding?.kind === "meal")*60000);
+  if (endedAt <= start || journeyDay(start) !== plan.day) throw Error("这段空档已满，无法再放入生活活动");
+  for (const r of focus) {
+    if (unknownFocus(r) && endedAt > r.startedAt) throw Error("旧专注没有可靠的结束时间");
+    if (intervals(r).some(s => start < s.end && endedAt > s.start)) throw Error("这段时间已有专注记录");
+  }
+  const event: RestEvent = {id:moving?.id || id, kind, startedAt:start, endedAt,
+    afterCount:completedBeforeRest(records,log.scope,start),
+    presetKey:moving?.presetKey ?? nextPreset(valid,plan,kind), estimated:true};
+  return validateRestLog({...valid,events:[...valid.events,event].sort((a,b)=>a.startedAt-b.startedAt)},log.scope);
 }
 export function completedBeforeRest(records: FocusSession[], scope: string, now: number): number {
   return records.filter(r => r.status === "saved" && journeyDay(r.startedAt) === journeyDay(now) &&
