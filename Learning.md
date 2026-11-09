@@ -2,6 +2,17 @@
 
 <!-- LEARNING_SCHEMA_V1 -->
 
+## LEARN-P0-POMO-081-01 - pending 不足以证明持久意图尚未发送
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-081
+- Evidence: tests/local-editing.test.mjs; tests/quick-edit.test.cjs; docs/ACCEPTANCE-P0-POMO-081.md
+- Applies-To: 本模块及类似持久outbox升级时，允许编辑或合并尚未发送意图的兼容判断
+- Lesson: 119旧队列在请求前没有持久发送标记，pending可能包括已发请求但尚未收到或保存回执的内容。新版本仅凭pending合并after会改变同一幂等身份的负载。升级负例验证旧缺标记条目保留原负载发送；新草稿显式attempted=false，发送前持久标true，只有false可合并。真实合成Feishu适配器验证丢失写响应后原负载仍能幂等完成、修改后的同版本负载被拒绝。
+- Required-Check: 同时验证旧缺字段pending不能替换且原同步仍通，新草稿连续编辑/重启后可编辑，在途不变，响应丢失重试不重复，失败恢复副本仍可用；不能把队列展示状态当成网络副作用证据。
+- Supersedes: none
+- Invalid-When: 改用另一套有明确持久发送/确认协议的队列时重新验证；本条不允许清空旧意图、自动重放未知副作用或迁移真实数据。
+
 仅保存本独立仓库已验证、可用于后续农场任务的工程教训；任务状态只看模块执行卡。本文件不写入、不替代澄行根Learning及根路线图。
 
 ## LEARN-P0-POMO-076-01 - 样本新鲜度与多级控制交付租约分开验证
