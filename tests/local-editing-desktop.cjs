@@ -71,6 +71,15 @@ app.whenReady().then(async()=>{let win;try{
  assert.ok(remote.every(r=>r.colorOverride==='longterm'));
  await click('修改记录 '+r1);await input('[aria-label="补记番茄数"]',1);await click('保存修改');
  await until(async()=>(await queue()).length===1);assert.equal((await queue())[0].attempted,false);
+ await click('补记');await selectTask('p2');await click('保存补记');
+ await until(()=>js("document.querySelectorAll('.record').length===3"));
+ await until(async()=>(await queue()).length===2);
+ const future=(await queue()).find(e=>e.payload.before.id!==r1);
+ assert.equal(future.payload.after.colorOverride,'longterm');assert.equal(future.payload.after.task.projectType,'personal');
+ await context('[data-task-group=task] .task-name');await click('修改番茄类型');await js("document.querySelector('#manual-category').click()");
+ await until(()=>js("!!document.querySelector('[role=option]')"));await js("[...document.querySelectorAll('[role=option]')].find(e=>e.textContent.includes('跟随任务项目')).click()");await click('保存类型');
+ await until(async()=>(await queue()).length===3&&(await queue()).every(e=>!e.payload.after.colorOverride));
+ assert.ok((await queue()).every(e=>e.payload.after.task.projectType==='personal'));
  const image=await win.webContents.capturePage();fs.writeFileSync(path.join(__dirname,'../artifacts/local-editing.png'),image.toPNG());
  fs.writeFileSync(path.join(__dirname,'../artifacts/local-editing-desktop.json'),JSON.stringify({passed:true,calls,checks:['local completion before upload, partial still available, actual counts','right-click > edit > category coalesces without sync','same task history and board type, unrelated task isolated','cold renderer retains pending edits','in-flight locked; receipts contain latest values; later edits enabled']},null,2));
  console.log('PASS local-editing desktop');clearTimeout(deadline);app.exit(0);

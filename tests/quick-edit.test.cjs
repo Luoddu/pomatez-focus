@@ -524,6 +524,24 @@ test("correction replaces ledger/history, unchecks owned excess row, and retries
   );
   assert.equal(h.state.writes.length, writes);
 });
+
+test("coalesced color plus content edit reaches real adapter once and survives lost response without changing project association", async () => {
+  const h=harness(), before=seed(h),q=new CaptureQueue(captureStore());
+  const draft=(original,after,kind,id)=>({id,sourceKey:h.key,kind,state:'pending',payload:{id,sourceKey:h.key,before:original,after}});
+  q.revise([draft(before,{...before,colorOverride:'software',colorRevision:1},'color','first')]);
+  let shown=q.project(before,h.key);
+  q.revise([draft(shown,{...shown,startedAt:before.endedAt-1500000,elapsedSeconds:1500,acceptedSeconds:1500,completedCount:1},'edit','second')]);
+  shown=q.project(before,h.key);
+  q.revise([draft(shown,{...shown,colorOverride:'research',colorRevision:2},'color','third')]);
+  assert.equal(q.entries.length,1);assert.equal(q.entries[0].kind,'edit');
+  const payload=q.entries[0].payload;assert.deepEqual(payload.before,before);assert.equal(payload.after.colorRevision,1);
+  h.state.lose='PUT:plans';await assert.rejects(h.client.correctRecord(payload),/response lost/);
+  const result=await h.client.correctRecord(payload);
+  assert.equal(result.record.colorOverride,'research');assert.equal(result.record.completedCount,1);assert.equal(result.record.acceptedSeconds,1500);
+  assert.deepEqual(result.record.task,before.task);assert.equal(h.state.plans[1].fields.已完成,false);
+  const writes=h.state.writes.length;await h.client.correctRecord(payload);assert.equal(h.state.writes.length,writes);
+  await assert.rejects(h.client.correctRecord({...payload,after:{...payload.after,colorOverride:'personal'}}),/另一台/);
+});
 test("legacy unowned completions are retained and manual ledger changes block corrections", async () => {
   const h = harness(),
     before = seed(h);

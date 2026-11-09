@@ -2188,7 +2188,7 @@ export default function FocusApp() {
             onSync={() => {
               requestSync(true);
             }}
-            tasks={boardTasks}
+            tasks={baseBoardTasks}
             onAddManual={timer.addManual}
             onEdit={editRecord}
             appendSource={sourceKey || ""}
