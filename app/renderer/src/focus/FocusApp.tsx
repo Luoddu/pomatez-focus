@@ -48,7 +48,7 @@ import {
 } from "./taskSnapshot";
 import QuadrantBoard from "./components/QuadrantBoard";
 import { sameTask, projectLocalCompletion } from "./localBoard";
-import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup, rebindBoardGroup, taskCategory, setTaskCategory } from "./boardLayout";
+import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup, rebindBoardGroup, taskCategory, setTaskCategory, categoryApplies } from "./boardLayout";
 import FocusTimer from "./components/FocusTimer";
 import FocusCapture from "./components/FocusCapture";
 import ReviewPanel from "./components/ReviewPanel";
@@ -992,7 +992,7 @@ export default function FocusApp() {
   const changeTaskCategory = (task: FocusTask, type: ProjectType | "") => {
     assertCategoryEditable(task);
     const scope = task.sourceKey || "local";
-    const layout = setTaskCategory(readBoardLayout(localStorage,scope),scope,task,type);
+    const layout = setTaskCategory(readBoardLayout(localStorage,scope),scope,task,type,timer.getSnapshot().records.map(r=>editQueue.project(r,sourceKey)));
     saveBoardLayout(localStorage,layout);
     quietSync.touch(boardScope!);
     setBoardRevision(n=>n+1);
@@ -1008,7 +1008,7 @@ export default function FocusApp() {
         if (original.status !== "saved") continue;
         const before = editQueue.project(original,sourceKey);
         const choice = taskCategory(before.task,before.task.source === "local" && !before.task.sourceKey ? localLayout : boardLayout);
-        if (!choice || (before.colorOverride || "") === choice.type) continue;
+        if (!choice || !categoryApplies(original,choice) || (before.colorOverride || "") === choice.type) continue;
         if (editQueue.categoryDiscarded(before,sourceKey || "local",choice.type,choice.at)) continue;
         const prior = editQueue.entries.find(e => (e.kind === "edit" || e.kind === "color") &&
           (e.payload as PendingEdit).before.id === before.id && e.sourceKey === sourceKey);

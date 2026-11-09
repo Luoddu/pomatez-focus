@@ -102,5 +102,5 @@ test("failed color intent shares safe discard but pending color remains protecte
   q.add(item);assert.throws(()=>q.discardFailedEdit('base','color-edit'));
   q.entries[0].state='failed';q.discardFailedEdit('base','color-edit');
   assert.equal(q.entries.length,0);assert.equal(JSON.stringify(record),raw);
-  assert.deepEqual(JSON.parse(s.getItem('pomatez-discarded-edit-v1:color-edit')).entry,item);
+  assert.deepEqual(JSON.parse(s.getItem('pomatez-discarded-edit-v1:color-edit')).entry,{...item,state:'failed',attempted:false});
 });

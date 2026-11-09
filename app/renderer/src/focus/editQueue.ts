@@ -78,7 +78,8 @@ export class EditQueue {
         )
       )
         throw Error();
-      this.entries = rows;
+      this.entries = rows.map((r: OutboxItem) => (r.kind === "edit" || r.kind === "color") && r.attempted !== false
+        ? {...r,attempted:true} : r);
     } catch {
       this.storageError = "待同步修改无法读取，请先导出本机数据";
     }
@@ -111,7 +112,7 @@ export class EditQueue {
       )
     )
       throw Error("这条记录已有待同步修改，请先同步或重试");
-    this.save([...this.entries, item]);
+    this.save([...this.entries, (item.kind === "edit" || item.kind === "color") && item.state === "pending" ? {...item,attempted:item.attempted ?? false} : item]);
   }
   // Only unsent drafts may be replaced. Once a request might have reached the
   // server, preserve its identity and payload for idempotent recovery.
@@ -122,8 +123,8 @@ export class EditQueue {
       const payload = item.payload as PendingEdit;
       const prior = next.find(e => e.sourceKey === item.sourceKey &&
         (e.kind === "edit" || e.kind === "color") && (e.payload as PendingEdit).before.id === payload.before.id);
-      if (!prior) { next.push(item); continue; }
-      if (prior.attempted || prior.state === "failed") throw Error("这条修改已发送，请等待同步完成或处理失败后再修改");
+      if (!prior) { next.push({...item,attempted:false}); continue; }
+      if (prior.attempted !== false || prior.state === "failed") throw Error("这条修改已发送，请等待同步完成或处理失败后再修改");
       const old = prior.payload as PendingEdit;
       if (JSON.stringify(old.after) !== JSON.stringify(payload.before)) throw Error("记录已改变，请重新打开修改");
       const kind = prior.kind === "edit" || item.kind === "edit" ? "edit" : "color";

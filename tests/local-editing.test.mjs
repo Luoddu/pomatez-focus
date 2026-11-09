@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EditQueue} from '../app/renderer/src/focus/editQueue.ts';
 import {projectLocalCompletion,sameTask} from '../app/renderer/src/focus/localBoard.ts';
-import {setTaskCategory,taskCategory,saveBoardLayout,readBoardLayout,projectBoardLayout,rebindBoardGroup} from '../app/renderer/src/focus/boardLayout.ts';
+import {setTaskCategory,taskCategory,saveBoardLayout,readBoardLayout,projectBoardLayout,rebindBoardGroup,categoryApplies} from '../app/renderer/src/focus/boardLayout.ts';
 const store=()=>{const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)}};
 const task={id:'plan1',planId:'plan1',taskId:'task',source:'feishu',sourceKey:'base',title:'Same',plannedToday:2,doneToday:0,projectType:'research'};
 const day=new Date().setHours(0,0,0,0);
@@ -46,7 +46,7 @@ test('local completion removes saved slot before sync, keeps partial slot, isola
 test('task preference is instant, durable, scoped, rebinds quick identity, leaves original project/history untouched',()=>{
  const s=store();let layout=setTaskCategory(null,'base',task,'software');saveBoardLayout(s,layout);
  layout=readBoardLayout(s,'base');assert.equal(taskCategory(task,layout).type,'software');
- assert.equal(projectBoardLayout([task],layout)[0].projectType,'software');assert.equal(task.projectType,'research');
+ assert.equal(projectBoardLayout([task],layout)[0].tomatoType,'software');assert.equal(projectBoardLayout([task],layout)[0].projectType,'research');assert.equal(task.projectType,'research');
  assert.equal(taskCategory({...task,sourceKey:'foreign'},layout),undefined);
  assert.equal(sameTask(task,{...task,id:'another-plan'}),true);assert.equal(sameTask(task,{...task,taskId:'same-name'}),false);
  const quick={...task,taskId:'quick-q'};layout=setTaskCategory(layout,'base',quick,'misc');
@@ -72,4 +72,30 @@ test('task type applies to free focus bound to a Base and multiple completed slo
  const r={...record,task:rows[0],completedCount:2};
  const projected=projectLocalCompletion(rows,[r],day);
  assert.deepEqual(projected.map(t=>t.kind),['done','done',undefined]);assert.equal(projected[0].doneToday,2);
+});
+test('upgrade preserves unknown old pending payload for idempotent send; only explicit new draft is editable',async()=>{
+ const s=store(),legacy=intent(record,{...record,colorOverride:'software',colorRevision:1});
+ s.setItem('pomatez-quick-edit-outbox-v1',JSON.stringify([legacy]));
+ const old=new EditQueue(s);assert.equal(old.entries[0].attempted,true);
+ assert.throws(()=>old.revise([intent(old.project(record,'base'),{...record,colorOverride:'research'})]),/已发送/);
+ let sent;await old.drain('base',async e=>{sent=e});assert.deepEqual(sent.payload,legacy.payload);
+ const freshStore=store(),fresh=new EditQueue(freshStore);fresh.revise([legacy]);assert.equal(fresh.entries[0].attempted,false);
+ const restored=new EditQueue(freshStore); // constructor preserves explicit false
+ assert.equal(restored.entries[0].attempted,false);
+ restored.revise([intent(restored.project(record,'base'),{...record,colorOverride:'research',colorRevision:2})]);
+ assert.equal(restored.project(record,'base').colorOverride,'research');
+});
+test('completed task choice never rewrites newer remote color; explicit new choice and newly saved local record still work',()=>{
+ const original={...record,cloudSynced:true};
+ const layout=setTaskCategory(null,'base',task,'software',[original]),choice=taskCategory(task,layout);
+ assert.equal(categoryApplies(original,choice),true);
+ const applied={...original,colorOverride:'software',colorRevision:1};assert.equal(categoryApplies(applied,choice),false);
+ const remote={...applied,colorOverride:'research',colorRevision:2};assert.equal(categoryApplies(remote,choice),false);
+ assert.equal(categoryApplies(remote,taskCategory(task,setTaskCategory(layout,'base',task,'personal',[remote]))),true);
+ assert.equal(categoryApplies({...record,id:'new'},choice),true);
+ assert.equal(categoryApplies({...record,id:'remote-new',cloudSynced:true},choice),false);
+ const projected=projectBoardLayout([task],layout)[0];assert.equal(projected.projectType,'research');
+ const reset=setTaskCategory(layout,'base',task,'',[applied]);
+ assert.equal(projectBoardLayout([task],reset)[0].projectType,'research');
+ assert.equal(projected.tomatoType,'software');assert.equal(projectBoardLayout([task],reset)[0].tomatoType,undefined);
 });

@@ -35,6 +35,8 @@ export type FocusTask = {
   // Saved with the session; later changes to a project's category do not
   // recolor an existing tomato.
   projectType?: ProjectType;
+  // Transient board display preference; never replace the real project snapshot.
+  tomatoType?: ProjectType;
 };
 // 主观感受（结束确认页可选填写）：-2 很痛苦 … +2 很愉快。
 // 只存本地记录，不上传飞书；旧记录无此字段按未填写处理。

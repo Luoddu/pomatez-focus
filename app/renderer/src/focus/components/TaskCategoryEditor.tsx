@@ -5,7 +5,7 @@ import ManualEntryDialog from "./ManualEntryDialog";
 import {parseTitle} from "./shared";
 
 export default function TaskCategoryEditor({task,onSave,onClose}:{task:FocusTask;onSave:(task:FocusTask,type:ProjectType|"")=>void;onClose:()=>void}) {
-  const [type,setType]=useState<ProjectType|"">(task.projectType || "");
+  const [type,setType]=useState<ProjectType|"">(task.tomatoType || task.projectType || "");
   const [error,setError]=useState("");
   return <ManualEntryDialog title="修改番茄类型" onClose={onClose}>
     <div className="manual-form"><strong>{parseTitle(task.title).name}</strong>

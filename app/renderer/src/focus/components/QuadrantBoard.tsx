@@ -75,7 +75,7 @@ const GroupList = ({
       {groupTasks(tasks).map((group) => {
         // 占位行（done）只贡献已收数据，不渲染 chip；pending 是乐观临时 chip
         const research = group.tasks.some(
-          (t) => t.projectType === "research"
+          (t) => (t.tomatoType || t.projectType) === "research"
         );
         const rows = group.tasks.filter((t) => t.kind !== "done");
         const info = group.tasks.find((t) => t.plannedToday != null);

@@ -70,7 +70,7 @@ app.whenReady().then(async()=>{let win;try{
  assert.ok(calls.some(c=>c[0]==='color'&&c[1]===r2&&c[2]==='longterm'));
  assert.ok(remote.every(r=>r.colorOverride==='longterm'));
  await click('修改记录 '+r1);await input('[aria-label="补记番茄数"]',1);await click('保存修改');
- await until(async()=>(await queue()).length===1);assert.equal((await queue())[0].attempted,undefined);
+ await until(async()=>(await queue()).length===1);assert.equal((await queue())[0].attempted,false);
  const image=await win.webContents.capturePage();fs.writeFileSync(path.join(__dirname,'../artifacts/local-editing.png'),image.toPNG());
  fs.writeFileSync(path.join(__dirname,'../artifacts/local-editing-desktop.json'),JSON.stringify({passed:true,calls,checks:['local completion before upload, partial still available, actual counts','right-click > edit > category coalesces without sync','same task history and board type, unrelated task isolated','cold renderer retains pending edits','in-flight locked; receipts contain latest values; later edits enabled']},null,2));
  console.log('PASS local-editing desktop');clearTimeout(deadline);app.exit(0);

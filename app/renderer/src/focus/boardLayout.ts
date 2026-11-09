@@ -1,4 +1,4 @@
-import type { FocusTask, FocusQuadrant, ProjectType } from "./session";
+import type { FocusTask, FocusSession, FocusQuadrant, ProjectType } from "./session";
 import { PROJECT_TYPES } from "./classification.js";
 
 export const BOARD_LAYOUT_KEY = "pomatez-board-layout-v1";
@@ -8,7 +8,7 @@ export type BoardLayout = {
   scope: string;
   order: string[];
   quadrants: { key: string; quadrant: FocusQuadrant }[];
-  categories?: {key: string; type: ProjectType | ""; at: number}[];
+  categories?: {key: string; type: ProjectType | ""; at: number; targets: {id:string; revision:number}[]}[];
 };
 const validKey = (v: unknown): v is string =>
   typeof v === "string" && v.length > 0 && v.length <= 500;
@@ -27,20 +27,30 @@ function validate(v: any, scope: string): BoardLayout {
     v.quadrants.some((x: any) => !x || !validKey(x.key) || !quadrants.includes(x.quadrant)) ||
     new Set(v.quadrants.map((x: any) => x.key)).size !== v.quadrants.length ||
     (v.categories !== undefined && (!Array.isArray(v.categories) || v.categories.length > 10000 ||
-      v.categories.some((x:any) => !validKey(x.key) || !Number.isFinite(x.at) || (x.type !== "" && !PROJECT_TYPES.includes(x.type))) ||
+      v.categories.some((x:any) => !validKey(x.key) || !Number.isFinite(x.at) || (x.type !== "" && !PROJECT_TYPES.includes(x.type)) ||
+        !Array.isArray(x.targets) || x.targets.length>10000 || x.targets.some((r:any)=>!validKey(r.id)||!Number.isInteger(r.revision)||r.revision<0)) ||
       new Set(v.categories.map((x:any)=>x.key)).size !== v.categories.length)))
     throw Error("看板安排格式无效");
   return { version: 1, scope, order: [...v.order],
     quadrants: v.quadrants.map((x: any) => ({ key: x.key, quadrant: x.quadrant })),
-    ...(v.categories ? {categories: v.categories.map((x:any)=>({key:x.key,type:x.type,at:x.at}))} : {}) };
+    ...(v.categories ? {categories: v.categories.map((x:any)=>({key:x.key,type:x.type,at:x.at,targets:x.targets.map((r:any)=>({id:r.id,revision:r.revision}))}))} : {}) };
 }
 export function taskCategory(task: FocusTask, layout: BoardLayout | null) {
   return layout && (task.sourceKey || "local") === layout.scope ? layout.categories?.find(x=>x.key === boardGroupKey(task)) : undefined;
 }
-export function setTaskCategory(layout: BoardLayout | null, scope: string, task: FocusTask, type: ProjectType | ""): BoardLayout {
+export function setTaskCategory(layout: BoardLayout | null, scope: string, task: FocusTask, type: ProjectType | "", records: FocusSession[] = []): BoardLayout {
   if ((task.sourceKey || "local") !== scope || (layout && layout.scope !== scope)) throw Error("任务来源已变化");
   return validate({...layout,version:1,scope,order:layout?.order || [],quadrants:layout?.quadrants || [],
-    categories:[...(layout?.categories || []).filter(x=>x.key !== boardGroupKey(task)),{key:boardGroupKey(task),type,at:Date.now()}]},scope);
+    categories:[...(layout?.categories || []).filter(x=>x.key !== boardGroupKey(task)),{key:boardGroupKey(task),type,at:Date.now(),
+      targets:records.filter(r=>r.task.source===task.source && (r.task.sourceKey || "local")===scope && boardGroupKey(r.task)===boardGroupKey(task))
+        .map(r=>({id:r.id,revision:r.colorRevision || 0}))}]},scope);
+}
+export function categoryApplies(record: FocusSession, choice: NonNullable<BoardLayout["categories"]>[number]) {
+  const target=choice.targets.find(r=>r.id===record.id);
+  // A completed choice must not overwrite a later revision from another device.
+  // New local records inherit the preference once; incoming remote history is not
+  // retroactively claimed by a choice made before it was read.
+  return target ? (record.colorRevision || 0) <= target.revision : !record.cloudSynced && !(record.colorRevision || 0);
 }
 export function readBoardLayout(store: Store, scope: string | null): BoardLayout | null {
   if (!scope) return null;
@@ -64,7 +74,7 @@ export function projectBoardLayout(rows: FocusTask[], layout: BoardLayout | null
     const quadrant = layout && belongs(row, layout.scope) ? changes.get(key) : undefined;
     const group = groups.get(key) || [];
     const category = taskCategory(row,layout);
-    group.push({...row,...(quadrant ? {quadrant} : {}),...(category?.type ? {projectType:category.type} : {})});
+    group.push({...row,...(quadrant ? {quadrant} : {}),...(category?.type ? {tomatoType:category.type} : {})});
     groups.set(key, group);
   }
   const ranks = new Map(layout?.order.map((key, i) => [key, i]) || []);
