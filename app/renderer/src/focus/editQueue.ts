@@ -44,6 +44,7 @@ export type OutboxItem = {
   payload: QuickTask | PendingEdit | RemovePlan;
   state: "pending" | "failed";
   error?: string;
+  attempted?: boolean;
   taskRows?: FocusTask[];
 };
 const KEY = "pomatez-quick-edit-outbox-v1";
@@ -53,8 +54,8 @@ export class EditQueue {
   running = false;
   storageError = "";
   private listeners = new Set<() => void>();
-  private store: Pick<Storage, "getItem" | "setItem">;
-  constructor(store: Pick<Storage, "getItem" | "setItem">) {
+  private store: Pick<Storage, "getItem" | "setItem"> & Partial<Pick<Storage,"key" | "length">>;
+  constructor(store: Pick<Storage, "getItem" | "setItem"> & Partial<Pick<Storage,"key" | "length">>) {
     this.store = store;
     try {
       const raw = store.getItem(KEY);
@@ -111,6 +112,47 @@ export class EditQueue {
     )
       throw Error("这条记录已有待同步修改，请先同步或重试");
     this.save([...this.entries, item]);
+  }
+  // Only unsent drafts may be replaced. Once a request might have reached the
+  // server, preserve its identity and payload for idempotent recovery.
+  revise(items: OutboxItem[]) {
+    let next = [...this.entries];
+    for (const item of items) {
+      if (item.kind !== "edit" && item.kind !== "color") throw Error("只能修改专注记录草稿");
+      const payload = item.payload as PendingEdit;
+      const prior = next.find(e => e.sourceKey === item.sourceKey &&
+        (e.kind === "edit" || e.kind === "color") && (e.payload as PendingEdit).before.id === payload.before.id);
+      if (!prior) { next.push(item); continue; }
+      if (prior.attempted || prior.state === "failed") throw Error("这条修改已发送，请等待同步完成或处理失败后再修改");
+      const old = prior.payload as PendingEdit;
+      if (JSON.stringify(old.after) !== JSON.stringify(payload.before)) throw Error("记录已改变，请重新打开修改");
+      const kind = prior.kind === "edit" || item.kind === "edit" ? "edit" : "color";
+      const colorChanged = payload.after.colorOverride !== old.before.colorOverride;
+      const after = {...payload.after,
+        revision: kind === "edit" ? (old.before.revision || 0) + 1 : old.before.revision,
+        colorRevision: (old.before.colorRevision || 0) + Number(colorChanged)};
+      next = next.map(e => e === prior ? {...prior,kind,payload:{...old,after}} : e);
+    }
+    this.save(next);
+  }
+  project(record: FocusSession, sourceKey: string | null) {
+    const intent = this.entries.find(e => e.sourceKey === sourceKey &&
+      (e.kind === "edit" || e.kind === "color") && (e.payload as PendingEdit).before.id === record.id);
+    return intent ? (intent.payload as PendingEdit).after : record;
+  }
+  categoryDiscarded(record: FocusSession, sourceKey: string, type: ProjectType | "", since: number) {
+    // Existing verified recovery copies also remember an explicit discard across
+    // restarts. A later user category choice has a newer timestamp and can retry.
+    for (let i=0;i<(this.store.length || 0);i++) {
+      const key=this.store.key?.(i);
+      if (!key?.startsWith("pomatez-discarded-edit-v1:")) continue;
+      try {
+        const backup=JSON.parse(this.store.getItem(key) || "null"), item=backup?.entry;
+        if (backup.discardedAt >= since && item?.sourceKey === sourceKey &&
+          item.payload?.after?.id === record.id && (item.payload.after.colorOverride || "") === type) return true;
+      } catch { /* unrelated malformed recovery copy never overwrites its bytes */ }
+    }
+    return false;
   }
   retry(sourceKey: string) {
     this.save(
@@ -193,11 +235,13 @@ export class EditQueue {
     this.running = true;
     try {
       while (ready()) {
-        const e = this.entries.find(
+        const pending = this.entries.find(
           (e) => e.sourceKey === sourceKey && e.state === "pending" && !isCapturedTask(e)
         );
-        if (!e) break;
+        if (!pending) break;
+        const e = {...pending, attempted: true};
         try {
+          this.save(this.entries.map(x => x.id === e!.id ? e! : x));
           if (await send(e) === false) break; // postponed, still pending with the same identity
           this.save(this.entries.filter((x) => x.id !== e.id));
         } catch (error: any) {

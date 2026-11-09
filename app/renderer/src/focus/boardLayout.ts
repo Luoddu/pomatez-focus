@@ -1,4 +1,5 @@
-import type { FocusTask, FocusQuadrant } from "./session";
+import type { FocusTask, FocusQuadrant, ProjectType } from "./session";
+import { PROJECT_TYPES } from "./classification.js";
 
 export const BOARD_LAYOUT_KEY = "pomatez-board-layout-v1";
 type Store = Pick<Storage, "getItem" | "setItem">;
@@ -7,6 +8,7 @@ export type BoardLayout = {
   scope: string;
   order: string[];
   quadrants: { key: string; quadrant: FocusQuadrant }[];
+  categories?: {key: string; type: ProjectType | ""; at: number}[];
 };
 const validKey = (v: unknown): v is string =>
   typeof v === "string" && v.length > 0 && v.length <= 500;
@@ -23,10 +25,22 @@ function validate(v: any, scope: string): BoardLayout {
     v.order.length > 10000 || !v.order.every(validKey) || new Set(v.order).size !== v.order.length ||
     !Array.isArray(v.quadrants) || v.quadrants.length > 10000 ||
     v.quadrants.some((x: any) => !x || !validKey(x.key) || !quadrants.includes(x.quadrant)) ||
-    new Set(v.quadrants.map((x: any) => x.key)).size !== v.quadrants.length)
+    new Set(v.quadrants.map((x: any) => x.key)).size !== v.quadrants.length ||
+    (v.categories !== undefined && (!Array.isArray(v.categories) || v.categories.length > 10000 ||
+      v.categories.some((x:any) => !validKey(x.key) || !Number.isFinite(x.at) || (x.type !== "" && !PROJECT_TYPES.includes(x.type))) ||
+      new Set(v.categories.map((x:any)=>x.key)).size !== v.categories.length)))
     throw Error("看板安排格式无效");
   return { version: 1, scope, order: [...v.order],
-    quadrants: v.quadrants.map((x: any) => ({ key: x.key, quadrant: x.quadrant })) };
+    quadrants: v.quadrants.map((x: any) => ({ key: x.key, quadrant: x.quadrant })),
+    ...(v.categories ? {categories: v.categories.map((x:any)=>({key:x.key,type:x.type,at:x.at}))} : {}) };
+}
+export function taskCategory(task: FocusTask, layout: BoardLayout | null) {
+  return layout && (task.sourceKey || "local") === layout.scope ? layout.categories?.find(x=>x.key === boardGroupKey(task)) : undefined;
+}
+export function setTaskCategory(layout: BoardLayout | null, scope: string, task: FocusTask, type: ProjectType | ""): BoardLayout {
+  if ((task.sourceKey || "local") !== scope || (layout && layout.scope !== scope)) throw Error("任务来源已变化");
+  return validate({...layout,version:1,scope,order:layout?.order || [],quadrants:layout?.quadrants || [],
+    categories:[...(layout?.categories || []).filter(x=>x.key !== boardGroupKey(task)),{key:boardGroupKey(task),type,at:Date.now()}]},scope);
 }
 export function readBoardLayout(store: Store, scope: string | null): BoardLayout | null {
   if (!scope) return null;
@@ -49,7 +63,8 @@ export function projectBoardLayout(rows: FocusTask[], layout: BoardLayout | null
     const key = boardGroupKey(row);
     const quadrant = layout && belongs(row, layout.scope) ? changes.get(key) : undefined;
     const group = groups.get(key) || [];
-    group.push(quadrant && quadrant !== row.quadrant ? { ...row, quadrant } : row);
+    const category = taskCategory(row,layout);
+    group.push({...row,...(quadrant ? {quadrant} : {}),...(category?.type ? {projectType:category.type} : {})});
     groups.set(key, group);
   }
   const ranks = new Map(layout?.order.map((key, i) => [key, i]) || []);
@@ -86,12 +101,13 @@ export function moveBoardGroup(rows: FocusTask[], layout: BoardLayout | null,
   // Preserve preferences for temporarily absent stable tasks; bound persisted metadata.
   const present = new Set(order);
   const absent = (layout?.order || []).filter(k => !present.has(k));
-  return validate({ version: 1, scope, order: [...order, ...absent], quadrants: changes }, scope);
+  return validate({ ...layout, version: 1, scope, order: [...order, ...absent], quadrants: changes }, scope);
 }
 export function rebindBoardGroup(layout: BoardLayout | null, before: string, after: string): BoardLayout | null {
-  if (!layout || before === after || (!layout.order.includes(before) && !layout.quadrants.some(q => q.key === before))) return null;
+  if (!layout || before === after || (!layout.order.includes(before) && !layout.quadrants.some(q => q.key === before) && !layout.categories?.some(q=>q.key === before))) return null;
   const moved = layout.quadrants.find(q => q.key === before);
   return validate({ ...layout, order: Array.from(new Set(layout.order.map(k => k === before ? after : k))),
     quadrants: [...layout.quadrants.filter(q => q.key !== before && (!moved || q.key !== after)),
-      ...(moved ? [{ ...moved, key: after }] : [])] }, layout.scope);
+      ...(moved ? [{ ...moved, key: after }] : [])],
+    ...(layout.categories ? {categories:layout.categories.filter(q=>q.key !== after).map(q=>q.key === before ? {...q,key:after} : q)} : {}) }, layout.scope);
 }

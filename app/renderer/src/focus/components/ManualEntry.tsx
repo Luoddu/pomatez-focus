@@ -45,7 +45,7 @@ export default function ManualEntry({
   const [count, setCount] = useState(initial?.completedCount ?? 1);
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   const [error, setError] = useState("");
-  const [category, setCategory] = useState<ProjectType | "">("");
+  const [category, setCategory] = useState<ProjectType | "">(initial?.colorOverride || "");
   const durationAnchor = useRef({seconds:initial?.acceptedSeconds ?? 1500,
     available:initial ? manualWindow(initial,initial.startedAt,initial.endedAt!,initial.acceptedSeconds ?? 1500).availableSeconds : 1500});
   const timestamps = (startValue: string, endValue: string) => ({
@@ -159,9 +159,8 @@ export default function ManualEntry({
         }),
         // 感受只留本机；undefined 会被 JSON 序列化丢弃，等于清除
         mood: mood ?? undefined,
-        ...(!initial && category
-          ? { colorOverride: category, colorRevision: 1 }
-          : {}),
+        colorOverride: category || undefined,
+        colorRevision: (initial?.colorRevision || 0) + Number(category !== (initial?.colorOverride || "")),
         status: "saved",
         syncTarget: "plan",
         // 飞书任务走既有待同步队列；本地任务与自由专注只留本机
@@ -267,10 +266,10 @@ export default function ManualEntry({
           </button>
         </span>
       </div>
-      {!initial && (
+      {(
         <div className="manual-row">
           <label id="manual-category-label" htmlFor="manual-category">
-            番茄分类
+            番茄类型
           </label>
           <CategorySelect value={category} onChange={setCategory} />
         </div>

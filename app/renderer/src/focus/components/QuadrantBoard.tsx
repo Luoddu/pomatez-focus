@@ -3,6 +3,7 @@ import {
   FocusTask,
   FocusQuadrant,
   FocusProject,
+  ProjectType,
   FocusSession,
 } from "../session";
 import QuickTaskEntry from "./QuickTaskEntry";
@@ -10,8 +11,8 @@ import { QUADRANTS, clock, groupTasks, parseTitle } from "./shared";
 import { chipWindow } from "../chipWindow";
 import FarmField from "./FarmField";
 import TaskTitle from "./TaskTitle";
-import TaskProjectEditor, { TaskProjectReceipt } from "./TaskProjectEditor";
-import { effectiveTaskProgress, formatEffective, TomatoWeights } from "../weights";
+import TaskCategoryEditor from "./TaskCategoryEditor";
+import { formatEffective, TomatoWeights } from "../weights";
 import { withTaskCredit, partialProgress } from "../partialTomato";
 
 // 已收格子的视觉上限：计划数很大时只画前 12 格，文字仍显示真实 x/y
@@ -68,8 +69,7 @@ const GroupList = ({
     task.kind !== "free" &&
     task.kind !== "pending";
   const canEditProject = (task: FocusTask) =>
-    !!onEditProject && task.source === "feishu" && task.projectEditable === true && !!task.taskId &&
-    task.sourceKey === boardScope && !task.quickTask && task.kind !== "free";
+    !!onEditProject && (task.sourceKey || "local") === boardScope;
   return (
     <div className="task-list">
       {groupTasks(tasks).map((group) => {
@@ -81,7 +81,7 @@ const GroupList = ({
         const info = group.tasks.find((t) => t.plannedToday != null);
         const rawDone = info?.doneToday ?? 0;
         const rawPlanned = info?.plannedToday ?? rows.length;
-        const {done, planned, missing} = effectiveTaskProgress({...group.tasks[0], doneToday:rawDone, plannedToday:rawPlanned}, records, Date.now(), weights);
+        const done = rawDone, planned = rawPlanned;
         const pending = rows.filter(
           (t) =>
             t.kind !== "pending" &&
@@ -245,7 +245,7 @@ const GroupList = ({
               {/* 已收进度：文字在上、红色记数格在下，仍驻行尾右侧 */}
               <span
                 className={`harvest-mini ${complete ? "done" : ""}`}
-                title={`今日有效已收 ${formatEffective(done)} 个，共计划 ${formatEffective(planned)} 个${missing ? "（部分明细尚未加载，缺失部分按任务项目比例折算）" : ""}`}
+                title={`今日已收 ${formatEffective(done)} 个，共计划 ${formatEffective(planned)} 个`}
               >
                 <span className="hm-text">
                   已收 {formatEffective(done)}/{formatEffective(planned)}
@@ -304,7 +304,7 @@ const GroupList = ({
               <button className="ctx-item" role="menuitem" onClick={() => {
                 onEditProject!(menu.task);
                 setMenu(null);
-              }}>修改所属项目</button>
+              }}>修改番茄类型</button>
             )}
           </div>
         </div>
@@ -339,7 +339,7 @@ export default function QuadrantBoard({
   completing,
   onAddTask,
   loadProjects,
-  onTaskProjectSaved,
+  onTaskCategory,
   records,
   weights,
   journalSource,
@@ -380,7 +380,7 @@ export default function QuadrantBoard({
     project?: FocusProject
   ) => void;
   loadProjects?: () => Promise<FocusProject[]>;
-  onTaskProjectSaved?: (receipt: TaskProjectReceipt) => void;
+  onTaskCategory?: (task: FocusTask, type: ProjectType | "") => void;
   records: FocusSession[];
   weights?: TomatoWeights;
   journalSource: string;
@@ -407,8 +407,8 @@ export default function QuadrantBoard({
   const rows = [QUADRANTS.slice(0, 2), QUADRANTS.slice(2, 4)];
   return (
     <div className="left-col">
-      {projectTask && projectTask.sourceKey === boardScope && onTaskProjectSaved && (
-        <TaskProjectEditor task={projectTask} onClose={() => setProjectTask(null)} onSaved={onTaskProjectSaved} />
+      {projectTask && (projectTask.sourceKey || "local") === boardScope && onTaskCategory && (
+        <TaskCategoryEditor task={projectTask} onClose={() => setProjectTask(null)} onSave={onTaskCategory} />
       )}
       {capture}
       <div className={`quadrants${dragging ? " is-dragging" : ""}`}>
@@ -469,7 +469,7 @@ export default function QuadrantBoard({
                       onAdjust={onAdjust}
                       activeTaskId={activeTaskId}
                       onComplete={onComplete}
-                      onEditProject={onTaskProjectSaved ? setProjectTask : undefined}
+                      onEditProject={onTaskCategory ? setProjectTask : undefined}
                       completing={completing}
                       dragRef={dragRef}
                       boardScope={boardScope}

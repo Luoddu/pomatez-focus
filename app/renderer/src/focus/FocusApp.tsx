@@ -23,6 +23,7 @@ import {
 } from "./session";
 import {
   EditQueue,
+  OutboxItem,
   PendingEdit,
   QuickTask,
   RemovePlan,
@@ -46,7 +47,8 @@ import {
   taskDay,
 } from "./taskSnapshot";
 import QuadrantBoard from "./components/QuadrantBoard";
-import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup, rebindBoardGroup } from "./boardLayout";
+import { sameTask, projectLocalCompletion } from "./localBoard";
+import { readBoardLayout, saveBoardLayout, projectBoardLayout, moveBoardGroup, rebindBoardGroup, taskCategory, setTaskCategory } from "./boardLayout";
 import FocusTimer from "./components/FocusTimer";
 import FocusCapture from "./components/FocusCapture";
 import ReviewPanel from "./components/ReviewPanel";
@@ -362,7 +364,7 @@ export default function FocusApp() {
         r.startedAt,r.endedAt,r.acceptedSeconds,r.completedCount,r.revision,r.colorRevision]) };
     }),
     ...editQueue.entries.map(e => ({ key: `edit:${e.sourceKey}:${e.id}`, source: e.sourceKey,
-      value: `${e.kind}:${isCapturedTask(e)}` })),
+      value: JSON.stringify([e.kind,isCapturedTask(e),(e.payload as PendingEdit).after]) })),
     ...completionQueue.entries.filter(e => e.state !== "done").map(e => ({
       key: `complete:${e.sourceKey}:${e.planId}`, source: e.sourceKey, value: e.planId })),
   ];
@@ -403,7 +405,10 @@ export default function FocusApp() {
   // Queue revisions trigger projection; elapsed-second renders do not touch storage/sorting.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [tasks, sourceKey, editRevision, queueRevision, boardDayStart]);
-  const boardTasks = useMemo(() => projectBoardLayout(baseBoardTasks, boardLayout), [baseBoardTasks, boardLayout]);
+  // Queue contents mutate behind a stable owner; its published revision invalidates this projection.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const localRecords = useMemo(() => timer.records.map(r=>editQueue.project(r,sourceKey)), [timer.records,editRevision,sourceKey,editQueue]);
+  const boardTasks = useMemo(() => projectBoardLayout(projectLocalCompletion(baseBoardTasks, localRecords, boardDayStart), boardLayout), [baseBoardTasks, localRecords, boardDayStart, boardLayout]);
   const boardTasksRef = useRef(boardTasks);
   boardTasksRef.current = boardTasks;
   const moveBoard = (key: string, quadrant: FocusQuadrant, target?: string, after?: boolean) => {
@@ -462,30 +467,7 @@ export default function FocusApp() {
       (r.task.source === "local" || r.task.sourceKey === sourceKey)
   );
   // Demo 模式把内存态演示记录叠在真实记录后展示；接入飞书后只用真实记录
-  const shownRecords = useMemo(
-    () =>
-      (api() ? timer.records : [...timer.records, ...demoSeed]).map(
-        (record) => {
-          const intent = outbox.find(
-            (e) =>
-              e.kind === "color" &&
-              (e.payload as PendingEdit).before.id === record.id
-          );
-          const after = (intent?.payload as PendingEdit | undefined)
-            ?.after;
-          return after &&
-            (after.colorRevision || 0) > (record.colorRevision || 0)
-            ? {
-                ...record,
-                colorOverride: after.colorOverride,
-                colorRevision: after.colorRevision,
-              }
-            : record;
-        }
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [timer.records, demoSeed, editRevision, sourceKey]
-  );
+  const shownRecords = useMemo(() => api() ? localRecords : [...localRecords,...demoSeed], [localRecords,demoSeed]);
   const totalTomatoes = useMemo(
     () =>
       shownRecords
@@ -1001,23 +983,55 @@ export default function FocusApp() {
   useEffect(() => {
     if (sourceKey) void loadProjects().catch(() => {});
   }, [sourceKey, loadProjects]);
-  const applyTaskProject = (receipt: {sourceKey: string; taskId: string; projectType?: ProjectType}) => {
-    if (taskScope.current !== `${receipt.sourceKey}|${taskDay()}`) return;
-    ++refreshSequence.current;
-    setLoadingTasks(false);
-    const fresh = tasksRef.current.map(task => task.projectEditable && task.sourceKey === receipt.sourceKey && task.taskId === receipt.taskId
-      ? {...task, projectType: receipt.projectType}
-      : task);
-    tasksRef.current = fresh;
-    writeTaskSnapshot(localStorage, receipt.sourceKey, fresh);
-    setTasks(fresh);
-    notify("所属项目已更新");
+  const assertCategoryEditable = (task: FocusTask) => {
+    if (!boardScope || ((task.sourceKey || "local") !== boardScope && !(task.source === "local" && !task.sourceKey))) throw Error("请连接这项任务所属的飞书表");
+    if (editQueue.entries.some(e => (e.kind === "edit" || e.kind === "color") &&
+      (e.attempted || e.state === "failed") && sameTask((e.payload as PendingEdit).after.task,task)))
+      throw Error("同任务有已发送的修改，请等待同步完成或处理失败后再修改类型");
   };
+  const changeTaskCategory = (task: FocusTask, type: ProjectType | "") => {
+    assertCategoryEditable(task);
+    const scope = task.sourceKey || "local";
+    const layout = setTaskCategory(readBoardLayout(localStorage,scope),scope,task,type);
+    saveBoardLayout(localStorage,layout);
+    quietSync.touch(boardScope!);
+    setBoardRevision(n=>n+1);
+  };
+  // The durable task preference also covers history loaded after the click and
+  // records saved later. Original records/outbox remain the only sync ledger.
+  useEffect(() => {
+    if (!boardScope || timer.blocked) return;
+    const changes: OutboxItem[] = [];
+    try {
+      const localLayout = boardScope === "local" ? boardLayout : readBoardLayout(localStorage,"local");
+      for (const original of timer.records) {
+        if (original.status !== "saved") continue;
+        const before = editQueue.project(original,sourceKey);
+        const choice = taskCategory(before.task,before.task.source === "local" && !before.task.sourceKey ? localLayout : boardLayout);
+        if (!choice || (before.colorOverride || "") === choice.type) continue;
+        if (editQueue.categoryDiscarded(before,sourceKey || "local",choice.type,choice.at)) continue;
+        const prior = editQueue.entries.find(e => (e.kind === "edit" || e.kind === "color") &&
+          (e.payload as PendingEdit).before.id === before.id && e.sourceKey === sourceKey);
+        if (prior?.attempted || prior?.state === "failed") continue;
+        if (before.task.source === "local" && !before.cloudSynced && !prior) {
+          timer.recolor(before.id,choice.type || undefined);
+        } else if (connected && sourceKey) {
+          const id = crypto.randomUUID();
+          changes.push({id,sourceKey,kind:"color",state:"pending",payload:{id,sourceKey,before,after:recolorSession(before,choice.type || undefined)}});
+        }
+      }
+      if (changes.length) editQueue.revise(changes);
+    } catch(e:any) { notify(e.message || "类型已保存在本机，记录修改尚未保存，请检查本机存储", "error"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardScope,boardLayout,boardRevision,timer.records,editRevision,connected,sourceKey]);
   const editRecord = (before: FocusSession, after: FocusSession) => {
+    const categoryChanged = before.colorOverride !== after.colorOverride;
+    if (categoryChanged) assertCategoryEditable(after.task);
     if (!connected || !sourceKey || !api()) {
       if (before.task.source !== "local" || before.cloudSynced)
         throw Error("请连接原飞书表后修改");
       timer.addManual({ ...after, cloudSynced: false, sync: "local" });
+      if (categoryChanged) changeTaskCategory(after.task,after.colorOverride || "");
       return;
     }
     if (
@@ -1026,48 +1040,22 @@ export default function FocusApp() {
     )
       throw Error("请连接这条记录所属的飞书表");
     const id = crypto.randomUUID();
-    editQueue.add({
+    editQueue.revise([{
       id,
       sourceKey,
       kind: "edit",
       payload: { id, sourceKey, before, after },
       state: "pending",
-    });
+    }]);
+    if (categoryChanged) changeTaskCategory(after.task,after.colorOverride || "");
     notify("修改已保存在本机，最后一次操作后安静5分钟再同步。");
   };
   const recolorRecord = (before: FocusSession, type?: ProjectType) => {
-    if (!api() && demoSeed.some((r) => r.id === before.id)) {
-      setDemoSeed((rows) =>
-        rows.map((r) =>
-          r.id === before.id ? recolorSession(r, type) : r
-        )
-      );
+    if (!api() && demoSeed.some(r=>r.id === before.id)) {
+      setDemoSeed(rows=>rows.map(r=>sameTask(r.task,before.task) ? recolorSession(r,type) : r));
       return;
     }
-    if (before.task.source === "local" && !before.cloudSynced) {
-      timer.recolor(before.id, type);
-      return;
-    }
-    if (
-      !connected ||
-      !sourceKey ||
-      !api() ||
-      before.task.sourceKey !== sourceKey
-    )
-      throw Error("请连接这条记录所属的飞书表后改色");
-    const id = crypto.randomUUID();
-    editQueue.add({
-      id,
-      sourceKey,
-      kind: "color",
-      state: "pending",
-      payload: {
-        id,
-        sourceKey,
-        before,
-        after: recolorSession(before, type),
-      },
-    });
+    changeTaskCategory(before.task,type || "");
   };
   const editReady = useRef(false);
   editReady.current =
@@ -1203,6 +1191,7 @@ export default function FocusApp() {
                 colorOverride: edit.after.colorOverride,
                 colorRevision: edit.after.colorRevision,
               };
+              if (colorBefore.colorOverride === colorAfter.colorOverride) return;
               const result = await api().recolorRecord({
                 before: colorBefore,
                 after: colorAfter,
@@ -1222,6 +1211,8 @@ export default function FocusApp() {
               acceptedSeconds: edit.after.acceptedSeconds,
               completedCount: edit.after.completedCount,
               segments: edit.after.segments,
+              colorOverride: edit.after.colorOverride,
+              colorRevision: edit.after.colorRevision,
               revision: (edit.before.revision || 0) + 1,
             };
             const result = await api().correctRecord({ before, after });
@@ -2120,7 +2111,7 @@ export default function FocusApp() {
               completing={""}
               onAddTask={addQuickTask}
               loadProjects={loadProjects}
-              onTaskProjectSaved={connected && sourceKey ? applyTaskProject : undefined}
+              onTaskCategory={boardScope ? changeTaskCategory : undefined}
               records={shownRecords}
               weights={weights}
               journalSource={sourceKey || ""}
@@ -2208,6 +2199,7 @@ export default function FocusApp() {
             dayReviews={dayReviews}
             reviewState={reviewState}
             editingIds={editingIds}
+            lockedIds={outbox.filter(e=>e.attempted || e.state === "failed").filter(e=>e.kind === "edit" || e.kind === "color").map(e=>(e.payload as PendingEdit).before.id)}
             onGenerate={() => generate()}
             refreshedLabel={dailyRefresh.source === sourceKey ? refreshLabel(dailyRefresh.stamp) ||
               (dailyRefresh.stamp?.failedAt && dailyRefresh.stamp.failedAt>=refreshBoundary(Date.now())

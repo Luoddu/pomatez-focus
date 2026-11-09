@@ -164,6 +164,7 @@ export default function HistoryPanel({
   dayReviews = {},
   reviewState = "loaded",
   editingIds = [],
+  lockedIds = [],
   onGenerate,
   refreshedLabel,
   generating,
@@ -198,6 +199,7 @@ export default function HistoryPanel({
   dayReviews?: Record<string, string>;
   reviewState?: "loading" | "loaded" | "error";
   editingIds?: string[];
+  lockedIds?: string[];
   onGenerate: () => void;
   refreshedLabel: string;
   generating: boolean;
@@ -781,7 +783,7 @@ export default function HistoryPanel({
                                   className="btn-text record-edit"
                                   aria-label={`修改记录 ${r.id}`}
                                   title="修改这条记录"
-                                  disabled={editingIds.includes(r.id)}
+                                  disabled={lockedIds.includes(r.id)}
                                   onClick={() => {
                                     setEntryOpen(false);
                                     setEditRecord(r);
@@ -789,7 +791,7 @@ export default function HistoryPanel({
                                 >
                                   <PencilIcon />
                                   {editingIds.includes(r.id)
-                                    ? "修改待同步"
+                                    ? "修改 · 待同步"
                                     : "修改"}
                                 </button>
                               )}
@@ -856,13 +858,13 @@ export default function HistoryPanel({
               }}
               style={{ left: colorMenu.x, top: colorMenu.y }}
             >
-              <span className="color-menu-title">番茄分类</span>
+              <span className="color-menu-title">番茄类型</span>
               {PROJECT_TYPES.map((type) => (
                 <button
                   key={type}
                   role="menuitemradio"
                   aria-checked={recordCategory(menuRecord) === type}
-                  disabled={editingIds.includes(menuRecord.id)}
+                  disabled={lockedIds.includes(menuRecord.id)}
                   onClick={() => {
                     try {
                       onRecolor(menuRecord, type);
@@ -884,7 +886,7 @@ export default function HistoryPanel({
                 role="menuitem"
                 disabled={
                   !menuRecord.colorOverride ||
-                  editingIds.includes(menuRecord.id)
+                  lockedIds.includes(menuRecord.id)
                 }
                 onClick={() => {
                   try {
