@@ -13,6 +13,7 @@ import {
   moveSlot,
   readJourney,
   reconcileJourney,
+  journeyDisplayPlan,
   applyJourneyTemplate,
   restActions,
   REST_LABELS,
@@ -187,23 +188,27 @@ export default function TodayJourney({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, controls.active?.id, controls.ready, scope, day]);
+  const displayPlan = useMemo(
+    () => plan ? journeyDisplayPlan(plan, records, controls.active) : null,
+    [plan, records, controls.active]
+  );
   const done = useMemo(
-    () => (plan ? completion(plan, records) : {}),
-    [plan, records]
+    () => (displayPlan ? completion(displayPlan, records) : {}),
+    [displayPlan, records]
   );
   const nowMinute = Math.floor(Date.now()/60000);
   const fitted = useMemo(
-    () => plan ? fitJourneyDay(plan, records, controls.active,
+    () => displayPlan ? fitJourneyDay(displayPlan, records, controls.active,
       controls.restLog?.scope === scope ? controls.restLog.events : [],
       controls.focusSeconds,controls.breakSeconds,Date.now()) : null,
     // Start times change on record edits or session changes, never on elapsed-second ticks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, records, controls.restLog, scope, controls.active?.id, controls.active?.startedAt, controls.active?.status,
+    [displayPlan, records, controls.restLog, scope, controls.active?.id, controls.active?.startedAt, controls.active?.status,
       controls.active?.plannedSeconds, controls.active?.task.source, controls.active?.task.sourceKey,
       controls.focusSeconds,controls.breakSeconds,nowMinute]
   );
   const timeline: {starts:Record<string,JourneyTime>;end:JourneyTime|null} = fitted?.timeline || {starts:{},end:null};
-  const shownPlan = fitted?.plan || plan;
+  const shownPlan = fitted?.plan || displayPlan;
   const slots = shownPlan?.stages.flatMap((s) => s.slots) || [],
     selected = slots.find((s) => s.id === edit);
   const options = useMemo(() => {
@@ -287,7 +292,7 @@ export default function TodayJourney({
     });
     setChoice(match?.id || (p.task ? "__preset__" : ""));
     setDestination(
-      plan!.stages.find((s) => s.slots.some((v) => v.id === p.id))!.id
+      shownPlan!.stages.find((s) => s.slots.some((v) => v.id === p.id))!.id
     );
   };
   const current = !!(
@@ -584,7 +589,7 @@ export default function TodayJourney({
                         onClick={() => open(p)}
                         onDragStart={(e) => {
                           if (
-                            locked(plan, p, records, controls.active)
+                            locked(shownPlan!, p, records, controls.active)
                           ) {
                             e.preventDefault();
                             return;

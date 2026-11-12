@@ -280,9 +280,8 @@ function eligible(r, plan) {
     r.completedCount <= 100 &&
     Number.isFinite(r.startedAt) &&
     journeyDay(r.startedAt) === plan.day &&
-    (plan.scope === "local"
-      ? r.task?.source === "local"
-      : r.task?.source === "feishu" && r.task.sourceKey === plan.scope)
+    (r.task?.source === "local" ||
+      (plan.scope !== "local" && r.task?.source === "feishu" && r.task.sourceKey === plan.scope))
   );
 }
 export function completion(plan, records) {
@@ -465,6 +464,28 @@ export function reconcileJourney(plan, records, active) {
       used.add(k);
     }
   return result;
+}
+// Derived view only: overflow completions must never enlarge the saved preset.
+export function journeyDisplayPlan(plan, records, active = null) {
+  const view = reconcileJourney(plan, records, active);
+  const slots = view.stages.flatMap(s => s.slots), done = completion(view, records);
+  const used = new Set(slots.filter(p => done[p.id]).map(p =>
+    JSON.stringify([p.binding.sessionId, p.binding.unit])));
+  const ids = new Set(slots.map(p => p.id));
+  const rows = new Map(records.filter(r => eligible(r, view)).map(r => [r.id, r]));
+  const last = view.stages[view.stages.length - 1];
+  for (const r of [...rows.values()].sort((a,b) => a.startedAt-b.startedAt || a.id.localeCompare(b.id))) {
+    for (let unit = 0; unit < r.completedCount; unit++) {
+      const key = JSON.stringify([r.id, unit]);
+      if (used.has(key)) continue;
+      let id = `actual:${key}`;
+      while (ids.has(id)) id += ":";
+      ids.add(id);
+      used.add(key);
+      last.slots.push({id, task:null, binding:{sessionId:r.id, unit}});
+    }
+  }
+  return view;
 }
 export function locked(plan, slot, records, active) {
   return (

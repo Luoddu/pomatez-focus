@@ -97,6 +97,7 @@ export function reconcileJourney(
   records: FocusSession[],
   active: FocusSession | null
 ): Journey;
+export function journeyDisplayPlan(plan: Journey, records: FocusSession[], active?: FocusSession | null): Journey;
 export function locked(
   plan: Journey,
   slot: JourneySlot,

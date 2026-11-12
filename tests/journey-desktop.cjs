@@ -157,7 +157,30 @@ app.whenReady().then(async () => {
     await until(() =>
       js(`document.querySelectorAll('.journey-tomato').length===16`)
     );
-    if (phase === "times") {
+    if (phase === "complete") {
+      const original=await plan(), p=structuredClone(original);
+      p.stages=p.stages.slice(0,1); p.stages[0].slots=p.stages[0].slots.slice(0,2);
+      const at=new Date(); at.setHours(8,0,0,0);
+      const base={startedAt:at.getTime(),endedAt:at.getTime()+1800000,plannedSeconds:1800,
+        elapsedSeconds:1800,acceptedSeconds:1800,status:'saved',sync:'local'};
+      const records=[{...base,id:'cloud-seven',task:tasks[0],completedCount:7},
+        {...base,id:'local-four',task:{id:'local-task',source:'local',title:'合成本地完成'},completedCount:4}];
+      const key=`pomatez-journey-v1:synthetic:${p.day}`;
+      const source=(rows)=>`localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(p))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records:rows}))})`;
+      await reload(source(records),false,11);
+      assert.equal(await js("document.querySelectorAll('.journey-tomato[data-complete=true]').length"),11);
+      assert.equal((await plan()).stages.flatMap(s=>s.slots).length,2);
+      await open(10);
+      assert.ok(await js("document.querySelector('.journey-dialog').textContent.includes('合成本地完成')"));
+      assert.ok(await js("document.querySelector('.journey-dialog h3').textContent.includes('已完成')"));
+      await click('关闭旅程编辑');
+      win.setSize(780,760); await wait(100);
+      assert.ok(await js("document.querySelector('.journey-card').scrollWidth<=document.querySelector('.journey-card').clientWidth+1"));
+      await reload(source([{...records[1],completedCount:1}]),false,2);
+      assert.equal(await js("document.querySelectorAll('.journey-tomato[data-complete=true]').length"),1);
+      assert.equal((await plan()).stages.flatMap(s=>s.slots).length,2);
+      checks.push('seven cloud plus four local units visible with two planned slots; overflow details open read-only; narrow view fits; correction removes extras and preserves preset');
+    } else if (phase === "times") {
       const original = await plan(), p=structuredClone(original); p.stages.at(-1).slots = p.stages.at(-1).slots.slice(0,1);
       const at = new Date(); at.setHours(14,7,0,0);
       const endedAt = at.getTime()+4500000, key=`pomatez-journey-v1:synthetic:${p.day}`;

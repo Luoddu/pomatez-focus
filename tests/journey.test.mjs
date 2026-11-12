@@ -10,6 +10,7 @@ import {
   taskRef,
   resolveTask,
   reconcileJourney,
+  journeyDisplayPlan,
   completion,
   journeyActualTimes,
   journeyTimeline,
@@ -368,4 +369,41 @@ test("road is 100 tomatoes with independent 25-unit flags", () => {
   assert.deepEqual(journeyRoad(282), { reached: 200, next: 300 });
   assert.deepEqual(journeyRoad(300), { reached: 300, next: 400 });
   assert.deepEqual(journeyRoad(1000), { reached: 1000, next: 1100 });
+});
+
+test('connected journey includes seven cloud and four local saved units immediately', () => {
+  const p = {...plan(), scope:'table1'}, records = [
+    record(7,{id:'cloud',task:{source:'feishu',sourceKey:'table1'}}),
+    record(4,{id:'local'})
+  ];
+  const before = JSON.stringify(p), view = journeyDisplayPlan(p,records);
+  assert.equal(Object.keys(completion(view,records)).length,11);
+  assert.equal(JSON.stringify(p),before);
+  const migrated = records.map(r => ({...r,task:{source:'feishu',sourceKey:'table1'}}));
+  assert.equal(Object.keys(completion(journeyDisplayPlan(p,migrated),migrated)).length,11);
+  assert.deepEqual(journeyDisplayPlan(p,records),view);
+  const wrong = [record(2,{id:'foreign',task:{source:'feishu',sourceKey:'other'}}),
+    record(3,{id:'yesterday',startedAt:now-86400000}),record(1,{id:'review',status:'review'})];
+  assert.equal(Object.keys(completion(journeyDisplayPlan(p,[...records,...wrong]),[...records,...wrong])).length,11);
+});
+test('actual overflow is complete, read only, reversible and retained past midnight cutoff', () => {
+  const p=plan(); p.stages.forEach(s=>s.slots=[]);
+  const records=[record(100),record(12,{id:'second'})], before=JSON.stringify(p);
+  const view=journeyDisplayPlan(p,records);
+  assert.equal(Object.keys(completion(view,records)).length,112);
+  assert.equal(new Set(view.stages.flatMap(s=>s.slots).map(s=>s.id)).size,112);
+  assert.equal(JSON.stringify(p),before);
+  const fitted=fitJourneyDay(view,records,null,[],1500,300,now+86400000);
+  assert.equal(Object.keys(completion(fitted.plan,records)).length,112);
+  assert.equal(Object.keys(completion(journeyDisplayPlan(p,[record(2)]),[record(2)])).length,2);
+  assert.equal(journeyDisplayPlan(p,[]).stages.flatMap(s=>s.slots).length,0);
+  assert.deepEqual(validateJourney(p,p.scope,p.day),p);
+});
+test('existing planned bindings and extras never count one unit twice', () => {
+  const p=reconcileJourney(plan(),[record(20)],null), before=JSON.stringify(p);
+  const view=journeyDisplayPlan(p,[record(20),record(20)]);
+  assert.equal(Object.keys(completion(view,[record(20)])).length,20);
+  assert.equal(JSON.stringify(p),before);
+  assert.equal(p.stages.flatMap(s=>s.slots).length,16);
+  assert.deepEqual(view.stages.flatMap(s=>s.slots).slice(0,13),p.stages.flatMap(s=>s.slots).slice(0,13));
 });
