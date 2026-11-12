@@ -36,7 +36,17 @@ const WEEK_CHARS = "一二三四五六日";
 // 与月历同一番茄红色系
 const heatTier = (v: number) => {
   const count = Number(formatEffective(v));
-  return count <= 0 ? 0 : count < 0.5 ? 1 : count < 1 ? 2 : count < 2 ? 3 : count < 4 ? 4 : 5;
+  return count <= 0
+    ? 0
+    : count < 0.5
+    ? 1
+    : count < 1
+    ? 2
+    : count < 2
+    ? 3
+    : count < 4
+    ? 4
+    : 5;
 };
 const countText = formatEffective;
 const slotLabel = (col: number) =>
@@ -109,13 +119,15 @@ export default function StatsPanel({
     [displayedRecords, now]
   );
   const buckets = useMemo(
-    () => categoryBuckets(scoped, range, now).map((bucket) => ({
-      ...bucket,
-      count: Number(formatEffective(bucket.count)),
-      categories: bucket.categories.map((item) => ({
-        ...item, count: Number(formatEffective(item.count)),
+    () =>
+      categoryBuckets(scoped, range, now).map((bucket) => ({
+        ...bucket,
+        count: Number(formatEffective(bucket.count)),
+        categories: bucket.categories.map((item) => ({
+          ...item,
+          count: Number(formatEffective(item.count)),
+        })),
       })),
-    })),
     [scoped, range, now]
   );
   const trendPoints = useMemo(
@@ -228,100 +240,60 @@ export default function StatsPanel({
           onToggleCompact={onToggleCompact}
         />
       </div>
-      <ResearchProgress
-        records={displayedRecords}
-        now={now}
-        onTrend={() => {
-          setCategory("research");
-          setAnchor(Date.now());
-          setRangeKey("week");
-        }}
-      />
-      <RoutinePanel records={scoped} range={range} now={now} />
-      {summary.count === 0 && summary.seconds === 0 ? (
-        <div className="card stats-empty">所选区间暂无专注记录</div>
-      ) : (
-        <>
-          <StatsTrendChart
-            points={trendPoints}
-            categoryLabel={categoryLabel}
-            tone={
-              categoryTone && mixColor(categoryTone, "#675b50", 0.15)
-            }
-            baselineTone={
-              categoryTone && mixColor(categoryTone, "#ffffff", 0.35)
-            }
-            filters={
-              <div
-                className="category-filters"
-                role="group"
-                aria-label="趋势番茄分类"
-              >
-                {(["all", ...STAT_CATEGORIES] as CategoryFilter[]).map(
-                  (type) => (
-                    <button
-                      key={type}
-                      className="category-filter"
-                      aria-pressed={category === type}
-                      onClick={() => setCategory(type)}
-                    >
-                      {type !== "all" && (
-                        <i style={{ background: TOMATO_TONES[type] }} />
-                      )}
-                      {type === "all"
-                        ? "全部"
-                        : type === "unclassified"
-                        ? "未分类"
-                        : PROJECT_LABELS[type]}
-                    </button>
-                  )
-                )}
-              </div>
-            }
+      <div className="stats-dashboard">
+        <div className="stats-primary">
+          <ResearchProgress
+            records={displayedRecords}
+            now={now}
+            onTrend={() => {
+              setCategory("research");
+              setAnchor(Date.now());
+              setRangeKey("week");
+            }}
           />
-          <div className="stats-grid">
-            <div className="stats-col">
-              <section className="card stats-card stats-summary">
-                <h3>区间合计</h3>
-                <div className="stats-summary-metrics">
-                  <div className="st-row">
-                    <span className="st-label">番茄</span>
-                    <div className="st-value">
-                      <strong>{formatEffective(summary.count)}</strong>
-                    </div>
-                  </div>
-                  <div className="st-row">
-                    <span className="st-label">专注时长</span>
-                    <div className="st-value">
-                      <strong className="long">
-                        {durationText(summary.seconds)}
-                      </strong>
-                    </div>
-                  </div>
-                  <div className="st-row">
-                    <span className="st-label">活跃天数</span>
-                    <div className="st-value">
-                      <strong>{summary.activeDays}</strong>
-                    </div>
-                  </div>
-                  <div className="st-row">
-                    <span className="st-label">日均番茄</span>
-                    <div className="st-value">
-                      <strong>{formatEffective(summary.activeDays ? summary.count / summary.activeDays : 0)}</strong>
-                    </div>
-                  </div>
-                  <div className="st-row streak">
-                    <span className="st-label">连续收获</span>
-                    <div className="st-value">
-                      <strong
-                        data-tier={streak >= 7 ? "mid" : undefined}
+          {summary.count > 0 || summary.seconds > 0 ? (
+            <>
+              <StatsTrendChart
+                points={trendPoints}
+                categoryLabel={categoryLabel}
+                tone={
+                  categoryTone &&
+                  mixColor(categoryTone, "#675b50", 0.15)
+                }
+                baselineTone={
+                  categoryTone &&
+                  mixColor(categoryTone, "#ffffff", 0.35)
+                }
+                filters={
+                  <div
+                    className="category-filters"
+                    role="group"
+                    aria-label="趋势番茄分类"
+                  >
+                    {(
+                      ["all", ...STAT_CATEGORIES] as CategoryFilter[]
+                    ).map((type) => (
+                      <button
+                        key={type}
+                        className="category-filter"
+                        aria-pressed={category === type}
+                        onClick={() => setCategory(type)}
                       >
-                        {streak} 天
-                      </strong>
-                    </div>
+                        {type !== "all" && (
+                          <i
+                            style={{ background: TOMATO_TONES[type] }}
+                          />
+                        )}
+                        {type === "all"
+                          ? "全部"
+                          : type === "unclassified"
+                          ? "未分类"
+                          : PROJECT_LABELS[type]}
+                      </button>
+                    ))}
                   </div>
-                </div>
-              </section>
+                }
+              />
               <section className="card stats-card stats-bars">
                 <div className="harvest-heading">
                   <h3>{BAR_TITLE[rangeKey]}</h3>
@@ -356,7 +328,9 @@ export default function StatsPanel({
                     return (
                       <div className="bar-col" key={i}>
                         {buckets.length <= 14 && b.count > 0 && (
-                          <span className="bar-val">{formatEffective(b.count)}</span>
+                          <span className="bar-val">
+                            {formatEffective(b.count)}
+                          </span>
                         )}
                         <div
                           className={`bar${b.isToday ? " today" : ""}${
@@ -373,9 +347,9 @@ export default function StatsPanel({
                                 ? tone.glow || undefined
                                 : undefined,
                           }}
-                          title={`${b.label} · ${
-                            formatEffective(b.count)
-                          } 个番茄 · ${durationText(b.seconds)}`}
+                          title={`${b.label} · ${formatEffective(
+                            b.count
+                          )} 个番茄 · ${durationText(b.seconds)}`}
                         >
                           {harvestView === "category" &&
                             b.categories
@@ -396,7 +370,9 @@ export default function StatsPanel({
                                     c.category === "unclassified"
                                       ? "未分类"
                                       : PROJECT_LABELS[c.category]
-                                  } · ${formatEffective(c.count)} 个（${Math.round(
+                                  } · ${formatEffective(
+                                    c.count
+                                  )} 个（${Math.round(
                                     (c.count / b.count) * 100
                                   )}%）· ${durationText(c.seconds)}`}
                                 />
@@ -420,12 +396,64 @@ export default function StatsPanel({
                   </div>
                 )}
               </section>
+            </>
+          ) : (
+            <div className="card stats-empty">所选区间暂无专注记录</div>
+          )}
+        </div>
+        <div className="stats-secondary">
+          <section className="card stats-card stats-summary">
+            <h3>区间合计</h3>
+            <div className="stats-summary-metrics">
+              <div className="st-row">
+                <span className="st-label">番茄</span>
+                <div className="st-value">
+                  <strong>{formatEffective(summary.count)}</strong>
+                </div>
+              </div>
+              <div className="st-row">
+                <span className="st-label">专注时长</span>
+                <div className="st-value">
+                  <strong className="long">
+                    {durationText(summary.seconds)}
+                  </strong>
+                </div>
+              </div>
+              <div className="st-row">
+                <span className="st-label">活跃天数</span>
+                <div className="st-value">
+                  <strong>{summary.activeDays}</strong>
+                </div>
+              </div>
+              <div className="st-row">
+                <span className="st-label">日均番茄</span>
+                <div className="st-value">
+                  <strong>
+                    {formatEffective(
+                      summary.activeDays
+                        ? summary.count / summary.activeDays
+                        : 0
+                    )}
+                  </strong>
+                </div>
+              </div>
+              <div className="st-row streak">
+                <span className="st-label">连续收获</span>
+                <div className="st-value">
+                  <strong data-tier={streak >= 7 ? "mid" : undefined}>
+                    {streak} 天
+                  </strong>
+                </div>
+              </div>
             </div>
+          </section>
+          <RoutinePanel records={scoped} range={range} now={now} />
+          {(summary.count > 0 || summary.seconds > 0) && (
             <section className="card stats-card stats-heat">
               <h3>时段热力</h3>
               <div className="routine-zone-legend">
-                <span>☀ 08:00–09:30 晨间起步</span>
-                <span>☾ 23:30–08:00 休息区</span>
+                <span>08:00–09:30 晨间</span>
+                <span>23:30–08:00 休息时段</span>
               </div>
               <div className="sh-grid">
                 <span className="sh-corner" />
@@ -464,7 +492,7 @@ export default function StatsPanel({
                               ? `${tip} · ${countText(value)} 个番茄`
                               : `${tip} · ${
                                   timeZoneKind(col) === "rest"
-                                    ? "安心休息"
+                                    ? "休息时段暂无记录"
                                     : "暂无收获"
                                 }`
                           }
@@ -475,9 +503,9 @@ export default function StatsPanel({
                 ))}
               </div>
             </section>
-          </div>
-        </>
-      )}
+          )}
+        </div>
+      </div>
     </main>
   );
 }

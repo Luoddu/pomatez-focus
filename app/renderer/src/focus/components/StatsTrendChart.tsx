@@ -81,7 +81,6 @@ export default function StatsTrendChart({
     >
       <div className="stats-trend-heading">
         <div>
-          <span className="stats-trend-eyebrow">专注节奏</span>
           <h3>专注趋势</h3>
           <p>{categoryLabel} · 已保存专注时长 · 日历日均</p>
         </div>

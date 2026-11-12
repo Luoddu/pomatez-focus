@@ -2997,12 +2997,66 @@ input:focus-visible {
 /* Keep reading and chart distances stable on wide desktop windows. */
 .stats-page > * {
   width: 100%;
-  max-width: 1080px;
+  max-width: 1280px;
   flex: none;
   min-width: 0;
 }
 .stats-page > .routine-panel {
   margin: 0;
+}
+.stats-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.stats-primary,
+.stats-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.stats-dashboard .card,
+.stats-dashboard .stats-trend {
+  margin: 0;
+  padding: 20px;
+  border-radius: 16px;
+  min-width: 0;
+}
+.stats-dashboard .stats-trend {
+  background: #fff;
+  box-shadow: none;
+  border-color: var(--border);
+}
+.stats-dashboard .stats-trend-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.stats-dashboard .stats-trend h3 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.stats-dashboard .stats-card h3 {
+  font-size: 17px;
+  color: var(--text);
+  letter-spacing: 0;
+}
+.stats-dashboard .research-heading {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.stats-dashboard .routine-metrics {
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+.stats-dashboard .stats-trend-plot {
+  height: 210px;
+}
+@media (max-width: 900px) {
+  .stats-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .stats-tabs {
   display: inline-flex;

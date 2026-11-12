@@ -40,8 +40,8 @@ export default function RoutinePanel({
   return (
     <section className="card routine-panel" aria-label="晨间与休息节奏">
       <div>
-        <strong>珍惜早晨，安心休息</strong>
-        <span>08:00–09:30 轻轻开始 · 23:30–08:00 留给睡眠</span>
+        <strong>作息时段</strong>
+        <span>晨间 08:00–09:30 · 休息时段 23:30–08:00</span>
       </div>
       <div className="routine-metrics">
         <span>
@@ -49,15 +49,9 @@ export default function RoutinePanel({
           · {routine.morningDays} 天
         </span>
         <span className="routine-rest">
-          休息时段记录 {Math.round(routine.restSeconds / 60)} 分钟 ·
-          如实保留，不额外奖励熬夜
+          休息时段记录 {Math.round(routine.restSeconds / 60)} 分钟
         </span>
       </div>
-      <p>
-        {routine.morningDays > 0
-          ? "你已经给一些早晨留出了专注。保持小步开始，比晚上赶工更从容。"
-          : "早上有余力时，从一颗小番茄开始；休息也是安排的一部分。"}
-      </p>
       {days.length > 0 && (
         <div className="routine-holidays" aria-label="区间节假日">
           {days.map((d) => (
@@ -70,7 +64,7 @@ export default function RoutinePanel({
               {d.holiday.rest
                 ? d.count > 0
                   ? ` · 收获 ${d.count}`
-                  : " · 安心休息"
+                  : " · 休息日"
                 : ""}
             </span>
           ))}

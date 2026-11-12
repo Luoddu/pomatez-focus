@@ -31,7 +31,7 @@ export default function ResearchProgress({
       aria-label="科研持续投入"
     >
       <div className="research-heading">
-        <strong>科研 · 持续生长</strong>
+        <strong>科研投入</strong>
         <button className="btn-text" onClick={onTrend}>
           查看科研时长趋势
         </button>
@@ -51,12 +51,8 @@ export default function ResearchProgress({
       </div>
       <p>
         {met
-          ? "本周科研目标已达成，每一次投入都在积累。"
-          : current.count > 0
-          ? `本周已积累 ${current.count} 个科研番茄，距离目标还有 ${
-              goal - current.count
-            } 个。按自己的节奏继续。`
-          : "从一个科研番茄开始，让持续投入慢慢看得见。"}
+          ? "本周目标已达成"
+          : `距本周目标还差 ${goal - current.count} 个`}
       </p>
       <div
         className="research-weeks"
