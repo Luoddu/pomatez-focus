@@ -3,12 +3,13 @@ const {app,BrowserWindow}=require('electron'),assert=require('node:assert/strict
 if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('isolated silent profile required');
 const root=path.resolve(__dirname,'..'),old=process.env.POMO_SYNC_EXPECT_OLD==='1',checks=[];
 const {FocusService}=require('../app/electron/build/focus/service');
+const {FeishuTransportError}=require('../app/electron/build/focus/feishuErrors');
 const source='synthetic-recovery',tasks=[{id:'p1',planId:'p1',taskId:'t1',title:'Synthetic sync task · 第 1 个番茄',source:'feishu',sourceKey:source,quadrant:'iu'}];
 let initial=true,readers=[],saved=[],calls=[],archives=[],firstId,failFirst=true,failHistory=false;
 FocusService.prototype.status=()=>({configured:true,sourceKey:source});
 FocusService.prototype.projects=async()=>({sourceKey:source,projects:[]});
 FocusService.prototype.today=async()=>{if(initial)await new Promise(r=>readers.push(r));return tasks};
-FocusService.prototype.history=async()=>{if(failHistory)throw Error('Synthetic history read failure');return {sourceKey:source,records:saved,missing:0}};
+FocusService.prototype.history=async()=>{if(failHistory)throw new FeishuTransportError({code:'ENOTFOUND',message:'private-host-secret'},'GET','bitable/v1/apps/private/tables/private/records');return {sourceKey:source,records:saved,missing:0}};
 FocusService.prototype.generateToday=async()=>{throw Error('unexpected generation')};
 FocusService.prototype.classifyHistory=async()=>({classified:0});
 FocusService.prototype.sync=async r=>{firstId=firstId||r.id;calls.push(r.id);if(failFirst&&r.id===firstId)throw Error('Synthetic original record conflict; untouched');return {synced:true,planId:r.task.planId}};
@@ -54,7 +55,9 @@ app.whenReady().then(async()=>{try{
   assert.equal(calls.filter(id=>id===firstId).length,2);assert.equal(archives.filter(id=>id===firstId).length,1);assert.equal((await stored()).records.length,2);assert.deepEqual((await stored()).active,paused);
   assert.equal(await js("!!document.querySelector('.sync-progress')"),false);checks.push('explicit retry succeeds on same ID once, clears matching error, preserves both records and paused timer/segments');
   const recordsBefore=(await stored()).records;failHistory=true;await click('手动同步');await idle();await until(()=>js("!!document.querySelector('.sync-progress.error')"));await click('查看同步失败原因');
-  assert.ok(await js("document.querySelector('.sync-error-details').textContent.includes('回读飞书成果失败：Synthetic history read failure')"));assert.deepEqual((await stored()).records,recordsBefore);assert.equal(calls.length,3);
+  assert.ok(await js("document.querySelector('.sync-error-details').textContent.includes('回读飞书成果失败：飞书域名解析失败')"));
+  assert.ok(await js("document.querySelector('.toast.error').textContent.includes('回读飞书成果失败') && document.querySelector('.toast.error').textContent.includes('ENOTFOUND') && !document.body.textContent.includes('private-host-secret')"));
+  assert.deepEqual((await stored()).records,recordsBefore);assert.equal(calls.length,3);
   failHistory=false;await click('手动同步');await idle();await until(()=>js("!document.querySelector('.sync-progress')"));assert.equal(calls.length,3);assert.deepEqual((await stored()).active,paused);checks.push('history-read failure names its phase, never undoes cloud receipts or replays already shared records; retry still works');
   // Verify keyboard-accessible details stay inside narrow viewport without floating sync animations.
   failHistory=true;await click('手动同步');await idle();await until(()=>js("!!document.querySelector('.sync-progress.error')"));win.setContentSize(480,900);await click('查看同步失败原因');

@@ -897,7 +897,7 @@ export default function FocusApp() {
         state: "error",
         errors,
       });
-      if (manualSyncRequested.current.delete(sourceKey)) notify(`记录已保存在本机，待同步：${e.message}`, "error");
+      if (manualSyncRequested.current.delete(sourceKey)) notify(`${phase}失败：${e.message || "未返回错误原因"}`, "error");
     } finally {
       syncing.current = false;
       setSyncBusy(false);

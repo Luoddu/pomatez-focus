@@ -4,7 +4,7 @@ import path from "path";
 import https from "https";
 import { createHash } from "crypto";
 import { PrefsRepository } from "./preferences";
-import { FeishuRequestError, recoverDataReady } from "./feishuErrors";
+import { FeishuRequestError, FeishuTransportError, recoverDataReady } from "./feishuErrors";
 import {
   Feishu,
   GenerateProgress,
@@ -15,6 +15,12 @@ import {
 
 export const request: Request = (method, route, body, token) =>
   new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error instanceof FeishuRequestError ? error : new FeishuTransportError(error, method, route));
+    };
     const payload = body ? JSON.stringify(body) : undefined;
     const req = https.request(
       {
@@ -29,34 +35,45 @@ export const request: Request = (method, route, body, token) =>
       },
       (res) => {
         let text = "";
+        let ended = false;
+        res.on("error", fail);
+        res.on("aborted", () => fail({code:"RESPONSE_INTERRUPTED"}));
+        res.on("close", () => {
+          if (!ended && !res.complete) fail({code:"RESPONSE_INTERRUPTED"});
+        });
         res.setEncoding("utf8");
         res.on("data", (chunk) => {
+          if (settled) return;
           text += chunk;
-          if (text.length > 8 * 1024 * 1024)
-            req.destroy(new Error("response too large"));
+          if (text.length > 8 * 1024 * 1024) {
+            fail({code:"RESPONSE_TOO_LARGE"});
+            text = "";
+            req.destroy();
+          }
         });
         res.on("end", () => {
+          ended = true;
+          if (settled) return;
+          if (res.complete === false) { fail({code:"RESPONSE_INTERRUPTED"}); return; }
           try {
             const result = JSON.parse(text);
             if (res.statusCode !== 200 || result.code !== 0) {
-              reject(
+              fail(
                 new FeishuRequestError(Number(result.code), res.statusCode, method)
               );
               return;
             }
+            settled = true;
             resolve(result);
           } catch {
+            settled = true;
             reject(new Error("飞书响应无法解析，请稍后重试"));
           }
         });
       }
     );
-    req.on("timeout", () => req.destroy(new Error("timeout")));
-    req.on("error", () =>
-      reject(
-        new Error("无法连接飞书，记录已保留在本机；请检查网络后重试")
-      )
-    );
+    req.on("timeout", () => { fail({code:"CLIENT_TIMEOUT"}); req.destroy(); });
+    req.on("error", fail);
     if (payload) req.write(payload);
     req.end();
   });
