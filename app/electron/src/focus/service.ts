@@ -4,6 +4,7 @@ import path from "path";
 import https from "https";
 import { createHash } from "crypto";
 import { PrefsRepository } from "./preferences";
+import { FeishuRequestError, recoverDataReady } from "./feishuErrors";
 import {
   Feishu,
   GenerateProgress,
@@ -39,13 +40,7 @@ export const request: Request = (method, route, body, token) =>
             const result = JSON.parse(text);
             if (res.statusCode !== 200 || result.code !== 0) {
               reject(
-                new Error(
-                  `飞书请求未通过（HTTP ${
-                    res.statusCode
-                  }，代码 ${Number(
-                    result.code
-                  )}）。请检查权限或稍后重试。`
-                )
+                new FeishuRequestError(Number(result.code), res.statusCode, method)
               );
               return;
             }
@@ -331,7 +326,11 @@ export class FocusService {
     if (this.planWriting) throw Error("正在写入番茄计划，请稍候");
     this.planWriting = true;
     try {
-      return await this.connected().archiveHistory(value);
+      const client = this.connected(), snapshot = structuredClone(value);
+      return await recoverDataReady(() => {
+        if (this.client !== client) throw Error("飞书连接已变化，本机记录保留，请切回原连接后同步");
+        return client.archiveHistory(snapshot);
+      });
     } finally {
       this.planWriting = false;
     }
@@ -339,12 +338,21 @@ export class FocusService {
   // 计划表方向的同步（含确认 N 个番茄的多行完成/补行）与生成、±、
   // 右键完成共用 planWriting 锁，避免 list-then-write 交错出重复键
   async sync(value: any) {
-    if (value?.syncTarget !== "plan")
-      return this.connected().sync(value);
+    if (value?.syncTarget !== "plan") {
+      const client = this.connected(), snapshot = structuredClone(value);
+      return recoverDataReady(() => {
+        if (this.client !== client) throw Error("飞书连接已变化，本机记录保留，请切回原连接后同步");
+        return client.sync(snapshot);
+      });
+    }
     if (this.planWriting) throw new Error("正在写入番茄计划，请稍候");
     this.planWriting = true;
     try {
-      return await this.connected().sync(value);
+      const client = this.connected(), snapshot = structuredClone(value);
+      return await recoverDataReady(() => {
+        if (this.client !== client) throw Error("飞书连接已变化，本机记录保留，请切回原连接后同步");
+        return client.sync(snapshot);
+      });
     } finally {
       this.planWriting = false;
     }
