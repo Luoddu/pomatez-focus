@@ -1,6 +1,6 @@
 # P0-POMO-087 飞书传输失败分类与中断收口
 
-- IN_PROGRESS；owner/root，模块本卡唯一状态源；基线9c2e3c4a7ba608d5241cca421d476178cca09b24，task/p0-pomo-087-transport-errors。用户提供手动同步两处错误，分别共享明细和写回记录，均显示无法连接。
+- DONE（传输错误分类/响应中断处理与交付）；个人故障根因及积压恢复待验证；owner/root，模块本卡唯一状态源；基线9c2e3c4a7ba608d5241cca421d476178cca09b24，task/p0-pomo-087-transport-errors。用户提供手动同步两处错误，分别共享明细和写回记录，均显示无法连接。
 - 目标：修复传输层遮蔽错误及响应中断不收口，保留可判定的安全原因/读写/接口类别，帮助定位真实失败；不能宣称未知个人网络根因已修复。T1可回滚本地实现，实际网络根因unknown；无网络配置、凭证或云写修改。
 - 四源：①service.ts:17–62把req.error所有原因丢弃，18秒timeout与response too large也被归为无法连接；res未监听error/aborted。用户两阶段都走该公共函数。无凭证公开open.feishu.cn/open-apis/ GET本机113ms返回404，仅证明当下主机可达，不证明业务请求成功。②实际Electron34.5.8/Node20.19.1；固定官方https://raw.githubusercontent.com/nodejs/node/v20.19.1/lib/_http_client.js socketCloseListener/res.destroy及request destroy/error机制；官方文档Web未取得，源码已读；不变更第三方版本/代理/重试策略。③Learning原有不可把pending当未发送，复用FeishuRequestError与service幂等记账/写锁；scripts/test-sync-recovery.cjs及plan-fixture可用。④sync-ready、plan、feishu及P085完整链验收；现有只测JSON业务码未覆盖真实响应中断。
 - 写集：app/electron/src/focus/service.ts、feishuErrors.ts；renderer FocusApp.tsx仅手动同步toast保留已有phase；tests/sync-ready.test.cjs及新tests/transport.test.cjs、必要合成测试runner；任务/验收、CHANGELOG、版本helper输出、私有忽略artifacts。根仓共享文档/真实用户profile/凭证/云记录/系统代理禁止写；不自动重启安装。
