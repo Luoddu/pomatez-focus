@@ -379,7 +379,7 @@ export default function QuadrantBoard({
     count: number,
     project?: FocusProject
   ) => void;
-  loadProjects?: () => Promise<FocusProject[]>;
+  loadProjects?: (refresh?: boolean) => Promise<FocusProject[]>;
   onTaskCategory?: (task: FocusTask, type: ProjectType | "") => void;
   records: FocusSession[];
   weights?: TomatoWeights;

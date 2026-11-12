@@ -1,3 +1,4 @@
+import { ProjectCatalog } from "./projectCatalog";
 import React, {
   useContext,
   useCallback,
@@ -962,26 +963,16 @@ export default function FocusApp() {
       state: "pending",
     });
   };
-  const projectCache = useRef<{source: string; expires: number; request: Promise<FocusProject[]>} | null>(null);
-  const loadProjects = useCallback(async (): Promise<
-    FocusProject[]
-  > => {
+  const projectCache = useRef(new ProjectCatalog());
+  const loadProjects = useCallback(async (refresh = false): Promise<FocusProject[]> => {
     if (!sourceKey || !api()) throw Error("请先连接飞书以选择项目");
-    const cached = projectCache.current;
-    if (cached?.source === sourceKey && Date.now() < cached.expires) return cached.request;
-    const request: Promise<FocusProject[]> = api().projects().then((result: {sourceKey: string; projects: FocusProject[]}) => {
-      if (result.sourceKey !== sourceKey) throw Error("飞书连接已变化，请重新打开表单");
-      if (projectCache.current?.request === request) projectCache.current.expires = Date.now() + 60000;
-      return result.projects;
-    }).catch((error: unknown) => {
-      if (projectCache.current?.request === request) projectCache.current = null;
-      throw error;
-    });
-    projectCache.current = {source: sourceKey, request, expires: Infinity};
-    return request;
+    return projectCache.current.load(sourceKey, () => api().projects(), refresh);
   }, [sourceKey]);
   useEffect(() => {
+    const catalog = projectCache.current;
     if (sourceKey) void loadProjects().catch(() => {});
+    else catalog.clear();
+    return () => catalog.clear();
   }, [sourceKey, loadProjects]);
   const assertCategoryEditable = (task: FocusTask) => {
     if (!boardScope || ((task.sourceKey || "local") !== boardScope && !(task.source === "local" && !task.sourceKey))) throw Error("请连接这项任务所属的飞书表");

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import type { FocusQuadrant, FocusProject } from "../session";
 import { PROJECT_LABELS, PROJECT_TONES } from "../week";
 export default function QuickTaskEntry({
@@ -16,7 +16,7 @@ export default function QuickTaskEntry({
     project?: FocusProject
   ) => void;
   onClose: () => void;
-  loadProjects?: () => Promise<FocusProject[]>;
+  loadProjects?: (refresh?: boolean) => Promise<FocusProject[]>;
   initial?: { title: string; count: number };
 }) {
   const [title, setTitle] = useState(initial?.title || "");
@@ -27,14 +27,19 @@ export default function QuickTaskEntry({
   const [loading, setLoading] = useState(!!loadProjects);
   const [projectError, setProjectError] = useState("");
   const [retry, setRetry] = useState(0);
+  const previousLoader = useRef<typeof loadProjects>();
   useEffect(() => {
     let cancelled = false;
     if (!loadProjects) return;
     setLoading(true);
     setProjectError("");
-    setProjects([]);
-    setProjectId("");
-    loadProjects()
+    const changedSource = previousLoader.current !== loadProjects;
+    previousLoader.current = loadProjects;
+    if (changedSource) {
+      setProjects([]);
+      setProjectId("");
+    }
+    loadProjects(!changedSource && retry > 0)
       .then((rows) => {
         if (!cancelled) setProjects(rows);
       })
@@ -55,12 +60,14 @@ export default function QuickTaskEntry({
       className="quick-task-form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (initial && loading) return;
+
         try {
           if (!title.trim() || title.trim().length > 200)
             throw Error("请输入 1–200 字的任务名称");
           if (!Number.isInteger(count) || count < 1 || count > 50)
             throw Error("计划番茄数应为 1–50");
+          if (projectId && !project)
+            throw Error("原项目已不可用，请重新选择项目或暂不归属");
           onAdd(title.trim(), quadrant, count, project);
           onClose();
         } catch (err: any) {
@@ -77,7 +84,7 @@ export default function QuickTaskEntry({
         onChange={(e) => setTitle(e.target.value)}
       />
       <label className="quick-project">
-        <span>所属项目</span>
+        <span>所属项目（可选）</span>
         <span
           className="quick-project-swatch"
           style={{
@@ -89,10 +96,15 @@ export default function QuickTaskEntry({
         <select
           aria-label="新增任务所属项目"
           value={projectId}
-          disabled={loading || !!projectError || !projects.length}
+          disabled={!projects.length && !projectId}
           onChange={(e) => setProjectId(e.target.value)}
         >
-          <option value="">{loading ? "正在读取项目…" : projectError ? "项目读取失败" : "暂不归属（浅灰）"}</option>
+          <option value="">暂不归属（浅灰）</option>
+          {projectId && !project && (
+            <option value={projectId} disabled>
+              原项目已不可用，请重新选择
+            </option>
+          )}
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -103,12 +115,27 @@ export default function QuickTaskEntry({
           ))}
         </select>
       </label>
+      {loadProjects && !projectError && (
+        <button
+          type="button"
+          className="btn-text"
+          disabled={loading}
+          onClick={() => setRetry((n) => n + 1)}
+        >
+          {loading ? "正在读取项目…" : "刷新项目"}
+        </button>
+      )}
       {loading && (
-        <small role="status">正在读取飞书项目，确认后可选择所属项目。</small>
+        <small role="status">
+          正在读取项目；不归属项目可直接确认，已有列表仍可使用。
+        </small>
       )}
-      {!loading && !projectError && loadProjects && !projects.length && (
-        <small role="status">飞书项目表暂无可选项目。</small>
-      )}
+      {!loading &&
+        !projectError &&
+        loadProjects &&
+        !projects.length && (
+          <small role="status">飞书项目表暂无可选项目。</small>
+        )}
       {projectError && (
         <small role="status">
           {projectError}{" "}
@@ -133,8 +160,12 @@ export default function QuickTaskEntry({
             onChange={(e) => setCount(Number(e.target.value))}
           />
         </label>
-        <button className="btn-small" type="submit" disabled={!!initial && loading}>
-          {initial ? "确认整理" : "添加"}
+        <button className="btn-small" type="submit">
+          {initial
+            ? projectId
+              ? "确认整理"
+              : "暂不归属，确认整理"
+            : "添加"}
         </button>
         <button className="btn-text" type="button" onClick={onClose}>
           取消

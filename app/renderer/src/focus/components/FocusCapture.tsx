@@ -8,7 +8,7 @@ export default function FocusCapture({title,onTitle,items,allowEntry,canCapture,
   title:string;onTitle:(value:string)=>void;items:QuickTask[];canCapture:boolean;canOrganize:boolean;
   allowEntry:boolean;
   onCapture:(title:string)=>void;onOrganize:(before:QuickTask,title:string,quadrant:FocusQuadrant,count:number,project?:FocusProject)=>void;
-  loadProjects:()=>Promise<FocusProject[]>;
+  loadProjects:(refresh?: boolean)=>Promise<FocusProject[]>;
 }) {
   const [error,setError]=useState("");
   const [inputOpen,setInputOpen]=useState(false);
