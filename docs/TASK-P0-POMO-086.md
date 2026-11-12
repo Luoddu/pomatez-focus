@@ -1,6 +1,6 @@
 # P0-POMO-086 旅程完成记录显示完整
 
-- IN_PROGRESS；owner/root，模块状态源本卡，基线0dcec8c7f48429be01bb0c18c65e6c2956d45d80，task/p0-pomo-086-journey-complete。用户要求完成上轮已T0复现的旅程11个仅亮7个修复，并附1254607读取错误复发截图。
+- DONE（旅程实现/交付）；同步1254607复发仍待定位，未解决；owner/root，模块状态源本卡，基线0dcec8c7f48429be01bb0c18c65e6c2956d45d80，task/p0-pomo-086-journey-complete。用户要求完成上轮已T0复现的旅程11个仅亮7个修复，并附1254607读取错误复发截图。
 - T1展示/派生逻辑，有来源及持久旅程关系，需独立复核。写集：renderer focus/journey.js、journey.d.ts、components/TodayJourney.tsx；tests/journey.test.mjs与必要隐藏桌面脚本；任务/验收、CHANGELOG、既有版本helper输出。同步复发先T0完整链路定位，不在未知具体接口/阶段时追加同层重试补丁；未获证据不宣称同步已修复。根共享文件只读。
 - 四源：①HistoryPanel按当天全部记录累计，journey eligible在连接态排除local来源，reconcile只填预设空位，已合成复现7云+4本地→概览11/旅程7；②不适用第三方语义变更，纯本项目派生显示；同步1254607官方语义沿P085证据，不重新猜测网络/权限；③复用reconcile/completion/fitJourneyDay及现有只读详情，Learning未命中显示新教训；④journey/journey-templates/api与已有隐藏Electron验收。
 - 实现：连接态也接纳本地saved记录；用只读派生旅程视图补齐未放入预设的已完成单位，不把溢出图标写入模板/持久计划，不增加未来计划，原预设100上限不变；当实际记录改数量/删除时派生视图随之恢复；其他飞书来源仍隔离。已完成图标不会被24点未来计划裁剪隐藏。
