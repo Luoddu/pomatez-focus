@@ -2990,8 +2990,19 @@ input:focus-visible {
 /* ── 专注统计页：区间 tab + 汇总条 + 图表网格 ── */
 .stats-page {
   flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  gap: 16px;
   overflow-y: auto;
+}
+/* Keep reading and chart distances stable on wide desktop windows. */
+.stats-page > * {
+  width: 100%;
+  max-width: 1080px;
+  flex: none;
+  min-width: 0;
+}
+.stats-page > .routine-panel {
+  margin: 0;
 }
 .stats-tabs {
   display: inline-flex;
@@ -3154,7 +3165,7 @@ button.stats-range-label:hover {
 .stats-trend-plot {
   position: relative;
   margin-top: 10px;
-  height: 166px;
+  height: clamp(180px, 22vw, 240px);
 }
 .stats-trend-insufficient {
   position: absolute;
