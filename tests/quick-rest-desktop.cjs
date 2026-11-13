@@ -44,7 +44,7 @@ app.whenReady().then(async()=>{try{
  checks.push('drag header into historical gap records60 minutes; dragging lit meal moves same id without duplicate');
  const beforeFailure=JSON.stringify(await log());
  await js("window.originalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('pomatez-rest-log-v2:'))return;return window.originalSet.call(this,k,v)};void 0");
- await click('gym');assert.equal(JSON.stringify(await log()),beforeFailure);assert.equal(await js("document.querySelector('.journey-rest-start[data-rest-kind=gym]').getAttribute('aria-pressed')"),'true');assert.match(await js("document.querySelector('.journey-error').textContent"),/未保存/);
+ await click('gym');assert.equal(JSON.stringify(await log()),beforeFailure);assert.equal(await js("document.querySelector('.journey-rest-start[data-rest-kind=gym]').getAttribute('aria-pressed')"),'false');assert.match(await js("document.querySelector('.journey-error').textContent"),/未保存/);
  await js("Storage.prototype.setItem=window.originalSet;void 0");
  checks.push('failed save preserves stored log and displays error');
  await js("document.querySelector('.journey-rest-start[data-rest-kind=meal]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}))");
@@ -61,6 +61,21 @@ app.whenReady().then(async()=>{try{
  entries=(await log()).events;assert.equal(entries.length,2);assert.ok(entries.every(e=>e.endedAt<=at(12,25)));
  assert.equal(await js("JSON.stringify(JSON.parse(localStorage.getItem('pomatez-focus-v1')).records)"),before);
  checks.push('starting real focus cancels future nap, keeps past rests and original focus records byte-identical');
+
+ const retained=structuredClone((await log()).events);
+ await js('window.__now='+at(12,50)+';void 0');
+ await wait(1100);
+ const button=label=>js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===${JSON.stringify(label)}||b.textContent.trim()===${JSON.stringify(label)});if(!b)throw Error('button missing');b.click()})()`);
+ await button('结束');await button('确认结束');await until(()=>js("!!document.querySelector('.review-card')"));await button('1 个番茄');await button('记录番茄');
+ await until(()=>js("JSON.parse(localStorage.getItem('pomatez-focus-v1')).records.length===3"));
+ for(const kind of ['meal','nap','gym'])assert.equal(await js(`document.querySelector('.journey-rest-start[data-rest-kind="${kind}"]').getAttribute('aria-pressed')`),'false');
+ assert.deepEqual((await log()).events,retained);
+ const stored=await js("JSON.parse(localStorage.getItem('pomatez-focus-v1'))");assert.notEqual(stored.records.find(r=>!['one','two'].includes(r.id)).cloudSynced,true);assert.equal(stored.records.find(r=>!['one','two'].includes(r.id)).completedCount,1);
+ await win.webContents.reload();await until(()=>js("document.querySelectorAll('.journey-tomato[data-complete=true]').length===3"));await freeze();await js('window.__now='+at(12,50)+';void 0');
+ for(const kind of ['meal','nap','gym'])assert.equal(await js(`document.querySelector('.journey-rest-start[data-rest-kind="${kind}"]').getAttribute('aria-pressed')`),'false');
+ await click('meal');await click('nap');let nextEvents=(await log()).events;assert.equal(nextEvents.length,retained.length+2);assert.deepEqual(nextEvents.slice(0,retained.length),retained);
+ await click('meal');nextEvents=(await log()).events;assert.equal(nextEvents.length,retained.length+1);assert.deepEqual(nextEvents.slice(0,retained.length),retained);
+ checks.push('real local tomato confirmation resets all three shortcuts before sync and after reload; next clicks append and only current-round toggle cancels, old timeline remains byte-identical');
  fs.writeFileSync(path.join(__dirname,'../artifacts/quick-rest-desktop.json'),JSON.stringify({passed:checks.length,checks},null,2));
  console.log(JSON.stringify({passed:checks.length,checks}));clearTimeout(deadline);app.exit(0);
 }catch(e){console.error(e);clearTimeout(deadline);app.exit(1)}});

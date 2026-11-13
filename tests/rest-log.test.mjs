@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { newJourney, journeyDay } from "../app/renderer/src/focus/journey.js";
-import { readRestLog, writeRestLog, restLogKey, legacyRestLogKey, openRest, startRest, closeRest, restClock, completedBeforeRest, validateRestLog, restBackfillWindow, backfillRest } from "../app/renderer/src/focus/restLog.ts";
+import { readRestLog, writeRestLog, restLogKey, legacyRestLogKey, openRest, startRest, closeRest, restClock, completedBeforeRest, validateRestLog, restBackfillWindow, backfillRest, currentRestShortcut } from "../app/renderer/src/focus/restLog.ts";
 const at = (d,h,m=0) => new Date(2026,9,d,h,m).getTime();
 const memory = () => { const m=new Map(); return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)}; };
 const plan = () => newJourney("A",journeyDay(at(10,12)),()=>"unused");
@@ -108,4 +108,21 @@ test("legacy paused focus with unknown end is not treated as empty; explicit seg
   const known={...old,segments:[{start:at(10,9),end:at(10,10)}]};
   assert.equal(restBackfillWindow(empty,[],known,at(10,12)).startedAt,at(10,10));
   assert.equal(backfillRest(empty,p,"nap",at(10,10),at(10,11),at(10,12),[],known,"gap").events.length,1);
+});
+
+
+test('rest shortcuts reset after a new local tomato without cancelling prior history; fragments and other scope/day do not reset',()=>{
+ const now=at(10,14),base={id:'base',status:'saved',completedCount:6,startedAt:at(10,8),endedAt:at(10,11),task:{source:'feishu',sourceKey:'A'}};
+ const events=['meal','nap','gym'].map((kind,i)=>({id:kind,kind,startedAt:at(10,12,i*10),endedAt:at(10,12,i*10+5),afterCount:6,presetKey:null}));
+ const log={version:2,scope:'A',events},original=structuredClone(log);
+ const next={...base,id:'new',startedAt:at(10,13),endedAt:at(10,13,25),completedCount:1,cloudSynced:false};
+ for(const kind of ['meal','nap','gym']) {
+   assert.equal(currentRestShortcut(log,kind,[base],now)?.id,kind);
+   assert.equal(currentRestShortcut(log,kind,[base,next],now),null);
+   for(const ignored of [{...next,completedCount:0},{...next,status:'review'},{...next,task:{source:'feishu',sourceKey:'B'}},{...next,startedAt:at(9,13),endedAt:at(9,13,25)}])assert.equal(currentRestShortcut(log,kind,[base,ignored],now)?.id,kind);
+ }
+ assert.deepEqual(log,original);
+ const ongoing={...log,events:[{...events[0],endedAt:null}]};assert.equal(currentRestShortcut(ongoing,'meal',[base,next],now)?.id,'meal');
+ assert.equal(currentRestShortcut(log,'meal',[base],at(11,14)),null);
+ const storage=memory();writeRestLog(storage,log);assert.equal(currentRestShortcut(readRestLog(storage,'A'),'meal',[base,next],now),null);
 });

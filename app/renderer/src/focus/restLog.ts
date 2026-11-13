@@ -238,3 +238,14 @@ export function backfillRest(log: RestLog, plan: Journey, kind: ActualRestKind,
     presetKey:nextPreset(valid,plan,kind)};
   return validateRestLog({...valid,events:[...valid.events,event].sort((a,b)=>a.startedAt-b.startedAt)},log.scope);
 }
+
+// Header shortcuts belong to the current completed-tomato boundary. Historical
+// events remain in the log/timeline and must never become a new round's toggle.
+export function currentRestShortcut(log: RestLog | null, kind: ActualRestKind,
+  records: FocusSession[], now: number): RestEvent | null {
+  if (!log) return null;
+  const recent = log.events.filter(e => e.kind === kind && journeyDay(e.startedAt) === journeyDay(now)).slice(-1)[0];
+  if (!recent) return null;
+  if (recent.endedAt === null) return recent;
+  return recent.afterCount === completedBeforeRest(records, log.scope, now) ? recent : null;
+}

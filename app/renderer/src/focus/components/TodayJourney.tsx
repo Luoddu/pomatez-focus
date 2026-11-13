@@ -30,7 +30,7 @@ import {
   JourneySettingsIcon,
 } from "./JourneyIcons";
 import JourneyTemplates from "./JourneyTemplates";
-import { ACTUAL_REST, ActualRestKind, RestEvent, RestLog, openRest, restClock } from "../restLog";
+import { ACTUAL_REST, ActualRestKind, RestEvent, RestLog, openRest, restClock, currentRestShortcut } from "../restLog";
 
 const localTimeInput = (at: number) => {
   const d = new Date(at);
@@ -129,7 +129,7 @@ export default function TodayJourney({
     e.dataTransfer.effectAllowed = id ? "move" : "copy";
   };
   const quick = (kind: ActualRestKind, toggle = false) => attempt(() => {
-    const recent=controls.restLog?.events.filter(e => e.kind===kind && journeyDay(e.startedAt)===day).slice(-1)[0];
+    const recent=currentRestShortcut(controls.restLog,kind,records,Date.now());
     if(toggle && recent) controls.cancelRestAction(recent.id);
     else controls.quickRestAction(kind);
     setRestMenu(null);
@@ -445,13 +445,13 @@ export default function TodayJourney({
         <span className="journey-heading-actions">
           {today && <span className="journey-rest-controls">
             {(["meal", "nap", "gym"] as ActualRestKind[]).map(kind => {
-              const recent = ongoing?.kind === kind ? ongoing : actualRests.filter(event => event.kind === kind).slice(-1)[0];
+              const recent = currentRestShortcut(controls.restLog,kind,records,Date.now());
               const state = recent ? recent.endedAt === null ? "ongoing" : "completed" : "planned";
               return <button key={kind}
               className={`btn-text journey-rest-start${state === "ongoing" ? " is-ongoing" : recent ? " is-recorded" : ""}`}
               data-rest-kind={kind} data-rest-state={state}
               aria-label={ACTUAL_REST[kind].record}
-              title={recent ? `再次点击取消并撤回占时；拖到番茄前补记；右键精确记录 · ${recent.estimated ? "已安排" : state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `点击记录${ACTUAL_REST[kind].label}；拖到番茄前补记；右键精确记录`}
+              title={recent ? `再次点击取消本轮记录并撤回占时；拖到番茄前补记；右键精确记录 · ${recent.estimated ? "已安排" : state === "ongoing" ? "正在进行" : "最近已完成"} · ${restDetails(recent)}` : `点击记录${ACTUAL_REST[kind].label}；拖到番茄前补记；右键精确记录`}
               aria-pressed={!!recent} aria-expanded={restMenu === kind} disabled={!controls.ready || !controls.restLog}
               draggable onDragStart={e => dragRest(e,kind)} onDragEnd={() => { restDrag.current=null; setDraggingRest(false); }}
               onContextMenu={e => { e.preventDefault(); setRestMenu(kind); }}
