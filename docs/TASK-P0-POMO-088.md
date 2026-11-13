@@ -1,5 +1,5 @@
 # P0-POMO-088 本机今日旅程恢复
-- IN_PROGRESS；owner/root，本模块本卡为状态源；基线d7c22a852d252c15b1529803cea3e6f46cab9f21。用户要求把今日已建立任务同步到旅程并排查反复目录未就绪。新督促/游戏/晚间提醒需求仍保留，未宣称实施。
+- DONE（本机旅程恢复）；owner/root，本模块本卡为状态源；基线d7c22a852d252c15b1529803cea3e6f46cab9f21。用户要求把今日已建立任务同步到旅程并排查反复目录未就绪。新督促/游戏/晚间提醒需求仍保留，未宣称实施。
 - T1本机安排操作，复用JOURNEY-API协议1，固定当前源客户端；允许通过既有客户端读取2026-11-13今日目录、保存私有忽略artifacts快照，按当前真实task ID与CAS调整未完成/非计时槽位，写后再读确认；用户截图顺序仅作待核对目标，先验证目录对应任务。不得修改实际记录/计时、云任务/凭证、陌生进程/后台、全量清空计划或绕过LOCKED/TASK_UNAVAILABLE。根共享文件只读。
 - 四源：①截图说明目录未同步，当前原生发现文件存在；具体接口失败尚unknown；②复用现有固定Electron34.5.8单实例通道，无第三方运行语义变更，官方依据沿JOURNEY-API.md；③复用journey-client、CAS回执及Learning传输ID/逻辑ID分离机制；④journey-api/gateway/desktop既有正反验收。本次先T0接口读，再按真实证据决定写；若目录不含目标不伪造ID/越权读取凭证。
 - 写集：docs/TASK-P0-POMO-088.md、ACCEPTANCE-P0-POMO-088.md、私有忽略artifacts；运行写仅既有用户目录journey-api请求/回执与App原旅程localStorage。必要产品修复需补卡，本轮不预先扩大网络/接口范围。
