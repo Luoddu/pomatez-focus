@@ -8,3 +8,11 @@
 - 独立review_local_editing代码复核无P1/P2，独立21/21通过；末次证据复核PASS，可冻结，无剩余P1/P2。Learning-Review: none — 既有记录与显示分离原则的局部投影修正，无新的通用工程机制。
 - 基线bfb4ac6536c3aae0d2dc61b7a2a31d98a6a5ba37；源版本130；不改配套、个人数据、根共享文件。软件包/本机准备/公开更新尚待完成，不等于用户安装。
 - 回滚129固定安装包与源码，无数据迁移。
+
+## 固定交付
+- 固定产品commit 8ed48e7861d1d6f373348a568d2061a241b6c06b；独立冻结核对PASS，工作树干净。干净构建、117文件包内比对、隐藏隔离启动PASS。
+- NSIS内部ASAR SHA256 f41a20de921b44b621976847224086eb49ec36418136489d75a843c7ccfecba7，与win-unpacked一致。安装包83294156字节，SHA256 7fd2082e2b2f37a44a8c6fd81f09901a65bd014fca1965f29130b3cf331289f4。
+- 本机stage成功并二次回读alreadyPrepared=true，未关闭/重启个人App。源码与公开130五资产、固定annotated tag均验证；旧129与Latest不变。release443980956：https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.130 。
+- 真实129更新器发现130，errors=[]、downloads=0、自动下载和退出自动安装false；原始证据artifacts/release130-live-update.json、release130-remote-public.json、release130-package-acceptance.json。
+- 软件交付DONE；个人在设置“重启以加载更新”后生效，不把stage当已安装。包含129按钮修复，配套无修改。回滚129且无需历史迁移。
+- Learning-Review: none — 沿同一检查点既有判断，构建发布沿用验证过的流程，无新通用机制。
