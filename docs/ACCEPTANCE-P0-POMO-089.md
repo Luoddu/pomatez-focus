@@ -55,3 +55,14 @@
 
 - 严格桌面验证曾失败：原fixture返回空history，renderer的0进度异步覆盖手工注入12；已使用合成12记录并等待真实renderer投影完成后注入监测。cp4-strict-fixed.txt PASS，未修改产品计数或放行门禁。浏览器桌面清理的成功/异常路径均已await异步注册读回。
 - 最终独立复核PASS：复核534原始结果、修正后的三条桌面链及Learning，未发现P1/P2，允许冻结CP4；个人卡顿和断线恢复仍须交付后确认。
+
+
+## CP4 固定128交付
+- 产品commit c7268d94daa258dd11b8ee077c7f932cc46f820e，独立冻结核对PASS、工作树干净；干净生产构建、108文件包源对照及隐藏smoke PASS。NSIS内ASAR SHA256 cd4acbd5a524facdfa0faa8c6c0cb9ede2988898288315e300ef9fb5751089c3，与win-unpacked一致。
+- 128安装包83130514字节，SHA256 d9d4b4dc40e35e3792514a3784b3182c6f03418f8ae92bc28114d4a47611aac1；stage-local-update两次回读已准备/幂等通过。
+- 已发布 https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.128 ，release443866904，annotated tag固定上述产品commit；五资产远端size/digest一致，旧127和Latest保持。证据artifacts/release128-remote-public.json。
+- 真实127更新器发布前current127、发布后available128，feed匹配，errors=[]、downloads=0、自动下载和退出自动安装均false（artifacts/release128-live-update.json）。
+- 既有个人配套更新为1.3.1：先核原五文件与127包一致，再核key/permissions/host_permissions/content_scripts与新版完全一致，调用既有BrowserControl.install，五文件读回匹配。未扩权限、未另建注册项、未关闭个人进程；浏览器实际重载仍待用户。
+- 最终窄回读：个人App127、配套文件1.3.1、严格配置存在且此前已确认strictCapable/gameRulesReady，当前receipt disconnected且过期。128包准备不等于安装完成，配套文件更新不等于worker重载，不标个人链DONE。
+- 未完成项：用户从保存/备份入口重启到128、Edge重新加载配套，再验证连接与正常使用响应。日常偶发整窗卡顿没有完整现场复现，本次仅关闭两项有证据缺陷，不声称全部根治。
+- 回滚：127公开安装包和固定源码保留，配套原字节可从127包恢复；不回写或删除个人番茄历史。Learning沿c7268d9的089-02，本发布读回没有新增可复用结论。
