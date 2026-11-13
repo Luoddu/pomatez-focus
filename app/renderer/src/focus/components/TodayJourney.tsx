@@ -576,7 +576,6 @@ export default function TodayJourney({
                         data-complete={!!actual}
                         data-effective-count={actual ? tomatoWeight(actual, weights) : undefined}
                         data-active={running}
-                        data-time-label={futureTime ? "future" : times ? "actual" : undefined}
                         className={`journey-tomato${
                           actual ? " is-complete" : ""
                         }${running ? " is-active" : ""}`}
@@ -638,17 +637,17 @@ export default function TodayJourney({
                           <JourneyOutline size={22} />
                         )}
                         {times?.start !== undefined && <small className="journey-time-corner"
-                          data-time-kind="actual" title={`实际专注开始 ${journeyDetail(plan.day, times.start)}`}>
-                          {journeyClock(times.start)}
+                          data-time-kind="actual" title={`实际专注开始 ${journeyDetail(plan.day, times.start)}${actual?.endedAt ? ` · 结束 ${journeyDetail(plan.day,actual.endedAt)}` : ""}`}>
+                          {journeyHour(plan.day, times.start)}
                         </small>}
-                        {times?.end !== undefined && <small className="journey-time-corner journey-time-end"
+                        {terminal && times?.start === undefined && times?.end !== undefined && <small className="journey-time-corner"
                           data-time-kind="actual" title={`实际专注结束 ${journeyDetail(plan.day, times.end)}`}>
-                          {journeyClock(times.end)}
+                          {journeyHour(plan.day, times.end)}
                         </small>}
                         {futureTime && <small className="journey-time-corner"
                           data-time-kind={futureTime.kind}
                           title={`${futureTime.kind === "estimate" ? "预计" : "计划"}${terminal ? "结束" : "开始"} ${journeyDetail(plan.day, futureTime.at)}`}>
-                          {futureTime.kind === "estimate" ? "预计" : "计划"}{journeyDay(futureTime.at) === plan.day ? journeyClock(futureTime.at) : `${journeyHour(plan.day,futureTime.at)}:${String(new Date(futureTime.at).getMinutes()).padStart(2,"0")}`}
+                          {journeyHour(plan.day, futureTime.at)}
                         </small>}
                       </button>
                       {actualAt(position)}
