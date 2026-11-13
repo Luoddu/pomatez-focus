@@ -307,6 +307,29 @@ const activeInJourney = (plan, active) => active &&
   Number.isFinite(active.startedAt) && journeyDay(active.startedAt) === plan.day &&
   (plan.scope === "local" ? active.task?.source === "local" :
     active.task?.source === "feishu" && active.task.sourceKey === plan.scope);
+// One pair per saved session, even when its tomatoes cross stage boundaries.
+export function journeySlotTimes(plan, records, active = null) {
+  const done = completion(plan, records), slots = plan.stages.flatMap(s => s.slots);
+  const groups = new Map(), result = {};
+  for (const slot of slots) {
+    const record = done[slot.id];
+    if (!record) continue;
+    const group = groups.get(record.id);
+    if (group) group.last = slot.id;
+    else groups.set(record.id, {record, first:slot.id, last:slot.id});
+  }
+  for (const {record, first, last} of groups.values()) {
+    result[first] = {...result[first], start:record.startedAt};
+    if (Number.isFinite(record.endedAt) && record.endedAt >= record.startedAt)
+      result[last] = {...result[last], end:record.endedAt};
+  }
+  if (activeInJourney(plan, active) && !groups.has(active.id)) {
+    const slot = slots.find(p => !done[p.id] && p.binding?.sessionId === active.id) ||
+      slots.find(p => !done[p.id] && !p.binding);
+    if (slot) result[slot.id] = {start:active.startedAt};
+  }
+  return result;
+}
 // Display only: actual session boundaries never overwrite template hours or bindings.
 export function journeyActualTimes(plan, records, active = null) {
   const done = completion(plan, records),

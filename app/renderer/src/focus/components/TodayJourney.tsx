@@ -7,6 +7,7 @@ import {
   completion,
   fitJourneyDay,
   journeyHour,
+  journeySlotTimes,
   JourneyTime,
   journeyDay,
   locked,
@@ -209,6 +210,7 @@ export default function TodayJourney({
   );
   const timeline: {starts:Record<string,JourneyTime>;end:JourneyTime|null} = fitted?.timeline || {starts:{},end:null};
   const shownPlan = fitted?.plan || displayPlan;
+  const slotTimes = useMemo(() => shownPlan ? journeySlotTimes(shownPlan, records, controls.active) : {}, [shownPlan, records, controls.active]);
   const slots = shownPlan?.stages.flatMap((s) => s.slots) || [],
     selected = slots.find((s) => s.id === edit);
   const options = useMemo(() => {
@@ -551,6 +553,11 @@ export default function TodayJourney({
                     const stageTime = timeline.starts[s.id];
                     const terminal = p.id === slots[slots.length-1]?.id &&
                       (j !== 0 || s.time === null || timeline.end?.kind === "actual");
+                    const times = slotTimes[p.id];
+                    const futureTime = !actual && !running && !times
+                      ? terminal && timeline.end?.kind !== "actual" ? timeline.end
+                        : j === 0 && stageTime?.kind !== "actual" ? stageTime : null
+                      : null;
                     return (
                       <React.Fragment key={p.id}>
                       {today && actual && <span className={`journey-rest-drop${draggingRest ? " is-visible" : ""}`}
@@ -569,6 +576,7 @@ export default function TodayJourney({
                         data-complete={!!actual}
                         data-effective-count={actual ? tomatoWeight(actual, weights) : undefined}
                         data-active={running}
+                        data-time-label={futureTime ? "future" : times ? "actual" : undefined}
                         className={`journey-tomato${
                           actual ? " is-complete" : ""
                         }${running ? " is-active" : ""}`}
@@ -629,19 +637,19 @@ export default function TodayJourney({
                         ) : (
                           <JourneyOutline size={22} />
                         )}
-                        {terminal && timeline.end ? (
-                          <small className="journey-time-corner"
-                            data-time-kind={timeline.end.kind}
-                            title={`${timeline.end.kind === "actual" ? "实际专注结束" : timeline.end.kind === "estimate" ? "预计结束" : "预设结束参考"} ${journeyDetail(plan.day, timeline.end.at)}${stageTime?.kind === "actual" ? ` · 本段专注开始 ${journeyDetail(plan.day, stageTime.at)}` : ""}`}>
-                            {journeyHour(plan.day, timeline.end.at)}
-                          </small>
-                        ) : j === 0 && stageTime ? (
-                          <small className="journey-time-corner"
-                            data-time-kind={stageTime.kind}
-                            title={`${stageTime.kind === "actual" ? "实际专注开始" : stageTime.kind === "estimate" ? "预计开始" : "预设参考"} ${journeyDetail(plan.day, stageTime.at)}${s.time !== null ? ` · 模板参考 ${s.time}点` : ""}`}>
-                            {journeyHour(plan.day, stageTime.at)}
-                          </small>
-                        ) : null}
+                        {times?.start !== undefined && <small className="journey-time-corner"
+                          data-time-kind="actual" title={`实际专注开始 ${journeyDetail(plan.day, times.start)}`}>
+                          {journeyClock(times.start)}
+                        </small>}
+                        {times?.end !== undefined && <small className="journey-time-corner journey-time-end"
+                          data-time-kind="actual" title={`实际专注结束 ${journeyDetail(plan.day, times.end)}`}>
+                          {journeyClock(times.end)}
+                        </small>}
+                        {futureTime && <small className="journey-time-corner"
+                          data-time-kind={futureTime.kind}
+                          title={`${futureTime.kind === "estimate" ? "预计" : "计划"}${terminal ? "结束" : "开始"} ${journeyDetail(plan.day, futureTime.at)}`}>
+                          {futureTime.kind === "estimate" ? "预计" : "计划"}{journeyDay(futureTime.at) === plan.day ? journeyClock(futureTime.at) : `${journeyHour(plan.day,futureTime.at)}:${String(new Date(futureTime.at).getMinutes()).padStart(2,"0")}`}
+                        </small>}
                       </button>
                       {actualAt(position)}
                       </React.Fragment>

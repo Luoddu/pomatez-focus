@@ -164,3 +164,5 @@ export function applyJourneyTemplate(
   records?: FocusSession[],
   active?: FocusSession | null
 ): Journey;
+
+export function journeySlotTimes(plan: Journey, records: FocusSession[], active?: FocusSession | null): Record<string, {start?: number; end?: number}>;

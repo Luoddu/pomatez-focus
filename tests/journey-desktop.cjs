@@ -188,14 +188,14 @@ app.whenReady().then(async () => {
         plannedSeconds:4500,elapsedSeconds:4500,acceptedSeconds:4500,completedCount:14,status:'saved',sync:'local'};
       const seedTime = snapshot => `localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(p))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify(snapshot))})`;
       await reload(seedTime({active:null,records:[rec]}),false,14);
-      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').textContent.trim()`),'15');
+      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').textContent.trim()`),'15:22');
       assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').dataset.timeKind`),'actual');
-      assert.equal(await js(`document.querySelector('.journey-stage:first-child .journey-time-corner').textContent.trim()`),'14');
+      assert.equal(await js(`document.querySelector('.journey-stage:first-child .journey-time-corner').textContent.trim()`),'14:07');
       const active={...rec,id:'unbound-time',status:'paused',completedCount:0};delete active.endedAt;
       const saved={...rec,completedCount:13,startedAt:at.getTime()-7200000,endedAt:at.getTime()-3600000};
       await reload(seedTime({active,records:[saved]}),false,14);
       const snapshot=await stored(), actualPlan=await plan();
-      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').textContent.trim()`),'24');
+      assert.equal(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').textContent.trim()`),'14:07');
       assert.ok(await js(`document.querySelector('.journey-stage:last-child .journey-time-corner').title.includes('14:07')`));
       assert.equal(actualPlan.stages.at(-1).slots[0].binding,null);
       assert.deepEqual(snapshot.active,{...active,recovered:true,segmentOpen:false});
@@ -203,24 +203,38 @@ app.whenReady().then(async () => {
       assert.deepEqual((await stored()).active,snapshot.active);
       assert.deepEqual(await plan(),actualPlan);
       assert.equal(actualPlan.endHour,24);
-      checks.push('single-slot terminal shows hour15 with precise hover, native active keeps hour24 and hover14:07 without bindings/state changes');
-      const q=original; q.stages.forEach((s,i)=>s.time=[10,14,16,19,21][i]); q.endHour=23;
+      checks.push('single-slot terminal shows15:22, native active shows14:07 without bindings/state changes');
+      const q=structuredClone(original); q.stages.forEach((s,i)=>s.time=[10,14,16,19,21][i]); q.endHour=23;
       const time=(h,m)=>{const d=new Date(at);d.setHours(h,m,0,0);return d.getTime()};
       const records=[{...rec,id:'am',completedCount:4,startedAt:time(14,10),endedAt:time(15,50)},
         {...rec,id:'pm',completedCount:3,startedAt:time(16,17),endedAt:time(17,47)},
         {...rec,id:'eve',completedCount:3,startedAt:time(19,48),endedAt:time(20,48)}];
       await reload(`localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(q))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records}))})`,false,12);
       const labels=await js(`[...document.querySelectorAll('.journey-stage .journey-time-corner')].map(e=>e.textContent.trim())`);
-      assert.deepEqual(labels,['14','16','19','22','24']);
+      assert.deepEqual(labels,['14:10','15:50','16:17','17:47','19:48','20:48','预计22:48','预计24:00']);
       assert.equal(await js(`Number(document.querySelector('.journey-card').dataset.trimmed)`),4);
       assert.equal((await plan()).stages.flatMap(s=>s.slots).length,16);
       assert.ok(await js(`document.querySelectorAll('.journey-stage')[3].querySelector('.journey-time-corner').title.includes('预计开始 22:48')`));
       assert.deepEqual((await plan()).stages.map(s=>s.time),[10,14,16,19,21]);
+      const exact = {...rec,id:'afternoon',completedCount:3,startedAt:time(13,32),endedAt:time(15,5)};
+      await reload(`localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(original))});localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records:[exact]}))})`,true);
+      await until(()=>js(`document.querySelectorAll('.journey-tomato[data-complete="true"]').length===3`));
+      assert.deepEqual(await js(`[...document.querySelectorAll('.journey-time-corner[data-time-kind="actual"]')].map(e=>e.textContent.trim())`),['13:32','15:05']);
+      assert.equal(await js(`document.querySelectorAll('.journey-tomato[data-complete="true"]').length`),3);
+      win.setMinimumSize(360,500);
+      for(const width of [780,520]) {
+        win.setSize(width,850); await wait(200);
+        await js(`document.querySelector('.journey-card').scrollIntoView({block:"center"});void 0`);
+        await wait(100);
+        assert.ok(await js(`(()=>{const row=document.querySelector('.journey-stages'),box=row.getBoundingClientRect();const labels=[...row.querySelectorAll('.journey-time-corner')].map(e=>e.getBoundingClientRect());return labels.every(r=>r.top>=box.top && r.bottom<=box.bottom) && labels.every((a,i)=>labels.slice(i+1).every(b=>a.bottom<=b.top || b.bottom<=a.top || a.right<=b.left || b.right<=a.left));})()`));
+        fs.writeFileSync(path.join(root,`artifacts/p091-journey-${width}.png`),(await win.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
+      }
+      checks.push('13:32–15:05 three local unsynced tomatoes show exact boundaries once; 780/520 labels neither overlap nor clip; future explicitly estimated');
       const beforeNextDay=await stored();
       await click('明天','.journey-heading button');
-      assert.equal(await js(`document.querySelector('.journey-stage .journey-time-corner').textContent.trim()`),'8');
+      assert.equal(await js(`document.querySelector('.journey-stage .journey-time-corner').textContent.trim()`),'计划08:00');
       assert.deepEqual((await stored()).records,beforeNextDay.records);
-      checks.push('actual14/16/19 and future22 capped24; four unfinishable outlines hidden, raw16/template/history retained; tomorrow remains8');
+      checks.push('actual minute boundaries and future22:48 capped24:00; four unfinishable outlines hidden, raw16/template/history retained; tomorrow remains8');
     } else if (phase === "plan") {
       await click("设置", ".journey-heading button");
       await click("复制新建", ".journey-dialog button");
@@ -305,16 +319,16 @@ app.whenReady().then(async () => {
         3
       );
       const marker = () => js(`document.querySelector('.journey-stage .journey-time-corner').textContent.trim()`);
-      assert.equal(await marker(), "8");
+      assert.equal(await marker(), "08:07");
       assert.equal((await plan()).stages[0].time, 8);
-      assert.equal(await js(`document.querySelectorAll('.journey-stage')[1].querySelector('.journey-time-corner').textContent.trim()`), "12");
+      assert.equal(await js(`document.querySelectorAll('.journey-stage')[1].querySelector('.journey-time-corner').textContent.trim()`), "预计12:07");
       const corrected = await stored();
       corrected.records.find(r=>r.id==='seed-today').startedAt += 600000;
       await reload(`localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify(corrected))})`);
-      assert.equal(await marker(), "8");
+      assert.equal(await marker(), "08:17");
       assert.ok(await js(`document.querySelector('.journey-stage .journey-time-corner').title.includes('08:17')`));
       assert.equal((await plan()).stages[0].time, 8);
-      checks.push("actual hour8 with precise08:07/edited08:17 hover, early-day budget and original template8 preserved");
+      checks.push("actual visible08:07/edited08:17, early-day budget and original template8 preserved");
       assert.equal(
         await js(`document.querySelector('.stb-from').textContent`),
         "200"
@@ -359,7 +373,7 @@ app.whenReady().then(async () => {
         shape.same && shape.left && shape.below && !shape.overflow,
         JSON.stringify(shape)
       );
-      assert.ok(await js(`(()=>{const e=document.querySelector('.journey-card .journey-stages');return e.scrollWidth<=e.clientWidth+1})()`));
+      assert.ok(await js(`(()=>{const e=document.querySelector('.journey-card .journey-stages');return getComputedStyle(e).overflowX==="auto" && e.clientWidth<=e.closest(".journey-card").clientWidth})()`));
       checks.push(
         "journey full overview width above science card, outer column preserved"
       );
@@ -400,7 +414,7 @@ app.whenReady().then(async () => {
       await until(async () => !!(await stored()).active);
       const a = (await stored()).active;
       const started = new Date(a.startedAt), startedLabel = `${String(started.getHours()).padStart(2,'0')}:${String(started.getMinutes()).padStart(2,'0')}`;
-      assert.equal(await js(`document.querySelector('.journey-tomato[data-active="true"]').closest('.journey-stage').querySelector('.journey-time-corner').textContent.trim()`), String(started.getHours()));
+      assert.equal(await js(`document.querySelector('.journey-tomato[data-active="true"]').closest('.journey-stage').querySelector('.journey-time-corner').textContent.trim()`), startedLabel);
       assert.ok(await js(`document.querySelector('.journey-tomato[data-active="true"]').closest('.journey-stage').querySelector('.journey-time-corner').title.includes(${JSON.stringify(startedLabel)})`));
       assert.equal(a.task.id, "plan-row1");
       assert.equal(

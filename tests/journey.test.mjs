@@ -15,6 +15,7 @@ import {
   journeyActualTimes,
   journeyTimeline,
   journeyHour,
+  journeySlotTimes,
   fitJourneyDay,
   moveSlot,
   resizeStages,
@@ -406,4 +407,26 @@ test('existing planned bindings and extras never count one unit twice', () => {
   assert.equal(JSON.stringify(p),before);
   assert.equal(p.stages.flatMap(s=>s.slots).length,16);
   assert.deepEqual(view.stages.flatMap(s=>s.slots).slice(0,13),p.stages.flatMap(s=>s.slots).slice(0,13));
+});
+
+test("actual minute boundaries belong to a session, not invented per-tomato times", () => {
+  const start = new Date(2026,9,8,13,32).getTime(), end = new Date(2026,9,8,15,5).getTime();
+  const r = record(3,{startedAt:start,endedAt:end});
+  const p = reconcileJourney(plan(),[r]);
+  const slots = p.stages.flatMap(s=>s.slots), filled = slots.filter(s=>s.binding?.sessionId===r.id);
+  const before = JSON.stringify({p,r});
+  assert.deepEqual(journeySlotTimes(p,[r]),{[filled[0].id]:{start},[filled[2].id]:{end}});
+  // Move the final unit to another stage: still only one start and end.
+  p.stages[0].slots = p.stages[0].slots.filter(s=>s.id!==filled[2].id);
+  p.stages[1].slots.unshift(filled[2]);
+  assert.deepEqual(journeySlotTimes(p,[r]),{[filled[0].id]:{start},[filled[2].id]:{end}});
+  const single = record(1,{startedAt:start,endedAt:end});
+  assert.deepEqual(journeySlotTimes(p,[single]),{[filled[0].id]:{start,end}});
+  assert.deepEqual(journeySlotTimes(p,[{...single,endedAt:start-1}]),{[filled[0].id]:{start}});
+  for(const bad of [{...r,completedCount:0},{...r,startedAt:start-86400000},{...r,task:{source:'feishu',sourceKey:'other'}}])
+    assert.deepEqual(journeySlotTimes(p,[bad]),{});
+  const active = {...single,status:'active',endedAt:null};
+  assert.deepEqual(journeySlotTimes(p,[],active),{[filled[0].id]:{start}});
+  assert.deepEqual(journeySlotTimes(p,[],{...active,task:{source:'feishu',sourceKey:'other'}}),{});
+  assert.equal(JSON.stringify(r),JSON.stringify(JSON.parse(before).r));
 });

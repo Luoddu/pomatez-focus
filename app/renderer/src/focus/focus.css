@@ -4822,3 +4822,10 @@ button.stats-range-label:hover {
 .journey-rest-drop { display:inline-block; flex:none; width:0; height:26px; border-radius:4px; }
 .journey-rest-drop.is-visible { width:14px; background:var(--blue-soft); border:1px dashed var(--blue); }
 .journey-rest-drop.is-over { background:var(--blue); }
+
+/* Keep minute labels readable; a long itinerary scrolls instead of hiding times. */
+.journey-card .journey-stages { padding-top:18px; padding-bottom:20px; }
+.journey-card .journey-tomato[data-time-label="actual"] { min-width:34px; }
+.journey-card .journey-tomato[data-time-label="future"] { min-width:64px; }
+.journey-card .journey-time-corner { left:50%; transform:translateX(-50%); top:-14px; font-size:10px; line-height:12px; white-space:nowrap; }
+.journey-card .journey-time-end { top:auto; bottom:-14px; }
