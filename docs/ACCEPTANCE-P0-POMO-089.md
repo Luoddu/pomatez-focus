@@ -42,3 +42,16 @@
 - 并发：冻结后status干净、HEAD未漂移，另一worktree无本任务写集/运行资源冲突；本检查点仅两份文档。四源预检沿本卡，无新第三方运行语义。
 - Learning-Review: none — 同一发布验收链的DNR教训已在386bdff的LEARN-P0-POMO-089-01记录；本次包摘要和发布回读未产生新的通用工程结论。
 - 回滚：保留126公开安装包及个人App原状态，127仅通过保存/备份入口安装；不迁移或删除专注记录。未完成个人激活前任务保持REVIEW，不标DONE。
+
+
+## CP4 128修复验收（冻结前）
+- 已验证：127安装及1.3.0配套字节一致，Node20.19.1/Electron34.5.8宿主启动正常。初查严格模式未启用，之后窄回读发现已启用且曾strictCapable/gameRulesReady=true，但当前连接断开。截图的版本更新与连接激活是不同状态。
+- 卡顿分类：日常偶发整窗停顿的完整个人复现仍unknown。5秒采样曾见主进程1.5625 CPU秒，渲染/GPU各0.015625秒，不据此归因。没有读取浏览历史或记录内容，没有关闭个人程序。
+- 确证缺陷一：同步registry读取231ms期间0ms定时器不能执行，232ms后才触发。Node20.19.1官方child_process文档L190/L767明确阻塞机制；现改execFile异步、固定脚本/stdin数据、10秒timeout及16KB输出边界保持。实际隔离registry读取200ms期间13次timer，安装互斥拒绝重入、失败后正常再安装。来源 https://nodejs.org/download/release/v20.19.1/docs/api/child_process.html 。
+- 确证缺陷二：原strict worker收到阻断状态后反复receipt，宿主回复状态构成闭环，无心跳100ms触及21消息上限；1.3.1按连接/日/提醒/reason去重确认，放行和断线清理。新增真实native host加worker完整闭环证明首次2帧、1次回执，心跳不重复，新提醒回执仍通，断线仍限制。
+- 目标测试18/18 PASS（artifacts/p089/cp4-targeted.txt），全回归534/534 PASS（artifacts/p089/cp4-all-tests.txt），生产构建PASS。桌面首次失败是清理阶段未await新异步read，产品链已执行；补齐测试等待后桌面六组PASS及每日锁六组PASS。未通过失败样例不充作成功证据。
+- 独立review_local_editing无P1/P2；其独立17/18 PASS，剩余随机HKCU测试项在fixture创建时遭沙箱拒绝，未进入产品断言。主执行方在获准隔离注册测试环境18/18通过，明确区分两份证据。独立真实宿主闭环及事件循环响应通过。
+- Learning已记录LEARN-P0-POMO-089-02；原生同步阻塞沿官方机制及本次验收保存，没有把推测性日常性能根因写入Learning。发布/个人128安装及1.3.1重载另行回读，当前不标DONE。
+
+- 严格桌面验证曾失败：原fixture返回空history，renderer的0进度异步覆盖手工注入12；已使用合成12记录并等待真实renderer投影完成后注入监测。cp4-strict-fixed.txt PASS，未修改产品计数或放行门禁。浏览器桌面清理的成功/异常路径均已await异步注册读回。
+- 最终独立复核PASS：复核534原始结果、修正后的三条桌面链及Learning，未发现P1/P2，允许冻结CP4；个人卡顿和断线恢复仍须交付后确认。

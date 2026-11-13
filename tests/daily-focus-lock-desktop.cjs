@@ -19,7 +19,7 @@ app.whenReady().then(async()=>{try{
  await until(()=>main.restMonitor.snapshot().settings.reminderMinutes===.25);await click('设置策略');assert.equal(await js("document.querySelector('[aria-label=提醒间隔]').value"),'15');assert.equal(await js("document.querySelector('[aria-label=提醒间隔单位]').value"),'seconds');
  await assert.rejects(js("window.focusApi.focusLockConfigure({enabled:true,releaseMinutes:15})"),/配套/);await assert.rejects(js('window.focusApi.browserSetup()'));
  checks.push('real renderer seconds selector saves 15 seconds through preload/main and reopens identically; old companion capability cannot arm; headless production registry setup refused');
- let registration=null;const installed=main.browserControl.install(process.execPath,{read:()=>registration,write:v=>registration=v});
+ let registration=null;const installed=await main.browserControl.install(process.execPath,{read:()=>registration,write:v=>registration=v});
  child=spawn('cmd.exe',['/d','/c',path.join(path.dirname(registration),'native-host.cmd'),`chrome-extension://${installed.extensionId}/`],{cwd:path.dirname(registration),windowsHide:true,stdio:['pipe','pipe','pipe']});
  let buffer=Buffer.alloc(0),responses=[],relay=null;child.stdout.on('data',v=>{buffer=Buffer.concat([buffer,v]);while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){const n=buffer.readUInt32LE(0),answer=JSON.parse(buffer.subarray(4,4+n));if(relay)relay(answer);else responses.push(answer);buffer=buffer.subarray(4+n);}});
  const sendNative=v=>{const b=Buffer.from(JSON.stringify(v)),h=Buffer.alloc(4);h.writeUInt32LE(b.length);child.stdin.write(Buffer.concat([h,b]));};

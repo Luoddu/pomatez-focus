@@ -38,7 +38,7 @@ else {
   let port=null,timer=null,tries=0,retry=null,connecting=null,epoch=0,current={day:"",key:"",until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}},serial=Promise.resolve();
   // All activation/install/startup paths share restoration before opening a
   // native port; a late read must never replace newly processed control state.
-  let gameRulesReady=false;
+  let gameRulesReady=false,lastReceiptKey=null;
   async function enforceGames(){
     if(gameRulesReady)return;
     await chrome.declarativeNetRequest.updateDynamicRules({removeRuleIds:[10001],addRules:[{id:10001,priority:1,action:{type:'block'},condition:{requestDomains:GAME_DOMAINS,resourceTypes:['main_frame','sub_frame','stylesheet','script','image','font','object','xmlhttprequest','ping','csp_report','media','websocket','other']}}]});
@@ -64,10 +64,17 @@ else {
     current=decision;
     await chrome.storage.session.set({control:decision});
     if(!owns(expected,turn))return;
-    if(decision.control.pause && expected && typeof state.reminderKey==="string") expected.postMessage({type:"receipt",key:state.reminderKey,pausedCount:Math.min(100,count)});
+    // The host answers receipts with state. A receipt is an acknowledgement,
+    // not another poll: one per reminder/lock transition and connection.
+    const receiptKey=JSON.stringify([state.day,state.reminderKey,decision.control.reason]);
+    if(decision.control.pause && expected && typeof state.reminderKey==="string" && receiptKey!==lastReceiptKey) {
+      lastReceiptKey=receiptKey;
+      expected.postMessage({type:"receipt",key:state.reminderKey,pausedCount:Math.min(100,count)});
+    }
+    if(!decision.control.pause && !decision.control.blockedUntil)lastReceiptKey=null;
   }
   function enqueue(state,expected,turn=epoch) { serial=serial.then(()=>apply(state,expected,turn)).catch(()=>{if(owns(expected,turn))stop();}); }
-  function release() { epoch++;port=null;current=decide({v:1,ready:false},current,Date.now());if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
+  function release() { lastReceiptKey=null;epoch++;port=null;current=decide({v:1,ready:false},current,Date.now());if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
   function stop() { const p=port;release();if(p)p.disconnect(); }
   function connect() {
     if(port)return Promise.resolve();if(connecting)return connecting;

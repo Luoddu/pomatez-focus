@@ -2,12 +2,14 @@ const {app,BrowserWindow}=require('electron'),assert=require('node:assert/strict
 if(process.env.POMATEZ_HEADLESS!=='1'||!process.env.POMATEZ_PROFILE)throw Error('isolated silent profile required');
 const when=new Date(2026,10,13,12).getTime(),day='2026-11-13',wait=ms=>new Promise(r=>setTimeout(r,ms));
 const {FocusService}=require('../app/electron/build/focus/service');
-FocusService.prototype.status=()=>({configured:true,sourceKey:'synthetic-strict'});FocusService.prototype.today=async()=>[];FocusService.prototype.dailyReviews=async()=>({sourceKey:'synthetic-strict',reviews:{}});FocusService.prototype.history=async()=>({sourceKey:'synthetic-strict',missing:0,records:[]});
+FocusService.prototype.status=()=>({configured:true,sourceKey:'synthetic-strict'});FocusService.prototype.today=async()=>[];FocusService.prototype.dailyReviews=async()=>({sourceKey:'synthetic-strict',reviews:{}});FocusService.prototype.history=async()=>({sourceKey:'synthetic-strict',missing:0,records:[{id:'strict-history',task:{id:'synthetic-task',title:'合成科研',source:'feishu',sourceKey:'synthetic-strict',projectType:'research'},startedAt:when-10000,endedAt:when-9000,acceptedSeconds:1,elapsedSeconds:1,completedCount:12,status:'saved',sync:'synced',cloudSynced:true}]});
 const main=require('../app/electron/build/main');
 const deadline=setTimeout(()=>app.exit(2),30000);let video;
 app.whenReady().then(async()=>{try{
  const until=async f=>{for(let i=0;i<160;i++){if(await f())return;await wait(30)}throw Error('desktop wait timeout')};let farm;
  await until(()=>{farm=BrowserWindow.getAllWindows()[0];return farm&&!farm.webContents.isLoadingMainFrame()});const js=s=>farm.webContents.executeJavaScript(s,true);
+ // Wait for the real renderer's history projection before injecting monitoring state.
+ await until(()=>main.restMonitor.snapshot().progress?.effectiveCount===12);
  main.browserControl.now=()=>when;main.browserControl.focusLock.now=()=>when;
  const state={...main.restMonitor.snapshot(),settings:{supervise:true,pomodoroGoal:12,quotaMinutes:15,reminderMinutes:5},status:'recording',progress:{day,completedCount:12,effectiveCount:12},usage:{day,start:when-3600000,end:when,totalSeconds:300,bilibili:300,xiaohongshu:0,hours:[],sessions:[],coverageStart:when-3600000},usageVerifiedThrough:when,live:{site:'bilibili',checkedAt:when,expiresAt:when+7000},updatedAt:when};main.restMonitor.state=state;
  await assert.rejects(js('focusApi.strictEnable()'),/配套/);

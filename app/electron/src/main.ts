@@ -271,7 +271,7 @@ else {
       handler("focusLockResume", () => {browserControl.focusLock.resume(restMonitor.snapshot());return publishRest(restMonitor.snapshot());});
       handler("browserSetup", async () => {
         if(headless) throw Error("静默测试不得安装真实浏览器配套");
-        const result=browserControl.install(process.execPath);
+        const result=await browserControl.install(process.execPath);
         await shell.openPath(result.directory);
         return result;
       });

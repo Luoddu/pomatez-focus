@@ -61,10 +61,16 @@ export class BrowserControl {
   close() { try { atomic(path.join(this.directory,"browser-control-projection.json"),{owner:OWNER,v:1,ready:false,expiresAt:0}); } catch (_) {} }
   // Only an explicit trusted farm action installs the per-user host. Tests
   // inject a registry adapter and never touch the real browser registration.
-  install(executable: string, registry = nativeRegistry()) {
+  private installing=false;
+  async install(executable: string, registry = nativeRegistry()) {
+    if(this.installing)throw Error('浏览器配套正在更新，请稍候');
+    this.installing=true;
+    try{return await this.installOnce(executable,registry);}finally{this.installing=false;}
+  }
+  private async installOnce(executable: string, registry = nativeRegistry()) {
     if(process.platform!=="win32") throw Error("配套安装目前支持Windows Edge");
     if(typeof executable!=="string" || !path.isAbsolute(executable) || !fs.statSync(executable).isFile()) throw Error("配套运行文件无效");
-    const target=path.join(this.directory,"browser-control"), manifest=path.join(target,"host-manifest.json"), old=registry.read();
+    const target=path.join(this.directory,"browser-control"), manifest=path.join(target,"host-manifest.json"), old=await registry.read();
     if(old && path.resolve(old).toLowerCase()!==path.resolve(manifest).toLowerCase()) throw Error("已有其他来源的浏览器注册，未覆盖");
     if(fs.existsSync(target) && (!fs.existsSync(path.join(target,"host-config.json")) || json(path.join(target,"host-config.json")).owner!==OWNER)) throw Error("配套目录不属于本App，未覆盖");
     if(/[\r\n"%!]/.test(executable+target)) throw Error("安装路径含不支持的批处理字符");
@@ -84,8 +90,8 @@ export class BrowserControl {
     } finally {
       if(fresh && fs.existsSync(stage) && path.dirname(path.resolve(stage))===path.resolve(this.directory)) fs.rmSync(stage,{recursive:true});
     }
-    registry.write(manifest);
-    if(registry.read()?.toLowerCase()!==manifest.toLowerCase()) throw Error("配套注册回读未确认，请重试");
+    await registry.write(manifest);
+    if((await registry.read())?.toLowerCase()!==manifest.toLowerCase()) throw Error("配套注册回读未确认，请重试");
     return { directory:path.join(target,"extension"),extensionId:id };
   }
 }

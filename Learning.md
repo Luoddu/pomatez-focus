@@ -2,6 +2,19 @@
 
 <!-- LEARNING_SCHEMA_V1 -->
 
+## LEARN-P0-POMO-089-02 - 回执与状态响应必须验证完整闭环
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-089
+- Evidence: tests/browser-control.test.cjs; docs/ACCEPTANCE-P0-POMO-089.md
+- Applies-To: 本模块native messaging中宿主回复状态、配套返回回执的双向协议
+- Lesson: 严格阻断状态的pause持续为true，若每次状态都发receipt，而宿主对receipt再次回复状态，会形成不依赖心跳的反馈循环。单次decide测试和直接状态注入不能发现它。真实worker接真实native宿主后验证同一连接/提醒/拦截状态只确认一次，首次状态加确认回复共两帧，正常心跳不追加回执，新提醒仍得到确认。
+- Required-Check: 验证有界消息数量及新提醒正例、断线保护、重连与状态转换；回执去重须在发送前建立，不能误关正常心跳或放宽限制。
+- Supersedes: none
+- Invalid-When: 宿主不再回复receipt、改为独立单向确认协议或提醒身份语义变化时重验；不将此闭环缺陷泛化为所有个人卡顿的根因。
+
+
+
 ## LEARN-P0-POMO-089-01 - 请求拦截规则须显式验证网页入口类型
 
 - Status: VALIDATED
