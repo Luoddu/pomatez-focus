@@ -29,3 +29,16 @@
 - Learning：新增LEARN-P0-POMO-089-01，证据为本回执及真实浏览器测试。其他缺陷是本轮实现修正，未另造重复教训。
 
 - 最终回归：artifacts/p089/final-tests.txt 531/531 PASS；最终生产构建与strict desktop PASS。独立review_local_editing再复核当前diff、受影响23项独立PASS、原始531结果和Learning，未发现剩余P1/P2，可进入冻结和发布门禁；个人激活不在合成结果内。
+
+
+## CP3 固定包与发布验收
+- 已验证：产品冻结commit386bdff3331045bdc73bba494a31d418a54427fa，版本0.1.0-preview.127；独立review_local_editing对冻结commit复核PASS。仅本卡及验收文档收口，无产品代码再次变更。
+- 531/531回归、生产构建、隔离打包smoke及108个构建文件逐字节核对通过。NSIS解出的app.asar与win-unpacked一致，SHA256为4fa6be437f977260ecb23c12f9cb668ecb515f5b90af2ef2a5eb6ba07aef729e。
+- 安装包83125324字节，SHA256为89e81e5d26a3345b433d26b4d1cd52a9ffeba49c7c9780a616e9e38b848051ac。原始证据artifacts/release127-package-acceptance.json及artifacts/p089/package.txt。
+- 已验证：本地stage helper准备127，同字节再次执行返回alreadyPrepared=true；没有结束个人App或直接替换运行ASAR。个人安装版只读回读仍126，不能把准备包视为安装完成。
+- 已发布：https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.127 ，release443827221；预发布保持prerelease=true，Latest不变。五资产远端size/SHA256均匹配，旧126资产及发布时间未改；annotated tag固定到上述产品commit。证据artifacts/release127-remote-public.json。
+- 原126真实updater在发布前判定current126，发布后判定available127，feed文件与固定包一致，errors=[]、downloads=0、autoDownload=false、autoInstallOnAppQuit=false。证据artifacts/release127-live-update.json。
+- 待完成：个人App安全重启安装、浏览器配套1.3重新加载并确认权限、严格模式启用及真实状态回读。Windows窗口激活失败且截图FrameArrived超时，已停止不可靠UI尝试并请用户使用现有“重启以加载更新”入口；不强制杀进程，不宣称个人防护已生效。
+- 并发：冻结后status干净、HEAD未漂移，另一worktree无本任务写集/运行资源冲突；本检查点仅两份文档。四源预检沿本卡，无新第三方运行语义。
+- Learning-Review: none — 同一发布验收链的DNR教训已在386bdff的LEARN-P0-POMO-089-01记录；本次包摘要和发布回读未产生新的通用工程结论。
+- 回滚：保留126公开安装包及个人App原状态，127仅通过保存/备份入口安装；不迁移或删除专注记录。未完成个人激活前任务保持REVIEW，不标DONE。
