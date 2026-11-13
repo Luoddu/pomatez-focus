@@ -26,9 +26,10 @@ type Usage = {
     site: "bilibili" | "xiaohongshu";
   }[];
 };
-type FocusLock={enabled:boolean;plannedEnabled:boolean;goal:number;quotaMinutes:number;releaseMinutes:number;plannedReleaseMinutes:number;day:string;count:number|null;reached:boolean;lockedForChanges:boolean;releasing:boolean;until:number;blocked:boolean;quotaSpent:boolean;error:string};
+type FocusLock={strict?:boolean;enabled:boolean;plannedEnabled:boolean;goal:number;quotaMinutes:number;releaseMinutes:number;plannedReleaseMinutes:number;day:string;count:number|null;reached:boolean;lockedForChanges:boolean;releasing:boolean;until:number;blocked:boolean;quotaSpent:boolean;error:string};
 export type RestState = {
-  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean;focusLockCapable?:boolean;leaseCapable?:boolean;focusLock?:FocusLock };
+  strictSupervision?:{enabled:boolean;directories?:number;error:string;games:{running:boolean;checkedAt:number;blocked:number;error:string};bedtimeError:string};
+  browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean;gameRulesReady?:boolean;focusLockCapable?:boolean;leaseCapable?:boolean;focusLock?:FocusLock };
   settings: {
     quotaMinutes: number;
     supervise: boolean;
@@ -367,7 +368,7 @@ export default function ScientificRest({
                 开启督促
                 <input
                   type="checkbox"
-                  checked={lock?.enabled?!lock.releasing:state.settings.supervise}
+                  checked={lock?.strict?true:lock?.enabled?!lock.releasing:state.settings.supervise}
                   disabled={busy||!!lock?.lockedForChanges}
                   onChange={(e) =>
                     lock?.enabled?void lockAction(e.target.checked?"focusLockResume":"focusLockRelease"):void configure(
@@ -403,8 +404,8 @@ export default function ScientificRest({
               </div>
               {lock?.enabled&&<div className="daily-focus-summary" role="status">
                 <span>每日锁 · 今日 {lock.count===null?"待确认":lock.count}/{lock.goal}</span>
-                <small>{!state.browserControl?.focusLockCapable?"更新配套后生效":lock.quotaSpent?"今日额度已用完":lock.releasing?`放行至 ${time(lock.until)}`:lock.reached?"已达标，可临时放行":"未达标，督促已锁定"}</small>
-                {lock.reached&&!lock.releasing&&!lock.quotaSpent&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockRelease")}>临时放行 {lock.releaseMinutes} 分钟</button>}
+                <small>{!state.browserControl?.focusLockCapable?"更新配套后生效":lock.quotaSpent?"今日额度已用完":lock.releasing?(lock.strict?"按实际使用累计 · 每天合计15分钟":`放行至 ${time(lock.until)}`):lock.reached?"已达标，可使用剩余额度":"未达标，督促已锁定"}</small>
+                {lock.reached&&!lock.releasing&&!lock.quotaSpent&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockRelease")}>{lock.strict?'使用今日剩余额度':`临时放行 ${lock.releaseMinutes} 分钟`}</button>}
                 {lock.releasing&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockResume")}>恢复锁定</button>}
               </div>}
               <div className="rest-sites">
@@ -428,6 +429,13 @@ export default function ScientificRest({
           </div>
         ) : view === "settings" ? (
           <div className="rest-settings">
+            <div className="daily-focus-settings">
+              <strong>严格督促</strong>
+              <p>游戏持续限制；工作日完成12个有效番茄后，B站与小红书每天累计最多15分钟，不能手动关闭督促。每天22:59提醒保存工作。</p>
+              {state.strictSupervision?.enabled?<p role="status">已启用 · {state.strictSupervision.games.error||state.strictSupervision.error||(state.strictSupervision.games.running?(state.browserControl?.gameRulesReady?'游戏平台与网站拦截已确认':'程序拦截运行中 · 游戏网站拦截待确认'):'游戏平台拦截待确认')}{state.strictSupervision.bedtimeError?` · ${state.strictSupervision.bedtimeError}`:''}</p>:<button className="btn-small" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await api().strictEnable();setDraft('15');setDraftGoal('12');}catch(e:any){setError(e.message);}finally{setBusy(false);}}}>启用严格督促</button>}
+              {state.strictSupervision?.enabled&&<button className="btn-text" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await api().strictAddGame();}catch(e:any){setError(e.message);}finally{setBusy(false);}}}>添加游戏目录（已添加 {state.strictSupervision.directories||0} 个）</button>}
+              <small>覆盖已列游戏平台和默认Steam/Epic游戏目录；新增或自定义目录游戏需补充规则。关闭农场会停止程序拦截；浏览器配套继续阻断已列游戏域名。此模式不提供工作日关闭按钮。</small>
+            </div>
             <label>
               每日摸鱼额度{" "}
               <input
@@ -437,6 +445,7 @@ export default function ScientificRest({
                 max={480}
                 step={5}
                 value={draft}
+                disabled={!!lock?.strict}
                 onChange={(e) => setDraft(e.target.value)}
               />{" "}
               分钟

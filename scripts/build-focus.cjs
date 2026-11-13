@@ -120,6 +120,7 @@ fs.copyFileSync(
   path.join(root, "app/electron/build/LICENSE.pomatez.txt")
 );
 const after = sourceState();
+fs.copyFileSync(path.join(root,'third-party/focuser/LICENSE'),path.join(root,'app/electron/build/LICENSE.focuser.txt'));
 if (source.head !== after.head || source.version !== after.version || after.dirty) source.dirty = true;
 fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 fs.writeFileSync(path.join(root, "artifacts/focus-build.json"), JSON.stringify(source, null, 2));

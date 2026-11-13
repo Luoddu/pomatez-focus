@@ -28,6 +28,7 @@ export type RestState = {
   status: "connecting" | "recording" | "interrupted";
   message: string;
   updatedAt: number | null;
+  usageVerifiedThrough?: number;
   live?: {
     checkedAt: number;
     startedAt: number;
@@ -860,6 +861,7 @@ export class ActivityWatchRest {
       }
       if (!recent) this.fullReadAt = now;
       this.state.usage = u;
+      this.state.usageVerifiedThrough=Math.min(now,...health.map(list=>Date.parse(list[0].timestamp)+Number(list[0].duration)*1000));
       this.state.updatedAt = now;
       if (!this.monitorStartedAt) this.monitorStartedAt = now;
       this.state.live = liveSignal(

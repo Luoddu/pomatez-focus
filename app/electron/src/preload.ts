@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld("focusApi", {
   savePreference: (value: any) => invoke("savePreference",value),
   applyDevicePreference: (value: any) => invoke("applyDevicePreference",value),
   restState: () => invoke("restState"),
+  strictEnable: () => invoke('strictEnable'),
+  strictAddGame: () => invoke('strictAddGame'),
   restRefresh: () => invoke("restRefresh"),
   restSettings: (value: any) => invoke("restSettings", value),
   browserConfigure: (value: any) => invoke("browserConfigure", value),

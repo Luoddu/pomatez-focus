@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { nativeRegistry } from './nativeRegistry';
 import type { RestState } from "./activitywatch";
 import { DailyFocusLock } from "./dailyFocusLock";
+import {StrictSettings} from './strict-supervision/settings';
 
 export type BrowserPolicy = { mode: "mirror" | "pause" | "cooldown" | "quota"; cooldownMinutes: number; autoRaise: boolean };
 export const HOST = "io.github.luoddu.pomatez_focus";
@@ -19,9 +20,11 @@ export class BrowserControl {
   policy = { ...defaultBrowserPolicy };
   private error = "";
   readonly focusLock:DailyFocusLock;
+  readonly strict:StrictSettings;
   private state:RestState|null=null;
   constructor(readonly directory: string, readonly build: string, private now = Date.now) {
-    this.focusLock=new DailyFocusLock(directory,now);
+    this.strict=new StrictSettings(directory);
+    this.focusLock=new DailyFocusLock(directory,now,()=>this.strict.enabled);
     const file=path.join(directory,"browser-control-settings.json");
     if (fs.existsSync(file)) try { this.policy=validBrowserPolicy(json(file)); } catch (_) { this.policy={...defaultBrowserPolicy,autoRaise:false,mode:"mirror"}; this.error="干预策略损坏，保留原文件，请重新保存"; }
   }
@@ -31,11 +34,12 @@ export class BrowserControl {
     this.policy=next; this.error=""; return this.snapshot();
   }
   snapshot() {
-    let connected=false, pausedCount=0, pauseKey="", checkedAt: number|null=null,focusLockCapable=false,leaseCapable=false;
+    let connected=false, pausedCount=0, pauseKey="", checkedAt: number|null=null,focusLockCapable=false,leaseCapable=false,strictCapable=false,gameRulesReady=false;
     try { const v=json(path.join(this.directory,"browser-control-receipt.json")); const age=this.now()-v.checkedAt;
       if(v.owner===OWNER && v.connected===true && age>=0 && age<=12000) { connected=true; checkedAt=v.checkedAt;focusLockCapable=v.focusLockCapable===true;leaseCapable=v.leaseCapable===true; if (Number.isInteger(v.pausedCount)&&v.pausedCount>=0&&v.pausedCount<=100) pausedCount=v.pausedCount; if(typeof v.pauseKey==="string"&&v.pauseKey.length<=100) pauseKey=v.pauseKey; }
     } catch (_) {}
-    return { policy:{...this.policy}, connected, pausedCount, pauseKey, checkedAt, error:this.error,focusLockCapable,leaseCapable,focusLock:this.focusLock.snapshot(this.state),
+    try{const v=json(path.join(this.directory,'browser-control-receipt.json'));strictCapable=connected&&v.strictCapable===true;gameRulesReady=connected&&v.gameRulesReady===true;}catch(_){}
+    return { strictEnabled:this.strict.enabled,strictError:this.strict.error,strictCapable,gameRulesReady,policy:{...this.policy}, connected, pausedCount, pauseKey, checkedAt, error:this.error,focusLockCapable,leaseCapable,focusLock:this.focusLock.snapshot(this.state),
       installed:fs.existsSync(path.join(this.directory,"browser-control","host-config.json")) };
   }
   publish(state: RestState) {
@@ -47,7 +51,7 @@ export class BrowserControl {
     const leaseVersion=browser.leaseCapable?2:1,leaseMs=leaseVersion===2?20000:7000;
     const midnight=new Date(now);midnight.setHours(24,0,0,0);
     try { atomic(path.join(this.directory,"browser-control-projection.json"),{
-      owner:OWNER,v:1,ready,leaseVersion,expiresAt:ready?Math.min(now+leaseMs,midnight.getTime()):0,day:localDay(now),supervise:state.settings.supervise||lock.enabled,
+      owner:OWNER,v:1,ready,strict:this.strict.enabled,leaseVersion,expiresAt:ready?Math.floor(Math.min(now+leaseMs,midnight.getTime(),lock.strict&&lock.releasing?lock.permitUntil:Infinity)):0,day:localDay(now),supervise:state.settings.supervise||lock.enabled,
       mode:this.policy.mode,cooldownMinutes:this.policy.cooldownMinutes,reminderKey:ready?(state.reminder?.key||""):"",
       quotaSpent:ready && !!state.usage && state.usage.totalSeconds>=state.settings.quotaMinutes*60,
       ...(lock.enabled?{focusLock:{blocked:lock.blocked,goal:lock.goal,count:lock.count,until:lock.until,quotaSpent:lock.quotaSpent}}:{}),

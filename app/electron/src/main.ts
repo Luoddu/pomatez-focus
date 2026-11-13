@@ -8,6 +8,7 @@ import {
   shell,
   powerMonitor,
   screen,
+  dialog,
 } from "electron";
 import path from "path";
 import fs from "fs";
@@ -20,6 +21,8 @@ import { RestReminderWindow } from "./focus/restReminderWindow";
 import { BrowserControl, FarmPresence, validBrowserPolicy } from "./focus/browserControl";
 import { JourneyGateway } from "./focus/journeyGateway";
 import { StartupSettings, startsInTray } from "./focus/startup";
+import {GameGuard,GAME_EXECUTABLES} from './focus/strict-supervision/gameGuard';
+import {BedtimeReminder} from './focus/strict-supervision/bedtime';
 const startInTray=startsInTray(process.argv);
 const startupSettings=new StartupSettings(app,{platform:process.platform,packaged:app.isPackaged,executable:process.execPath,portable:!!process.env.PORTABLE_EXECUTABLE_FILE});
 const headless = process.env.POMATEZ_HEADLESS === "1";
@@ -65,11 +68,21 @@ const show = () => {
   }
 };
 export const browserControl = new BrowserControl(app.getPath("userData"), __dirname);
+const gameDirectories=[path.join(process.env['ProgramFiles(x86)']||'C:\\Program Files (x86)','Steam','steamapps','common'),path.join(process.env.ProgramFiles||'C:\\Program Files','Epic Games'),...browserControl.strict.directories];
+export const gameGuard=new GameGuard(()=>browserControl.strict.enabled,{executables:GAME_EXECUTABLES,directories:gameDirectories});
+export const bedtime=new BedtimeReminder(app.getPath('userData'),()=>browserControl.strict.enabled,async()=>{
+  if(headless)return;
+  show();shell.beep();
+  if(!win||win.isDestroyed())throw Error('Farm unavailable');
+  const pinned=win.isAlwaysOnTop();win.setAlwaysOnTop(true);
+  try{await dialog.showMessageBox(win,{type:'warning',title:'23:00 收工提醒',message:'请保存所有工作，准备下线',detail:'23:00结束工作，23:30准备睡觉。明早7:30或8:00起床，8:30回到办公室。\n请逐个确认文档已保存；农场不会自动关闭工作软件。',buttons:['已确认，去保存工作'],noLink:true});}
+  finally{if(win&&!win.isDestroyed())win.setAlwaysOnTop(pinned);}
+});
 export const farmPresence = new FarmPresence(() => win, headless);
 const publishRest = (state: ReturnType<ActivityWatchRest["snapshot"]>) => {
   const browser = browserControl.publish(state);
   farmPresence.update(browser.focusLock.enabled?{...state,settings:{...state.settings,supervise:browser.focusLock.blocked}}:state,browser.policy);
-  const next={...state,browserControl:browser};
+  const next={...state,browserControl:browser,strictSupervision:{enabled:browserControl.strict.enabled,directories:browserControl.strict.directories.length,error:browserControl.strict.error,games:{...gameGuard.status},bedtimeError:bedtime.error}};
   if(win && !win.isDestroyed()) win.webContents.send("focus:rest-state",next);
   if(!quitting && farmReady) restPopup.update(browser.focusLock.enabled?{...next,settings:{...next.settings,supervise:false}}:next);
   return next;
@@ -231,6 +244,23 @@ else {
         throw Error("不支持的设备偏好");
       });
       handler("restState", () => publishRest(restMonitor.snapshot()));
+      handler('strictEnable',()=>{
+        if(process.platform!=='win32')throw Error('严格游戏拦截目前支持Windows');
+        if(!browserControl.snapshot().strictCapable)throw Error('请先更新并重新加载浏览器配套，再打开B站或小红书完成严格模式连接');
+        browserControl.strict.enable();
+        restMonitor.configure({...restMonitor.snapshot().settings,supervise:true,pomodoroGoal:12,quotaMinutes:15});
+        if(!headless){gameGuard.start();bedtime.start();}
+        return publishRest(restMonitor.snapshot());
+      });
+      handler('strictAddGame',async()=>{
+        if(headless||!win)throw Error('静默测试不得选择个人游戏目录');
+        const result=await dialog.showOpenDialog(win,{title:'选择具体游戏目录（目录内程序将被限制）',properties:['openDirectory']});
+        if(!result.canceled&&result.filePaths.length===1){
+          const selected=browserControl.strict.addDirectory(result.filePaths[0],[process.env.SystemRoot||'C:\\Windows',process.env.ProgramFiles||'C:\\Program Files',process.env['ProgramFiles(x86)']||'C:\\Program Files (x86)',app.getPath('home'),app.getPath('desktop'),app.getPath('documents'),app.getPath('userData')],[process.env.SystemRoot||'C:\\Windows',path.dirname(process.execPath),app.getPath('userData')]);
+          if(!gameDirectories.includes(selected))gameDirectories.push(selected);
+        }
+        return publishRest(restMonitor.snapshot());
+      });
       handler("browserConfigure", value => { browserControl.configure(value,restMonitor.snapshot()); return publishRest(restMonitor.snapshot()); });
       handler("focusLockConfigure", value => {
         const current=browserControl.snapshot();
@@ -409,6 +439,7 @@ else {
         win?.webContents.send("focus:suspend"); restMonitor.suspend();
       });
       powerMonitor.on("resume", () => {
+        if(!headless)void bedtime.tick();
         restRuntimePaused = false;
         win?.webContents.send("focus:suspend");
         if (!headless) void ensureRestRuntime().catch(() => {}).finally(() => { if (!quitting && !restRuntimePaused) restMonitor.start(); });
@@ -423,6 +454,7 @@ else {
             {
               label: "退出（保留专注）",
               click: () => {
+                if(browserControl.strict.enabled){show();return;}
                 quitting = true;
                 app.quit();
               },
@@ -441,6 +473,7 @@ else {
       // isolated loopback fixture; normal desktop starts it automatically.
       if (!headless) {
         restMonitor.start();
+        if(browserControl.strict.enabled){gameGuard.start();bedtime.start();}
         void ensureRestRuntime().catch(() => {}).finally(() => {
           if (!quitting && !restRuntimePaused && restMonitor.isRunning()) void restMonitor.refreshNow();
         });
@@ -471,6 +504,7 @@ app.on("before-quit", () => {
   journeyGateway.close();
   quitting = true;
   restMonitor.stop();
+  gameGuard.close();bedtime.close();
   restPopup.close();
   farmPresence.close();
   browserControl.close();

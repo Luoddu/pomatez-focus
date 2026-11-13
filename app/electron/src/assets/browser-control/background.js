@@ -2,7 +2,19 @@
 const HOST="io.github.luoddu.pomatez_focus";
 const TARGETS=["*://*.bilibili.com/*","*://*.xiaohongshu.com/*"];
 function target(url) { try { const h=new URL(url).hostname; return ["bilibili.com","xiaohongshu.com"].some(d=>h===d||h.endsWith("."+d)); } catch (_) { return false; } }
-function decide(state, old, now) {
+const GAME_DOMAINS=['steampowered.com','steamcommunity.com','steamcontent.com','steamstatic.com','battle.net','battlenet.com.cn','blizzard.com','blzstatic.cn','wegame.com','wegame.com.cn','epicgames.com','riotgames.com','ubisoftconnect.com','ea.com','origin.com','gog.com'];
+function decide(state,old,now){
+  const strict=state?.strict===true||old.strict===true;
+  if(!strict)return decideLegacy(state,old,now);
+  const date=new Date(now),weekday=date.getDay()>=1&&date.getDay()<=5;
+  const midnight=new Date(now);midnight.setHours(24,0,0,0);
+  if(!weekday){const v=decideLegacy(state,old,now);return {...v,strict:true,control:{...v.control,strict:true,strictAllowedUntil:0}};}
+  const f=state?.focusLock,lease=state?.leaseVersion===2?20000:7000;
+  const allowed=state?.v===1&&state.ready===true&&state.supervise===true&&Number.isSafeInteger(state.expiresAt)&&state.expiresAt>now&&state.expiresAt<=now+lease&&f?.blocked===false&&f.goal===12&&Number.isFinite(f.count)&&f.count>=12&&f.quotaSpent===false;
+  const reason=f?.quotaSpent?'今日额度已用完':'每日专注锁';
+  return {strict:true,day:state?.day||old.day,key:state?.reminderKey||old.key,until:0,control:{strict:true,strictAllowedUntil:allowed?state.expiresAt:0,pause:!allowed,blockedUntil:allowed?0:midnight.getTime(),expiresAt:midnight.getTime(),reason:allowed?'':reason,message:'工作日严格督促 · 需12个有效番茄，娱乐累计最多15分钟；未连接时保持锁定。'}};
+}
+function decideLegacy(state, old, now) {
   const leaseVersion=state?.leaseVersion??1,leaseMs=leaseVersion===2?20000:7000;
   const ok=[1,2].includes(leaseVersion) && state?.v===1 && state.ready===true && state.supervise===true && Number.isSafeInteger(state.expiresAt) && now<=state.expiresAt && state.expiresAt<=now+leaseMs && ["mirror","pause","cooldown","quota"].includes(state.mode);
   // Release the page lease immediately, but keep the original absolute deadline
@@ -21,19 +33,27 @@ function decide(state, old, now) {
   const resumed=state.mode==="cooldown"&&until>now&&old.control?.blockedUntil!==until;
   return {day:state.day,key,mode:state.mode,until,control:{pause:state.mode!=="mirror"&&(!!fresh||resumed),blockedUntil:until,expiresAt:state.expiresAt,reason:state.mode==="quota"&&state.quotaSpent?"今日额度已用完":until>now?"冷静一下，再决定是否继续":""}};
 }
-if(typeof module!=="undefined") module.exports={target,decide};
+if(typeof module!=="undefined") module.exports={target,decide,GAME_DOMAINS};
 else {
   let port=null,timer=null,tries=0,retry=null,connecting=null,epoch=0,current={day:"",key:"",until:0,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}},serial=Promise.resolve();
   // All activation/install/startup paths share restoration before opening a
   // native port; a late read must never replace newly processed control state.
-  const restored=chrome.storage.session.get("control").then(v=>{
+  let gameRulesReady=false;
+  async function enforceGames(){
+    if(gameRulesReady)return;
+    await chrome.declarativeNetRequest.updateDynamicRules({removeRuleIds:[10001],addRules:[{id:10001,priority:1,action:{type:'block'},condition:{requestDomains:GAME_DOMAINS,resourceTypes:['main_frame','sub_frame','stylesheet','script','image','font','object','xmlhttprequest','ping','csp_report','media','websocket','other']}}]});
+    gameRulesReady=true;
+  }
+  const restored=Promise.all([chrome.storage.session.get("control"),chrome.storage.local.get('strict')]).then(async([v,s])=>{
     if(v.control)current={...v.control,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
+    if(s.strict===true||current.strict===true){current=decide({strict:true},current,Date.now());await enforceGames();}
     return true;
-  }).catch(()=>{console.warn("科学专注配套状态恢复失败，请重新加载扩展；当前不施加浏览限制。");return false;});
+  }).catch(()=>{current=decide({strict:true},current,Date.now());console.warn("科学专注配套状态恢复失败，请重新加载扩展；娱乐页面暂时保持限制。");return false;});
   async function tabs() { return chrome.tabs.query({url:TARGETS}); }
   const owns=(expected,turn)=>turn===epoch&&port===expected;
   async function apply(state,expected,turn) {
     if(!owns(expected,turn))return;
+    if(state?.strict===true){current=decide({v:1,strict:true,ready:false},current,Date.now());await chrome.storage.local.set({strict:true});await enforceGames();if(!owns(expected,turn))return;}
     const decision=decide(state,current,Date.now());
     let count=0;
     for(const tab of await tabs()) {
@@ -47,7 +67,7 @@ else {
     if(decision.control.pause && expected && typeof state.reminderKey==="string") expected.postMessage({type:"receipt",key:state.reminderKey,pausedCount:Math.min(100,count)});
   }
   function enqueue(state,expected,turn=epoch) { serial=serial.then(()=>apply(state,expected,turn)).catch(()=>{if(owns(expected,turn))stop();}); }
-  function release() { epoch++;port=null;current={...current,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
+  function release() { epoch++;port=null;current=decide({v:1,ready:false},current,Date.now());if(timer)clearInterval(timer);timer=null;enqueue({v:1,ready:false},null); }
   function stop() { const p=port;release();if(p)p.disconnect(); }
   function connect() {
     if(port)return Promise.resolve();if(connecting)return connecting;
@@ -59,13 +79,14 @@ else {
     if(!(await restored) || port || turn!==epoch) return;
     if(!(await tabs()).length || port || turn!==epoch) return;
     if(retry)clearTimeout(retry);retry=null;
-    const p=port=chrome.runtime.connectNative(HOST);
+    let p;try{p=port=chrome.runtime.connectNative(HOST);}catch(_){release();return;}
     p.onMessage.addListener(state=>{if(port!==p)return;tries=0;enqueue(state,p);});
     p.onDisconnect.addListener(()=>{void chrome.runtime.lastError;if(port!==p)return;release();if(++tries<=3)retry=setTimeout(()=>void connect(),tries*10000);});
-    p.postMessage({type:"status",features:["daily-focus-lock-v1","control-lease-v2"]}); timer=setInterval(()=>{if(port)port.postMessage({type:"status",features:["daily-focus-lock-v1","control-lease-v2"]});},5000);
+    const features=()=>["daily-focus-lock-v1","control-lease-v2","strict-supervision-v1",...(gameRulesReady?["game-request-rules-v1"]:[])];
+    p.postMessage({type:"status",features:features()}); timer=setInterval(()=>{if(port)port.postMessage({type:"status",features:features()});},5000);
   }
   chrome.runtime.onMessage.addListener((v,sender,reply)=>{
-    if(v?.type==="getControl"&&target(sender.tab?.url)) { reply(current.control);return; }
+    if(v?.type==="getControl"&&target(sender.tab?.url)) { void restored.then(()=>reply(current.control));return true; }
     if(v?.type==="reconnect"&&!sender.tab) { tries=0;void connect();reply({connected:!!port}); }
   });
   chrome.tabs.onUpdated.addListener((_id,change,tab)=>{if(change.status==="complete"&&target(tab.url))void connect();});

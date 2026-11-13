@@ -2,6 +2,17 @@
 
 <!-- LEARNING_SCHEMA_V1 -->
 
+## LEARN-P0-POMO-089-01 - 请求拦截规则须显式验证网页入口类型
+
+- Status: VALIDATED
+- Source-Task: P0-POMO-089
+- Evidence: scripts/test-strict-browser.cjs; docs/ACCEPTANCE-P0-POMO-089.md
+- Applies-To: 本模块及使用Chromium declarativeNetRequest阻止站点访问/下载的配套规则
+- Lesson: 实测Edge157.0.4341.46中，只有requestDomains而省略资源类型的动态block规则能保存，但testMatchOutcome的main_frame不命中；空excludedResourceTypes也未改变此结果。官方API说明未指定类型时默认排除main_frame。显式resourceTypes加入main_frame后，真实浏览器对映射至loopback的安装包入口返回ERR_BLOCKED_BY_CLIENT且服务器零命中；普通科研页面仍命中服务器，动态规则跨重启保留。规则存在或子资源匹配不等于阻止进入站点。
+- Required-Check: 同时检查main_frame、下载/请求类型、相似域名负例，并验证真实请求与正常页面；以manifest公钥派生扩展ID选择CDP目标，不能仅按background.js文件名误选内置扩展。
+- Supersedes: none
+- Invalid-When: 换浏览器/API版本、权限或资源类型集合后重验；不泛化为所有平台或未知下载镜像均已封禁，不授权扩大个人浏览器权限。
+
 ## LEARN-P0-POMO-081-01 - pending 不足以证明持久意图尚未发送
 
 - Status: VALIDATED

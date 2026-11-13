@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { dayKey } from "./activitywatch";
 import type { RestState, RestSettings } from "./activitywatch";
+import {isWeekday} from './strict-supervision/settings';
 
 const OWNER="pomatez-daily-focus-lock-v1";
 type Data={v:1;owner:string;enabled:boolean;releaseMinutes:number;day:{date:string;enabled:boolean;goal:number;quotaMinutes:number;releaseMinutes:number;until:number}};
@@ -17,7 +18,7 @@ export class DailyFocusLock {
   private error="";
   private foreign=false;
   private file:string;
-  constructor(directory:string,private now=Date.now){
+  constructor(directory:string,private now=Date.now,private strictEnabled=()=>false){
     this.file=path.join(directory,"daily-focus-lock.json");
     if(fs.existsSync(this.file))try{
       if(fs.statSync(this.file).size>8192)throw Error("size");
@@ -45,18 +46,24 @@ export class DailyFocusLock {
     this.data=next;
   }
   snapshot(state:RestState|null){
-    this.roll(state);const now=this.now(),d=this.data.day.date===dayKey(now)?this.data.day:{...this.data.day,date:dayKey(now),enabled:this.data.enabled,until:0},p=state?.progress;
+    this.roll(state);const now=this.now(),d=this.data.day.date===dayKey(now)?{...this.data.day}:{...this.data.day,date:dayKey(now),enabled:this.data.enabled,until:0},p=state?.progress;
+    const strict=this.strictEnabled()&&isWeekday(now);
+    if(strict){d.goal=12;d.quotaMinutes=15;d.enabled=true;}
     const count=p?.day===d.date?(p.effectiveCount??p.completedCount):null;
     const reached=count!==null&&count>=d.goal;
     const usage=state?.usage?.day===d.date?state.usage:null;
     const quotaSpent=!!usage&&usage.totalSeconds>=d.quotaMinutes*60;
-    const enabled=d.enabled&&!this.error;
-    const releasing=enabled&&reached&&!quotaSpent&&now<d.until;
+    const enabled=strict||(d.enabled&&!this.error);
+    const fresh=!strict||(state?.status==='recording'&&!!usage&&Number.isFinite(usage.end)&&usage.end<=now&&now-usage.end<=35000&&!!state.live&&state.live.checkedAt<=now&&state.live.expiresAt>now);
+    const verified=state?.usageVerifiedThrough;
+    const permitUntil=strict?(Number.isFinite(verified)&&verified!<=now&&usage?Math.min(endOfDay(now),verified!+Math.max(0,900-usage.totalSeconds)*1000):0):d.until;
+    const releasing=enabled&&reached&&!quotaSpent&&now<d.until&&now<permitUntil&&fresh&&!this.error;
     return {enabled,plannedEnabled:this.data.enabled,goal:d.goal,quotaMinutes:d.quotaMinutes,releaseMinutes:d.releaseMinutes,plannedReleaseMinutes:this.data.releaseMinutes,day:d.date,
-      count,reached,lockedForChanges:enabled&&!reached,releasing,until:releasing?d.until:0,
+      strict,fresh,permitUntil,count,reached,lockedForChanges:strict||(enabled&&!reached),releasing,until:releasing?d.until:0,
       blocked:enabled&&!releasing,quotaSpent,error:this.error};
   }
   configure(value:any,state:RestState|null){
+    if(this.strictEnabled()&&isWeekday(this.now()))throw Error('工作日严格督促不可关闭或修改');
     if(!value||Object.keys(value).sort().join("|")!=="enabled|releaseMinutes"||typeof value.enabled!=="boolean"||!minutes(value.releaseMinutes))throw Error("每日锁策略无效，临时放行须为1–60分钟");
     const current=this.snapshot(state);
     if(current.lockedForChanges&&(value.enabled!==this.data.enabled||value.releaseMinutes!==this.data.releaseMinutes))throw Error("今日目标尚未完成，每日锁策略已锁定");
@@ -68,16 +75,17 @@ export class DailyFocusLock {
   release(state:RestState|null){
     const current=this.snapshot(state);
     if(!current.enabled||!current.reached)throw Error("请先完成今日有效番茄目标，再临时放行");
-    if(state?.status!=="recording"||state.usage?.day!==current.day)throw Error("网站用时尚未确认，请恢复监测后再放行");
+    if(state?.status!=="recording"||state.usage?.day!==current.day||!current.fresh)throw Error("网站用时尚未确认，请恢复监测后再放行");
     if(current.quotaSpent)throw Error("今日网站额度已用完，不能临时放行");
     // An already-running pass is idempotent, never extended by repeated clicks.
     if(current.releasing)return current;
-    this.save({...this.data,day:{...this.data.day,until:Math.min(endOfDay(this.now()),this.now()+current.releaseMinutes*60000)}});
+    this.save({...this.data,day:{...this.data.day,until:current.strict?endOfDay(this.now()):Math.min(endOfDay(this.now()),this.now()+current.releaseMinutes*60000)}});
     return this.snapshot(state);
   }
   resume(state:RestState|null){if(!this.snapshot(state).enabled)throw Error("每日锁尚未开启");this.save({...this.data,day:{...this.data.day,until:0}});return this.snapshot(state);}
   guardSettings(next:RestSettings,state:RestState){
     const current=this.snapshot(state);
+    if(current.strict&&(!next.supervise||next.pomodoroGoal!==12||next.quotaMinutes!==15))throw Error('工作日固定12个有效番茄、累计15分钟，不能关闭督促或放宽额度');
     if((this.data.enabled||current.enabled)&&next.pomodoroGoal<1)throw Error("每日锁启用时，番茄目标至少为1个");
     if(current.lockedForChanges&&(!next.supervise||next.pomodoroGoal<current.goal))throw Error("今日目标尚未完成，不能关闭督促或降低目标");
   }
