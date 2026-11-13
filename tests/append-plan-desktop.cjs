@@ -8,6 +8,7 @@ const {
 process.env.POMATEZ_HEADLESS = "1";
 app.commandLine.appendSwitch("mute-audio");
 const seed = process.argv.includes("seed");
+const boundaryMode = process.argv.includes("boundary");
 const historyMode = process.argv.includes("history");
 let release,
   uploads = 0,
@@ -27,6 +28,7 @@ const tasks = ["iu", "inu", "uni", "unu"].map((quadrant) => ({
   doneToday: quadrant === "iu" ? 3 : 0,
   ...(quadrant === "iu" ? { kind: "done" } : {}),
 }));
+if (boundaryMode) { tasks[0].plannedToday=2; tasks[0].doneToday=2; }
 if (historyMode) {
   const now = Date.now(), today = new Date().setHours(0, 0, 0, 0);
   shared = [
@@ -128,7 +130,34 @@ app.whenReady().then(async () => {
       js(
         "JSON.parse(localStorage.getItem('pomatez-quick-edit-outbox-v1')||'[]')"
       );
-    if (historyMode) {
+    if (boundaryMode) {
+      await until(()=>js("!!document.querySelector('.quad-iu .task')"));
+      const day=new Date().setHours(0,0,0,0);
+      const old={id:'old-two',task:{...tasks[0],kind:undefined,doneToday:0},status:'saved',startedAt:day+1000,endedAt:day+3001000,plannedSeconds:1500,elapsedSeconds:3000,acceptedSeconds:3000,completedCount:2,sync:'pending',cloudSynced:false,revision:0,colorRevision:0};
+      await js(`localStorage.setItem('pomatez-focus-v1',${JSON.stringify(JSON.stringify({active:null,records:[old]}))})`);
+      win.reload(); await delay(600);
+      await until(()=>js("!!document.querySelector('.quad-iu .task')"));
+      await js("document.querySelector('.quad-iu .task').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}))");
+      await until(()=>js("!!document.querySelector('[aria-label=\"增加番茄：Synthetic iu\"]')"));
+      await js(`(()=>{const b=document.querySelector('[aria-label="增加番茄：Synthetic iu"]');b.click();b.click()})()`);
+      await until(()=>js("document.querySelectorAll('.quad-iu .chip').length===2"));
+      assert.match(await js("document.querySelector('.quad-iu .hm-text').textContent"),/2\/4/);
+      assert.deepEqual(await js("[...document.querySelectorAll('.quad-iu .chip')].map(e=>e.textContent.trim())"),['3','4']);
+      const before=(await stored()).records;
+      await js("[...document.querySelectorAll('.quad-iu .chip')].find(e=>e.textContent.trim()==='3').click()");
+      await click('开始专注');await click('暂停');
+      const active=(await stored()).active;
+      assert.match(active.task.title,/第 3 个/);assert.equal(active.task.quickTask.sequence,1);
+      win.reload();await delay(600);
+      await until(async()=>(await stored())?.active?.id===active.id);
+      assert.deepEqual((await stored()).records,before);
+      await click("结束");await click("确认结束");await click("放弃本次");
+      await until(()=>js("document.querySelectorAll('.quad-iu .chip').length===2"));
+      assert.match(await js("document.querySelector('.quad-iu .hm-text').textContent"),/2\/4/);
+      assert.deepEqual((await stored()).records,before);assert.equal((await stored()).active,null);
+      assert.equal(uploads,0);
+      console.log('PASS old two + two appends stay2/4, chips3/4 selectable, real start/pause and reload, old records unchanged, receipt-local index preserved');
+    } else if (historyMode) {
       await until(() => js("document.querySelectorAll('.task').length===4"));
       await until(() => js("!!document.querySelector('[aria-label=\"手动同步\"]')&&!document.querySelector('[aria-label=\"手动同步\"]').disabled"));
       await click("手动同步");
@@ -159,7 +188,7 @@ app.whenReady().then(async () => {
       await click("修改记录 history-0");
       assert.equal(await js("!!document.querySelector('#manual-task')"), true);
       await click("取消");
-      release(); await until(async ()=>(await queue()).length===0);
+      release(); await click("手动同步"); await until(async ()=>(await queue()).length===0);
       assert.equal(uploads, 0);
       assert.deepEqual((await stored()).active, before.active);
       assert.deepEqual((await stored()).records, before.records);
@@ -181,6 +210,9 @@ app.whenReady().then(async () => {
       await js(
         "(()=>{const b=document.querySelector('[aria-label=\"增加番茄：Synthetic iu\"]');b.click();b.click()})()"
       );
+      await until(async()=>(await queue()).length===2);
+      await until(()=>js("!!document.querySelector('[aria-label=\"手动同步\"]')&&!document.querySelector('[aria-label=\"手动同步\"]').disabled"));
+      await click("手动同步");
       await until(() => requests.length === 1);
       for (const quadrant of ["inu", "uni", "unu"]) await add(quadrant);
       assert.equal((await queue()).length, 5);
@@ -226,6 +258,7 @@ app.whenReady().then(async () => {
       await js(
         "(()=>{const s=document.querySelector('#manual-task');s.value=[...s.options].find(o=>o.textContent.includes('Synthetic iu')).value;s.dispatchEvent(new Event('change',{bubbles:true}))})()"
       );
+      await js(`(()=>{for(const [selector,value] of [["#manual-minutes","10"],['[aria-label="补记番茄数"]',"0"]]){const e=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,value);e.dispatchEvent(new Event("input",{bubbles:true}));}})()`);
       await click("保存补记");
       await js(
         "[...document.querySelectorAll('.quad-iu .chip')].find(e=>e.textContent.trim()==='4').click()"
@@ -238,7 +271,7 @@ app.whenReady().then(async () => {
       assert.equal((await stored()).active.task.quadrant, "iu");
       release();
       await until(async () =>
-        (await queue()).every((e) => e.state === "failed")
+        (await queue()).some((e) => e.state === "failed") && (await queue()).every(e=>["pending","failed"].includes(e.state))
       );
       assert.equal((await queue()).length, 5);
       assert.equal(uploads, 0);

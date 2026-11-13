@@ -10,8 +10,8 @@ const env = {
   ),
 };
 delete env.ELECTRON_RUN_AS_NODE;
-for (const phase of ["seed", "restart", "history"]) {
-  const phaseEnv = phase === "history" ? { ...env, POMATEZ_PROFILE: path.join(__dirname, "../artifacts/test-profiles", randomUUID()) } : env;
+for (const phase of ["boundary", "seed", "restart", "history"]) {
+  const phaseEnv = ["history","boundary"].includes(phase) ? { ...env, POMATEZ_PROFILE: path.join(__dirname, "../artifacts/test-profiles", randomUUID()) } : env;
   const r = spawnSync(
     require("electron"),
     [path.join(__dirname, "../tests/append-plan-desktop.cjs"), phase, "--mute-audio"],

@@ -11,7 +11,9 @@ export function projectLocalCompletion(tasks: FocusTask[], records: FocusSession
   const end = new Date(day); end.setDate(end.getDate() + 1);
   const saved = records.filter(r => r.status === "saved" && r.startedAt >= day && r.startedAt < end.getTime());
   const completed = new Set<string>();
-  const sequence = (task: FocusTask) => task.quickTask?.sequence || Number(task.title.match(/第\s*(\d+)\s*个番茄/)?.[1] || 0);
+  // Appended quickTask.sequence is the receipt-local index (usually 1), not
+  // the task-wide ordinal. Keep it intact for binding; use the plan title here.
+  const sequence = (task: FocusTask) => Number(task.title.match(/第\s*(\d+)\s*个番茄\s*$/)?.[1] || 0) || task.quickTask?.sequence || 0;
   for (const record of saved) {
     const start = sequence(record.task), count = record.completedCount || 0;
     if (start && count > 1) for (const task of tasks) {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {quickRows} from '../app/renderer/src/focus/quickTasks.ts';
 import {EditQueue} from '../app/renderer/src/focus/editQueue.ts';
 import {projectLocalCompletion,sameTask} from '../app/renderer/src/focus/localBoard.ts';
 import {setTaskCategory,taskCategory,saveBoardLayout,readBoardLayout,projectBoardLayout,rebindBoardGroup,categoryApplies} from '../app/renderer/src/focus/boardLayout.ts';
@@ -98,4 +99,27 @@ test('completed task choice never rewrites newer remote color; explicit new choi
  const reset=setTaskCategory(layout,'base',task,'',[applied]);
  assert.equal(projectBoardLayout([task],reset)[0].projectType,'research');
  assert.equal(projected.tomatoType,'software');assert.equal(projectBoardLayout([task],reset)[0].tomatoType,undefined);
+});
+
+test('appended slots use task ordinal, not receipt-local index, when projecting old multi-tomato completion',()=>{
+ const first={...task,title:'Same · 第 1 个番茄'}, old={...record,task:first,completedCount:2};
+ const base={...first,kind:'done',doneToday:2,plannedToday:4};
+ const appended=[3,4].flatMap(sequence=>quickRows({id:'append'+sequence,sourceKey:'base',title:'Same',quadrant:'iu',count:1,day,append:{taskId:'task',sequence,doneToday:2,plannedToday:4}}));
+ const original=JSON.stringify({base,appended,old});
+ assert.deepEqual(appended.map(t=>t.quickTask.sequence),[1,1]);
+ const projected=projectLocalCompletion([base,...appended],[old],day);
+ assert.deepEqual(projected.map(t=>t.kind),['done',undefined,undefined]);
+ assert.ok(projected.every(t=>t.doneToday===2 && t.plannedToday===4));
+ const latest={...record,id:'new',task:appended[0],completedCount:1};
+ assert.deepEqual(projectLocalCompletion([base,...appended],[old,latest],day).map(t=>t.kind),['done','done',undefined]);
+ assert.equal(projectLocalCompletion([base,...appended],[old,latest],day)[0].doneToday,3);
+ assert.equal(JSON.stringify({base,appended,old}),original);
+});
+
+test('task name containing a tomato phrase does not replace canonical trailing ordinal',()=>{
+ const rows=quickRows({id:'named',sourceKey:'base',title:'复盘第1个番茄',quadrant:'iu',count:3,day});
+ const saved={...record,task:rows[0],completedCount:2};
+ assert.deepEqual(projectLocalCompletion(rows,[saved],day).map(t=>t.kind),['done','done',undefined]);
+ const append=quickRows({id:'later',sourceKey:'base',title:'复盘第1个番茄',quadrant:'iu',count:1,day,append:{taskId:rows[0].taskId,sequence:4,doneToday:2,plannedToday:4}})[0];
+ assert.notEqual(projectLocalCompletion([...rows,append],[saved],day).at(-1).kind,'done');
 });
