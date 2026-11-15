@@ -7,7 +7,7 @@ const DAY = 86400000, OFFSET = 8 * 3600000;
 export const sleepGoals = { timeZone: 'UTC+08:00', bedtime: '23:30', wakeFrom: '07:40', wakeBy: '08:00' };
 type Entry = { day: string; revision: string; bedtimeAt: string | null; wakeAt: string | null; updatedAt: string };
 type Store = { version: 1; entries: Record<string, Entry>; receipts: Record<string, { hash: string; day: string; revision: string }> };
-class SleepError extends Error { constructor(readonly code: string, message: string) { super(message); } }
+class SleepError extends Error { constructor(readonly code: string, message: string) { super(message); Object.setPrototypeOf(this, SleepError.prototype); } }
 function fail(code: string, message: string): never { throw new SleepError(code, message); }
 function object(v: any) { return !!v && typeof v === 'object' && !Array.isArray(v); }
 function fields(v: any, allowed: string[]) { if (!object(v) || Object.keys(v).some(k => !allowed.includes(k))) fail('INVALID', '未知字段或无效对象'); }
@@ -87,7 +87,7 @@ export class SleepStore {
     catch (e: any) { return { requestId: q?.requestId || null, error: { code: e.code || 'INTERNAL', message: e instanceof SleepError ? e.message : '睡眠接口处理失败' } }; }
   }
   private run(q: any) {
-    if (!object(q) || q.protocol !== 1 || q.scope !== 'sleep' || !ID.test(q.requestId || '')) fail('INVALID', '接口版本、scope或requestId无效');
+    if (!object(q) || q.protocol !== 1 || q.scope !== 'sleep' || typeof q.requestId !== 'string' || !ID.test(q.requestId)) fail('INVALID', '接口版本、scope或requestId无效');
     const now = this.now(), s = this.load();
     const base = { protocol: 1, scope: 'sleep', requestId: q.requestId, goals: sleepGoals, measure: 'self-reported-rest-window' };
     if (q.op === 'read') {

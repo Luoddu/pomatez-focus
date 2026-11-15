@@ -1,5 +1,8 @@
 const { call: transport } = require('./journey-client.cjs');
-const call = (request, profile) => transport({ ...request, scope: 'sleep' }, profile);
+const call = async (request, profile) => {
+  if (!request || typeof request !== 'object' || Array.isArray(request) || typeof request.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(request.requestId)) throw Error('Invalid request ID');
+  return transport({ ...request, scope: 'sleep' }, profile);
+};
 module.exports = { call };
 if (require.main === module) {
   let input = ''; process.stdin.setEncoding('utf8');
