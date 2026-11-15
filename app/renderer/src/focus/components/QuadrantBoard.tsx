@@ -42,7 +42,7 @@ const GroupList = ({
   onSelect: (id: string) => void;
   onAdjust?: (taskId: string, delta: 1 | -1) => void;
   activeTaskId: string;
-  onComplete?: (task: FocusTask) => void;
+  onComplete?: (task: FocusTask, wholeTask?: boolean) => void;
   onEditProject?: (task: FocusTask) => void;
   completing: string;
   dragRef: React.MutableRefObject<BoardDrag | null>;
@@ -283,7 +283,7 @@ const GroupList = ({
             role="menu"
             style={{
               left: Math.max(0, Math.min(menu.x, window.innerWidth - 190)),
-              top: Math.max(0, Math.min(menu.y, window.innerHeight - 90)),
+              top: Math.max(0, Math.min(menu.y, window.innerHeight - 150)),
             }}
           >
             {menu.allowComplete && <button
@@ -298,7 +298,12 @@ const GroupList = ({
             >
               {completing === menu.task.id
                 ? "正在完成…"
-                : "标记完成（不计专注时间）"}
+                : "完成这个番茄（不计专注时间）"}
+            </button>}
+            {canComplete(menu.task) && <button className="ctx-item" role="menuitem"
+              disabled={activeTaskId === menu.task.taskId}
+              onClick={()=>{onComplete!(menu.task,true);setMenu(null);}}>
+              完成整个任务（不再每日生成）
             </button>}
             {canEditProject(menu.task) && (
               <button className="ctx-item" role="menuitem" onClick={() => {
@@ -371,7 +376,7 @@ export default function QuadrantBoard({
   farmNow?: number;
   onAdjust?: (taskId: string, delta: 1 | -1) => void;
   activeTaskId: string;
-  onComplete?: (task: FocusTask) => void;
+  onComplete?: (task: FocusTask, wholeTask?: boolean) => void;
   completing: string;
   onAddTask?: (
     title: string,

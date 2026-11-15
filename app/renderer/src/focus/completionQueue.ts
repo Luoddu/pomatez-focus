@@ -6,6 +6,7 @@ type Entry = {
   task: FocusTask;
   state: "pending" | "failed" | "done";
   error?: string;
+  wholeTask?: true;
 };
 type Store = Pick<Storage, "getItem" | "setItem">;
 const KEY = "pomatez-completion-queue-v1";
@@ -31,7 +32,8 @@ export class CompletionQueue {
               typeof e.planId !== "string" ||
               !e.task ||
               typeof e.task.id !== "string" ||
-              !["pending", "failed", "done"].includes(e.state)
+              !["pending", "failed", "done"].includes(e.state) ||
+              (e.wholeTask !== undefined && (e.wholeTask !== true || !e.task.taskId))
           )
         )
           throw Error();
@@ -63,20 +65,22 @@ export class CompletionQueue {
     this.entries = next;
     this.emit();
   }
-  enqueue(task: FocusTask, sourceKey: string) {
+  enqueue(task: FocusTask, sourceKey: string, wholeTask = false) {
     if (this.storageError) throw Error(this.storageError);
     if (!sourceKey || (task.sourceKey && task.sourceKey !== sourceKey))
       throw Error("任务来源已改变，请刷新后重试。");
+    if (wholeTask && (!task.taskId || task.quickTask || task.kind === "free")) throw Error("任务尚未绑定，不能完成整个任务");
     const planId = task.planId || task.id;
     if (
       this.entries.some(
-        (e) => e.sourceKey === sourceKey && e.planId === planId
+        (e) => e.sourceKey === sourceKey && !!e.wholeTask === wholeTask &&
+          (wholeTask ? e.task.taskId === task.taskId : e.planId === planId)
       )
     )
       return;
     this.save([
       ...this.entries,
-      { sourceKey, planId, task, state: "pending" },
+      { sourceKey, planId, task, state: "pending", ...(wholeTask ? {wholeTask:true as const} : {}) },
     ]);
   }
   retry(sourceKey: string) {
@@ -100,7 +104,7 @@ export class CompletionQueue {
       (e) =>
         e.sourceKey !== sourceKey ||
         e.state !== "done" ||
-        ids.has(e.planId)
+        (e.wholeTask ? rows.some(t => t.taskId === e.task.taskId) : ids.has(e.planId))
     );
     if (next.length !== this.entries.length) this.save(next);
   }
@@ -108,7 +112,9 @@ export class CompletionQueue {
     const entries = this.entries.filter(
       (e) => e.sourceKey === sourceKey
     );
-    const hidden = new Set(entries.map((e) => e.planId));
+    const whole = new Set(entries.filter(e=>e.wholeTask).map(e=>e.task.taskId));
+    rows = rows.filter(t=>(t.sourceKey && t.sourceKey !== sourceKey) || !whole.has(t.taskId));
+    const hidden = new Set(entries.filter(e=>!e.wholeTask).map((e) => e.planId));
     const counts = new Map<string, number>();
     rows.forEach((t) => {
       if (t.kind !== "done" && hidden.has(t.planId || t.id))
@@ -128,7 +134,7 @@ export class CompletionQueue {
   }
   async drain(
     sourceKey: string,
-    send: (planId: string) => Promise<unknown>,
+    send: (planId: string, taskId?: string) => Promise<unknown>,
     ready = () => true
   ) {
     if (this.running || this.storageError) return;
@@ -142,12 +148,13 @@ export class CompletionQueue {
         if (!entry) break;
         let error: string | undefined;
         try {
-          await send(entry.planId);
+          await send(entry.planId, entry.wholeTask ? entry.task.taskId : undefined);
         } catch (e: any) {
           error = e.message || "同步失败，请重试";
         }
         this.save(
-          this.entries.map((e) =>
+          this.entries.filter(e => !entry.wholeTask || error || e === entry ||
+            e.sourceKey !== sourceKey || e.task.taskId !== entry.task.taskId).map((e) =>
             e === entry
               ? {
                   ...e,

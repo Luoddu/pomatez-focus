@@ -1730,7 +1730,7 @@ export class Feishu {
         plannedToday: h.planned,
       } as any);
     });
-    return result;
+    return result.filter(t => linkedById.get(t.taskId)?.fields?.["完成"] !== true);
   }
   // 生成今日番茄：移植 Invoke-FeishuTodayPomodoroGeneration.ps1 的幂等算法；
   // 字段缺失/歧义直接报错，不在 App 内自动改表结构
@@ -2059,6 +2059,25 @@ export class Feishu {
   // 右键「标记完成」：只把该行「已完成」勾选置 true——不建专注记录、
   // 不写分钟台账。PUT 同值幂等，重试安全；mergePlan 对已勾选行只会保持
   // 勾选（已完成===true 时 patch 继续带 true），不会被后续同步刷回
+  async completeWholeTask(taskId: any, sourceKey: any) {
+    if (sourceKey !== connectionKey(this.config)) throw Error("任务来源已改变，未完成任务");
+    id(taskId);
+    const table = await this.projectTaskTable(), path = `${this.root()}/tables/${id(table)}`;
+    const fields = await this.list(`${path}/fields`);
+    const done = fields.filter((f:any)=>f.field_name === "完成");
+    if (done.length !== 1 || done[0].type !== 7) throw Error("任务表需要唯一的完成复选框，未写入");
+    const route = `${path}/records/${id(taskId)}`;
+    const read = async () => {
+      const row = (await this.call("GET",route)).data?.record;
+      if (!row?.fields || row.record_id !== taskId) throw Error("原任务不存在，未完成任务");
+      return row;
+    };
+    if ((await read()).fields["完成"] !== true) {
+      await this.call("PUT",route,{fields:{"完成":true}});
+      if ((await read()).fields["完成"] !== true) throw Error("任务完成回读未通过，保留本机意图等待重试");
+    }
+    return {completed:true,taskId};
+  }
   async completePlan(recordId: any, now = new Date()) {
     id(recordId);
     const { path, fields } = await this.planSchema();

@@ -381,3 +381,28 @@ test("free focus with N>0 never creates extra plan rows or completions", async (
   assert.notEqual(state.plans[0].fields["已完成"], true);
   assert.notEqual(state.plans[1].fields["已完成"], true);
 });
+
+test('whole task completion writes only task checkbox; refresh and next-day generation exclude it',async()=>{
+ const {state,client}=harness();
+ const {connectionKey}=require('../app/electron/build/focus/feishu.js');
+ const {collectTaskPlans}=require('../app/electron/build/focus/generate.js');
+ state.tasks[0].fields['近日行动']=true;state.tasks[0].fields['今日计划番茄数']=1;
+ state.tasks.push({record_id:'routine',fields:{任务名称:'Daily',近日行动:true,今日计划番茄数:1}});
+ const before=structuredClone(state.plans);
+ await client.completeWholeTask('t1',connectionKey(config));
+ assert.deepEqual(state.plans,before);assert.deepEqual(state.writes.map(w=>w.body.fields),[{完成:true}]);
+ assert.deepEqual(await client.today(),[]);
+ const next=new Date();next.setDate(next.getDate()+1);next.setHours(0,0,0,0);
+ assert.deepEqual(collectTaskPlans(state.tasks,'今日计划番茄数',next.getTime(),50,'recent').plans,[{recordId:'routine',count:1}]);
+ await client.completeWholeTask('t1',connectionKey(config));assert.equal(state.writes.length,1);
+});
+test('whole task rejects foreign scope, invalid schema/missing task; lost response retries idempotently',async()=>{
+ const {connectionKey}=require('../app/electron/build/focus/feishu.js');
+ const {state,client}=harness();const key=connectionKey(config);
+ await assert.rejects(()=>client.completeWholeTask('t1','foreign'),/来源/);
+ state.completionType=1;await assert.rejects(()=>client.completeWholeTask('t1',key),/复选框/);
+ state.completionType=7;await assert.rejects(()=>client.completeWholeTask('missing',key),/不存在/);
+ assert.equal(state.writes.length,0);
+ state.lose=true;await assert.rejects(()=>client.completeWholeTask('t1',key),/lost response/);
+ await client.completeWholeTask('t1',key);assert.equal(state.writes.length,1);
+});

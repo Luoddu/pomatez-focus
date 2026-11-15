@@ -1567,11 +1567,11 @@ export default function FocusApp() {
     completionQueue
       .drain(
         sourceKey,
-        async (planId) => {
+        async (planId, taskId) => {
           const status = await api().status();
           if (status.sourceKey !== sourceKey)
             throw Error("飞书连接已改变，请切回原连接后重试。");
-          await api().completeToday({ planId });
+          await api().completeToday({ planId, ...(taskId ? {scope:"task",taskId,sourceKey} : {}) });
         },
         () =>
           queueReady.current && !editQueue.running && !syncing.current && syncAllowed()
@@ -1597,17 +1597,17 @@ export default function FocusApp() {
     busy,
     quietRevision,
   ]);
-  const completeChip = (task: FocusTask) => {
+  const completeChip = (task: FocusTask, wholeTask = false) => {
     if (!api() || !connected || !sourceKey) {
       notify("请先在设置中连接飞书，再标记完成。", "error");
       return;
     }
-    if (active?.task.id === task.id) {
+    if (active?.task.id === task.id || (wholeTask && active?.task.taskId === task.taskId)) {
       notify("这个番茄正在专注中，请先结束并确认本次专注。", "error");
       return;
     }
     try {
-      completionQueue.enqueue(task, sourceKey);
+      completionQueue.enqueue(task, sourceKey, wholeTask);
       setSelected((previous) => (previous === task.id ? "" : previous));
     } catch (e: any) {
       notify(e.message, "error");

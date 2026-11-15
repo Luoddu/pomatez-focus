@@ -105,7 +105,7 @@ app.whenReady().then(async()=>{try{
   await js("document.querySelector('.quad-iu').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__dragData}))");
   await until(()=>js(`!!document.querySelector('.quad-iu [data-task-group="${key}"]')`));
   await js("document.querySelector('[data-task-group=t1] .chip').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:200,clientY:200}))");
-  await click('标记完成（不计专注时间）');assert.equal(completes.length,0);
+  await click('完成这个番茄（不计专注时间）');assert.equal(completes.length,0);
   await advance(539000);assert.equal(creates.length,0);assert.equal(saved.length,0);
   await advance(540000);await until(async()=>(await queue()).length===0&&saved.length===1&&completes.length===1);assert.deepEqual(completes,['p1']);
   assert.equal(await js(`document.querySelectorAll('.quad-iu [data-task-group="t-${quick.id}"] .chip').length`),2);

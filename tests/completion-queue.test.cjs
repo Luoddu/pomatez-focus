@@ -131,3 +131,16 @@ test("pause drain for another plan operation; resume still completes remaining i
   await q.drain("A", async () => {});
   assert.ok(q.entries.every((e) => e.state === "done"));
 });
+
+test('whole-task intent hides future plan IDs, survives offline/restart and clears obsolete per-plan intents only after acknowledgment',async()=>{
+ const s=storage(),q=new CompletionQueue(s),a=task('p1');
+ q.enqueue(a,'A');q.enqueue(a,'A',true);q.enqueue(task('p2'),'A',true);
+ assert.equal(q.entries.length,2);
+ const future=[{...task('tomorrow'),sourceKey:'A'},{...task('foreign'),sourceKey:'B'},{...task('other'),taskId:'t2'}];
+ assert.deepEqual(q.project(future,'A').map(t=>t.id),['foreign','other']);
+ await q.drain('A',async()=>{throw Error('offline')});
+ const restored=new CompletionQueue(s);restored.reconcile('A',[]);assert.equal(restored.entries.length,2);
+ restored.retry('A');const sent=[];await restored.drain('A',async(planId,taskId)=>{sent.push({planId,taskId});if(!taskId)throw Error('yesterday');});
+ assert.equal(restored.entries.length,1);assert.equal(restored.entries[0].state,'done');assert.equal(sent.at(-1).taskId,'t1');
+ restored.reconcile('A',[]);assert.equal(restored.entries.length,0);
+});

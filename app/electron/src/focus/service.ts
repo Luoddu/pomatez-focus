@@ -232,6 +232,8 @@ export class FocusService {
     if (this.planWriting) throw new Error("正在写入番茄计划，请稍候");
     this.planWriting = true;
     try {
+      if (value.scope === "task") return await this.connected().completeWholeTask(value.taskId, value.sourceKey);
+      if (value.scope !== undefined) throw Error("完成范围无效");
       return await this.connected().completePlan(planId);
     } finally {
       this.planWriting = false;

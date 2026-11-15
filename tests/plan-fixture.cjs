@@ -79,6 +79,7 @@ function harness() {
       if (method === "GET" && url.endsWith("/tasks/fields"))
         return items([
           { field_name: "任务名称", type: 1, is_primary: true },
+          ...(!state.missingCompletion ? [{field_name:"完成",type:state.completionType ?? 7}] : []),
           {
             field_name: "象限",
             type: 3,
@@ -110,8 +111,8 @@ function harness() {
         state.fields.push(structuredClone(body));
         return { data: { field: body } };
       }
-      if (method === "PUT" && url.includes("/plans/records/")) {
-        const row = state.plans.find(
+      if (method === "PUT" && (url.includes("/plans/records/") || url.includes("/tasks/records/"))) {
+        const row = bucket.find(
           (r) => r.record_id === url.split("/").pop()
         );
         assert.ok(row);
