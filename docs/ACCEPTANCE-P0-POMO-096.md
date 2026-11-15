@@ -1,6 +1,6 @@
 # P0-POMO-096 合并验收
 
-状态 REVIEW；唯一状态源 TASK-P0-POMO-096.md。产品已验证，成品发布待完成。
+状态 DONE（合并发行与交接范围）；唯一状态源 TASK-P0-POMO-096.md。最终独立复核PASS；NAS部署、个人安装与物理双机验收不在完成声明内。
 
 ## 来源与四源
 
@@ -23,3 +23,10 @@
 ## Learning与回滚
 
 无新增跨任务实证教训，沿用039发行、054幂等及057跨日投影。旧版回滚前须排空wholeTask意图，保留共享服务状态；不删除个人数据。既有category-review旧即时写断言不适配QuietSync，不纳入本次通过声明。
+
+## 固定发行回执
+
+- 独立reviewer冻结83ffc196beafe5cb8613ede663c8610df793f003复核PASS，无P1/P2，工作树干净。干净构建、NSIS成品内ASAR与win-unpacked一致；131个构建文件逐字节核验；隐藏隔离成品启动通过。artifacts/p096-release-build.log、p096-package.log、p096-package-verify.log、p096-inner.log。
+- 五资产远端大小/SHA256与本地全部一致，固定annotated tag指向83ffc196；公开135为prerelease且未设Latest，旧134资产未变。artifacts/release135-remote-draft.json、release135-remote-public.json。发行页https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.135 。
+- 真实公开134安装包下载SHA256与原验收一致，包内b8e1b73/134 provenance核验；其实际updater发现135，errors=[]、下载0、自动安装false。真实132 updater同样发现135。artifacts/release135-live-update.json、release135-live132.json。未伪改旧版本号冒充更新检测。
+- 本地135包已通过stage-local-update原子准备，未安装/重启。用户后续截图确认NAS Docker开关关闭、已有本地数据卷；一台电脑需外网访问。详细待实施项、候选配置与正反验收见HANDOFF-P0-POMO-096.md，不含私人地址/凭据。
