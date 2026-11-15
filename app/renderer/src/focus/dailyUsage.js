@@ -28,3 +28,10 @@ export function dailyUsage(usage, offsetMinutes = null) {
   }
   return rows;
 }
+
+// Selected-day detail must use the same clipped intervals as its daily bar.
+/** @returns {Array<{start:number,end:number,site:string}>} */
+export function dailySessions(sessions, selected) {
+  return (sessions||[]).filter(s=>!selected||(s.start<selected.end&&s.end>selected.start))
+    .map(s=>selected?{...s,start:Math.max(s.start,selected.start),end:Math.min(s.end,selected.end)}:s);
+}

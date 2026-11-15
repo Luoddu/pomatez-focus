@@ -45,3 +45,18 @@ test('extension shared gate applies every day, disconnected fails closed, ordina
  assert.equal(decide({...s,shared:{...s.shared,cooldownUntil:now+2000}},allowed,now).control.sharedAllowedUntil,0);
  assert.equal(decide({...s,shared:undefined},{},now).control.shared,undefined);
 });
+
+test('concurrent first binding cannot switch authority; failed validation can retry',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'p095-bind-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const client=new SharedEntertainment(dir);let finish;
+ client.request=()=>new Promise(resolve=>finish=resolve);
+ const response={v:1,timeZone:'Asia/Shanghai',day:'2026-11-16',serverNow:1000,dayEndsAt:86400000,quotaMs:900000,reservedMs:0,remainingMs:900000,permitUntil:0,releaseUntil:0,cooldownUntil:0};
+ const first=client.configure({url:'https://first.invalid',token:'a'.repeat(64)});
+ await assert.rejects(client.configure({url:'https://second.invalid',token:'b'.repeat(64)}),/正在验证/);
+ finish(response);await first;
+ const saved=JSON.parse(codec.decryptString(fs.readFileSync(path.join(dir,'shared-entertainment.enc'))));assert.equal(saved.url,'https://first.invalid');
+ await assert.rejects(client.configure({url:'https://second.invalid',token:'b'.repeat(64)}),/已绑定/);
+ const failed=new SharedEntertainment(path.join(dir,'retry'));failed.request=async()=>{throw Error('synthetic outage');};
+ await assert.rejects(failed.configure({url:'https://first.invalid',token:'a'.repeat(64)}));assert.equal(failed.snapshot().enabled,false);
+ failed.request=async()=>response;assert.equal((await failed.configure({url:'https://first.invalid',token:'a'.repeat(64)})).enabled,true);
+});

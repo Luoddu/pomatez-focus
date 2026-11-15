@@ -17,6 +17,21 @@ function union(items){
   }
   return result;
 }
+
+function dailyTotals(day,items){
+  const start=Date.parse(day+'T00:00:00+08:00'),end=start+DAY;
+  const intervals=items.map(x=>({...x,start:Math.max(start,x.start),end:Math.min(end,x.end)})).filter(x=>x.end>x.start).sort((a,b)=>a.start-b.start);
+  const times=[...new Set(intervals.flatMap(x=>[x.start,x.end]))].sort((a,b)=>a-b),active={bilibili:[],xiaohongshu:[]};
+  const row={day,start,end,bilibili:0,xiaohongshu:0,totalSeconds:0,hasRecords:false,coverage:'unknown'};let i=0;
+  for(let t=0;t<times.length-1;t++){
+    const now=times[t];while(i<intervals.length&&intervals[i].start<=now){const item=intervals[i++];active[item.site].push(item);}
+    for(const site of ['bilibili','xiaohongshu'])while(active[site].length&&active[site].at(-1).end<=now)active[site].pop();
+    const a=active.bilibili.at(-1),b=active.xiaohongshu.at(-1),winner=a&&(!b||a.start>=b.start)?a:b;
+    if(winner){const seconds=(times[t+1]-now)/1000;row[winner.site]+=seconds;row.totalSeconds+=seconds;row.hasRecords=true;row.coverage='partial';}
+  }
+  return row;
+}
+
 class Authority{
   constructor(file,{now=Date.now,weekdaySeconds=900,weekendSeconds=3600,releaseSeconds=900,cooldownSeconds=120}={}){
     for(const n of [weekdaySeconds,weekendSeconds,releaseSeconds,cooldownSeconds])if(!Number.isSafeInteger(n)||n<1||n>28800)fail('invalid server policy');
@@ -55,8 +70,9 @@ class Authority{
       if(action==='statistics'){
         const days=body.days??30;if(![1,7,30].includes(days))fail('invalid range');
         const start=endOf(now)-days*DAY;
-        const rows=this.db.prepare('SELECT device,intervals,received FROM usage WHERE day>=? AND day<=?').all(dateOf(start),day);
-        return {v:1,start,end:now,timeZone:'Asia/Shanghai',sessions:rows.flatMap(r=>JSON.parse(r.intervals)),devices:[...new Set(rows.map(r=>r.device))].map(id=>({id,lastReceived:Math.max(...rows.filter(r=>r.device===id).map(r=>r.received))})),coverage:'reported-only'};
+        const rows=this.db.prepare('SELECT device,day,intervals,received FROM usage WHERE day>=? AND day<=?').all(dateOf(start),day);
+        const daily=Array.from({length:days},(_,i)=>{const date=dateOf(start+i*DAY);return dailyTotals(date,rows.filter(r=>r.day===date).flatMap(r=>JSON.parse(r.intervals)));});
+        return {v:1,start,end:now,timeZone:'Asia/Shanghai',daily,devices:[...new Set(rows.map(r=>r.device))].map(id=>({id,lastReceived:Math.max(...rows.filter(r=>r.device===id).map(r=>r.received))})),coverage:'reported-only'};
       }
       if(action==='usage'){
         if(body.day!==day||!Array.isArray(body.intervals)||body.intervals.length>3000)fail('invalid usage day or size');
@@ -84,8 +100,9 @@ class Authority{
       if(action==='resume')this.db.prepare('UPDATE days SET release=0,permit=0 WHERE day=?').run(day);
       if(action==='cooldown'){
         if(!identifier(body.key))fail('invalid reminder key');
-        // Global reminder identity survives device changes and replay, even after expiry.
-        const key='cooldown:'+day+':'+body.key;
+        // Only shared consumption can create a new cooldown generation. An old
+        // device-local reminder cannot restart an already completed cooldown.
+        const key='cooldown:'+day+':'+d.spent;
         const seen=this.db.prepare('SELECT result FROM requests WHERE id=?').get(key);
         deadline=seen?JSON.parse(seen.result).deadline:(d.cooldown>now?d.cooldown:now+1000*this.policy.cooldownSeconds);
         if(!seen){this.db.prepare('UPDATE days SET cooldown=?,permit=0 WHERE day=?').run(deadline,day);this.db.prepare('INSERT INTO requests VALUES(?,?,?)').run(key,key,JSON.stringify({deadline}));}
@@ -110,7 +127,7 @@ function createServer(authority,tokens,{tls}={}){
     if(typeof token!=='string'||token.length<32||!identifier(device))fail('invalid authentication configuration');
     return [crypto.createHash('sha256').update(token).digest(),device];
   });
-  if(!entries.length)fail('authentication required');
+  if(!entries.length||entries.length>32)fail('one to 32 registered devices required');
   const transport=tls?require('node:https'):http;
   const server=transport.createServer({...tls,requestTimeout:5000,headersTimeout:5000,maxHeaderSize:8192},(req,res)=>{
     const reply=(status,value)=>{if(res.destroyed||res.writableEnded)return;res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
@@ -127,8 +144,7 @@ function createServer(authority,tokens,{tls}={}){
   server.maxConnections=16;return server;
 }
 module.exports={Authority,createServer,dateOf};
-// No default production launcher: deployment must supply device tokens, durable
-// storage, TLS/private ingress and an explicit lifecycle after deployment review.
+// Deployment must supply tokens, durable local storage and reviewed TLS ingress.
 
 if(require.main===module){
   try{

@@ -24,12 +24,20 @@ app.whenReady().then(async()=>{try{
  const {SharedEntertainment}=require('../app/electron/build/focus/sharedEntertainment'),second=new SharedEntertainment(path.join(process.env.POMATEZ_PROFILE,'second'));
  await second.configure({url:config.url,token:process.env.P095_SHARED_SECOND});await second.tick(state(),true,false);assert.equal(second.snapshot().reservedMs,main.sharedEntertainment.snapshot().reservedMs);
  const reloaded=new SharedEntertainment(path.join(process.env.POMATEZ_PROFILE,'second'));await reloaded.tick(state(),true,false);assert.equal(reloaded.snapshot().reservedMs,second.snapshot().reservedMs);
- const stats=await js('window.focusApi.sharedStatistics(30)');assert.equal(stats.devices.length,2);assert.ok(stats.sessions.length>0);
+ const stats=await js('window.focusApi.sharedStatistics(30)');assert.equal(stats.devices.length,2);assert.ok(stats.daily.some(d=>d.hasRecords));
  await js("document.querySelector('.rest-stat-link').click()");await until(()=>js("!!document.querySelector('.rest-shared-statistics')"));await js("document.querySelector('.rest-shared-statistics').open=true;document.querySelector('.rest-shared-statistics button').click()");await until(()=>js("document.querySelectorAll('.rest-shared-statistics .rest-daily-bar').length===30"));
  assert.equal(await js("document.querySelector('.rest-shared-statistics').scrollWidth<=document.querySelector('.rest-shared-statistics').clientWidth+1"),true);
  await js("document.querySelector('.rest-shared-statistics').scrollIntoView({block:'center'})");await wait(500);
+ await win.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});await wait(300);
  fs.writeFileSync(path.resolve('artifacts/p095-shared-desktop.png'),(await win.webContents.capturePage()).toPNG());
  main.browserControl.close();const closed=await poll();assert.equal(closed.ready,false);assert.equal(closed.shared.enabled,true);assert.equal(decide(closed,{},Date.now()).control.sharedAllowedUntil,0);
  console.log(JSON.stringify({passed:10,checks:['real preload rejects old companion','native host negotiates shared capability','HTTPS authority via real main IPC','Windows safeStorage encrypted reload','server-reserved permit reaches native host','second desktop client shares allowance','client restart keeps balance','shared statistics production bridge','30-day shared chart no overflow','closed farm projection fails closed']}));
+
+ const fixture=path.join(process.env.POMATEZ_PROFILE,'shared-video.html');fs.writeFileSync(fixture,'<!doctype html><canvas id="c" width="8" height="8"></canvas><video muted></video>');
+ const video=new BrowserWindow({show:false,webPreferences:{contextIsolation:false,nodeIntegration:false,sandbox:true}});video.webContents.setAudioMuted(true);await video.loadFile(fixture);const vjs=s=>video.webContents.executeJavaScript(s,true);
+ await vjs("globalThis.chrome={runtime:{lastError:null,onMessage:{addListener:f=>globalThis.receive=f},sendMessage:(_v,f)=>f({shared:true,sharedAllowedUntil:Date.now()+600,strict:false,pause:false})}};const canvas=document.querySelector('canvas'),v=document.querySelector('video');v.srcObject=canvas.captureStream(0);canvas.getContext('2d').fillRect(0,0,8,8);v.srcObject.getVideoTracks()[0].requestFrame();");
+ await vjs(fs.readFileSync(path.join(install.directory,'content.js'),'utf8'));await vjs("document.querySelector('video').play()");assert.equal(await vjs("document.querySelector('video').paused"),false);
+ await vjs("const actualNow=Date.now;Date.now=()=>actualNow()-3600000;true");await wait(950);assert.equal(await vjs("document.querySelector('video').paused"),true);assert.equal(await vjs("!!document.querySelector('[data-pomatez-control=blocked]')"),true);video.destroy();
+ console.log(JSON.stringify({passed:2,checks:['shared content permits real muted playback','monotonic lease expiration pauses video despite local clock rollback']}));
  child.kill();clearTimeout(deadline);app.exit(0);
 }catch(e){console.error(e);child?.kill();clearTimeout(deadline);app.exit(1);}});

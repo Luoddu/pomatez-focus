@@ -8,12 +8,12 @@
 
 ## 已验证
 
-- 固定Node完整逻辑测试：`node scripts/test-focus-all.cjs` 569通过。实际执行使用绝对24.22.1路径；提升权限默认PATH另指向24.18.0，已识别并用固定版复跑。原始artifacts/p095-all.log。
-- 服务/客户端/图表15项专项通过：实际HTTPS两个客户端共享窗口，重启/同ID重试不重复扣额；额度耗尽拒绝、合法次日继续；冷静倒计时跨午夜延续，合法到期恢复；服务器时钟回退拒绝，时间恢复后仍读原额度；无效身份/HTTP地址拒绝，合法TLS连接成功；未知覆盖不当零。原始artifacts/p095-shared-tests.log。
-- `scripts/test-shared-entertainment-desktop.cjs` 10检查通过：真实Electron主进程/preload、Windows safeStorage密文、两个客户端和重启、Native Messaging能力协商与投影、共享统计桥接和30日图、关闭农场投影后不放行。合成HTTPS服务器及临时证书，只在测试进程信任；假注册表adapter，不动个人Edge或配置。原始artifacts/p095-shared-desktop.log。
+- 固定Node完整逻辑测试：`node scripts/test-focus-all.cjs` 573通过。实际执行使用绝对24.22.1路径；提升权限默认PATH另指向24.18.0，已识别并用固定版复跑。原始artifacts/p095-all.log。
+- 服务/客户端/图表19项专项通过：实际HTTPS两个客户端共享窗口，重启/同ID重试不重复扣额；额度耗尽拒绝、合法次日继续；冷静倒计时跨午夜延续，合法到期恢复；服务器时钟回退拒绝，时间恢复后仍读原额度；无效身份/HTTP地址拒绝，合法TLS连接成功；未知覆盖不当零。原始artifacts/p095-shared-tests.log。
+- `scripts/test-shared-entertainment-desktop.cjs` 12检查通过：真实Electron主进程/preload、Windows safeStorage密文、两个客户端和重启、Native Messaging能力协商与投影、共享统计桥接和30日图、关闭农场投影后不放行。合成HTTPS服务器及临时证书，只在测试进程信任；假注册表adapter，不动个人Edge或配置。原始artifacts/p095-shared-desktop.log。
 - `scripts/test-daily-usage-desktop.cjs` 8检查通过：原今日小时图、7/30日柱图、日期时段、缺失口径、窄/宽无溢出。原始artifacts/p095-daily-desktop.log。
 - `scripts/test-daily-focus-lock.cjs` 6整链路检查通过：真实静音视频、原生宿主/worker/内容脚本、11/12限制与12/12合法放行、额度耗尽、旧本机模式断连/重连兼容。原始artifacts/p095-lock-desktop.log。
-- 构建曾暴露JSX闭合及JS时区参数类型错误，已按精确编译错误修正并构建通过；最终界面小改后再构建。
+- 构建曾暴露JSX闭合及JS时区参数类型错误，已按精确编译错误修正并构建通过；最终构建与每日/共享桌面再次通过。
 
 ## 限制与未完成
 
@@ -24,3 +24,13 @@ NAS尚未启用/确认Docker，真实网络与两台物理电脑未接入；不�
 ## 并发、Learning、回滚
 
 基线3abac0c；独占task/p0-pomo-095-shared-entertainment及合成随机profile/端口，无其他工作树重叠写。全部修改在本卡写集。Learning none：缓存排空、区间去重和固定运行版本核对均复用既有要求，本轮尚无需新增的跨任务教训；独立复核若提出候选再处理。回滚源码至preview133，保留真实统计与加密连接/服务数据库；已启用共享的客户端不能静默改为本机新额度，实际降级先停止娱乐放行并迁移服务状态。
+
+## 独立复核修复
+
+1347c9c被独立reviewer指出四个P2，均有针对性正反测试：首次绑定并发拒绝且失败可重试；冷静期代际改由服务共享消费决定，换机旧提醒不重开而新增消费仍可触发；跨午夜选日明细裁剪10/20分钟，未选日保留30分钟；30天两设备合法碎片记录原始超过1MiB时服务返回有界30日汇总，重复跨设备区间不重复累计。
+
+新增真实静音视频验证：有效共享许可可播放；客户端墙钟回退一小时，单调时钟许可到期仍暂停并遮罩。额外2项与原10项均通过。测试中一次executeJavaScript返回函数不能序列化，已改为返回布尔值后通过，不涉及产品修补。
+
+共享隐藏窗口截图存在旧帧现象，不把它作为图表视觉验收证据；真实DOM30柱、宽度边界和桥接数据已通过，每日图宽窄布局另测。
+
+NAS只读定位：已安装极空间客户端并登录Z4Pro；截图工具两次超时，未确认Docker入口或部署网络，未在NAS写入。私人设备编号和路径不进入文档。

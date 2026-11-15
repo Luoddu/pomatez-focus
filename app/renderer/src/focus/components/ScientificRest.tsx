@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { api } from "./shared";
 import type { FocusSession } from "../session";
 import { dailyRestProgress } from "../restProgress";
-import { dailyUsage } from "../dailyUsage";
+import { dailyUsage, dailySessions } from "../dailyUsage";
 import { DEFAULT_WEIGHTS, TomatoWeights } from "../weights";
 import {
   durationText,
@@ -175,7 +175,7 @@ export default function ScientificRest({
   if(sharedClock.current.value!==sharedSource)sharedClock.current={value:sharedSource,at:performance.now()};
   const sharedElapsed=Math.max(0,performance.now()-sharedClock.current.at);
   const shared=sharedSource?{...sharedSource,releaseMs:Math.max(0,sharedSource.releaseMs-sharedElapsed),cooldownMs:Math.max(0,sharedSource.cooldownMs-sharedElapsed)}:undefined;
-  const cloudDays=dailyUsage(cloudStats,480);
+  const cloudDays:ReturnType<typeof dailyUsage>=cloudStats?.daily||[];
   const cloudMax=Math.max(60,...cloudDays.map(d=>d.totalSeconds));
   async function connectShared(){setBusy(true);setError('');try{await api().sharedConfigure({url:sharedUrl,token:sharedToken});setSharedToken('');}catch(e:any){setError(e.message||'共享连接未保存');}finally{setBusy(false);}}
   async function loadShared(){setBusy(true);setError('');try{setCloudStats(await api().sharedStatistics(30));}catch(_){setError('共享统计暂不可达，保留上次显示');}finally{setBusy(false);}}
@@ -212,7 +212,7 @@ export default function ScientificRest({
   const days = dailyUsage(chart);
   const dailyMax = Math.max(60, ...days.map(d => d.totalSeconds));
   const selected = days.find(d => d.day === selectedDay);
-  const shownSessions = chart?.sessions.filter(s => !selected || (s.start < selected.end && s.end > selected.start)) || [];
+  const shownSessions = dailySessions(chart?.sessions,selected);
   const max = Math.max(
     60,
     ...(chart?.hours || []).map((h) => h.bilibili + h.xiaohongshu)

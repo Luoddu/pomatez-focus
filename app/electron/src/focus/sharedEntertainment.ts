@@ -36,6 +36,9 @@ export class SharedEntertainment {
     return {url:url.origin,token:v.token};
   }
   async configure(v:any){
+    if(this.busy)throw Error('正在验证共享连接，请稍后重试');
+    this.busy=true;
+    try{
     if(this.enabled)throw Error('共享连接已绑定；更换服务须迁移原有额度，不能在此重置');
     const next=this.validate(v);
     if((!safeStorage.isEncryptionAvailable()||(process.platform==='linux'&&safeStorage.getSelectedStorageBackend()==='basic_text')))throw Error('系统凭据加密不可用，未保存连接');
@@ -45,6 +48,7 @@ export class SharedEntertainment {
     fs.writeFileSync(this.file+'.tmp',safeStorage.encryptString(JSON.stringify(next)),{mode:0o600});
     fs.renameSync(this.file+'.tmp',this.file);
     this.config=next;this.enabled=true;this.accept(data,start);return this.snapshot();
+    }finally{this.busy=false;}
   }
   private request(action:string,body:any,config=this.config):Promise<any>{
     if(!config)return Promise.reject(Error('共享连接不可用'));

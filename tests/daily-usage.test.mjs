@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {dailyUsage} from '../app/renderer/src/focus/dailyUsage.js';
+import {dailyUsage,dailySessions} from '../app/renderer/src/focus/dailyUsage.js';
 const at=s=>new Date(s).getTime();
 const usage=(sessions,extra={})=>({start:at('2026-11-01T00:00:00'),end:at('2026-11-07T23:59:59'),coverageStart:at('2026-11-03T12:00:00'),sessions,...extra});
 test('daily bars split a viewing interval across midnight without losing seconds',()=>{const rows=dailyUsage(usage([{start:at('2026-11-03T23:50:00'),end:at('2026-11-04T00:20:00'),site:'bilibili'}]));assert.equal(rows.length,7);assert.equal(rows[2].bilibili,600);assert.equal(rows[3].bilibili,1200);assert.equal(rows.reduce((sum,r)=>sum+r.totalSeconds,0),1800);});
@@ -12,4 +12,12 @@ test('shared chart uses authority UTC+8 day boundaries independent of local zone
  const start=Date.parse('2026-11-15T15:50:00Z'),end=Date.parse('2026-11-15T16:10:00Z');
  const rows=dailyUsage({start,end,sessions:[{start,end,site:'bilibili'}]},480);
  assert.deepEqual(rows.map(r=>[r.day,r.bilibili]),[['2026-11-15',600],['2026-11-16',600]]);
+});
+
+test('selected-day intervals clip midnight while whole-range details preserve original duration',()=>{
+ const start=Date.parse('2026-11-03T23:50:00+08:00'),midnight=Date.parse('2026-11-04T00:00:00+08:00'),end=Date.parse('2026-11-04T00:20:00+08:00');
+ const intervals=[{start,end,site:'bilibili'}];
+ assert.equal((dailySessions(intervals,{start:start-1000,end:midnight})[0].end-start)/60000,10);
+ const next=dailySessions(intervals,{start:midnight,end:end+1000})[0];assert.equal(next.start,midnight);assert.equal((next.end-next.start)/60000,20);
+ assert.deepEqual(dailySessions(intervals,null),intervals);
 });

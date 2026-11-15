@@ -38,7 +38,7 @@ test('usage uploads merge overlapping retries and cannot erase already received 
  const f=setup(t),interval={start:initial-10000,end:initial,site:'bilibili'};
  f.a.call('usage','one',{day:dateOf(initial),intervals:[interval,interval]});
  f.a.call('usage','one',{day:dateOf(initial),intervals:[]});
- const stats=f.a.call('statistics','two',{days:7});assert.equal(stats.sessions.length,1);assert.deepEqual(stats.sessions[0],interval);assert.equal(stats.coverage,'reported-only');
+ const stats=f.a.call('statistics','two',{days:7});assert.equal(stats.daily.length,7);assert.equal(stats.daily.at(-1).bilibili,10);assert.equal(stats.coverage,'reported-only');
  assert.throws(()=>f.a.call('usage','one',{day:dateOf(initial),intervals:[{...interval,end:initial+1}]}),/interval/);
  assert.throws(()=>f.a.call('statistics','two',{days:10000}),/range/);
 });
@@ -65,4 +65,23 @@ test('midnight rolls daily quota but does not erase an active cooldown',t=>{
  const after=f.a.call('state','two');assert.equal(after.day,'2026-11-17');assert.equal(after.cooldownUntil,before.cooldownUntil);
  f.a.call('release','two',f.body('r'));assert.equal(f.a.call('grant','two',f.body('g')).operation.deadline,0);
  f.advance(60000);assert.ok(f.a.call('grant','two',f.body('g2')).operation.deadline>0);
+});
+
+test('late device-local reminder cannot restart completed cooldown without new shared consumption',t=>{
+ const f=setup(t);f.a.call('release','one',f.body('r'));
+ const first=f.a.call('cooldown','one',{...f.body('a'),key:'local-one'});f.advance(121000);
+ const late=f.a.call('cooldown','two',{...f.body('b'),key:'old-offline-local-two'});assert.equal(late.cooldownUntil,first.cooldownUntil);assert.ok(late.cooldownUntil<late.serverNow);
+ const grant=f.a.call('grant','two',f.body('g'));assert.ok(grant.operation.deadline>grant.serverNow);
+ const next=f.a.call('cooldown','one',{...f.body('c'),key:'new-local-one'});assert.ok(next.cooldownUntil>next.serverNow);assert.notEqual(next.cooldownUntil,first.cooldownUntil);
+});
+
+test('30 days of legitimate fragmented reports return bounded daily aggregates, not megabytes of raw intervals',t=>{
+ const f=setup(t);let rawBytes=0;
+ for(let d=29;d>=0;d--){const now=initial-d*86400000;f.time(now);
+   const intervals=Array.from({length:500},(_,i)=>({start:now-3600000+i*2000,end:now-3600000+i*2000+1000,site:'bilibili'}));
+   for(const device of ['one','two']){f.a.call('usage',device,{day:dateOf(now),intervals});rawBytes+=Buffer.byteLength(JSON.stringify(intervals));}
+ }
+ assert.ok(rawBytes>1024*1024);
+ const result=f.a.call('statistics','one',{days:30});assert.equal(result.daily.length,30);assert.equal(result.daily.reduce((n,d)=>n+d.bilibili,0),15000);
+ assert.equal(result.devices.length,2);assert.ok(Buffer.byteLength(JSON.stringify(result))<15000);assert.equal(result.sessions,undefined);
 });
