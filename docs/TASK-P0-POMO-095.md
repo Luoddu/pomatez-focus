@@ -11,3 +11,11 @@
 - 行为预算：前台两小时有界纵切，无新付费/后台服务；平台不明先做无依赖图表，未知同因两次停对应试错。跨工作周期/新云平台/真实网络暴露须明确方案和用户决定，不猜默认云商。
 - 回滚：回退本任务到133，保留既有AW与本机锁/睡眠文件；共享启用后降级不得静默发放新额度，最终云方案需单独定义退出路径。
 - Learning：复用已验证缓存和去重契约，未形成新实证教训前none。加载模块源码/上述测试及根路由/版本控制；不读取个人凭证/浏览历史/无关模块。
+
+## 2026-11-15 接入决定与本机服务纵切
+
+- 用户确认有NAS或飞书；NAS此前未用过Docker，运行条件未知。明确离线不发新额度、倒计时继续。先做本机双客户端与服务完整链路，NAS部署、开放端口及真实凭证均不在本卡授权内。
+- 补充允许写集：services/shared-entertainment/server.cjs、services/shared-entertainment/README.md；tests/shared-entertainment*.cjs；已有客户端sharedEntertainment*.ts与桥接/组件文件。独占合成临时SQLite和随机loopback端口，退出即关服务，不安装后台。
+- 固定本机Node24.22.1 / bundled SQLite3.53.4，node:sqlite DatabaseSync为官方release-candidate接口；不引入第三方包。官方SQLite事务薄适配，BEGIN IMMEDIATE+COMMIT保证核准原子；不自研持久锁/数据库。Node固定版API https://nodejs.org/download/release/v24.22.1/docs/api/sqlite.html 第154–249行、http.html；SQLite事务 https://www.sqlite.org/lang_transaction.html 第38–55行是现行补充说明，不冒充固定版证明。
+- 实现保守的短时许可预扣：全账号共享同一20秒许可窗口，重复/换设备沿用截止时间，不叠加；每次断开可能损失窗口内未用秒数，实际观看统计独立计量并明确区分。服务统一Asia/Shanghai日界；工作日900秒，周末3600秒，作为兼容既有策略的本地验证默认值，正式部署需核对用户设定。
+- 冷静期与放行截止时间由服务保存，幂等ID持久化，服务失败不回退本机新额度。服务默认仅loopback；鉴权使用随机测试令牌只在进程内传递，真实服务以后独立审查。

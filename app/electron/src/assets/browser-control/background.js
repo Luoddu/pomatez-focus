@@ -4,6 +4,15 @@ const TARGETS=["*://*.bilibili.com/*","*://*.xiaohongshu.com/*"];
 function target(url) { try { const h=new URL(url).hostname; return ["bilibili.com","xiaohongshu.com"].some(d=>h===d||h.endsWith("."+d)); } catch (_) { return false; } }
 const GAME_DOMAINS=['steampowered.com','steamcommunity.com','steamcontent.com','steamstatic.com','battle.net','battlenet.com.cn','blizzard.com','blzstatic.cn','wegame.com','wegame.com.cn','epicgames.com','riotgames.com','ubisoftconnect.com','ea.com','origin.com','gog.com'];
 function decide(state,old,now){
+  const decision=decideLocal(state,old,now);
+  if(state?.shared?.enabled!==true&&old.shared!==true)return decision;
+  const shared=state?.shared;
+  const fresh=state?.ready===true&&Number.isSafeInteger(state.expiresAt)&&state.expiresAt>now&&state.expiresAt<=now+20000;
+  const localBlocked=decision.control.strict?decision.control.strictAllowedUntil<=now&&new Date(now).getDay()>=1&&new Date(now).getDay()<=5:decision.control.blockedUntil>now&&decision.control.expiresAt>now;
+  const allowed=fresh&&!localBlocked&&Number.isSafeInteger(shared?.allowedUntil)&&shared.allowedUntil>now&&shared.allowedUntil<=now+20000&&shared.cooldownUntil<=now;
+  return {...decision,shared:true,control:{...decision.control,shared:true,sharedAllowedUntil:allowed?Math.min(shared.allowedUntil,state.expiresAt):0,pause:!allowed,reason:allowed?decision.control.reason:'共享娱乐额度',message:'共享许可已结束或尚未确认，请回到农场；换电脑不会重置余额。'}};
+}
+function decideLocal(state,old,now){
   const strict=state?.strict===true||old.strict===true;
   if(!strict)return decideLegacy(state,old,now);
   const date=new Date(now),weekday=date.getDay()>=1&&date.getDay()<=5;
@@ -44,16 +53,18 @@ else {
     await chrome.declarativeNetRequest.updateDynamicRules({removeRuleIds:[10001],addRules:[{id:10001,priority:1,action:{type:'block'},condition:{requestDomains:GAME_DOMAINS,resourceTypes:['main_frame','sub_frame','stylesheet','script','image','font','object','xmlhttprequest','ping','csp_report','media','websocket','other']}}]});
     gameRulesReady=true;
   }
-  const restored=Promise.all([chrome.storage.session.get("control"),chrome.storage.local.get('strict')]).then(async([v,s])=>{
+  const restored=Promise.all([chrome.storage.session.get("control"),chrome.storage.local.get(['strict','shared'])]).then(async([v,s])=>{
     if(v.control)current={...v.control,control:{pause:false,blockedUntil:0,expiresAt:0,reason:""}};
+    if(s.shared===true){current.shared=true;current=decide({shared:{enabled:true}},current,Date.now());}
     if(s.strict===true||current.strict===true){current=decide({strict:true},current,Date.now());await enforceGames();}
     return true;
-  }).catch(()=>{current=decide({strict:true},current,Date.now());console.warn("科学专注配套状态恢复失败，请重新加载扩展；娱乐页面暂时保持限制。");return false;});
+  }).catch(()=>{current=decide({strict:true,shared:{enabled:true}},current,Date.now());console.warn("科学专注配套状态恢复失败，请重新加载扩展；娱乐页面暂时保持限制。");return false;});
   async function tabs() { return chrome.tabs.query({url:TARGETS}); }
   const owns=(expected,turn)=>turn===epoch&&port===expected;
   async function apply(state,expected,turn) {
     if(!owns(expected,turn))return;
     if(state?.strict===true){current=decide({v:1,strict:true,ready:false},current,Date.now());await chrome.storage.local.set({strict:true});await enforceGames();if(!owns(expected,turn))return;}
+    if(state?.shared?.enabled===true){await chrome.storage.local.set({shared:true});if(!owns(expected,turn))return;}
     const decision=decide(state,current,Date.now());
     let count=0;
     for(const tab of await tabs()) {
@@ -89,7 +100,7 @@ else {
     let p;try{p=port=chrome.runtime.connectNative(HOST);}catch(_){release();return;}
     p.onMessage.addListener(state=>{if(port!==p)return;tries=0;enqueue(state,p);});
     p.onDisconnect.addListener(()=>{void chrome.runtime.lastError;if(port!==p)return;release();if(++tries<=3)retry=setTimeout(()=>void connect(),tries*10000);});
-    const features=()=>["daily-focus-lock-v1","control-lease-v2","strict-supervision-v1",...(gameRulesReady?["game-request-rules-v1"]:[])];
+    const features=()=>["daily-focus-lock-v1","control-lease-v2","strict-supervision-v1","shared-entertainment-v1",...(gameRulesReady?["game-request-rules-v1"]:[])];
     p.postMessage({type:"status",features:features()}); timer=setInterval(()=>{if(port)port.postMessage({type:"status",features:features()});},5000);
   }
   chrome.runtime.onMessage.addListener((v,sender,reply)=>{

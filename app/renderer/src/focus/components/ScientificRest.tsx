@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { api } from "./shared";
 import type { FocusSession } from "../session";
 import { dailyRestProgress } from "../restProgress";
+import { dailyUsage } from "../dailyUsage";
 import { DEFAULT_WEIGHTS, TomatoWeights } from "../weights";
 import {
   durationText,
@@ -28,6 +29,7 @@ type Usage = {
 };
 type FocusLock={strict?:boolean;enabled:boolean;plannedEnabled:boolean;goal:number;quotaMinutes:number;releaseMinutes:number;plannedReleaseMinutes:number;day:string;count:number|null;reached:boolean;lockedForChanges:boolean;releasing:boolean;until:number;blocked:boolean;quotaSpent:boolean;error:string};
 export type RestState = {
+  sharedEntertainment?:{enabled:boolean;connected:boolean;error:string;quotaMs:number;reservedMs:number;remainingMs:number;releaseMs:number;cooldownMs:number};
   strictSupervision?:{enabled:boolean;directories?:number;error:string;games:{running:boolean;checkedAt:number;blocked:number;error:string};bedtimeError:string};
   browserControl?: { policy: { mode: "mirror"|"pause"|"cooldown"|"quota"; cooldownMinutes: number; autoRaise: boolean }; connected:boolean; pausedCount:number; pauseKey:string; checkedAt:number|null; error:string; installed:boolean;gameRulesReady?:boolean;focusLockCapable?:boolean;leaseCapable?:boolean;focusLock?:FocusLock };
   settings: {
@@ -153,8 +155,10 @@ export default function ScientificRest({
   const [view, setView] = useState<"quota" | "stats" | "settings">(
     "quota"
   );
-  const [range, setRange] = useState<"today" | "week">("today");
+  const [range, setRange] = useState<"today" | "week" | "month">("today");
   const [week, setWeek] = useState<Usage | null>(null);
+  const [month, setMonth] = useState<Usage | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState("60");
@@ -164,6 +168,18 @@ export default function ScientificRest({
   const [draftRelease,setDraftRelease]=useState("15");
   const [busy, setBusy] = useState(false);
   const [setupNote,setSetupNote]=useState("");
+  const [sharedUrl,setSharedUrl]=useState(''),[sharedToken,setSharedToken]=useState('');
+  const [cloudStats,setCloudStats]=useState<any>(null);
+  const sharedSource=state.sharedEntertainment;
+  const sharedClock=useRef({value:sharedSource,at:performance.now()});
+  if(sharedClock.current.value!==sharedSource)sharedClock.current={value:sharedSource,at:performance.now()};
+  const sharedElapsed=Math.max(0,performance.now()-sharedClock.current.at);
+  const shared=sharedSource?{...sharedSource,releaseMs:Math.max(0,sharedSource.releaseMs-sharedElapsed),cooldownMs:Math.max(0,sharedSource.cooldownMs-sharedElapsed)}:undefined;
+  const cloudDays=dailyUsage(cloudStats,480);
+  const cloudMax=Math.max(60,...cloudDays.map(d=>d.totalSeconds));
+  async function connectShared(){setBusy(true);setError('');try{await api().sharedConfigure({url:sharedUrl,token:sharedToken});setSharedToken('');}catch(e:any){setError(e.message||'共享连接未保存');}finally{setBusy(false);}}
+  async function loadShared(){setBusy(true);setError('');try{setCloudStats(await api().sharedStatistics(30));}catch(_){setError('共享统计暂不可达，保留上次显示');}finally{setBusy(false);}}
+
   const policy=state.browserControl?.policy || {mode:"pause" as const,cooldownMinutes:2,autoRaise:true};
   const lock=state.browserControl?.focusLock;
   const requestId = useRef(0);
@@ -178,21 +194,25 @@ export default function ScientificRest({
   useEffect(() => {
     if (
       state.status !== "recording" ||
-      (!state.live?.site && !showHealth)
+      (!state.live?.site && !showHealth && !shared?.enabled)
     )
       return;
     setWallNow(Date.now());
     const timer = setInterval(() => setWallNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [state.status, state.live?.site, showHealth]);
+  }, [state.status, state.live?.site, showHealth, shared?.enabled]);
   // Read the clock on every render, including new detector snapshots between ticks.
   const displayNow = Date.now();
   const usage = displayUsage(state, displayNow);
   const statusDetail = monitorDetail(state, displayNow)+"\n浏览器控制："+(state.browserControl?.connected?"配套扩展已连接":"未连接，暂停尚未确认")+(lock?.enabled&&!state.browserControl?.focusLockCapable?"\n每日锁尚未确认：请更新并重新加载配套扩展":lock?.enabled&&!state.browserControl?.leaseCapable?"\n专注锁稳定修复待配套更新：更新浏览器配套，在Edge重新加载并刷新网站":"");
-  const ring=usage?quotaDisplay(usage.totalSeconds,lock?.enabled?lock.quotaMinutes:state.settings.quotaMinutes):null;
+  const ring=shared?.enabled?quotaDisplay(shared.reservedMs/1000,shared.quotaMs/60000):usage?quotaDisplay(usage.totalSeconds,lock?.enabled?lock.quotaMinutes:state.settings.quotaMinutes):null;
   const ratio=ring?.ratio||0,over=ring?.over||false;
   const watching=state.status==="recording" && !!state.live?.site && displayNow>=state.live.checkedAt && displayNow<=state.live.expiresAt;
-  const chart = range === "week" ? week : usage;
+  const chart = range === "month" ? month : range === "week" ? week : usage;
+  const days = dailyUsage(chart);
+  const dailyMax = Math.max(60, ...days.map(d => d.totalSeconds));
+  const selected = days.find(d => d.day === selectedDay);
+  const shownSessions = chart?.sessions.filter(s => !selected || (s.start < selected.end && s.end > selected.start)) || [];
   const max = Math.max(
     60,
     ...(chart?.hours || []).map((h) => h.bilibili + h.xiaohongshu)
@@ -227,8 +247,9 @@ export default function ScientificRest({
       setBusy(false);
     }
   }
-  async function selectRange(next: "today" | "week") {
+  async function selectRange(next: "today" | "week" | "month") {
     setRange(next);
+    setSelectedDay(null);
     setError("");
     const id = ++requestId.current;
     if (next === "today") {
@@ -237,8 +258,8 @@ export default function ScientificRest({
     }
     setLoading(true);
     try {
-      const value = await api().restStatistics("week");
-      if (requestId.current === id) setWeek(value);
+      const value = await api().restStatistics(next);
+      if (requestId.current === id) { if (next === "month") setMonth(value); else setWeek(value); }
     } catch (_) {
       if (requestId.current === id)
         setError("统计读取失败，请稍后重试");
@@ -256,8 +277,8 @@ export default function ScientificRest({
     setError("");
     try {
       await api().restRefresh();
-      if (view === "stats" && range === "week")
-        await selectRange("week");
+      if (view === "stats" && range !== "today")
+        await selectRange(range);
     } catch (e: any) {
       setError(e.message || "刷新失败，请稍后重试");
     } finally {
@@ -269,6 +290,14 @@ export default function ScientificRest({
       className="scientific-rest side-section"
       aria-label="科学专注"
     >
+      {shared?.enabled&&<div className="rest-shared-status" role="status">
+        <strong>跨电脑共享 · {shared.connected?'已连接':'暂未连接'}</strong>
+        <p>今日剩余 {durationText(shared.remainingMs/1000)} / {durationText(shared.quotaMs/1000)}</p>
+        <small>按许可预留，实际观看见统计。{shared.error}</small>
+        {shared.releaseMs>0&&<p>共享休息剩余 {durationText(shared.releaseMs/1000)}</p>}
+        {shared.cooldownMs>0&&<p>冷静剩余 {durationText(shared.cooldownMs/1000)}</p>}
+        {!lock?.enabled&&<button className="btn-small" disabled={busy} onClick={async()=>{setBusy(true);try{await api().sharedRelease();}catch(e:any){setError(e.message);}finally{setBusy(false);}}}>开始共享休息</button>}
+      </div>}
       <div className="side-title">
         <span className="rest-heading">
           科学专注
@@ -429,6 +458,14 @@ export default function ScientificRest({
           </div>
         ) : view === "settings" ? (
           <div className="rest-settings">
+            <details className="daily-focus-settings"><summary>跨电脑共享连接</summary>
+              {shared?.enabled?<p>已绑定统一服务。更换电脑请接入同一服务；不能通过重新绑定重置额度。</p>:<>
+                <p>服务部署完成后填写。同一服务统一核准额度，断网不发新额度，原倒计时继续。</p>
+                <label>服务地址<input type="url" value={sharedUrl} onChange={e=>setSharedUrl(e.target.value)} placeholder="https://" /></label>
+                <label>本设备连接码<input type="password" autoComplete="off" value={sharedToken} onChange={e=>setSharedToken(e.target.value)} /></label>
+                <button className="btn-small" disabled={busy||!sharedUrl||!sharedToken} onClick={()=>void connectShared()}>验证并连接</button>
+              </>}
+            </details>
             <div className="daily-focus-settings">
               <strong>严格督促</strong>
               <p>游戏持续限制；工作日完成12个有效番茄后，B站与小红书每天累计最多15分钟，不能手动关闭督促。每天22:59提醒保存工作。</p>
@@ -518,10 +555,20 @@ export default function ScientificRest({
           </div>
         ) : (
           <div className="rest-stats">
+            {shared?.enabled&&<details className="rest-shared-statistics"><summary>跨电脑近30天统计</summary>
+              <button className="btn-small" disabled={busy} onClick={()=>void loadShared()}>刷新共享统计</button>
+              <small>北京时间 · 只汇总已上报记录，未连接设备可能缺失；同一时间重叠记录去重。</small>
+              {cloudStats&&<><p>B站 {minutes(cloudDays.reduce((n,d)=>n+d.bilibili,0))} · 小红书 {minutes(cloudDays.reduce((n,d)=>n+d.xiaohongshu,0))}</p>
+                <div className="rest-daily-chart" style={{gridTemplateColumns:`repeat(${cloudDays.length||30},minmax(0,1fr))`}} aria-label="跨电脑每日使用时间">
+                {cloudDays.map((d,i)=><div className="rest-daily-bar" key={d.day} title={`${d.day} B站 ${minutes(d.bilibili)} 小红书 ${minutes(d.xiaohongshu)}`}><span className="rest-daily-stack"><i className="bili" style={{height:`${d.bilibili/cloudMax*100}%`}}/><i className="xhs" style={{height:`${d.xiaohongshu/cloudMax*100}%`}}/></span>{(i%5===0||i===cloudDays.length-1)&&<small>{d.day.slice(5)}</small>}</div>)}
+                </div>
+                <p>已收到 {cloudStats.devices?.length||0} 台设备的记录</p>
+              </>}
+            </details>}
             <div className="rest-chart-head">
-              <span>浏览时间分布</span>
+              <span>{range === "today" ? "今日观看时段" : "每日观看用时"}</span>
               <div role="group" aria-label="浏览统计范围">
-                {(["today", "week"] as const).map((r) => (
+                {(["today", "week", "month"] as const).map((r) => (
                   <button
                     className={`btn-text${
                       range === r ? " selected" : ""
@@ -529,12 +576,25 @@ export default function ScientificRest({
                     key={r}
                     onClick={() => void selectRange(r)}
                   >
-                    {r === "today" ? "今日" : "近7天"}
+                    {r === "today" ? "今日" : r === "week" ? "近7天" : "近30天"}
                   </button>
                 ))}
               </div>
             </div>
-            <div
+            <div className="rest-daily-summary" aria-live="polite">
+              <span>{range === "today" ? "今日" : range === "week" ? "近7天" : "近30天"} B站 <strong>{loading ? "读取中" : chart ? minutes(chart.bilibili) : "暂无数据"}</strong></span>
+              <small>本机已采集记录 · 非完整屏幕使用时间</small>
+            </div>
+            {range !== "today" && <>
+              <div className="rest-daily-chart" style={{gridTemplateColumns:`repeat(${days.length || 7}, minmax(0, 1fr))`}} aria-label="B站与小红书每日使用时间" aria-busy={loading}>
+                {days.map((d,i) => <button type="button" key={d.day} className={`rest-daily-bar${selectedDay===d.day?" selected":""}${d.hasRecords?"":" empty"}`} aria-pressed={selectedDay===d.day} aria-label={`${d.day}，${d.hasRecords?`B站 ${minutes(d.bilibili)}，小红书 ${minutes(d.xiaohongshu)}`:"暂无使用记录，不能推断为零使用"}`} title={`${d.day} · ${d.hasRecords?`B站 ${minutes(d.bilibili)} · 小红书 ${minutes(d.xiaohongshu)}`:"暂无使用记录"}`} onClick={()=>setSelectedDay(selectedDay===d.day?null:d.day)}>
+                  <span className="rest-daily-stack"><i className="bili" style={{height:`${d.bilibili/dailyMax*100}%`}}/><i className="xhs" style={{height:`${d.xiaohongshu/dailyMax*100}%`}}/>{!d.hasRecords&&<em>·</em>}</span>
+                  {(days.length<=7 || i%5===0 || i===days.length-1)&&<small>{d.day.slice(5).replace('-','/')}</small>}
+                </button>)}
+              </div>
+              <div className="rest-daily-detail" role="status">{selected?`${selected.day} · ${selected.hasRecords?`B站 ${minutes(selected.bilibili)}，小红书 ${minutes(selected.xiaohongshu)}`:"暂无使用记录"}`:"点击日期查看当天用时与浏览时段"}</div>
+            </>}
+            {range === "today" && <div
               className="rest-chart"
               aria-label="按小时统计 B站与小红书时间"
               aria-busy={loading}
@@ -571,7 +631,7 @@ export default function ScientificRest({
                   )}
                 </div>
               ))}
-            </div>
+            </div>}
             <div className="rest-chart-foot">
               <span>
                 <i className="rest-dot bili" />
@@ -588,10 +648,11 @@ export default function ScientificRest({
                   : "暂无浏览记录"}
               </span>
             </div>
-            <details className="rest-sessions">
+            <p className="rest-coverage-note">只统计已采集的活动。未开机、采集断连或记录缺失的时段不能当作零使用。</p>
+            <details className="rest-sessions" open={selectedDay !== null || undefined}>
               <summary>
                 查看浏览时段
-                {range === "week" &&
+                {range !== "today" &&
                 chart?.coverageStart &&
                 chart.coverageStart > chart.start
                   ? `（采集始于 ${new Date(
@@ -600,14 +661,14 @@ export default function ScientificRest({
                   : ""}
               </summary>
               <div>
-                {chart?.sessions.length
-                  ? chart.sessions
+                {shownSessions.length
+                  ? shownSessions
                       .slice(-80)
                       .reverse()
                       .map((s, i) => (
                         <div key={`${s.start}-${i}`}>
                           <span>
-                            {range === "week"
+                            {range !== "today"
                               ? `${new Date(s.start).toLocaleDateString(
                                   "zh-CN",
                                   { month: "numeric", day: "numeric" }

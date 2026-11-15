@@ -951,7 +951,7 @@ input:focus-visible {
 .rest-settings input { width: 55px; padding: 5px; border-radius: 5px; border: 1px solid var(--border); color: var(--text); background: var(--bg, #fff); font: inherit; }
 .rest-settings p { color: var(--muted); font-size: 11px; margin: 0; }
 .rest-settings .btn-small { align-self: flex-start; }
-.rest-stats { height: 128px; overflow-y: auto; }
+.rest-stats { min-height: 128px; height: auto; overflow: visible; }
 .rest-chart-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 11px; }
 .rest-chart-head > div { display: flex; gap: 6px; }
 .rest-chart-head button { padding: 2px 4px; font-size: 10px; color: var(--muted); border-radius: 4px; }
@@ -4822,3 +4822,25 @@ button.stats-range-label:hover {
 .journey-rest-drop { display:inline-block; flex:none; width:0; height:26px; border-radius:4px; }
 .journey-rest-drop.is-visible { width:14px; background:var(--blue-soft); border:1px dashed var(--blue); }
 .journey-rest-drop.is-over { background:var(--blue); }
+
+/* Recorded daily entertainment intervals; absent samples remain visibly unknown. */
+.rest-daily-summary { display:flex; flex-direction:column; gap:4px; padding:10px 0 4px; font-size:12px; }
+.rest-daily-summary strong { font-size:17px; color:#5867ff; margin-left:5px; font-variant-numeric:tabular-nums; }
+.rest-daily-summary small,.rest-coverage-note { color:var(--muted); font-size:10px; line-height:1.5; }
+.rest-daily-chart { display:grid; gap:3px; height:102px; margin:8px 0 24px; align-items:stretch; }
+.rest-daily-bar { background:transparent; padding:0; border:0; min-width:0; position:relative; cursor:pointer; }
+.rest-daily-bar.selected { background:#eef0ff; border-radius:4px; outline:1px solid #8994ff; }
+.rest-daily-stack { display:flex; height:100%; flex-direction:column-reverse; justify-content:flex-start; border-bottom:2px solid #e3e8f3; position:relative; }
+.rest-daily-stack i { display:block; flex:none; width:100%; min-height:0; }
+.rest-daily-stack .bili { background:#209eb0; border-radius:2px 2px 0 0; }
+.rest-daily-stack .xhs { background:#df6285; }
+.rest-daily-stack em { font-size:14px; color:#a0a8b8; font-style:normal; position:absolute; bottom:0; left:0; right:0; }
+.rest-daily-bar small { position:absolute; top:calc(100% + 4px); left:50%; transform:translateX(-50%); font-size:9px; color:var(--muted); white-space:nowrap; }
+.rest-daily-bar:first-child small { left:0; transform:none; }
+.rest-daily-bar:last-child small { left:auto; right:0; transform:none; }
+.rest-daily-detail { font-size:11px; line-height:1.5; margin:6px 0; min-height:17px; }
+.rest-coverage-note { margin:6px 0 0; white-space:normal; }
+
+.rest-shared-status,.rest-shared-statistics {padding:8px 0;font-size:12px;overflow-wrap:anywhere;}
+.rest-shared-status p {margin:4px 0;}
+.rest-shared-statistics small {display:block;color:var(--muted);}

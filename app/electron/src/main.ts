@@ -18,6 +18,7 @@ import { LocalUpdate } from "./focus/localUpdate";
 import { ActivityWatchRest, validSettings } from "./focus/activitywatch";
 import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
+import {SharedEntertainment} from "./focus/sharedEntertainment";
 import { BrowserControl, FarmPresence, validBrowserPolicy } from "./focus/browserControl";
 import { JourneyGateway } from "./focus/journeyGateway";
 import { SleepStore } from "./focus/sleep";
@@ -70,6 +71,7 @@ const show = () => {
     win.focus();
   }
 };
+export const sharedEntertainment=new SharedEntertainment(app.getPath("userData"));
 export const browserControl = new BrowserControl(app.getPath("userData"), __dirname);
 const gameDirectories=[path.join(process.env['ProgramFiles(x86)']||'C:\\Program Files (x86)','Steam','steamapps','common'),path.join(process.env.ProgramFiles||'C:\\Program Files','Epic Games'),...browserControl.strict.directories];
 export const gameGuard=new GameGuard(()=>browserControl.strict.enabled,{executables:GAME_EXECUTABLES,directories:gameDirectories});
@@ -83,9 +85,13 @@ export const bedtime=new BedtimeReminder(app.getPath('userData'),()=>browserCont
 });
 export const farmPresence = new FarmPresence(() => win, headless);
 const publishRest = (state: ReturnType<ActivityWatchRest["snapshot"]>) => {
-  const browser = browserControl.publish(state);
+  const local=browserControl.focusLock.snapshot(state);
+  const eligible=!local.enabled||(local.reached&&local.fresh&&!local.quotaSpent&&!local.error);
+  void sharedEntertainment.tick(state,eligible,browserControl.policy.mode==='cooldown');
+  const shared=sharedEntertainment.snapshot();
+  const browser = browserControl.publish(state,shared);
   farmPresence.update(browser.focusLock.enabled?{...state,settings:{...state.settings,supervise:browser.focusLock.blocked}}:state,browser.policy);
-  const next={...state,browserControl:browser,strictSupervision:{enabled:browserControl.strict.enabled,directories:browserControl.strict.directories.length,error:browserControl.strict.error,games:{...gameGuard.status},bedtimeError:bedtime.error}};
+  const next={...state,sharedEntertainment:shared,browserControl:browser,strictSupervision:{enabled:browserControl.strict.enabled,directories:browserControl.strict.directories.length,error:browserControl.strict.error,games:{...gameGuard.status},bedtimeError:bedtime.error}};
   if(win && !win.isDestroyed()) win.webContents.send("focus:rest-state",next);
   if(!quitting && farmReady) restPopup.update(browser.focusLock.enabled?{...next,settings:{...next.settings,supervise:false}}:next);
   return next;
@@ -246,6 +252,13 @@ else {
         }
         throw Error("不支持的设备偏好");
       });
+      handler("sharedConfigure", async value=>{if(!browserControl.snapshot().sharedCapable)throw Error("请先更新浏览器配套并打开B站确认连接，再启用共享");await sharedEntertainment.configure(value);return publishRest(restMonitor.snapshot());});
+      handler("sharedStatistics",value=>sharedEntertainment.statistics(value));
+      handler("sharedRelease",async()=>{
+        const local=browserControl.focusLock.snapshot(restMonitor.snapshot());
+        if(local.enabled)browserControl.focusLock.release(restMonitor.snapshot());
+        await sharedEntertainment.action('release');return publishRest(restMonitor.snapshot());
+      });
       handler("restState", () => publishRest(restMonitor.snapshot()));
       handler('strictEnable',()=>{
         if(process.platform!=='win32')throw Error('严格游戏拦截目前支持Windows');
@@ -270,8 +283,8 @@ else {
         if(value?.enabled&&!current.focusLock.enabled&&!current.focusLockCapable)throw Error("请先更新并连接浏览器配套，再开启每日专注锁");
         browserControl.focusLock.configure(value,restMonitor.snapshot());return publishRest(restMonitor.snapshot());
       });
-      handler("focusLockRelease", () => {browserControl.focusLock.release(restMonitor.snapshot());return publishRest(restMonitor.snapshot());});
-      handler("focusLockResume", () => {browserControl.focusLock.resume(restMonitor.snapshot());return publishRest(restMonitor.snapshot());});
+      handler("focusLockRelease", async () => {browserControl.focusLock.release(restMonitor.snapshot());if(sharedEntertainment.snapshot().enabled)await sharedEntertainment.action("release");return publishRest(restMonitor.snapshot());});
+      handler("focusLockResume", async () => {if(sharedEntertainment.snapshot().enabled)await sharedEntertainment.action("resume");browserControl.focusLock.resume(restMonitor.snapshot());return publishRest(restMonitor.snapshot());});
       handler("browserSetup", async () => {
         if(headless) throw Error("静默测试不得安装真实浏览器配套");
         const result=await browserControl.install(process.execPath);

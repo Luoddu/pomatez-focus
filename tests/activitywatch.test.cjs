@@ -1277,3 +1277,15 @@ test("short suspend and duplicate resume reconcile full day once then return to 
   m.reportProgress({day:dayKey(f.now()),completedCount:18});
   assert.equal(m.snapshot().progress.effectiveCount,undefined);
  });
+
+
+test("30-day scope caches separately and manual refresh drains its pending read", async () => {
+  const f=fixture();let release,entered;const gate=new Promise(r=>release=r),ready=new Promise(r=>entered=r);let hold=true;const spans=[];
+  const request=async (endpoint,body)=>{if(endpoint==="/query/"){const [s,e]=body.timeperiods[0].split("/");const days=(new Date(e)-new Date(s))/86400000;spans.push(days);if(days>28&&hold){entered();await gate;}}return f.request(endpoint,body);};
+  const monitor=new ActivityWatchRest(dir(),()=>{},()=>{},request,f.now);
+  await monitor.refresh();const month=monitor.statistics("month");await ready;
+  let refreshed=false;const manual=monitor.refreshNow().then(r=>{refreshed=true;return r;});
+  await new Promise(r=>setImmediate(r));assert.equal(refreshed,false);hold=false;release();await month;await manual;
+  await monitor.statistics("month");const count=spans.length;await monitor.statistics("month");assert.equal(spans.length,count);assert.equal(spans.filter(d=>d>28).length,2);
+  await monitor.statistics("week");assert.equal(spans.length,count+1);assert.ok(spans.at(-1)<7);monitor.stop();
+});

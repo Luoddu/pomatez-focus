@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld("focusApi", {
   readPreferences: (value: any) => invoke("readPreferences",value),
   savePreference: (value: any) => invoke("savePreference",value),
   applyDevicePreference: (value: any) => invoke("applyDevicePreference",value),
+  sharedConfigure: (value:any)=>invoke("sharedConfigure",value),
+  sharedStatistics: (days:number)=>invoke("sharedStatistics",days),
+  sharedRelease: ()=>invoke("sharedRelease"),
   restState: () => invoke("restState"),
   strictEnable: () => invoke('strictEnable'),
   strictAddGame: () => invoke('strictAddGame'),
@@ -35,7 +38,7 @@ contextBridge.exposeInMainWorld("focusApi", {
   focusLockRelease: () => invoke("focusLockRelease"),
   focusLockResume: () => invoke("focusLockResume"),
   restProgress: (value: { day: string; completedCount: number | null; gymAvailable?: boolean }) => invoke("restProgress", value),
-  restStatistics: (value: "today" | "week") => invoke("restStatistics", value),
+  restStatistics: (value: "today" | "week" | "month") => invoke("restStatistics", value),
   restAcknowledge: (value: string) => invoke("restAcknowledge", value),
   onRestState: (callback: (state: any) => void) => {
     const listener = (_event: any, state: any) => callback(state);

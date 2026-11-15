@@ -382,6 +382,8 @@ export class ActivityWatchRest {
   private storageOk = true;
   private week: Usage | null = null;
   private weekBusy: Promise<Usage> | null = null;
+  private month: Usage | null = null;
+  private monthBusy: Promise<Usage> | null = null;
   private bucketIds: {
     browser: string;
     window: string;
@@ -722,10 +724,21 @@ export class ActivityWatchRest {
     return summarize(response[0], range.start, now, this.coverageStart);
   }
   async statistics(value: any) {
-    if (value !== "week" && value !== "today")
+    if (value !== "week" && value !== "today" && value !== "month")
       throw Error("统计范围无效");
     if (value === "today") return (await this.refresh()).usage;
     const now = this.now();
+    if (value === "month") {
+      if (this.month && dayKey(this.month.end) === dayKey(now) && now - this.month.end >= 0 && now - this.month.end < 60000) return this.month;
+      if (!this.monthBusy) {
+        const generation = this.generation;
+        this.monthBusy = this.readUsage(30, now).then(result => {
+          if (generation === this.generation) this.month = result;
+          return result;
+        }).finally(() => { this.monthBusy = null; });
+      }
+      return this.monthBusy;
+    }
     if (
       this.week &&
       dayKey(this.week.end) === dayKey(now) &&
@@ -758,9 +771,9 @@ export class ActivityWatchRest {
   ): Promise<RestState> {
     // A timer may start a new day query while a week query is being awaited.
     // Drain the latest requests, not only those present at entry.
-    while (this.busy || this.weekBusy) {
+    while (this.busy || this.weekBusy || this.monthBusy) {
       await Promise.all(
-        [this.busy, this.weekBusy].map((p) => p?.catch(() => {}))
+        [this.busy, this.weekBusy, this.monthBusy].map((p) => p?.catch(() => {}))
       );
       if (generation !== this.generation) return this.snapshot();
     }
@@ -770,6 +783,7 @@ export class ActivityWatchRest {
     this.coverageStart = null;
     this.fullReadAt = 0;
     this.week = null;
+    this.month = null;
     return this.refresh();
   }
   refresh(incremental = false): Promise<RestState> {
