@@ -24,3 +24,5 @@
 原始证据位于忽略artifacts：p094-all-tests-final.log、p094-desktop-final.log、p094-journey-regression.log、p094-desktop-regression.log、p094-category-baseline.log及对应脚本、p094-quiet-sync.log、p094-packaged.json、p094-release-assets.json、p094-remote-draft/public.json、p094-tag-readback.txt、p094-update-before/after.log。NSIS验证首次假设嵌套app-64.7z不成立，本机7zip直接解出resources/app.asar；依据真实产物改校验路径，没有重打或替换发行物。草稿按tag API查询404后改用既有draft ID读取，没有重建或重传。
 
 Learning none仍引用本回执前述判断。回滚使用132并保留独立sleep文件。德楼设备部署/微信Hermes注册、长期真实打卡效果均未验收，不属于本次接口完成声明。
+
+最终review_sleep_api只读复核PASS，可DONE：五资产ID/大小/SHA256、固定tag、非Latest公开prerelease、132真实updater发现133均确认。代码接口与文档交付完成，用户App未自动安装。
