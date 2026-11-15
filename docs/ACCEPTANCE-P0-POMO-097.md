@@ -30,3 +30,11 @@ records were created. This limits live-write acceptance, not the isolated tests.
 Rollback: disable only this plugin through native CLI and reload via the existing owner;
 retain personal sleep records and request receipts. Previous farm can still read sleep
 records. Learning: existing idempotent recovery lessons apply; no new general lesson.
+
+137 UX follow-up: default cards are 176 CSS px high. Home shows only the seven-day
+trend; the statistics dialog holds 7/30-day averages and goal editing. Desktop test
+opens statistics, switches ranges, saves a goal through the actual form, closes it,
+and asserts the compact height. Narrow layout explicitly places the calendar below
+the rhythm row and tests their rectangles do not overlap. Updated screenshots inspected.
+136 was locally installed by the user; its unpublished release draft was cancelled
+after an upload timeout and the user's layout feedback. No public 136 tag was created.

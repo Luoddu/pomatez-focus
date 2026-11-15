@@ -4,6 +4,17 @@
 .rhythm-dashboard .side-title { gap:6px; flex-wrap:wrap; min-height:28px; }
 .rhythm-dashboard .side-title > span { white-space:nowrap; }
 .sleep-goal-link { font-size:11px; }
+.sleep-details-link { font-size:11px; }
+.sleep-preview-period { color:#8a94a3; font-size:10px; }
+.sleep-preview { height:176px; box-sizing:border-box; overflow:hidden; }
+.sleep-preview .sleep-chart { height:132px; }
+.sleep-preview .sleep-tonight { font-size:9px; margin:2px 0; padding:1px 4px; }
+.sleep-preview:has(.sleep-tonight) .sleep-chart { height:115px; }
+.sleep-modal-backdrop { position:fixed; inset:0; background:#26334855; border:0; z-index:1100; }
+.sleep-card.sleep-details { position:fixed; z-index:1101; left:50%; top:50%; transform:translate(-50%,-50%); width:min(620px,calc(100vw - 40px)); max-height:85vh; overflow:auto; padding:22px; box-sizing:border-box; box-shadow:0 20px 70px #26334833; }
+.sleep-dialog-heading { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.sleep-details .sleep-averages { font-size:12px; }
+.sleep-details .sleep-averages strong { font-size:20px; }
 .sleep-card { background:#fff; border:1px solid #e5e9f1; border-radius:14px; padding:10px; color:#263348; flex:1; min-width:0; }
 .sleep-toolbar { display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; }
 .sleep-ranges { display:flex; border-radius:7px; background:#f1f5fa; padding:2px; }
@@ -36,19 +47,23 @@
 .sleep-goals label { display:flex; flex:1 1 80px; min-width:0; flex-direction:column; gap:4px; font-size:11px; color:#69788c; }
 .sleep-goals input { min-width:0; width:100%; border:1px solid #dde4ed; border-radius:6px; padding:5px; box-sizing:border-box; background:white; color:#35445a; font:inherit; }
 .sleep-goals .btn-small { font-size:11px; padding:5px 10px; }
-.rhythm-dashboard .rest-compact .rest-card { flex:1; display:flex; flex-direction:column; padding:12px 10px; }
-.rhythm-dashboard .rest-compact .rest-quota { display:flex; flex-direction:column; justify-content:center; gap:14px; height:auto; flex:1; }
-.rhythm-dashboard .rest-compact .rest-ring { width:100%; max-width:160px; flex:none; }
+.rhythm-dashboard .rest-compact .rest-card.rest-view-quota { flex:none; height:176px; box-sizing:border-box; display:flex; flex-direction:column; padding:8px 10px; }
+.rhythm-dashboard .rest-compact .rest-quota { display:flex; flex-direction:column; justify-content:center; gap:4px; height:auto; flex:1; }
+.rhythm-dashboard .rest-compact .rest-ring { width:100%; max-width:108px; flex:none; }
 .rhythm-dashboard .rest-compact .rest-ring-label strong { font-size:clamp(17px,1.7vw,26px); }
-.rhythm-dashboard .rest-compact .rest-controls { width:100%; display:flex; flex-direction:column; gap:9px; padding:0; }
+.rhythm-dashboard .rest-compact .rest-controls { width:100%; display:flex; flex-direction:column; gap:3px; padding:0; }
 .rhythm-dashboard .rest-compact .rest-supervise { font-size:12px; justify-content:space-between; gap:6px; }
 .rhythm-dashboard .rest-compact .rest-links { justify-content:center; }
 .rhythm-dashboard .rest-compact .rest-links button { font-size:11px; }
 .rhythm-dashboard .rest-compact .rest-refresh { display:none; }
 .rhythm-dashboard:has(.rest-view-settings), .rhythm-dashboard:has(.rest-view-stats) { grid-template-columns:minmax(0,1fr); }
 @media (max-width:900px), (orientation:portrait) {
-  .rest-calendar-group > .rhythm-dashboard { grid-column:1 / -1; grid-row:3; }
-  .rhythm-dashboard .rest-compact .rest-ring { max-width:140px; }
+  .right-col:has(.rhythm-dashboard) { grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:repeat(6,auto); }
+  .rest-calendar-group > .rhythm-dashboard { grid-column:1 / -1; grid-row:4; }
+  .right-col:has(.rhythm-dashboard) .calendar-section { grid-column:1 / -1; grid-row:5; }
+  .right-col:has(.rhythm-dashboard) .overview-section .journey-card { grid-column:1 / -1; grid-row:3; }
+  .right-col:has(.rhythm-dashboard) > .records-section { grid-row:6; }
+  .rhythm-dashboard .rest-compact .rest-ring { max-width:108px; }
 }
 @media (max-width:420px) {
   .rhythm-dashboard { grid-template-columns:minmax(0,1fr); }

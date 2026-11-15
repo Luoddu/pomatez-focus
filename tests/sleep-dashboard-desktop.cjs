@@ -26,6 +26,8 @@ app.whenReady().then(async()=>{try{
  for(let i=0;i<100;i++){if(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-point').length===14"))break;await wait(100);}
  assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-point').length"),14);
  assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-target').length"),2);
+ assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-averages').length"),0);
+ await farm.webContents.executeJavaScript("document.querySelector('.sleep-details-link').click()");await wait(150);
  assert.ok(await farm.webContents.executeJavaScript("document.querySelector('.sleep-averages').innerText.includes('23:29')"));
  await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-ranges button')[1].click()");await wait(250);
  assert.ok(await farm.webContents.executeJavaScript("document.querySelector('.sleep-chart').getAttribute('aria-label').includes('30天')"));
@@ -33,12 +35,16 @@ app.whenReady().then(async()=>{try{
  await farm.webContents.executeJavaScript("(()=>{const input=document.querySelector('[aria-label=\"就寝目标\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'23:00');input.dispatchEvent(new Event('input',{bubbles:true}));})()");await wait(150);
  await farm.webContents.executeJavaScript("document.querySelector('.sleep-goals button[type=submit]').click()");await wait(500);
  assert.equal(check(await call(req('goals'),profile)).goals.bedtime,'23:00');
+ await farm.webContents.executeJavaScript("document.querySelector('.sleep-dialog-heading button').click()");await wait(150);
  farm.setSize(1600,1100);await wait(300);
  fs.writeFileSync(path.resolve('artifacts/p097-dashboard-wide.png'),(await farm.webContents.capturePage()).toPNG());
  const ratio=await farm.webContents.executeJavaScript("(()=>{const r=document.querySelector('.rhythm-dashboard');return getComputedStyle(r).gridTemplateColumns.split(' ').map(parseFloat)})()");assert.ok(Math.abs(ratio[0]/ratio[1]-2/3)<0.03);
  farm.setSize(860,1100);await wait(300);
+ await farm.webContents.executeJavaScript("document.querySelector('.rhythm-dashboard').scrollIntoView({block:'start'})");await wait(200);
  fs.writeFileSync(path.resolve('artifacts/p097-dashboard-narrow.png'),(await farm.webContents.capturePage()).toPNG());
  assert.ok(await farm.webContents.executeJavaScript('document.documentElement.scrollWidth<=window.innerWidth'));
+ assert.ok(await farm.webContents.executeJavaScript("(()=>{const r=document.querySelector('.rhythm-dashboard').getBoundingClientRect(),c=document.querySelector('.calendar-section').getBoundingClientRect();return c.top>=r.bottom-1})()"));
+ assert.ok(await farm.webContents.executeJavaScript("document.querySelector('.sleep-preview').getBoundingClientRect().height<=180"));
  assert.equal(farm.isVisible(),false);
  console.log(JSON.stringify({passed:8,checks:['real sleep transport','renderer statistics','renderer goal save','renderer write denial','14 endpoints and target lines','cross-midnight mean shown','2:3 layout','narrow no overflow'],profile:'synthetic'}));clearTimeout(timer);app.exit(0);
  }catch(e){console.error(e);clearTimeout(timer);app.exit(1)}});

@@ -7,6 +7,7 @@ type SleepStats = { rows: any[]; goals: { bedtime: string; wakeBy: string }; sum
 
 export default function SleepPanel() {
   const [range, setRange] = useState<7 | 30>(7);
+  const [details, setDetails] = useState(false);
   const [data, setData] = useState<{ week: SleepStats; month: SleepStats; tonight: any } | null>(null);
   const [error, setError] = useState(''), [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false), [saving, setSaving] = useState(false);
@@ -51,12 +52,15 @@ export default function SleepPanel() {
   const y = (value: number) => 20 + (value - plot.min) / (plot.max - plot.min) * 150;
   const hasRecords = plot.points.some((p: any) => p.bed !== null || p.wake !== null);
   return <section className="sleep-section side-section" aria-label="早睡早起">
-    <div className="side-title"><span>早睡早起</span><button className="btn-text sleep-goal-link" onClick={() => {
+    <div className="side-title"><span>早睡早起</span><button className="btn-text sleep-details-link" onClick={() => setDetails(true)}>统计</button></div>
+    {details && <button className="sleep-modal-backdrop" aria-label="关闭作息统计" onClick={() => { setDetails(false); setEditing(false); setRange(7); }}/>}
+    <div className={`sleep-card${details ? ' sleep-details' : ' sleep-preview'}`} role={details ? 'dialog' : undefined} aria-modal={details || undefined} aria-label={details ? '作息统计' : undefined}>
+      {details && <div className="sleep-dialog-heading"><strong>作息统计</strong><button className="btn-text" onClick={() => { setDetails(false); setEditing(false); setRange(7); }}>关闭</button></div>}
+      {details && <button className="btn-text sleep-goal-link" onClick={() => {
       if (!editing) { setBedtime(selected?.goals.bedtime || '23:30'); setWakeBy(selected?.goals.wakeBy || '08:00'); }
       setEditing(!editing);
-    }}>{editing ? '收起' : '设定目标'}</button></div>
-    <div className="sleep-card">
-      <div className="sleep-toolbar"><div className="sleep-ranges" aria-label="作息日期范围">{([7, 30] as const).map(days => <button key={days} className={range === days ? 'selected' : ''} aria-pressed={range === days} onClick={() => setRange(days)}>{days}天</button>)}</div><span className="sleep-legend"><i className="bed"/>就寝 <i className="wake"/>起床</span></div>
+    }}>{editing ? '收起目标' : '设定目标'}</button>}
+      <div className="sleep-toolbar">{details ? <div className="sleep-ranges" aria-label="作息日期范围">{([7, 30] as const).map(days => <button key={days} className={range === days ? 'selected' : ''} aria-pressed={range === days} onClick={() => setRange(days)}>{days}天</button>)}</div> : <span className="sleep-preview-period">近7天</span>}<span className="sleep-legend"><i className="bed"/>就寝 <i className="wake"/>起床</span></div>
       {data?.tonight?.bedtimeAt && <p className="sleep-tonight" role="status">今晚 {sleepClock(sleepMinute(data.tonight.day, data.tonight.bedtimeAt))} 已记 · 待起床</p>}
       {editing && <form className="sleep-goals" onSubmit={saveGoals}>
         <label>就寝目标<input aria-label="就寝目标" type="time" required value={bedtime} onChange={e => setBedtime(e.target.value)}/></label>
@@ -78,11 +82,11 @@ export default function SleepPanel() {
         </svg>
         {!hasRecords && <p className="sleep-empty-overlay">暂无打卡记录<br/><small>微信说“晚安”或“我起床了”</small></p>}
       </div>}
-      <div className="sleep-averages" aria-label="平均就寝起床时间">
+      {details && <div className="sleep-averages" aria-label="平均就寝起床时间">
         <span/><span>平均就寝</span><span>平均起床</span>
         {(['week', 'month'] as const).map((key, i) => <React.Fragment key={key}><span className="sleep-average-period">近{i === 0 ? 7 : 30}天</span><strong>{sleepClock(data?.[key].summary.meanBedtimeMinutes)}<small>{data?.[key].summary.bedtimeSamples || 0} 次</small></strong><strong>{sleepClock(data?.[key].summary.meanWakeMinutes)}<small>{data?.[key].summary.wakeSamples || 0} 次</small></strong></React.Fragment>)}
-      </div>
-      <p className="sleep-footnote">北京时间 · 按起床日归档 · 自报作息</p>
+      </div>}
+      {details && <p className="sleep-footnote">北京时间 · 按起床日归档 · 自报作息</p>}
     </div>
   </section>;
 }
