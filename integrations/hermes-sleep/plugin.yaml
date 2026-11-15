@@ -1,0 +1,7 @@
+name: pomatez-sleep
+version: "1.0.0"
+description: Local bedtime and wake check-ins for Pomatez; no network service.
+provides_tools:
+  - pomatez_sleep_check_in
+  - pomatez_sleep_read
+  - pomatez_sleep_stats

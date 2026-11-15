@@ -149,8 +149,10 @@ const time = (value: number) =>
   });
 export default function ScientificRest({
   state,
+  compact = false,
 }: {
   state: RestState;
+  compact?: boolean;
 }) {
   const [view, setView] = useState<"quota" | "stats" | "settings">(
     "quota"
@@ -287,10 +289,10 @@ export default function ScientificRest({
   }
   return (
     <section
-      className="scientific-rest side-section"
+      className={`scientific-rest side-section${compact ? ' rest-compact' : ''}`}
       aria-label="科学专注"
     >
-      {shared?.enabled&&<div className="rest-shared-status" role="status">
+      {shared?.enabled&&(!compact || view !== 'quota')&&<div className="rest-shared-status" role="status">
         <strong>跨电脑共享 · {shared.connected?'已连接':'暂未连接'}</strong>
         <p>今日剩余 {durationText(shared.remainingMs/1000)} / {durationText(shared.quotaMs/1000)}</p>
         <small>按许可预留，实际观看见统计。{shared.error}</small>
@@ -408,7 +410,7 @@ export default function ScientificRest({
                 />
               </label>
               <div className="rest-links">
-                <button
+                {!compact && <button
                   className="btn-text rest-stat-link"
                   onClick={() => {
                     setView("stats");
@@ -416,7 +418,7 @@ export default function ScientificRest({
                   }}
                 >
                   查看统计
-                </button>
+                </button>}
                 <button
                   className="btn-text"
                   onClick={() => {
@@ -431,13 +433,13 @@ export default function ScientificRest({
                   设置策略
                 </button>
               </div>
-              {lock?.enabled&&<div className="daily-focus-summary" role="status">
+              {!compact&&lock?.enabled&&<div className="daily-focus-summary" role="status">
                 <span>每日锁 · 今日 {lock.count===null?"待确认":lock.count}/{lock.goal}</span>
                 <small>{!state.browserControl?.focusLockCapable?"更新配套后生效":lock.quotaSpent?"今日额度已用完":lock.releasing?(lock.strict?"按实际使用累计 · 每天合计15分钟":`放行至 ${time(lock.until)}`):lock.reached?"已达标，可使用剩余额度":"未达标，督促已锁定"}</small>
                 {lock.reached&&!lock.releasing&&!lock.quotaSpent&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockRelease")}>{lock.strict?'使用今日剩余额度':`临时放行 ${lock.releaseMinutes} 分钟`}</button>}
                 {lock.releasing&&<button className="btn-text" disabled={busy} onClick={()=>void lockAction("focusLockResume")}>恢复锁定</button>}
               </div>}
-              <div className="rest-sites">
+              {!compact && <div className="rest-sites">
                 <div>
                   <i className="rest-dot bili" />
                   B站
@@ -452,12 +454,19 @@ export default function ScientificRest({
                     {usage ? durationText(usage.xiaohongshu) : "—"}
                   </strong>
                 </div>
-              </div>
-              {watching && <div className="rest-watching" role="status">正在浏览{state.live!.site==="bilibili"?" B站":"小红书"} · 时间正在流逝</div>}
+              </div>}
+              {!compact && watching && <div className="rest-watching" role="status">正在浏览{state.live!.site==="bilibili"?" B站":"小红书"} · 时间正在流逝</div>}
             </div>
           </div>
         ) : view === "settings" ? (
           <div className="rest-settings">
+            {compact && <button className="btn-text rest-stat-link" onClick={() => {setView('stats');void selectRange('today');}}>查看使用统计</button>}
+            {compact && lock?.enabled && <div className="daily-focus-summary" role="status">
+              <span>每日锁 · 今日 {lock.count === null ? '待确认' : lock.count}/{lock.goal}</span>
+              <small>{!state.browserControl?.focusLockCapable ? '更新配套后生效' : lock.quotaSpent ? '今日额度已用完' : lock.releasing ? (lock.strict ? '按实际使用累计 · 每天合计15分钟' : `放行至 ${time(lock.until)}`) : lock.reached ? '已达标，可使用剩余额度' : '未达标，督促已锁定'}</small>
+              {lock.reached && !lock.releasing && !lock.quotaSpent && <button className="btn-text" disabled={busy} onClick={() => void lockAction('focusLockRelease')}>{lock.strict ? '使用今日剩余额度' : `临时放行 ${lock.releaseMinutes} 分钟`}</button>}
+              {lock.releasing && <button className="btn-text" disabled={busy} onClick={() => void lockAction('focusLockResume')}>恢复锁定</button>}
+            </div>}
             <details className="daily-focus-settings"><summary>跨电脑共享连接</summary>
               {shared?.enabled?<p>已绑定统一服务。更换电脑请接入同一服务；不能通过重新绑定重置额度。</p>:<>
                 <p>服务部署完成后填写。同一服务统一核准额度，断网不发新额度，原倒计时继续。</p>

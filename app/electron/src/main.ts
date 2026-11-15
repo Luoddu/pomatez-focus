@@ -211,6 +211,10 @@ else {
         item.setSavePath(file);
       });
       handler("status", () => service.status());
+      handler('sleepRequest', value => {
+        if(!value || typeof value!=='object' || !['read','stats','goals','set_goals'].includes(value.op)) throw Error('无效作息请求');
+        return sleepStore.handle({...value,protocol:1,scope:'sleep',requestId:require('crypto').randomUUID()});
+      });
       handler('journeyResult', value => journeyGateway.complete(value));
       handler("configure", (value) => service.configure(value));
       handler("today", () => service.today());

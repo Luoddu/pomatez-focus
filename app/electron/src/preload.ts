@@ -5,6 +5,7 @@ const invoke = async (name: string, value?: any) => {
   return reply.value;
 };
 contextBridge.exposeInMainWorld("focusApi", {
+  sleepRequest: (value:any) => invoke('sleepRequest',value),
   journeyResult: (value:any) => invoke('journeyResult',value),
   onJourneyRequest: (callback:(request:any)=>void) => {
     const listener=(_event:any,request:any)=>callback(request);

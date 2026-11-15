@@ -66,3 +66,19 @@ INVALID、CONFLICT、ID_REUSED、ALREADY_RECORDED、CORRUPT、SAVE_FAILED、LIMI
 接入端应暴露sleep_read、sleep_check_in、sleep_correct、sleep_stats四个窄工具；使用参数数组启动Node，shell:false/windowsHide:true，超时15秒，stdin JSON/stdout JSON；不把微信文本拼到Shell。先保存逻辑请求ID，再执行，超时复用原请求；只有明确“现在睡/起床了”或用户确认的补记才写，计划/讨论不打卡。更正必须先读revision。
 
 部署电脑上应以合成隔离profile验证打卡→重试→更正→查询，再接真实记录。接口本机验收不能替代德楼电脑与微信Hermes的最终联调。
+# Dashboard and Hermes extension (preview.136)
+
+`goals` reads the current goals. `set_goals` accepts `bedtime` and `wakeBy` in
+HH:MM, optionally `wakeFrom` (must not exceed `wakeBy`). Goals use UTC+8 and
+are atomically persisted separately in `sleep-goals-v1.json`; changing a goal
+does not rewrite historical check-ins. Corrupt goal data fails closed.
+
+`stats.summary` additionally returns `meanBedtimeMinutes`, `meanWakeMinutes`,
+`bedtimeSamples`, and `wakeSamples`. Bedtime minutes are relative to midnight
+of the wake day (23:30 is -30, next 00:30 is 30, mean is 0). Missing values are
+excluded independently, never treated as midnight or zero-duration sleep.
+
+Renderer IPC only accepts `read`, `stats`, `goals`, and `set_goals`. Check-ins
+and explicit corrections remain on the controlled existing local transport.
+The native Hermes plugin and its installation contract are in
+`integrations/hermes-sleep/README.md`. No network service is involved.

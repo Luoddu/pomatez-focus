@@ -1,0 +1,11 @@
+# P0-POMO-097 睡眠可视化与Hermes本机接入
+
+- IN_PROGRESS；owner /root，模块状态源本卡。用户2026-11-15要求微信说我要睡了/晚安、我起床了/早上好即可记录，并把科学专注拆为2/5简版额度环与3/5早睡早起，浅色时间区间图、7/30天均值、自设目标线。NAS/Tailscale保持暂停。
+- 基线a90db53c4ce59390c23cb033fcbe8bb6d7dcc710，公开origin/codex/feishu-focus实时一致；独占task/p0-pomo-097-sleep-dashboard当前树与随机合成profile/端口。根仓共享文件存在不相关脏改，不覆盖；Hermes live接入另作根执行卡记录。
+- 写集：app/electron/src/focus/sleep.ts、main.ts、preload.ts；app/renderer/src/focus/components/HistoryPanel.tsx、ScientificRest.tsx、新SleepPanel.tsx及sleepChart.js、sleep.css、focus.css；tests/sleep*、tests/hermes-sleep*、scripts/test-sleep*；integrations/hermes-sleep/**；docs/SLEEP-API.md、本卡、ACCEPTANCE-P0-POMO-097.md；CHANGELOG及既有版本准备输出。忽略artifacts仅合成验证/发行，不提交个人资料。
+- 非目标：不改督促额度/禁用规则、不模拟睡眠阶段、不开放网络、不部署NAS、不读真实凭据/旧聊天、不迁移睡眠真相源、不关闭活动计时。sleep-checkins仍唯一记录源，新增目标持久配置可与旧记录兼容。
+- 四源：①135有本机SleepStore和stdio入口，无可视化/Hermes注册；本机Hermes固定d337b736aa1e8ebecfab043842d13e4a2d2f48a3。②固定Hermes website/docs/user-guide/features/plugins.md:18-99原生plugin.yaml/register_tool，官方system prompt section扩展继续按源码定位；不改Hermes核心。③复用Journey transport、sleep-client，Learning054幂等/057跨日投影；现有scripts/test-sleep-api-desktop。④P094睡眠验收与P096发行原文，当前135回归已确认。
+- 验收：跨午夜平均23:30+00:30=00:00、缺失不当0；7/30切换/目标保存重启仍在；浅色区间/端点/目标线，缺失不画假数据；正常额度环/勾选/设置可用且严格锁保持；消息正例自动打卡，重复/引用/未来计划/无授权来源不误写；原请求重试幂等、App关闭给失败而非成功；真实本机Hermes插件→stdio→农场→图表验证，微信实消息回执不足不得声称全链通过。完整测试/独立复核/固定发行后交付。
+- 允许两个有界子任务：frontend实现者仅renderer上述组件/CSS/图表纯函数测试，禁止后端/Hermes/live/提交；独立reviewer只读冻结diff和证据。共享工作树不同文件写集，协调者单写main/preload/sleep/插件/文档，发现重叠暂停冲突文件。
+- 预算：本轮前台实施验收，不新增常驻进程/计划任务/费用，Hermes复用已运行gateway；新模型测试至多2个合成短turn，真实微信需用户发消息，禁止测试消息冒充实际个人打卡；同因未知两次分类停止对应动作。
+- 回滚：退回135前保留sleep记录与目标配置；移除本任务Hermes插件并恢复仅本任务配置，其他插件/凭据不动。个人数据不删。Learning待检查点按原证据判断，不把本轮进度写成教训。

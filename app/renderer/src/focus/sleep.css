@@ -1,0 +1,57 @@
+/* Daylight sleep diary: timestamps, never invented sleep-stage measurements. */
+.rhythm-dashboard { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,3fr); gap:12px; align-items:stretch; min-width:0; }
+.rhythm-dashboard > .side-section { min-width:0; }
+.rhythm-dashboard .side-title { gap:6px; flex-wrap:wrap; min-height:28px; }
+.rhythm-dashboard .side-title > span { white-space:nowrap; }
+.sleep-goal-link { font-size:11px; }
+.sleep-card { background:#fff; border:1px solid #e5e9f1; border-radius:14px; padding:10px; color:#263348; flex:1; min-width:0; }
+.sleep-toolbar { display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; }
+.sleep-ranges { display:flex; border-radius:7px; background:#f1f5fa; padding:2px; }
+.sleep-ranges button { border:0; border-radius:5px; padding:4px 9px; font:inherit; font-size:11px; color:#7c8799; background:transparent; cursor:pointer; }
+.sleep-ranges button.selected { color:#4269aa; background:#fff; box-shadow:0 1px 3px #243c5614; }
+.sleep-legend { display:flex; align-items:center; gap:4px; font-size:10px; color:#65758a; }
+.sleep-legend i { width:6px; height:6px; border-radius:50%; display:inline-block; }
+.sleep-legend .bed { background:#7a88d4; }.sleep-legend .wake { background:#d9a84d; }
+.sleep-tonight { margin:7px 0 0; padding:5px 7px; background:#f3f5fc; color:#7a87b8; border-radius:6px; font-size:10px; }
+.sleep-chart-wrap { position:relative; min-width:0; margin:7px -5px 0; }
+.sleep-chart { display:block; width:100%; height:auto; overflow:visible; }
+.sleep-axis { font-size:10px; fill:#8b96a6; font-variant-numeric:tabular-nums; }
+.sleep-gridline { stroke:#edf0f5; stroke-width:1; }
+.sleep-window { fill:#e4edf9; }
+.sleep-trend { fill:none; stroke-width:1.8; stroke-linejoin:round; }
+.sleep-trend.bed { stroke:#7a88d4; }.sleep-trend.wake { stroke:#d9a84d; }
+.sleep-point { stroke:white; stroke-width:1.2; }.sleep-point.bed { fill:#7a88d4; }.sleep-point.wake { fill:#d9a84d; }
+.sleep-target { stroke-width:1; stroke-dasharray:4 4; opacity:.7; }.sleep-target.bed { stroke:#7a88d4; }.sleep-target.wake { stroke:#d9a84d; }
+.sleep-target-label { font-size:9px; paint-order:stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round; }.sleep-target-label.bed { fill:#7886c2; }.sleep-target-label.wake { fill:#b28b42; }
+.sleep-empty,.sleep-empty-overlay { font-size:12px; color:#8490a2; text-align:center; line-height:1.7; }
+.sleep-empty-overlay { position:absolute; left:38px; right:12px; top:38%; margin:0; background:#ffffffda; padding:5px; border-radius:6px; }
+.sleep-empty-overlay small { font-size:10px; }
+.sleep-averages { display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1fr); gap:7px 6px; text-align:center; border-top:1px solid #eff2f6; padding-top:9px; font-size:10px; color:#8a94a3; align-items:center; }
+.sleep-averages strong { font-size:14px; color:#40516d; font-weight:650; font-variant-numeric:tabular-nums; }
+.sleep-averages strong small { display:block; font-size:9px; color:#9aa4b1; font-weight:400; margin-top:1px; }
+.sleep-average-period { text-align:left; white-space:nowrap; }
+.sleep-footnote { font-size:9px; color:#a0a9b5; margin:9px 0 0; text-align:center; }
+.sleep-error { color:#ba4e4e; font-size:11px; overflow-wrap:anywhere; margin:8px 0; }
+.sleep-goals { display:flex; flex-wrap:wrap; gap:8px; padding:10px 0; border-bottom:1px solid #edf0f5; }
+.sleep-goals label { display:flex; flex:1 1 80px; min-width:0; flex-direction:column; gap:4px; font-size:11px; color:#69788c; }
+.sleep-goals input { min-width:0; width:100%; border:1px solid #dde4ed; border-radius:6px; padding:5px; box-sizing:border-box; background:white; color:#35445a; font:inherit; }
+.sleep-goals .btn-small { font-size:11px; padding:5px 10px; }
+.rhythm-dashboard .rest-compact .rest-card { flex:1; display:flex; flex-direction:column; padding:12px 10px; }
+.rhythm-dashboard .rest-compact .rest-quota { display:flex; flex-direction:column; justify-content:center; gap:14px; height:auto; flex:1; }
+.rhythm-dashboard .rest-compact .rest-ring { width:100%; max-width:160px; flex:none; }
+.rhythm-dashboard .rest-compact .rest-ring-label strong { font-size:clamp(17px,1.7vw,26px); }
+.rhythm-dashboard .rest-compact .rest-controls { width:100%; display:flex; flex-direction:column; gap:9px; padding:0; }
+.rhythm-dashboard .rest-compact .rest-supervise { font-size:12px; justify-content:space-between; gap:6px; }
+.rhythm-dashboard .rest-compact .rest-links { justify-content:center; }
+.rhythm-dashboard .rest-compact .rest-links button { font-size:11px; }
+.rhythm-dashboard .rest-compact .rest-refresh { display:none; }
+.rhythm-dashboard:has(.rest-view-settings), .rhythm-dashboard:has(.rest-view-stats) { grid-template-columns:minmax(0,1fr); }
+@media (max-width:900px), (orientation:portrait) {
+  .rest-calendar-group > .rhythm-dashboard { grid-column:1 / -1; grid-row:3; }
+  .rhythm-dashboard .rest-compact .rest-ring { max-width:140px; }
+}
+@media (max-width:420px) {
+  .rhythm-dashboard { grid-template-columns:minmax(0,1fr); }
+  .rhythm-dashboard .rest-compact .rest-quota { flex-direction:row; gap:16px; }
+  .rhythm-dashboard .rest-compact .rest-ring { max-width:110px; }
+}

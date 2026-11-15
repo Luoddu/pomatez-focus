@@ -42,17 +42,37 @@ function validateEntry(e: any, day: string) {
   if (wake !== null && (wake < start || wake >= start + DAY)) fail('INVALID', '起床时间须在归档日当天');
   if (bed !== null && wake !== null && (wake <= bed || wake - bed > DAY)) fail('INVALID', '起床须晚于就寝，打卡间隔不能超过24小时');
 }
-function project(e: Entry | undefined, day: string) {
+function minutes(value: string) { const [h,m] = value.split(':').map(Number); return h * 60 + m; }
+function validGoals(value: any) {
+  fields(value, ['timeZone','bedtime','wakeFrom','wakeBy']);
+  for (const key of ['bedtime','wakeFrom','wakeBy']) if (typeof value[key] !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value[key])) fail('INVALID','目标须为HH:MM');
+  if (value.timeZone !== 'UTC+08:00' || minutes(value.wakeFrom) > minutes(value.wakeBy)) fail('INVALID','起床目标范围无效');
+  return value as typeof sleepGoals;
+}
+function bedMinutes(value: string) { const m = minutes(value); return m >= 720 ? m - 1440 : m; }
+function project(e: Entry | undefined, day: string, goals = sleepGoals) {
   const start = midnight(day), bed = e?.bedtimeAt ? Date.parse(e.bedtimeAt) : null, wake = e?.wakeAt ? Date.parse(e.wakeAt) : null;
   return { day, revision: e?.revision || null, bedtimeAt: e?.bedtimeAt || null, wakeAt: e?.wakeAt || null,
     updatedAt: e?.updatedAt || null, complete: bed !== null && wake !== null,
     reportedRestMinutes: bed !== null && wake !== null ? Math.round((wake - bed) / 60000) : null,
-    bedtimeOnTarget: bed === null ? null : bed <= start - 30 * 60000,
-    wakeOnTarget: wake === null ? null : wake >= start + 460 * 60000 && wake <= start + 480 * 60000 };
+    bedtimeOnTarget: bed === null ? null : bed <= start + bedMinutes(goals.bedtime) * 60000,
+    wakeOnTarget: wake === null ? null : wake >= start + minutes(goals.wakeFrom) * 60000 && wake <= start + minutes(goals.wakeBy) * 60000 };
 }
 export class SleepStore {
   readonly file: string;
   constructor(directory: string, private now = Date.now) { this.file = path.join(directory, 'sleep-checkins-v1.json'); }
+  private goals() {
+    const file = path.join(path.dirname(this.file), 'sleep-goals-v1.json');
+    if (!fs.existsSync(file)) return {...sleepGoals};
+    try { const stat=fs.lstatSync(file); if(!stat.isFile()||stat.isSymbolicLink()||stat.size>4096) throw Error(); return validGoals(JSON.parse(fs.readFileSync(file,'utf8'))); }
+    catch (_) { return fail('CORRUPT','作息目标无法校验，原文件已保留'); }
+  }
+  private saveGoals(value: typeof sleepGoals) {
+    const file=path.join(path.dirname(this.file),'sleep-goals-v1.json'), temp=file+'.'+crypto.randomUUID()+'.tmp';
+    try { const parent=fs.lstatSync(path.dirname(file)); if(!parent.isDirectory()||parent.isSymbolicLink()) throw Error();
+      const fd=fs.openSync(temp,'wx',0o600); try { fs.writeFileSync(fd,JSON.stringify(value),'utf8'); fs.fsyncSync(fd); } finally {fs.closeSync(fd);} fs.renameSync(temp,file);
+    } catch (_) { fail('SAVE_FAILED','作息目标未保存，请重试'); } finally {if(fs.existsSync(temp)) fs.unlinkSync(temp);}
+  }
   private load(): Store {
     if (!fs.existsSync(this.file)) return { version: 1, entries: {}, receipts: {} };
     try {
@@ -88,29 +108,40 @@ export class SleepStore {
   }
   private run(q: any) {
     if (!object(q) || q.protocol !== 1 || q.scope !== 'sleep' || typeof q.requestId !== 'string' || !ID.test(q.requestId)) fail('INVALID', '接口版本、scope或requestId无效');
-    const now = this.now(), s = this.load();
-    const base = { protocol: 1, scope: 'sleep', requestId: q.requestId, goals: sleepGoals, measure: 'self-reported-rest-window' };
+    const now = this.now(), s = this.load(), goals = this.goals();
+    const base = { protocol: 1, scope: 'sleep', requestId: q.requestId, goals, measure: 'self-reported-rest-window' };
+    if(q.op==='goals') {fields(q,['protocol','scope','requestId','op']);return base;}
+    if(q.op==='set_goals') {
+      fields(q,['protocol','scope','requestId','op','bedtime','wakeBy','wakeFrom']);
+      if(typeof q.bedtime!=='string'||typeof q.wakeBy!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(q.wakeBy)) fail('INVALID','目标须为HH:MM');
+      const next=validGoals({...goals,bedtime:q.bedtime,wakeBy:q.wakeBy,wakeFrom:q.wakeFrom ?? (minutes(q.wakeBy)<minutes(goals.wakeFrom)?q.wakeBy:goals.wakeFrom)});
+      this.saveGoals(next);return {...base,goals:next};
+    }
     if (q.op === 'read') {
       fields(q, ['protocol','scope','requestId','op','day']);
       const day = q.day === undefined ? sleepDay(now) : q.day; midnight(day);
-      return { ...base, entry: project(s.entries[day], day) };
+      return { ...base, entry: project(s.entries[day], day, goals) };
     }
     if (q.op === 'stats') {
       fields(q, ['protocol','scope','requestId','op','through','days']);
       const through = q.through === undefined ? sleepDay(now) : q.through, end = midnight(through), count = q.days === undefined ? 30 : q.days;
       if (!Number.isInteger(count) || count < 1 || count > 366 || end > midnight(sleepDay(now))) fail('INVALID', '统计限过去1–366天');
-      const rows = Array.from({length: count}, (_, i) => { const day = sleepDay(end - (count - 1 - i) * DAY); return project(s.entries[day], day); });
+      const rows = Array.from({length: count}, (_, i) => { const day = sleepDay(end - (count - 1 - i) * DAY); return project(s.entries[day], day, goals); });
+      const beds=rows.filter(r=>r.bedtimeAt!==null).map(r=>(Date.parse(r.bedtimeAt!)-midnight(r.day))/60000);
+      const wakes=rows.filter(r=>r.wakeAt!==null).map(r=>(Date.parse(r.wakeAt!)-midnight(r.day))/60000);
+      const mean=(values:number[])=>values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):null;
       const completed = rows.filter(r => r.complete);
       const streak = (key: 'bedtimeOnTarget' | 'wakeOnTarget') => {
         let best = 0, run = 0;
         for (const r of rows) { run = r[key] === true ? run + 1 : 0; best = Math.max(best, run); }
         let index = rows.length - 1;
         // Today's wake check-in is pending until 08:00; it must not erase yesterday's streak at midnight.
-        if (key === 'wakeOnTarget' && end === midnight(sleepDay(now)) && now < end + 480 * 60000 && rows[index][key] === null) index--;
+        if (key === 'wakeOnTarget' && end === midnight(sleepDay(now)) && now < end + minutes(goals.wakeBy) * 60000 && rows[index][key] === null) index--;
         let current = 0; while (index >= 0 && rows[index--][key] === true) current++;
         return { current, bestInRange: best };
       };
       return { ...base, through, days: count, rows, summary: { completeNights: completed.length, missingOrPartialNights: count - completed.length,
+        meanBedtimeMinutes:mean(beds),meanWakeMinutes:mean(wakes),bedtimeSamples:beds.length,wakeSamples:wakes.length,
         meanReportedRestMinutes: completed.length ? Math.round(completed.reduce((a,r) => a + r.reportedRestMinutes!, 0) / completed.length) : null,
         bedtimeTargetDays: rows.filter(r => r.bedtimeOnTarget === true).length, wakeTargetDays: rows.filter(r => r.wakeOnTarget === true).length,
         bedtimeStreak: streak('bedtimeOnTarget'), wakeStreak: streak('wakeOnTarget') } };
@@ -120,7 +151,7 @@ export class SleepStore {
     const hash = crypto.createHash('sha256').update(canonical(q)).digest('hex'), receipt = s.receipts[q.requestId];
     if (receipt) {
       if (receipt.hash !== hash) fail('ID_REUSED', '同一requestId不可用于不同内容');
-      return { ...base, replayed: true, appliedRevision: receipt.revision, entry: project(s.entries[receipt.day], receipt.day) };
+      return { ...base, replayed: true, appliedRevision: receipt.revision, entry: project(s.entries[receipt.day], receipt.day, goals) };
     }
     let day: string, patch: any;
     if (q.op === 'check_in') {
@@ -141,6 +172,6 @@ export class SleepStore {
     const next: Entry = { day, revision: crypto.randomUUID(), bedtimeAt: old?.bedtimeAt || null, wakeAt: old?.wakeAt || null, ...patch, updatedAt: new Date(now).toISOString() };
     validateEntry(next, day);
     s.entries[day] = next; s.receipts[q.requestId] = { hash, day, revision: next.revision }; this.save(s);
-    return { ...base, replayed: false, appliedRevision: next.revision, entry: project(next, day) };
+    return { ...base, replayed: false, appliedRevision: next.revision, entry: project(next, day, goals) };
   }
 }

@@ -2,6 +2,7 @@ import ResearchGoal from "./ResearchGoal";
 import HarvestSync, { HarvestProgress } from "./HarvestSync";
 import TodayJourney, { JourneyControls } from "./TodayJourney";
 import ScientificRest, { RestState } from "./ScientificRest";
+import SleepPanel from "./SleepPanel";
 import { companionGreeting } from "../wellbeing.js";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -438,7 +439,10 @@ export default function HistoryPanel({
 
       </div>
       <div className="rest-calendar-group">
-      <ScientificRest state={restState} />
+      <div className="rhythm-dashboard">
+        <ScientificRest state={restState} compact />
+        <SleepPanel />
+      </div>
       <div className="side-section calendar-section">
         <div className="side-title research-goals-title">
           番茄月历
