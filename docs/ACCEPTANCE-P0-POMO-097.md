@@ -57,3 +57,5 @@ This proves a rendering cost and its local mitigation, not elimination of every 
 personal-device stall. Live user-process sampling after update is still required.
 
 138最终回归：582/582 PASS（p097-all138-final.log）。全局统计新增样式引用使原内存DOM打包测试失败；测试专用CSS empty loader修正后完整复验通过，产品CSS仍由桌面构建验证。12项桌面检查PASS。最终138相同绘制fixture四秒normal TaskDuration 0.002083s/LayoutCount0，animationCount0（p098-perf138.log）；仅支持隔离空闲负担改善，个人实际卡顿仍待更新后核验。Learning判断：未新增通用教训；当前性能数值限定本fixture，不外推。
+
+138发行验收：固定源码0cea8256336fd75538ccf044f49d2ab7f51bc02d，干净构建；144构建文件与ASAR逐字节一致，NSIS内ASAR与win-unpacked SHA一致，隐藏隔离启动PASS。五资产远端大小/SHA256全匹配；公开prerelease v0.1.0-preview.138，release ID446126850，固定annotated tag同源，137资产与Latest不变。真实137更新器发现138，errors空、downloads0、自动下载/退出安装均false。本机已stage138；最后只读安装检查仍137，用户加载138后的真实卡顿观察待续。独立复核关闭测试CSS装载问题并确认582/582。回滚保留数据，使用既有137安装包；不覆盖历史记录。
