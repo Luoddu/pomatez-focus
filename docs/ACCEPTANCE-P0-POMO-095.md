@@ -38,3 +38,11 @@ NAS只读定位：已安装极空间客户端并登录Z4Pro；截图工具两次
 ## 复审放行
 
 独立reviewer复审d0914de26e3ebcea2b7cafc93c8f60c9b15e58c0为PASS，独立重跑专项19/19，并核对573逻辑、12共享桌面、8每日UI。允许本机候选继续构建/打包/发行验收，不代表NAS上线。Learning none。
+
+## preview134发行回执
+
+- 固定发行源码b8e1b730e6d6846dea5d44c2ea44600365689896，干净构建；ASAR内89个build文件与源码构建逐字节一致。使用包内实际模块再次跑共享12项桌面检查通过。ASAR3.4.1在Windows按path.sep查目录，校验脚本曾用斜杠导致路径查询失败；已读取固定包源码按原生路径修正校验，不修改产品包。
+- NSIS大小75,540,545字节，SHA256 `6e2ee93e36bad8bacce34fc9abd71352bcfccde0eafc345be775f4c26345663d`。本机安装包保留，未安装/重启个人App。
+- GitHub五资产setup、blockmap、preview.yml、source-version.json、SHA256SUMS.txt与本地大小/服务端SHA256全部一致。draft验证后建立annotated tag，公开为非Latest prerelease。https://github.com/Luoddu/pomatez-focus/releases/tag/v0.1.0-preview.134
+- tag解引用为b8e1b730e6d6846dea5d44c2ea44600365689896；真实132与前一发布133更新器均检测134，无下载/安装，errors=[]。Latest仍preview51。原始artifacts/p095-asar-match.log、p095-packaged-desktop.log、p095-remote-assets.json、p095-published-update.log、p095-published-update-133.log。
+- 本机软件与发行阶段完成；整体任务仍IN_PROGRESS，NAS运行条件/部署批准及两台物理电脑接入验收未完成。已向用户请求只读确认极空间应用中心Docker状态。Learning none，沿用既有固定版本/原生路径验证要求。
