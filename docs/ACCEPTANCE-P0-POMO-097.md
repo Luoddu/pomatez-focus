@@ -61,3 +61,5 @@ personal-device stall. Live user-process sampling after update is still required
 138发行验收：固定源码0cea8256336fd75538ccf044f49d2ab7f51bc02d，干净构建；144构建文件与ASAR逐字节一致，NSIS内ASAR与win-unpacked SHA一致，隐藏隔离启动PASS。五资产远端大小/SHA256全匹配；公开prerelease v0.1.0-preview.138，release ID446126850，固定annotated tag同源，137资产与Latest不变。真实137更新器发现138，errors空、downloads0、自动下载/退出安装均false。本机已stage138；最后只读安装检查仍137，用户加载138后的真实卡顿观察待续。独立复核关闭测试CSS装载问题并确认582/582。回滚保留数据，使用既有137安装包；不覆盖历史记录。
 
 139滑块：原生range回看最近30天，7日窗口、默认今天倒数第二保持；hover/focus显示，触屏可用，最右侧回到默认。首次操作读取历史，连续拖动本地切片；历史未加载/失败与真实空记录区分。582/582回归、14项桌面检查与独立复核PASS。合成延迟500ms/失败/键盘重试恢复通过；隐藏窗口重复focus未发事件已追踪确认（调用1→1，键盘重试→2），未据此修改产品IPC。176px不增高，无统计页滑块，真实局部截图检查通过。四源见任务卡139段。用户138已加载，安装源码0cea825已确认；空闲3秒各进程CPU增量四舍五入0.00，仅为此次空闲观察。Learning：无新增，沿用异步状态与真实交互验收规则。
+
+139发行完成：源码8106dc4981bdddf53eca57200142ff04feaccb57；干净构建149文件与ASAR一致，NSIS内ASAR同SHA，隔离隐藏启动通过；5项远端资产大小/SHA256通过，公开v0.1.0-preview.139（release446135103），annotated tag同源，138与Latest保持。真实138更新器发现139，错误空、无下载/安装。139已stage本机，用户最后确认运行138，139待手动加载。实际绘制悬停截图p097-slider139-visible.png确认细滑块不遮挡日期，隐藏窗口初次截帧滞后不用于外观结论。Learning无新增，复用既有发行与真实交互规则。
