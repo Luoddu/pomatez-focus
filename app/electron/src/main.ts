@@ -20,6 +20,7 @@ import { ActivityWatchRuntime } from "./focus/activitywatchRuntime";
 import { RestReminderWindow } from "./focus/restReminderWindow";
 import { BrowserControl, FarmPresence, validBrowserPolicy } from "./focus/browserControl";
 import { JourneyGateway } from "./focus/journeyGateway";
+import { SleepStore } from "./focus/sleep";
 import { StartupSettings, startsInTray } from "./focus/startup";
 import {GameGuard,GAME_EXECUTABLES} from './focus/strict-supervision/gameGuard';
 import {BedtimeReminder} from './focus/strict-supervision/bedtime';
@@ -52,7 +53,9 @@ let win: BrowserWindow | null = null,
   quitting = false,
   farmReady = false;
 const service = new FocusService();
+export const sleepStore = new SleepStore(app.getPath('userData'));
 export const journeyGateway = new JourneyGateway(app.getPath('userData'), request => {
+  if (request.request?.scope === 'sleep') { journeyGateway.complete({ ticket: request.ticket, response: sleepStore.handle(request.request) }); return; }
   if(!win || win.isDestroyed() || !farmReady) throw Error('Farm unavailable');
   win.webContents.send('focus:journey-request',request);
 });
