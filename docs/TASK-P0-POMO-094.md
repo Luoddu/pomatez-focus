@@ -1,6 +1,6 @@
 # P0-POMO-094 睡眠打卡本机接口
 
-- IN_PROGRESS；owner /root，独立模块，本卡为唯一状态源。用户2026-11-15明确先实现接口，Hermes微信接入留后；目标23:30就寝、07:40–08:00起床。
+- DONE（接口、独立复核、133成品发布与132更新发现完成；Hermes接入不在范围）；owner /root，独立模块，本卡为唯一状态源。用户2026-11-15明确先实现接口，Hermes微信接入留后；目标23:30就寝、07:40–08:00起床。
 - 基线/协调ref：7bc332b1938a5db1659fe700a896401252acb163 / origin/codex/feishu-focus，实时check:sync通过；原工作区无修改。本任务独占p094工作区与合成profile，不占个人App/飞书/微信/远程设备。代码隔离任务分支。
 - 目标：本地stdio接口记录就寝/起床、补记更正、读取区间及达标统计。固定UTC+08:00，按起床日归档，缺失不是0，记录是自报休息时段不是实测睡眠。
 - 写集：app/electron/src/focus/sleep.ts、app/electron/src/main.ts、app/electron/src/assets/sleep-client.cjs、scripts/sleep-client.cjs、tests/sleep.test.cjs、tests/sleep-api-desktop.cjs、scripts/test-sleep-api-desktop.cjs、docs/SLEEP-API.md、本卡、docs/ACCEPTANCE-P0-POMO-094.md；验证后可写CHANGELOG及既有version输出。禁止根控制面、其他功能、实际数据、Hermes注册、云同步、微信、系统配置、自动升级个人App。
@@ -11,3 +11,5 @@
 - 上下文：模块AGENTS、上述源码/验收/Learning、根how-to-dispatch与version-control；不读个人运行数据/密钥/不相关模块。改变网络/身份/根集成需升级，实际Hermes接入不在本卡。
 - 回滚：回退本任务代码到基线，保留独立sleep数据文件，不迁移/删除个人历史；旧版忽略新文件。
 - Learning：沿用已验证054去重教训，本检查点无新可复用实证教训。
+
+- 最终证据：docs/ACCEPTANCE-P0-POMO-094.md。review_sleep_api最终源码、包、远端五资产与旧更新器复核PASS。旧分类测试契约失配明确保留；后续修订由分类/同步任务owner处理。发行tag固定9daad，验收文档后置提交不改变包。
