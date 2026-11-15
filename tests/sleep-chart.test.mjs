@@ -1,6 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {sleepMinute,sleepClock,clockMinute,sleepPlot,sleepSegments} from '../app/renderer/src/focus/sleepChart.js';
+import {sleepMinute,sleepClock,clockMinute,sleepPlot,sleepSegments,sleepHomeRows} from '../app/renderer/src/focus/sleepChart.js';
+test('home window keeps today second-last and advances on Beijing midnight',()=>{
+ const before=sleepHomeRows([],null,Date.parse('2026-11-15T23:59:59+08:00'));
+ assert.deepEqual(before.map(r=>r.day),['2026-11-10','2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-15','2026-11-16']);
+ const next={day:'2026-11-16',bedtimeAt:'2026-11-15T23:30:00+08:00',wakeAt:null};
+ const after=sleepHomeRows(before,next,Date.parse('2026-11-16T00:00:00+08:00'));
+ assert.equal(after[5].day,'2026-11-16');assert.equal(after[5].bedtimeAt,next.bedtimeAt);assert.equal(after[6].day,'2026-11-17');assert.equal(after[6].bedtimeAt,null);
+ assert.equal(before[5].day,'2026-11-15');
+});
 test('cross-midnight clocks share wake-day axis and mean midnight correctly',()=>{
  const a=sleepMinute('2026-11-16','2026-11-15T23:30:00+08:00'),b=sleepMinute('2026-11-16','2026-11-16T00:30:00+08:00');
  assert.equal(a,-30);assert.equal(b,30);assert.equal(sleepClock((a+b)/2),'00:00');assert.equal(sleepClock(-30),'23:30');

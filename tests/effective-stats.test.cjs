@@ -20,7 +20,7 @@ const source = `
 `;
 const compiled = esbuild.buildSync({
   absWorkingDir: root, stdin: { contents: source, resolveDir: root, loader: "ts" },
-  bundle: true, platform: "node", format: "cjs", write: false,
+  bundle: true, platform: "node", format: "cjs", write: false, loader: { ".css": "empty" },
   external: ["react", "react-dom", "react-dom/server"],
 }).outputFiles[0].text;
 const virtualModule = new Module(path.join(__dirname, ".effective-stats-memory.cjs"), module);

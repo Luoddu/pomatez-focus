@@ -1,4 +1,13 @@
 // Minutes relative to the wake day's midnight keep 23:30 and 00:30 adjacent.
+export function sleepHomeRows(rows, next, now) {
+  const today = new Date(now + 8 * 3600000).toISOString().slice(0, 10);
+  const midnight = Date.parse(today + 'T00:00:00+08:00');
+  const known = new Map([...rows, ...(next ? [next] : [])].map(row => [row.day, row]));
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(midnight + (i - 5) * 86400000 + 8 * 3600000).toISOString().slice(0, 10);
+    return known.get(day) || { day, bedtimeAt: null, wakeAt: null };
+  });
+}
 export function sleepMinute(day, timestamp) {
   if (!timestamp) return null;
   const n = (Date.parse(timestamp) - Date.parse(day + 'T00:00:00+08:00')) / 60000;

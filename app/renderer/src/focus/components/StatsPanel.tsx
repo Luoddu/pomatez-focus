@@ -1,5 +1,6 @@
 import ResearchProgress from "./ResearchProgress";
 import RoutinePanel from "./RoutinePanel";
+import SleepPanel from "./SleepPanel";
 import { timeZoneKind } from "../wellbeing.js";
 import React, { useMemo, useState } from "react";
 import { FocusSession } from "../session";
@@ -447,6 +448,7 @@ export default function StatsPanel({
               </div>
             </div>
           </section>
+          <SleepPanel detailed />
           <RoutinePanel records={scoped} range={range} now={now} />
           {(summary.count > 0 || summary.seconds > 0) && (
             <section className="card stats-card stats-heat">
