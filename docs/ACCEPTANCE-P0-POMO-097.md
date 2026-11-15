@@ -59,3 +59,5 @@ personal-device stall. Live user-process sampling after update is still required
 138最终回归：582/582 PASS（p097-all138-final.log）。全局统计新增样式引用使原内存DOM打包测试失败；测试专用CSS empty loader修正后完整复验通过，产品CSS仍由桌面构建验证。12项桌面检查PASS。最终138相同绘制fixture四秒normal TaskDuration 0.002083s/LayoutCount0，animationCount0（p098-perf138.log）；仅支持隔离空闲负担改善，个人实际卡顿仍待更新后核验。Learning判断：未新增通用教训；当前性能数值限定本fixture，不外推。
 
 138发行验收：固定源码0cea8256336fd75538ccf044f49d2ab7f51bc02d，干净构建；144构建文件与ASAR逐字节一致，NSIS内ASAR与win-unpacked SHA一致，隐藏隔离启动PASS。五资产远端大小/SHA256全匹配；公开prerelease v0.1.0-preview.138，release ID446126850，固定annotated tag同源，137资产与Latest不变。真实137更新器发现138，errors空、downloads0、自动下载/退出安装均false。本机已stage138；最后只读安装检查仍137，用户加载138后的真实卡顿观察待续。独立复核关闭测试CSS装载问题并确认582/582。回滚保留数据，使用既有137安装包；不覆盖历史记录。
+
+139滑块：原生range回看最近30天，7日窗口、默认今天倒数第二保持；hover/focus显示，触屏可用，最右侧回到默认。首次操作读取历史，连续拖动本地切片；历史未加载/失败与真实空记录区分。582/582回归、14项桌面检查与独立复核PASS。合成延迟500ms/失败/键盘重试恢复通过；隐藏窗口重复focus未发事件已追踪确认（调用1→1，键盘重试→2），未据此修改产品IPC。176px不增高，无统计页滑块，真实局部截图检查通过。四源见任务卡139段。用户138已加载，安装源码0cea825已确认；空闲3秒各进程CPU增量四舍五入0.00，仅为此次空闲观察。Learning：无新增，沿用异步状态与真实交互验收规则。

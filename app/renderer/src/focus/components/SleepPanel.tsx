@@ -8,6 +8,10 @@ type SleepStats = { rows: any[]; goals: { bedtime: string; wakeBy: string }; sum
 function SleepPanel({ detailed = false }: { detailed?: boolean }) {
   const [range, setRange] = useState<7 | 30>(7);
   const details = detailed;
+  const [dayOffset, setDayOffset] = useState(0);
+  const historyRequested = useRef(false);
+  const historyReadyRef = useRef(false);
+  const [historyReady, setHistoryReady] = useState(false);
   const [data, setData] = useState<{ week: SleepStats; month: SleepStats; tonight: any } | null>(null);
   const [error, setError] = useState(''), [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false), [saving, setSaving] = useState(false);
@@ -19,9 +23,9 @@ function SleepPanel({ detailed = false }: { detailed?: boolean }) {
     inFlight.current = true; const id = ++request.current;
     try {
       const tomorrow = new Date(Date.now() + 32 * 3600000).toISOString().slice(0, 10);
-      const [week, month, next] = await Promise.all([bridge().sleepRequest({ op: 'stats', days: 7 }), details ? bridge().sleepRequest({ op: 'stats', days: 30 }) : Promise.resolve(null), bridge().sleepRequest({ op: 'read', day: tomorrow })]);
+      const [week, month, next] = await Promise.all([bridge().sleepRequest({ op: 'stats', days: 7 }), details || historyRequested.current ? bridge().sleepRequest({ op: 'stats', days: 30 }) : Promise.resolve(null), bridge().sleepRequest({ op: 'read', day: tomorrow })]);
       if (week.error || month?.error || next.error) throw Error(week.error?.message || month?.error?.message || next.error?.message);
-      if (mounted.current && request.current === id) { setData({ week, month: month || week, tonight: next.entry }); setError(''); }
+      if (mounted.current && request.current === id) { setData({ week, month: month || week, tonight: next.entry }); setError(''); if (month) { historyReadyRef.current = true; setHistoryReady(true); } }
     } catch (e: any) { if (mounted.current) setError(e.message || '暂未读取到作息记录'); }
     finally {
       inFlight.current = false;
@@ -37,6 +41,10 @@ function SleepPanel({ detailed = false }: { detailed?: boolean }) {
     // A single slow refresh loop; no per-second state or persistence reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => { setDayOffset(0); }, [data?.week.through]);
+  function loadHistory() {
+    if (!historyReadyRef.current && (!historyRequested.current || !inFlight.current)) { historyRequested.current = true; setError(''); void refresh(); }
+  }
   async function saveGoals(e: React.FormEvent) {
     e.preventDefault(); setSaving(true); setError('');
     try {
@@ -47,10 +55,13 @@ function SleepPanel({ detailed = false }: { detailed?: boolean }) {
     finally { setSaving(false); }
   }
   const selected = data && (range === 7 ? data.week : data.month);
-  const plot = sleepPlot(details ? selected?.rows || [] : sleepHomeRows(data?.week.rows || [], data?.tonight, Date.now()), selected?.goals || {});
+  const plot = sleepPlot(details ? selected?.rows || [] : sleepHomeRows(data?.month.rows || [], data?.tonight, Date.now() + dayOffset * 86400000), selected?.goals || {});
+  const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 32 * 3600000).toISOString().slice(0, 10);
   const x = (i: number) => 43 + (i + .5) * (272 / Math.max(1, plot.points.length));
   const y = (value: number) => 20 + (value - plot.min) / (plot.max - plot.min) * 150;
   const hasRecords = plot.points.some((p: any) => p.bed !== null || p.wake !== null);
+  const historyPending = !details && dayOffset < 0 && !historyReady;
   return <section className="sleep-section side-section" aria-label="早睡早起">
     <div className="side-title"><span>早睡早起</span></div>
     <div className={`sleep-card${details ? ' sleep-full-stats' : ' sleep-preview'}`}>
@@ -68,18 +79,22 @@ function SleepPanel({ detailed = false }: { detailed?: boolean }) {
       {error && <p className="sleep-error" role="alert">{error}</p>}
       {loading && <p className="sleep-empty">正在读取作息…</p>}
       {!loading && <div className="sleep-chart-wrap">
-        <svg className="sleep-chart" viewBox="0 0 350 204" role="img" aria-label={details ? `近${range}天就寝与起床时间，虚线为目标，缺失日期留空` : '七日作息窗口，今天在倒数第二格，虚线为目标，缺失日期留空'}>
+        <svg className="sleep-chart" viewBox="0 0 350 204" role="img" aria-label={details ? `近${range}天就寝与起床时间，虚线为目标，缺失日期留空` : dayOffset === 0 ? '七日作息窗口，今天在倒数第二格，虚线为目标，缺失日期留空' : '历史七日作息窗口，虚线为目标，缺失日期留空'}>
           {plot.ticks.map((tick: number) => <g key={tick}><line className="sleep-gridline" x1="40" x2="320" y1={y(tick)} y2={y(tick)}/><text className="sleep-axis" x="33" y={y(tick) + 3} textAnchor="end">{sleepClock(tick)}</text></g>)}
           {[['bed', plot.bedGoal], ['wake', plot.wakeGoal]].map(([name, value]) => <g key={name as string}><line className={`sleep-target ${name}`} x1="40" x2="320" y1={y(value as number)} y2={y(value as number)}/><text className={`sleep-target-label ${name}`} x="320" y={y(value as number) - 4} textAnchor="end">{sleepClock(value)} 目标</text></g>)}
           {plot.points.map((p: any, i: number) => <g key={p.day}>
             <title>{p.day} 就寝 {sleepClock(p.bed)} · 起床 {sleepClock(p.wake)}</title>
             {p.bed !== null && p.wake !== null && <rect className="sleep-window" x={x(i) - (range === 7 ? 9 : 2.8)} y={y(p.bed)} width={range === 7 ? 18 : 5.6} height={Math.max(1, y(p.wake) - y(p.bed))} rx={range === 7 ? 7 : 2}/>}
-            {(range === 7 || i % 5 === 0 || i === plot.points.length - 1) && <text className={`sleep-axis${!details && i === 5 ? ' sleep-today' : ''}`} x={x(i)} y="190" textAnchor="middle">{!details && i === 5 ? '今天' : !details && i === 6 ? '明天' : p.day.slice(5).replace('-', '/')}</text>}
+            {(range === 7 || i % 5 === 0 || i === plot.points.length - 1) && <text className={`sleep-axis${!details && p.day === today ? ' sleep-today' : ''}`} x={x(i)} y="190" textAnchor="middle">{!details && p.day === today ? '今天' : !details && p.day === tomorrow ? '明天' : p.day.slice(5).replace('-', '/')}</text>}
           </g>)}
           {(['bed', 'wake'] as const).map(key => <g key={key}>{sleepSegments(plot.points, key).map((segment: any[], i: number) => <polyline key={i} className={`sleep-trend ${key}`} points={segment.map(p => `${x(p.index)},${y(p.value)}`).join(' ')}/>)}{plot.points.map((p: any, i: number) => p[key] !== null && <circle key={p.day} className={`sleep-point ${key}`} cx={x(i)} cy={y(p[key])} r={range === 7 ? 3.5 : 2}><title>{p.day} {key === 'bed' ? '就寝' : '起床'} {sleepClock(p[key])}</title></circle>)}</g>)}
         </svg>
-        {!hasRecords && <p className="sleep-empty-overlay">暂无打卡记录<br/><small>微信说“晚安”或“我起床了”</small></p>}
+        {historyPending ? <p className="sleep-empty-overlay" role="status">{error ? '历史记录未读取成功' : '正在读取历史记录…'}<br/><small>{error ? '再次拖动可重试' : '日期窗口已选定'}</small></p> : !hasRecords && <p className="sleep-empty-overlay">暂无打卡记录<br/><small>微信说“晚安”或“我起床了”</small></p>}
       </div>}
+      {!details && !loading && <input className="sleep-history-slider" type="range" min="-24" max="0" step="1" value={dayOffset}
+        aria-label="滑动查看作息日期" aria-valuetext={`${plot.points[0]?.day} 至 ${plot.points[6]?.day}`}
+        title="左右拖动查看最近30天，最右侧回到今天" onPointerDown={loadHistory} onFocus={loadHistory}
+        onChange={e => { loadHistory(); setDayOffset(Number(e.target.value)); }}/>}
       {details && <div className="sleep-averages" aria-label="平均就寝起床时间">
         <span/><span>平均就寝</span><span>平均起床</span>
         {(['week', 'month'] as const).map((key, i) => <React.Fragment key={key}><span className="sleep-average-period">近{i === 0 ? 7 : 30}天</span><strong>{sleepClock(data?.[key].summary.meanBedtimeMinutes)}<small>{data?.[key].summary.bedtimeSamples || 0} 次</small></strong><strong>{sleepClock(data?.[key].summary.meanWakeMinutes)}<small>{data?.[key].summary.wakeSamples || 0} 次</small></strong></React.Fragment>)}

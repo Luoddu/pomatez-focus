@@ -69,3 +69,11 @@
   .rhythm-dashboard .rest-compact .rest-quota { flex-direction:row; gap:16px; }
   .rhythm-dashboard .rest-compact .rest-ring { max-width:110px; }
 }
+/* A small hover/focus scrubber; absolute placement preserves the compact card. */
+.sleep-preview { position:relative; }
+.sleep-history-slider { position:absolute; left:20px; bottom:0; width:calc(100% - 40px); height:14px; margin:0; padding:0; appearance:none; background:transparent; opacity:0; cursor:ew-resize; }
+.sleep-preview:hover .sleep-history-slider, .sleep-history-slider:focus-visible { opacity:1; }
+.sleep-history-slider:focus-visible { outline:1px solid #7a88d4; outline-offset:1px; border-radius:5px; }
+.sleep-history-slider::-webkit-slider-runnable-track { height:3px; border-radius:3px; background:#e8edf5; }
+.sleep-history-slider::-webkit-slider-thumb { appearance:none; width:24px; height:5px; margin-top:-1px; border-radius:4px; background:#aab6cc; }
+@media (hover:none) { .sleep-history-slider { opacity:.65; height:22px; } .sleep-preview .sleep-chart { height:124px; } }
