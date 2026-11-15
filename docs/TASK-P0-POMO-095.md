@@ -19,3 +19,7 @@
 - 固定本机Node24.22.1 / bundled SQLite3.53.4，node:sqlite DatabaseSync为官方release-candidate接口；不引入第三方包。官方SQLite事务薄适配，BEGIN IMMEDIATE+COMMIT保证核准原子；不自研持久锁/数据库。Node固定版API https://nodejs.org/download/release/v24.22.1/docs/api/sqlite.html 第154–249行、http.html；SQLite事务 https://www.sqlite.org/lang_transaction.html 第38–55行是现行补充说明，不冒充固定版证明。
 - 实现保守的短时许可预扣：全账号共享同一20秒许可窗口，重复/换设备沿用截止时间，不叠加；每次断开可能损失窗口内未用秒数，实际观看统计独立计量并明确区分。服务统一Asia/Shanghai日界；工作日900秒，周末3600秒，作为兼容既有策略的本地验证默认值，正式部署需核对用户设定。
 - 冷静期与放行截止时间由服务保存，幂等ID持久化，服务失败不回退本机新额度。服务默认仅loopback；鉴权使用随机测试令牌只在进程内传递，真实服务以后独立审查。
+
+## 本机阶段检查点
+
+本机实现d0914de复审PASS，573逻辑/19专项/12共享桌面/8每日UI通过；准备preview134发行，仍为IN_PROGRESS，真实NAS部署与物理换机验收未完成。NAS只读确认Z4Pro客户端已登录，Docker/网络入口尚未确认，未改变设置。
