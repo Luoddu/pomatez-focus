@@ -30,7 +30,11 @@
 .sleep-window { fill:#e4edf9; }
 .sleep-trend { fill:none; stroke-width:1.8; stroke-linejoin:round; }
 .sleep-trend.bed { stroke:#7a88d4; }.sleep-trend.wake { stroke:#d9a84d; }
-.sleep-point { stroke:white; stroke-width:1.2; }.sleep-point.bed { fill:#7a88d4; }.sleep-point.wake { fill:#d9a84d; }
+.sleep-point.bed { color:#7a88d4; }.sleep-point.wake { color:#d9a84d; }
+.sleep-point.sleep-marker-late, .sleep-point.sleep-marker-very-late { color:#dc5055; }
+.sleep-marker-bg { fill:#fff; stroke:none; }
+.sleep-marker-tick, .sleep-marker-ring { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.sleep-marker-alert { fill:currentColor; stroke:none; font-family:Arial,sans-serif; font-size:18px; font-weight:700; }
 .sleep-target { stroke-width:1; stroke-dasharray:4 4; opacity:.7; }.sleep-target.bed { stroke:#7a88d4; }.sleep-target.wake { stroke:#d9a84d; }
 .sleep-target-label { font-size:9px; paint-order:stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round; }.sleep-target-label.bed { fill:#7886c2; }.sleep-target-label.wake { fill:#b28b42; }
 .sleep-empty,.sleep-empty-overlay { font-size:12px; color:#8490a2; text-align:center; line-height:1.7; }

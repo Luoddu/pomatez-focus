@@ -1,4 +1,9 @@
 // Minutes relative to the wake day's midnight keep 23:30 and 00:30 adjacent.
+export function sleepGoalMarker(value, goal) {
+  if (!Number.isFinite(value) || !Number.isFinite(goal)) return null;
+  const late = value - goal;
+  return late <= 20 ? 'check' : late <= 50 ? 'late' : 'very-late';
+}
 export function sleepHomeRows(rows, next, now) {
   const today = new Date(now + 8 * 3600000).toISOString().slice(0, 10);
   const midnight = Date.parse(today + 'T00:00:00+08:00');

@@ -1,6 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {sleepMinute,sleepClock,clockMinute,sleepPlot,sleepSegments,sleepHomeRows} from '../app/renderer/src/focus/sleepChart.js';
+import {sleepMinute,sleepClock,clockMinute,sleepPlot,sleepSegments,sleepHomeRows,sleepGoalMarker} from '../app/renderer/src/focus/sleepChart.js';
+test('goal markers preserve exact 20/50 minute boundaries and missing values',()=>{
+ assert.deepEqual([-60,0,20,20.001,50,50.001].map(d=>sleepGoalMarker(480+d,480)),['check','check','check','late','late','very-late']);
+ for(const value of [null,undefined,NaN])assert.equal(sleepGoalMarker(value,480),null);
+ assert.equal(sleepGoalMarker(480,null),null);
+ const actual=sleepMinute('2026-11-16','2026-11-16T00:20:00+08:00');
+ assert.equal(sleepGoalMarker(actual,clockMinute('23:30',true)),'late');
+ assert.equal(sleepGoalMarker(actual,clockMinute('00:00',true)),'check');
+});
 test('home window keeps today second-last and advances on Beijing midnight',()=>{
  const before=sleepHomeRows([],null,Date.parse('2026-11-15T23:59:59+08:00'));
  assert.deepEqual(before.map(r=>r.day),['2026-11-10','2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-15','2026-11-16']);

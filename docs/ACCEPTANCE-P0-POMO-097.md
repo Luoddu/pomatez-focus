@@ -67,3 +67,5 @@ personal-device stall. Live user-process sampling after update is still required
 2026-11-16 Hermes1.1更正：新增pomatez_sleep_correct，原生本人weixin鉴权、单字段CAS、持久UUID回执、回读verified；check_in强制可核实at，不再用工具调用时刻；带澄称呼问候支持。10项插件单测、7项真实Hermes上下文→stdio→隔离农场检查、14项UI检查通过，独立复核PASS；毫秒规范化与非+08偏移用例通过。未改变App源码/接口/记录schema，复用139已有correct，不制造无代码差异的App升级；只发布插件源码并本机安装。四源与范围见任务卡本日段。Learning无新增，现有幂等/CAS/原生薄适配覆盖本次。个人打卡不进入公共验收材料。
 
 Hermes1.1实际安装：仅替换本插件Python/manifest，旧版两文件已本机备份，哈希与固定e44dfd8源码一致。原生doctor通过4tools/0hooks。固定官方gateway/control_socket.py公开Windows命名管道pause_gateway_for_update配合原有恢复owner完成空闲加载；返回already_stopping但原生state实际restart_requested且旧进程退出，以状态与新pid为准。恢复入口首次无凭据网络探测失败，随后原代理401可达且现有owner自行恢复；未修改网络/审批/凭据。新原生gateway running，weixin connected、needs_attention=false、active_agents0。只复用既有服务，无NAS/Tailscale。真实个人字段更正和回读在本地私有P166验收，不进入公共材料。首次经微信调用新correct工具仍待用户真实请求；不把合成链路或doctor当作真实消息模型调用。Learning无新增：已有生命周期与分层验收规则适用。
+
+140目标标记验收：583/583回归，15项桌面检查通过；20及50分钟精确边界、跨午夜归档轴、缺失值与改目标后即时重算覆盖。独立复核PASS。真实隔离绘制首页及30天满记录截图已检查，标记可辨、首页仍176px；未新增图下规则或今天汇总，原全局统计均值保留。纯图表表现，不改变已有后端达标字段/睡眠记录。首次桌面计数失败因路径与组同类名重复计数，路径独立命名后复验通过。四源见任务卡140段。Learning无新增，沿用时间轴边界和真实渲染验收。

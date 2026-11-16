@@ -63,6 +63,13 @@ app.whenReady().then(async()=>{try{
  await farm.webContents.executeJavaScript("(()=>{const input=document.querySelector('[aria-label=\"就寝目标\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'23:00');input.dispatchEvent(new Event('input',{bubbles:true}));})()");await wait(150);
  await farm.webContents.executeJavaScript("document.querySelector('.sleep-goals button[type=submit]').click()");await wait(500);
  assert.equal(check(await call(req('goals'),profile)).goals.bedtime,'23:00');
+ assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-marker-late').length"),6);
+ await farm.webContents.executeJavaScript("document.querySelector('.sleep-goal-link').click()");await wait(100);
+ await farm.webContents.executeJavaScript("(()=>{const input=document.querySelector('[aria-label=\"就寝目标\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'22:30');input.dispatchEvent(new Event('input',{bubbles:true}));})()");await wait(100);
+ await farm.webContents.executeJavaScript("document.querySelector('.sleep-goals button[type=submit]').click()");await wait(400);
+ assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-marker-very-late').length"),6);
+ assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-marker-late').length"),1);
+ assert.equal(await farm.webContents.executeJavaScript("document.querySelectorAll('.sleep-marker-check').length"),7);
  await farm.webContents.executeJavaScript("Array.from(document.querySelectorAll('.stats-page button')).find(b=>b.textContent==='返回').click()");await wait(500);
  farm.setSize(1600,1100);await wait(300);
  fs.writeFileSync(path.resolve('artifacts/p097-dashboard-wide.png'),(await farm.webContents.capturePage()).toPNG());
@@ -75,5 +82,5 @@ app.whenReady().then(async()=>{try{
  assert.ok(await farm.webContents.executeJavaScript("document.querySelector('.sleep-preview').getBoundingClientRect().height<=180"));
  assert.ok(await farm.webContents.executeJavaScript("Array.from(document.querySelectorAll('.farm-scene .farm-sway,.farm-scene .farm-cloud,.farm-scene .farm-owl-eyes')).every(e=>getComputedStyle(e).animationName==='none')"));
  assert.equal(farm.isVisible(),false);
- console.log(JSON.stringify({passed:true,checks:['real sleep transport','renderer statistics','goal form save','renderer write denial','rolling window endpoints and today label','history slider keyboard and return','history loading failure and recovery','global statistics only','7/30 range toggle','mean shown','2:3 layout','176px compact height','narrow calendar non-overlap','ambient animation stopped'],profile:'synthetic'}));clearTimeout(timer);app.exit(0);
+ console.log(JSON.stringify({passed:true,checks:['real sleep transport','renderer statistics','goal form save','renderer write denial','rolling window endpoints and today label','history slider keyboard and return','history loading failure and recovery','global statistics only','7/30 range toggle','mean shown','goal markers update with goals','2:3 layout','176px compact height','narrow calendar non-overlap','ambient animation stopped'],profile:'synthetic'}));clearTimeout(timer);app.exit(0);
  }catch(e){console.error(e);clearTimeout(timer);app.exit(1)}});

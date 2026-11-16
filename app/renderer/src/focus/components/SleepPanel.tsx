@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import { sleepClock, sleepMinute, sleepPlot, sleepSegments, sleepHomeRows } from '../sleepChart.js';
+import { sleepClock, sleepMinute, sleepPlot, sleepSegments, sleepHomeRows, sleepGoalMarker } from '../sleepChart.js';
 import '../sleep.css';
 
 const bridge = () => (window as any).focusApi;
@@ -87,7 +87,15 @@ function SleepPanel({ detailed = false }: { detailed?: boolean }) {
             {p.bed !== null && p.wake !== null && <rect className="sleep-window" x={x(i) - (range === 7 ? 9 : 2.8)} y={y(p.bed)} width={range === 7 ? 18 : 5.6} height={Math.max(1, y(p.wake) - y(p.bed))} rx={range === 7 ? 7 : 2}/>}
             {(range === 7 || i % 5 === 0 || i === plot.points.length - 1) && <text className={`sleep-axis${!details && p.day === today ? ' sleep-today' : ''}`} x={x(i)} y="190" textAnchor="middle">{!details && p.day === today ? '今天' : !details && p.day === tomorrow ? '明天' : p.day.slice(5).replace('-', '/')}</text>}
           </g>)}
-          {(['bed', 'wake'] as const).map(key => <g key={key}>{sleepSegments(plot.points, key).map((segment: any[], i: number) => <polyline key={i} className={`sleep-trend ${key}`} points={segment.map(p => `${x(p.index)},${y(p.value)}`).join(' ')}/>)}{plot.points.map((p: any, i: number) => p[key] !== null && <circle key={p.day} className={`sleep-point ${key}`} cx={x(i)} cy={y(p[key])} r={range === 7 ? 3.5 : 2}><title>{p.day} {key === 'bed' ? '就寝' : '起床'} {sleepClock(p[key])}</title></circle>)}</g>)}
+          {(['bed', 'wake'] as const).map(key => <g key={key}>{sleepSegments(plot.points, key).map((segment: any[], i: number) => <polyline key={i} className={`sleep-trend ${key}`} points={segment.map(p => `${x(p.index)},${y(p.value)}`).join(' ')}/>)}{plot.points.map((p: any, i: number) => {
+            const marker = sleepGoalMarker(p[key], key === 'bed' ? plot.bedGoal : plot.wakeGoal);
+            if (!marker) return null;
+            const label = `${p.day} ${key === 'bed' ? '就寝' : '起床'} ${sleepClock(p[key])} · ${marker === 'check' ? '提前或晚不超过20分钟' : marker === 'late' ? '晚超过20分钟、不超过50分钟' : '晚超过50分钟'}`;
+            return <g key={p.day} className={`sleep-point ${key} sleep-marker-${marker}`} transform={`translate(${x(i)} ${y(p[key])}) scale(${range === 7 ? 1.1 : .65})`} role="img" aria-label={label}>
+              <title>{label}</title><circle className="sleep-marker-bg" r="7"/>
+              {marker === 'check' ? <path className="sleep-marker-tick" d="M -5 0 L -1 4 L 6 -5"/> : marker === 'late' ? <circle className="sleep-marker-ring" r="5.5"/> : <text className="sleep-marker-alert" textAnchor="middle" y="6">!</text>}
+            </g>;
+          })}</g>)}
         </svg>
         {historyPending ? <p className="sleep-empty-overlay" role="status">{error ? '历史记录未读取成功' : '正在读取历史记录…'}<br/><small>{error ? '再次拖动可重试' : '日期窗口已选定'}</small></p> : !hasRecords && <p className="sleep-empty-overlay">暂无打卡记录<br/><small>微信说“晚安”或“我起床了”</small></p>}
       </div>}
