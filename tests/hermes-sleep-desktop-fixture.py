@@ -20,8 +20,16 @@ request={'text':'晚安','request_id':str(uuid.uuid4()),'at':'2026-01-01T23:30:0
 first=p.check_in(request);assert not first.get('error'),first
 again=p.check_in(request);assert again.get('replayed'),again
 assert first['entry']['revision']==again['entry']['revision']
+correction={'kind':'bedtime','day':'2026-01-02','at':'2026-01-01T16:15:00.123456+01:00','expected_revision':first['entry']['revision'],'request_id':str(uuid.uuid4())}
+changed=p.correct(correction);assert changed['verified'],changed
+assert changed['entry']['wakeAt']==first['entry']['wakeAt']
+replayed=p.correct(correction);assert replayed['verified'] and replayed['replayed']
+conflict=json.loads(p.safe(p.correct)({**correction,'request_id':str(uuid.uuid4()),'at':'2026-01-01T23:20:00+08:00'}));assert conflict.get('error'),conflict
 set_session_vars(platform='weixin',chat_type='dm',user_id='other')
 try:p.check_in({**request,'request_id':str(uuid.uuid4())})
 except ValueError:pass
 else:raise AssertionError('unauthorized identity accepted')
-print(json.dumps({'passed':3,'checks':['real Hermes context and bridge write','same request replay','other user denied']}))
+try:p.correct(correction)
+except ValueError:pass
+else:raise AssertionError('unauthorized correction accepted')
+print(json.dumps({'passed':7,'checks':['real Hermes context and bridge write','same request replay','other user denied','correct and readback','correction replay','stale revision conflict','unauthorized correction denied']}))

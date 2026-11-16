@@ -43,7 +43,8 @@ class SleepBridgeTest(unittest.TestCase):
         with plugin.request_lock(lock):pass
     def test_phrases_and_quotes(self):
         for text in ['我要睡了','晚安！','我要睡了，晚安。']:self.assertEqual(plugin.phrase(text),'bedtime')
-        for text in ['我起床了','早上好','早安']:self.assertEqual(plugin.phrase(text),'wake')
+        for text in ['我起床了','早上好','早安','早上好澄']:
+            self.assertEqual(plugin.phrase(text),'wake')
         for text in ['他说晚安','明天我要睡了','“晚安”','不要记录晚安','如果说我起床了呢','晚安是什么意思']:
             with self.assertRaises(ValueError):plugin.phrase(text)
     def test_unknown_result_retries_identical_payload(self):
@@ -62,14 +63,47 @@ class SleepBridgeTest(unittest.TestCase):
         calls=[]
         def send(q):calls.append(q);return {'entry':{'revision':'old','bedtimeAt':'saved','wakeAt':None}}
         plugin.call=send
-        result=plugin.check_in({'text':'晚安','request_id':str(uuid.uuid4())})
+        result=plugin.check_in({'text':'晚安','request_id':str(uuid.uuid4()),'at':'2026-01-01T23:30:00+08:00'})
         self.assertTrue(result['alreadyRecorded']);self.assertEqual(len(calls),1);self.assertEqual(calls[0]['op'],'read')
     def test_register_narrow_native_tools_and_prompt(self):
         tools=[]
         class Context:
             def register_tool(self,**kw):tools.append(kw)
             def register_system_prompt_section(self,*a,**kw):pass
-        plugin.register(Context());self.assertEqual(len(tools),3)
+        plugin.register(Context());self.assertEqual(len(tools),4)
         for item in tools:self.assertEqual(item['toolset'],'hermes-weixin');self.assertFalse(item['schema']['parameters']['additionalProperties'])
+    def test_missing_time_never_uses_tool_clock(self):
+        plugin.call=lambda q:self.fail('must not write or read without timestamp')
+        with self.assertRaisesRegex(ValueError,'原始消息时间'):
+            plugin.check_in({'text':'早上好澄','request_id':str(uuid.uuid4())})
+    def test_correct_replay_readback_and_single_field(self):
+        old=str(uuid.uuid4()); new=str(uuid.uuid4()); calls=[]
+        params={'kind':'wake','day':'2026-01-02','at':'2026-01-02T08:14:52+08:00','expected_revision':old,'request_id':str(uuid.uuid4())}
+        def send(q):
+            calls.append(q)
+            if q['op']=='correct':
+                self.assertNotIn('bedtimeAt',q);self.assertEqual(q['expectedRevision'],old)
+                if len(calls)==1:raise TimeoutError()
+                return {'appliedRevision':new,'replayed':True}
+            return {'entry':{'revision':new,'wakeAt':params['at'],'bedtimeAt':'2026-01-01T23:30:00+08:00'}}
+        plugin.call=send
+        self.assertIn('error',json.loads(plugin.safe(plugin.correct)(params)))
+        result=plugin.correct(params);self.assertTrue(result['verified']);self.assertEqual(calls[0],calls[1])
+        with self.assertRaises(ValueError):plugin.correct({**params,'at':'2026-01-02T08:15:00+08:00'})
+    def test_correct_conflict_never_refreshes_revision(self):
+        calls=[]
+        def send(q):calls.append(q);return {'error':{'message':'CONFLICT'}}
+        plugin.call=send
+        p={'kind':'wake','day':'2026-01-02','at':'2026-01-02T08:14:52+08:00','expected_revision':str(uuid.uuid4()),'request_id':str(uuid.uuid4())}
+        with self.assertRaisesRegex(ValueError,'CONFLICT'):plugin.correct(p)
+        self.assertEqual(len(calls),1)
+    def test_correct_fractional_seconds_and_offset(self):
+        revision=str(uuid.uuid4()); payloads=[]
+        def send(q):
+            if q['op']=='correct':payloads.append(q);return {'appliedRevision':revision}
+            return {'entry':{'revision':revision,'wakeAt':'2026-01-02T00:14:52.123Z'}}
+        plugin.call=send
+        result=plugin.correct({'kind':'wake','day':'2026-01-02','at':'2026-01-02T01:14:52.123456+01:00','expected_revision':str(uuid.uuid4()),'request_id':str(uuid.uuid4())})
+        self.assertTrue(result['verified']);self.assertEqual(payloads[0]['wakeAt'],'2026-01-02T08:14:52.123+08:00')
 
 if __name__=='__main__':unittest.main()

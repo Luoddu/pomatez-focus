@@ -63,3 +63,5 @@ personal-device stall. Live user-process sampling after update is still required
 139滑块：原生range回看最近30天，7日窗口、默认今天倒数第二保持；hover/focus显示，触屏可用，最右侧回到默认。首次操作读取历史，连续拖动本地切片；历史未加载/失败与真实空记录区分。582/582回归、14项桌面检查与独立复核PASS。合成延迟500ms/失败/键盘重试恢复通过；隐藏窗口重复focus未发事件已追踪确认（调用1→1，键盘重试→2），未据此修改产品IPC。176px不增高，无统计页滑块，真实局部截图检查通过。四源见任务卡139段。用户138已加载，安装源码0cea825已确认；空闲3秒各进程CPU增量四舍五入0.00，仅为此次空闲观察。Learning：无新增，沿用异步状态与真实交互验收规则。
 
 139发行完成：源码8106dc4981bdddf53eca57200142ff04feaccb57；干净构建149文件与ASAR一致，NSIS内ASAR同SHA，隔离隐藏启动通过；5项远端资产大小/SHA256通过，公开v0.1.0-preview.139（release446135103），annotated tag同源，138与Latest保持。真实138更新器发现139，错误空、无下载/安装。139已stage本机，用户最后确认运行138，139待手动加载。实际绘制悬停截图p097-slider139-visible.png确认细滑块不遮挡日期，隐藏窗口初次截帧滞后不用于外观结论。Learning无新增，复用既有发行与真实交互规则。
+
+2026-11-16 Hermes1.1更正：新增pomatez_sleep_correct，原生本人weixin鉴权、单字段CAS、持久UUID回执、回读verified；check_in强制可核实at，不再用工具调用时刻；带澄称呼问候支持。10项插件单测、7项真实Hermes上下文→stdio→隔离农场检查、14项UI检查通过，独立复核PASS；毫秒规范化与非+08偏移用例通过。未改变App源码/接口/记录schema，复用139已有correct，不制造无代码差异的App升级；只发布插件源码并本机安装。四源与范围见任务卡本日段。Learning无新增，现有幂等/CAS/原生薄适配覆盖本次。个人打卡不进入公共验收材料。
