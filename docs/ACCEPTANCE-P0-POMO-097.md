@@ -69,3 +69,5 @@ personal-device stall. Live user-process sampling after update is still required
 Hermes1.1实际安装：仅替换本插件Python/manifest，旧版两文件已本机备份，哈希与固定e44dfd8源码一致。原生doctor通过4tools/0hooks。固定官方gateway/control_socket.py公开Windows命名管道pause_gateway_for_update配合原有恢复owner完成空闲加载；返回already_stopping但原生state实际restart_requested且旧进程退出，以状态与新pid为准。恢复入口首次无凭据网络探测失败，随后原代理401可达且现有owner自行恢复；未修改网络/审批/凭据。新原生gateway running，weixin connected、needs_attention=false、active_agents0。只复用既有服务，无NAS/Tailscale。真实个人字段更正和回读在本地私有P166验收，不进入公共材料。首次经微信调用新correct工具仍待用户真实请求；不把合成链路或doctor当作真实消息模型调用。Learning无新增：已有生命周期与分层验收规则适用。
 
 140目标标记验收：583/583回归，15项桌面检查通过；20及50分钟精确边界、跨午夜归档轴、缺失值与改目标后即时重算覆盖。独立复核PASS。真实隔离绘制首页及30天满记录截图已检查，标记可辨、首页仍176px；未新增图下规则或今天汇总，原全局统计均值保留。纯图表表现，不改变已有后端达标字段/睡眠记录。首次桌面计数失败因路径与组同类名重复计数，路径独立命名后复验通过。四源见任务卡140段。Learning无新增，沿用时间轴边界和真实渲染验收。
+
+140发行完成：固定源码c045b2a26714c28106233d0f1da9608b7d59b962，干净构建155文件与ASAR一致，NSIS内ASAR哈希匹配、隐藏隔离启动PASS。远端五资产大小/SHA256一致，公开v0.1.0-preview.140（release446501720），annotated tag同源，139资产与Latest不变。真实139更新器发现140，errors空/downloads0/自动下载与退出安装false。本机140已stage，未自动安装或关闭用户App，待用户手动加载。回滚139包并保留个人睡眠与目标配置。Learning无新增，沿用既有发布验证规则。
