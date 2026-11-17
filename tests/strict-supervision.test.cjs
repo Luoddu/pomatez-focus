@@ -44,3 +44,36 @@ test('separate game processes each get grace; backward clock does not force-clos
   assert.deepEqual(c.update([p],NaN),[]);
   assert.deepEqual(c.update([p],30002).map(x=>x.kind),['ask']);
 });
+
+test('Wallpaper Engine runtime exceptions are scoped to exact Steam app relative paths',()=>{
+ const base='D:\\SteamLibrary\\steamapps\\common',r={executables:['steam.exe'],directories:[base]};
+ for(const relative of ['wallpaper32.exe','wallpaper64.exe','launcher.exe','bin\\wallpaperui.exe','bin\\webwallpaper32.exe','bin\\webwallpaper64.exe','bin\\edgewallpaper64.exe','bin\\wallpaperservice32.exe']){
+  const exe=base+'\\wallpaper_engine\\'+relative;
+  assert.equal(matchesGame(proc(100,exe),r,99),false,relative);
+  assert.equal(matchesGame(proc(100,exe.toUpperCase()),r,99),false,'case '+relative);
+  assert.equal(matchesGame(proc(100,base+'\\OtherGame\\'+relative),r,99),true,'other app '+relative);
+ }
+ for(const relative of ['wallpaper_engine\\play.exe','wallpaper_engine\\steam.exe','wallpaper_engine\\projects\\wallpaper64.exe','wallpaper_engine\\bin\\sub\\webwallpaper64.exe','wallpaper_engine-copy\\wallpaper64.exe','wallpaper_engine\\..\\OtherGame\\wallpaper64.exe'])assert.equal(matchesGame(proc(100,base+'\\'+relative),r,99),true,relative);
+ assert.equal(matchesGame(proc(100,base+'\\wallpaper_engine\\wallpaper32.exe'),{...r,executables:['wallpaper32.exe']},99),true,'explicit deny keeps priority');
+});
+
+test('GameGuard never sends wallpaper close actions but still closes a game after grace',async()=>{
+ const {GameGuard}=require('../app/electron/build/focus/strict-supervision/gameGuard');
+ const base='C:\\Program Files (x86)\\Steam\\steamapps\\common';
+ const wallpaper=proc(8001,base+'\\wallpaper_engine\\wallpaper64.exe'),web=proc(8002,base+'\\wallpaper_engine\\bin\\webwallpaper64.exe'),game=proc(8003,base+'\\Game\\play.exe');
+ let now=0;const actions=[];
+ const g=new GameGuard(()=>true,{executables:['steam.exe'],directories:[base]},async request=>{
+  if(request.mode==='list')return {ok:true,items:[wallpaper,web,game],denied:0};
+  actions.push(...request.actions);return {ok:true,results:request.actions.map(a=>({pid:a.process.pid,kind:a.kind,ok:true}))};
+ },()=>now);
+ g.stopped=false;
+ await g.tick();now=30001;await g.tick();now=60001;await g.tick();g.close();
+ assert.deepEqual(actions.map(a=>[a.process.pid,a.kind]),[[8003,'ask'],[8003,'terminate']]);
+ assert.equal(g.status.blocked,1);
+});
+
+test('nested Steam-looking folders inside games and wallpaper projects cannot gain an exception',()=>{
+ const root='D:\\SteamLibrary\\steamapps\\common',r={executables:[],directories:[root]};
+ for(const relative of ['OtherGame\\steamapps\\common\\wallpaper_engine\\wallpaper64.exe','wallpaper_engine\\projects\\steamapps\\common\\wallpaper_engine\\wallpaper64.exe'])assert.equal(matchesGame(proc(100,root+'\\'+relative),r,99),true);
+ assert.equal(matchesGame(proc(100,root+'\\wallpaper_engine\\wallpaper64.exe'),r,99),false);
+});

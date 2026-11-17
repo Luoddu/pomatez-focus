@@ -5,6 +5,22 @@ import path from "path";
 
 export type ProcessIdentity = { pid: number; name: string; executable: string; startedAt: string };
 export type AppRules = { executables: readonly string[]; directories: readonly string[] };
+// Wallpaper Engine is a desktop utility distributed inside Steam's game tree.
+// Only its known runtime files qualify; never exempt the directory or a basename
+// globally (projects and unrelated executables remain subject to game rules).
+const WALLPAPER_RUNTIME = new Set([
+  'wallpaper32.exe', 'wallpaper64.exe', 'launcher.exe',
+  'bin\\webwallpaper32.exe', 'bin\\webwallpaper64.exe',
+  'bin\\edgewallpaper64.exe', 'bin\\wallpaperui.exe',
+  'bin\\wallpaperservice32.exe', 'bin\\wallpaperservice64.exe',
+  'bin\\applicationwallpaperinject32.exe', 'bin\\applicationwallpaperinject64.exe',
+  'bin\\apputil32.exe', 'bin\\winrtutil32.exe', 'bin\\winrtutil64.exe',
+]);
+function isWallpaperRuntime(exe: string, root: string): boolean {
+  if (!root.endsWith('\\steamapps\\common')) return false;
+  const appRoot = root + '\\wallpaper_engine\\';
+  return exe.startsWith(appRoot) && WALLPAPER_RUNTIME.has(exe.slice(appRoot.length));
+}
 function windowsPath(value: string): string | null {
   // Reject relative, device and UNC paths. No filesystem resolution or traversal.
   if (!/^[a-z]:[\\/]/i.test(value) || /[\x00-\x1f]/.test(value)) return null;
@@ -20,7 +36,7 @@ export function matchesGame(p: ProcessIdentity, rules: AppRules, ownPid: number)
   return rules.directories.some(d => {
     const root = windowsPath(d);
     // A drive root must never become an app-block rule.
-    return !!root && root.length > 2 && exe.startsWith(root + "\\");
+    return !!root && root.length > 2 && exe.startsWith(root + "\\") && !isWallpaperRuntime(exe, root);
   });
 }
 
